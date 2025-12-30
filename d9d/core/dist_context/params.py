@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from d9d.core.dist_context.configured import DistributedContext
+from .configured import DistributedContext
 
 
 class DeviceMeshParameters(BaseModel):

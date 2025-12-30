@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING
 import torch
 from torch.distributed import init_device_mesh, DeviceMesh
 
-from d9d.core.dist_context.log import build_dist_logger
+from .log import build_dist_logger
 
 if TYPE_CHECKING:
-    from d9d.core.dist_context.params import DeviceMeshParameters
+    from .params import DeviceMeshParameters
 
 
 def _resolve_master_addr() -> str:
