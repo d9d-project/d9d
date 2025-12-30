@@ -12,6 +12,10 @@ theme:
 markdown_extensions:
   - codehilite:
       linennums: true
+  - pymdownx.arithmatex:
+      generic: true
+  - admonition
+
 
 plugins:
 - search

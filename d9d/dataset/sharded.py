@@ -1,0 +1,151 @@
+import math
+from enum import StrEnum
+from typing import Any
+
+from torch.distributed.checkpoint.stateful import Stateful
+from torch.utils.data import Dataset
+from torch.utils.data.dataset import _T_co
+
+
+class ShardIndexingMode(StrEnum):
+    """
+    Defines how the dataset is split across shards.
+
+    Modes:
+        sequential: Round-robin distribution.
+
+            shard0: 0, 4, 8, 12
+            shard1: 1, 5, 9, 13
+            shard2: 2, 6, 10
+            shard3: 3, 7, 11
+
+        chunked: Contiguous blocks.
+
+            shard0: 0, 1, 2, 3
+            shard1: 4, 5, 6, 7
+            shard2: 8, 9, 10, 11
+            shard3: 12, 13
+    """
+
+    sequential = 'sequential'
+    chunked = 'chunked'
+
+
+class ShardedDataset(Dataset, Stateful):
+    """
+    A dataset wrapper that acts as a view onto a specific shard of the underlying dataset.
+
+    This is useful for Data Parallel training where each process should only see
+    a subset of the data. It supports different indexing modes and optional padding
+    to ensure all shards have equal length (preventing hangs in distributed collectives).
+    """
+
+    def __init__(
+            self,
+            dataset: Dataset,
+            total_shards: int,
+            current_shard: int,
+            indexing_mode: ShardIndexingMode,
+            pad_to_equal_size_across_shards: bool
+    ):
+        """
+        Constructs a ShardedDataset object.
+
+        Args:
+            dataset: The underlying dataset to shard.
+            total_shards: The total number of shards (e.g., number of DP ranks).
+            current_shard: The index of the current shard (e.g., current DP rank).
+            indexing_mode: How indices are assigned to shards (sequential/round-robin or chunked).
+            pad_to_equal_size_across_shards: If True, the length of the dataset will be padded
+                so that all shards report the same length. The last standard element is repeated.
+        """
+
+        self._dataset = dataset
+
+        self._total_shards = total_shards
+        self._current_shard = current_shard
+
+        self._indexing_mode = indexing_mode
+        self._pad_to_equal_size_across_shards = pad_to_equal_size_across_shards
+
+    def _compute_real_index_sequential(self, index: int):
+        return index * self._total_shards + self._current_shard
+
+    def _get_base_index_unsafe(self, index: int) -> _T_co:
+        """
+        Calculates the underlying dataset index for a given shard index,
+        without boundary checking.
+        """
+
+        match self._indexing_mode:
+            case 'sequential':
+                base_index = index * self._total_shards + self._current_shard
+
+                return base_index
+            case 'chunked':
+                ceil_len = math.ceil(len(self._dataset) / self._total_shards)
+                shard_start_offset = ceil_len * self._current_shard
+
+                return shard_start_offset + index
+
+    def __getitem__(self, index: int) -> _T_co:
+        """
+        Retrieves an item from the underlying dataset mapping logic shard index to physical index.
+
+        If padding is enabled and the index exceeds the valid data for this shard,
+        the last item in the dataset is returned.
+
+        Args:
+            index: The index relative to this shard.
+
+        Returns:
+            The data item.
+        """
+
+        base_index = self._get_base_index_unsafe(index)
+        if base_index >= len(self._dataset):
+            base_index = len(self._dataset) - 1
+        return self._dataset[base_index]
+
+    def __len__(self) -> int:
+        """
+        Returns the number of items in this specific shard.
+
+        If `pad_to_equal_size_across_shards` is True, this returns the ceiling
+        length (max length across all shards).
+        """
+
+        ceil_len = math.ceil(len(self._dataset) / self._total_shards)
+
+        if self._pad_to_equal_size_across_shards:
+            return ceil_len
+
+        shards_remainder = len(self._dataset) % self._total_shards
+        match self._indexing_mode:
+            case ShardIndexingMode.sequential:
+                shards_full = len(self._dataset) // self._total_shards
+                return shards_full + 1 if self._current_shard < shards_remainder else shards_full
+            case ShardIndexingMode.chunked:
+                is_shard_last = self._current_shard == self._total_shards - 1
+                return ceil_len if not is_shard_last or shards_remainder == 0 else ceil_len - (self._total_shards - shards_remainder)
+
+    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
+        if isinstance(self._dataset, Stateful):
+            self._dataset.load_state_dict(state_dict['dataset'])
+
+        # check whether env mismatched
+        if state_dict['total_shards'] != self._total_shards:
+            raise ValueError(f'Shard count mismatch')
+        self._total_shards = state_dict['total_shards']
+
+        self._current_shard = state_dict['current_shard']
+
+    def state_dict(self) -> dict[str, Any]:
+        dct = {
+            'total_shards': self._total_shards,
+            'current_shard': self._current_shard
+        }
+        if isinstance(self._dataset, Stateful):
+            dct['dataset'] = self._dataset.state_dict()
+        return dct
+
