@@ -87,7 +87,7 @@ class MoELayer(nn.Module, ModuleLateInit):
     def forward(
             self,
             hidden_states: torch.Tensor
-    ):
+    ) -> torch.Tensor:
         """
         Routes tokens to experts, computes, and combines results.
 

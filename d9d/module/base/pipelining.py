@@ -19,7 +19,7 @@ class PipelineStageInfo:
     num_stages: int
 
     @property
-    def is_current_stage_first(self):
+    def is_current_stage_first(self) -> bool:
         """
         Determines if this is the first stage in the pipeline.
 
@@ -30,7 +30,7 @@ class PipelineStageInfo:
         return self.current_stage == 0
 
     @property
-    def is_current_stage_last(self):
+    def is_current_stage_last(self) -> bool:
         """
         Determines if this is the last stage in the pipeline.
 
@@ -68,8 +68,8 @@ def distribute_layers_for_pipeline_stage(
 
     Returns:
         A tuple (start_index, end_index), representing the slice of layers for
-        the given stage. The start_index is inclusive and the end_index is
-        exclusive.
+            the given stage. The start_index is inclusive and the end_index is
+            exclusive.
 
     Raises:
         ValueError: If the pipeline configuration results in a stage having zero

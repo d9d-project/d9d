@@ -23,7 +23,7 @@ class FlashSdpa(nn.Module):
             attention_mask: torch.Tensor | None,
             is_causal: bool,
             scale: float
-    ):
+    ) -> torch.Tensor:
         """
         Computes Scaled Dot-Product Attention using FlashAttention.
 
@@ -37,7 +37,7 @@ class FlashSdpa(nn.Module):
 
         Returns:
             The attention output tensor, permuted to channel-last format.
-            Shape: `(batch, seq_len, n_q_heads, head_dim)`.
+                Shape: `(batch, seq_len, n_q_heads, head_dim)`.
         """
 
         with sdpa_kernel(SDPBackend.FLASH_ATTENTION):

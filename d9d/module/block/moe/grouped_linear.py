@@ -45,15 +45,15 @@ class GroupedLinear(nn.Module, ModuleLateInit):
 
         self.reset_parameters()
 
-    def forward(self, x: torch.Tensor, x_groups: torch.Tensor):
+    def forward(self, x: torch.Tensor, x_groups: torch.Tensor) -> torch.Tensor:
         """
         Performs the grouped matrix multiplication.
 
         Args:
             x: Flattened input tensor containing tokens for all groups.
-               Shape: `(total_tokens, in_features)`.
+                Shape: `(total_tokens, in_features)`.
             x_groups: CPU Tensor indicating the number of tokens assigned to each group.
-               Must sum to `total_tokens`. Shape: `(n_groups,)`.
+                Must sum to `total_tokens`. Shape: `(n_groups,)`.
 
         Returns:
             The output tensor. Shape: `(total_tokens, out_features)`.
