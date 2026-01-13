@@ -80,13 +80,14 @@ It supports:
 ```python
 import torch
 from torch.utils.data import TensorDataset
-from d9d.core import DistributedContext
+from d9d.core.dist_context import DistributedContext, BATCH_DOMAIN
 from d9d.dataset import ShardedDataset, ShardIndexingMode
 
 # You can infer your Data Parallel size and rank from DistributedContext object 
 context: DistributedContext
-dp_size = context.dp_size
-dp_rank = context.dp_rank
+batch_mesh = context.mesh_for(BATCH_DOMAIN)
+dp_size = batch_mesh.size('dp')
+dp_rank = batch_mesh.get_local_rank('dp')
 
 # Create Full Dataset
 base_ds = TensorDataset(torch.randn(100, 10))
