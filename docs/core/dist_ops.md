@@ -20,13 +20,13 @@ Gathering tensors of identical shapes from all ranks. d9d automatically allocate
 
 ```python
 import torch
-from d9d.core.dist_context import DistributedContext
+from d9d.core.dist_context import DistributedContext, REGULAR_DOMAIN
 from d9d.core.dist_ops import all_gather
 
 # Setup
 ctx: DistributedContext = ...
-group = ctx.mesh_regular.get_group()
-rank = ctx.mesh_regular.get_rank()
+group = ctx.mesh_for(REGULAR_DOMAIN).get_group()
+rank = ctx.mesh_for(REGULAR_DOMAIN).get_rank()
 
 # Each rank has a tensor of the same shape (e.g., [2, 2])
 # but different values
@@ -45,13 +45,13 @@ Gathering tensors where dimensions differ across ranks.
 
 ```python
 import torch
-from d9d.core.dist_context import DistributedContext
+from d9d.core.dist_context import DistributedContext, REGULAR_DOMAIN
 from d9d.core.dist_ops import all_gather_variadic_shape
 
 # Setup
 ctx: DistributedContext = ...
-group = ctx.mesh_regular.get_group()
-rank = ctx.mesh_regular.get_rank()
+group = ctx.mesh_for(REGULAR_DOMAIN).get_group()
+rank = ctx.mesh_for(REGULAR_DOMAIN).get_rank()
 
 # Rank 0 has shape [1], Rank 1 has shape [2], ...
 local_tensor = torch.randn((rank + 1,), device="cuda")
@@ -70,13 +70,13 @@ Sending arbitrary Python objects between ranks. These objects must be picklable.
 
 ```python
 import torch.distributed as dist
-from d9d.core.dist_context import DistributedContext
+from d9d.core.dist_context import DistributedContext, REGULAR_DOMAIN
 from d9d.core.dist_ops import all_gather_object
 
 # Setup
 ctx: DistributedContext = ...
-group = ctx.mesh_regular.get_group()
-rank = ctx.mesh_regular.get_rank()
+group = ctx.mesh_for(REGULAR_DOMAIN).get_group()
+rank = ctx.mesh_for(REGULAR_DOMAIN).get_rank()
 
 # Local data
 my_metadata = {

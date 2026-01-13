@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch.profiler as tprof
 
-from d9d.core.dist_context import DistributedContext
+from d9d.core.dist_context import DistributedContext, REGULAR_DOMAIN
 
 
 class Profiler:
@@ -46,8 +46,9 @@ class Profiler:
     def _dump_trace(self, prof):
         save_dir = self._save_dir / f'step_{prof.step_num}'
         save_dir.mkdir(parents=True, exist_ok=True)
-        coord_str = '-'.join(map(str, self._dist_context.mesh_regular.get_coordinate()))
-        rank = self._dist_context.mesh_regular.get_rank()
+        mesh_regular = self._dist_context.mesh_for(REGULAR_DOMAIN)
+        coord_str = '-'.join(map(str, mesh_regular.get_coordinate()))
+        rank = mesh_regular.get_rank()
         save_file = save_dir / f'rank-{rank}-coord-{coord_str}-trace.json'
 
         begin = time.monotonic()

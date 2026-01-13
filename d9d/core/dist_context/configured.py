@@ -6,9 +6,10 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 import torch
-from torch.distributed import init_device_mesh, DeviceMesh
+from torch.distributed import DeviceMesh
 
 from .log import build_dist_logger
+from .device_mesh_domains import ALL_DOMAIN_PROVIDERS, REGULAR_DOMAIN
 
 if TYPE_CHECKING:
     from .params import DeviceMeshParameters
@@ -26,9 +27,12 @@ def _resolve_master_addr() -> str:
         return master_addr
 
 
-# TODO idea: create DeviceMesh domain abstraction i.e. experts domain, general domain, ...
-# TODO idea: would be useful for training non-sequential models in future
-# TODO: we currently do not support TP
+def _build_mesh_domains(params: 'DeviceMeshParameters') -> dict[str, DeviceMesh]:
+    return {
+        provider.name: provider.build_mesh(params)
+        for provider in ALL_DOMAIN_PROVIDERS
+    }
+
 
 
 class DistributedContext:
@@ -46,31 +50,21 @@ class DistributedContext:
         self._params = params
 
         if params.is_distributed:
-            ep_replicate_dim = (params.data_parallel_replicate * params.data_parallel_shard * params.context_parallel
-                                // params.expert_parallel)
-            self._mesh_ep = init_device_mesh(
-                device_type="cuda",
-                mesh_shape=(params.pipeline_parallel,
-                            ep_replicate_dim,
-                            params.expert_parallel),
-                mesh_dim_names=('pp', 'replicate', 'ep')
-            )
-            self._mesh_regular = init_device_mesh(
-                device_type="cuda",
-                mesh_shape=(params.pipeline_parallel, params.data_parallel_replicate, params.data_parallel_shard,
-                            params.context_parallel),
-                mesh_dim_names=('pp', 'dp_replicate', 'dp_shard', 'cp')
-            )
-            self._num_nodes = self._mesh_regular.size() // torch.cuda.device_count()
+            meshes = _build_mesh_domains(params)
+            regular_mesh = meshes[REGULAR_DOMAIN]
+
+            self._meshes = meshes
+            self._num_nodes = regular_mesh.size() // torch.cuda.device_count()
             self._logger = build_dist_logger(
-                f'pp:{self._mesh_regular.get_local_rank("pp")}-'
-                f'dpr:{self._mesh_regular.get_local_rank("dp_replicate")}-'
-                f'dps:{self._mesh_regular.get_local_rank("dp_shard")}-'
-                f'cp:{self._mesh_regular.get_local_rank("cp")}-'
+                f'pp:{regular_mesh.get_local_rank("pp")}-'
+                f'dpr:{regular_mesh.get_local_rank("dp_replicate")}-'
+                f'dps:{regular_mesh.get_local_rank("dp_shard")}-'
+                f'cps:{regular_mesh.get_local_rank("cp_shard")}-'
+                f'cpr:{regular_mesh.get_local_rank("cp_replicate")}-'
+                f'tp:{regular_mesh.get_local_rank("tp")}'
             )
         else:
-            self._mesh_ep = None
-            self._mesh_regular = None
+            self._meshes = None
             self._num_nodes = 1
             self._logger = build_dist_logger('local')
 
@@ -91,17 +85,33 @@ class DistributedContext:
 
         return self._logger
 
-    @property
-    def mesh_ep(self) -> DeviceMesh | None:
-        """Returns the device mesh related to expert layers domain for Expert Parallel."""
+    def mesh_for(self, domain: str) -> DeviceMesh:
+        """
+        Returns the device mesh view associated with a specific logical domain.
 
-        return self._mesh_ep
+        Available Domains and Dimensions:
+            *   `regular` (`REGULAR_DOMAIN`): The most granular mesh for fully decomposed parallelism.
+                Dimensions: ``('pp', 'dp_replicate', 'dp_shard', 'cp_shard', 'cp_replicate', 'tp')``
+            *   `expert` (`EXPERT_DOMAIN`): Mesh optimized for distributing MoE (Mixture of Experts) layers.
+                Dimensions: ``('pp', 'replicate', 'ep')``
+            *   `dense` (`DENSE_DOMAIN`): Mesh optimized for distributing dense layers.
+                Dimensions: ``('pp', 'dp_replicate', 'dp_cp_shard', 'cp_replicate', 'tp')``
+            *   `batch` (`BATCH_DOMAIN`): Mesh optimized for distributing input data.
+                Dimensions: ``('pp', 'dp', 'cp', 'tp')``
 
-    @property
-    def mesh_regular(self) -> DeviceMesh | None:
-        """Returns the device mesh related to regular model domain."""
+        Args:
+            domain: The name of the domain to retrieve.
 
-        return self._mesh_regular
+        Returns:
+            The PyTorch DeviceMesh configured for the requested domain.
+
+        Raises:
+            ValueError: If the specified domain does not exist.
+        """
+
+        if domain not in self._meshes:
+            raise ValueError(f'Domain {domain} does not exist')
+        return self._meshes[domain]
 
     @property
     def is_main_process(self) -> bool:
@@ -133,7 +143,7 @@ class DistributedContext:
         self.wait_world()
 
         groups: list[torch.distributed.ProcessGroup | None] = [None]
-        for mesh in self.mesh_regular, self.mesh_ep:
+        for mesh in self._meshes.values():
             for dim in range(mesh.ndim):
                 groups.append(mesh.get_group(dim))
 
@@ -184,19 +194,6 @@ class DistributedContext:
         """Returns the parameters used to initialize this context."""
 
         return self._params
-
-    @property
-    def dp_size(self) -> int:
-        """Returns the total number of Data Parallel ranks (Replicated * Sharded)."""
-
-        return self.mesh_regular['dp_replicate'].size() * self.mesh_regular['dp_shard'].size()
-
-    @property
-    def dp_rank(self) -> int:
-        """Returns the linearized Data Parallel rank."""
-
-        return (self.mesh_regular['dp_shard'].size() * self.mesh_regular['dp_replicate'].get_local_rank() +
-                self.mesh_regular['dp_shard'].get_local_rank())
 
     @property
     def master_addr(self) -> str:

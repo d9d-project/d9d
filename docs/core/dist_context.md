@@ -49,39 +49,56 @@ d9d positions `DistributedContext` as the explicit controller for managing all t
 
 ## DeviceMesh Domains
 
-Modern architectures, especially Mixture-of-Experts (MoE), require different parallelism strategies for different parts of the model. d9d handles this by abstracting these strategies into specific **DeviceMesh Domains**.
+Modern architectures require different parallelism strategies for different parts of the model (e.g., standard dense layers vs. Mixture-of-Experts layers). d9d handles this by abstracting these strategies into specific **DeviceMesh Domains**.
 
-The underlying physical GPUs are immutable, but how we view them changes depending on the layer type being processed.
+The underlying physical GPUs are immutable, but how we view them changes depending on what we are working with (distributing MoE layers, Dense layers, distributing input batch). `DeviceMesh` object for specific domain is retrieved via `dist_ctx.mesh_for(domain_name)`.
 
-### Regular Domain (`mesh_regular`)
-*   **Used By**: Standard dense layers (Self-Attention, standard MLPs, RMSNorm).
+### Regular Domain (`regular`)
+
+*   **Identifier**: `REGULAR_DOMAIN` or `"regular"`
+*   **Purpose**: The most granular mesh view for fully decomposed parallelism. Used for setting up logging and seeding.
 *   **Dimensions**: 
     1.  `pp`: Pipeline Parallel
-    2.  `dp_replicate`: Data Parallel (DistributedDataParallel style)
-    3.  `dp_shard`: Data Parallel (FSDP/ZeRO style)
-    4.  `cp`: Context Parallel
+    2.  `dp_replicate`: Data Parallel (DDP style)
+    3.  `dp_shard`: Data Parallel (FSDP style)
+    4.  `cp_shard`: Context Parallel (FSDP style)
+    5.  `cp_replicate`: Context Parallel (DDP style)
+    6.  `tp`: Tensor Parallelism
 
-### Expert Domain (`mesh_ep`)
-*   **Used By**: MoE layers (Expert Gate, Experts).
+### Expert Domain (`expert`)
+
+*   **Identifier**: `EXPERT_DOMAIN` or `"expert"`
+*   **Purpose**: Mesh view optimized for distributing MoE (Mixture of Experts) layers. It is intended that sparse expert layers should be sharded across `ep` dimension and replicated across `replicate` dimension.
 *   **Dimensions**:
-    1.  `pp`: Pipeline Parallel (Shared with Regular Domain)
-    2.  `replicate`: Replication Dimension for Experts
-    3.  `ep`: Sharding Dimension for Experts
+    1.  `pp`: Pipeline Parallel
+    2.  `replicate`: Combined Replication Dimension (`(DP * CP) // EP`)
+    3.  `ep`: Expert Parallel Dimension
 
-### EP Re-slicing (The Conservation of Ranks)
-`mesh_ep` is not a new set of physical resources; it re-slices the ranks allocated to `mesh_regular`.
+### Dense Domain (`dense`)
 
-In the Expert Domain, the CP and DP dimensions (`dp_replicate`, `dp_shard`, `cp`) are collapsed and re-divided to form the Expert dimension (`ep`).
+*   **Identifier**: `DENSE_DOMAIN` or `"dense"`
+*   **Purpose**: Mesh view for distributing dense layers.
+*   **Dimensions**:
+    1.  `pp`: Pipeline Parallel
+    2.  `dp_replicate`: Data Parallel for replication using HSDP
+    3.  `dp_cp_shard`: Merged Data and Context Parallel dimension for sharding using HSDP
+    4.  `cp_replicate`: Context Parallel for replication
+    5.  `tp`: Tensor Parallel
 
-Mathematically, the total parallelism resources (within a pipeline stage) are conserved:
+### Batch Domain (`batch`)
 
-$$ \text{Total Ranks} = \text{DPR} \times \text{DPS} \times \text{CP} = \text{EP\_Replicate} \times \text{EP} $$
-
-This implies that **EP takes ranks from DP and CP**.
+*   **Identifier**: `BATCH_DOMAIN` or `"batch"`
+*   **Purpose**: Mesh view for distributing batch tensor and setting up DataLoader sharding.
+*   **Dimensions**:
+    1.  `pp`: Pipeline Parallel
+    2.  `dp`: Data Parallel
+    3.  `cp`: Context Parallel
+    4.  `tp`: Tensor Parallel
 
 ## Usage
 
 ### Initialization
+
 The system is usually initialized via `DeviceMeshParameters`.
 
 ```python
@@ -92,8 +109,10 @@ params = DeviceMeshParameters(
     pipeline_parallel=2,
     data_parallel_replicate=8,
     data_parallel_shard=1,
-    context_parallel=1,
-    expert_parallel=8
+    context_parallel_replicate=1,
+    context_parallel_shard=1,
+    expert_parallel=8,
+    tensor_parallel=1
 )
 
 dist_ctx = params.build()
