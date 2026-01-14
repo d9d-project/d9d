@@ -53,6 +53,9 @@ Modern architectures require different parallelism strategies for different part
 
 The underlying physical GPUs are immutable, but how we view them changes depending on what we are working with (distributing MoE layers, Dense layers, distributing input batch). `DeviceMesh` object for specific domain is retrieved via `dist_ctx.mesh_for(domain_name)`.
 
+!!! info "Demonstration Video: "
+    For better understanding domains, we have prepared a quick demonstration video [on YouTube](https://www.youtube.com/watch?v=UZ2yHTGdzzU).
+
 ### Regular Domain (`regular`)
 
 *   **Identifier**: `REGULAR_DOMAIN` or `"regular"`
@@ -68,11 +71,11 @@ The underlying physical GPUs are immutable, but how we view them changes dependi
 ### Expert Domain (`expert`)
 
 *   **Identifier**: `EXPERT_DOMAIN` or `"expert"`
-*   **Purpose**: Mesh view optimized for distributing MoE (Mixture of Experts) layers. It is intended that sparse expert layers should be sharded across `ep` dimension and replicated across `replicate` dimension.
+*   **Purpose**: Mesh view optimized for distributing MoE (Mixture of Experts) layers. It is intended that sparse expert layers should be sharded across `ep_shard` dimension and replicated across `ep_replicate` dimension.
 *   **Dimensions**:
     1.  `pp`: Pipeline Parallel
-    2.  `replicate`: Combined Replication Dimension (`(DP * CP) // EP`)
-    3.  `ep`: Expert Parallel Dimension
+    2.  `ep_replicate`: Combined Replication Dimension (`(DP * CP) // EP`)
+    3.  `ep_shard`: Expert Parallel Dimension
 
 ### Dense Domain (`dense`)
 
@@ -116,6 +119,17 @@ params = DeviceMeshParameters(
 )
 
 dist_ctx = params.build()
+```
+
+### Accessing DeviceMesh Domains
+
+```python
+from torch.distributed import DeviceMesh
+from d9d.core.dist_context import DistributedContext, DENSE_DOMAIN
+
+dist_ctx: DistributedContext = ...
+
+mesh_dense: DeviceMesh = dist_ctx.mesh_for(DENSE_DOMAIN)
 ```
 
 ### Rank Utilities
