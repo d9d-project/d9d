@@ -190,7 +190,7 @@ class DistributedContext:
         return self._current_device
 
     @property
-    def mesh_params(self) -> DeviceMeshParameters:
+    def mesh_params(self) -> 'DeviceMeshParameters':
         """Returns the parameters used to initialize this context."""
 
         return self._params

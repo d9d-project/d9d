@@ -91,8 +91,8 @@ class ExpertDomain(DeviceMeshDomain):
             ),
             mesh_dim_names=(
                 'pp',
-                'replicate',
-                'ep'
+                'ep_replicate',
+                'ep_shard'
             )
         )
 
