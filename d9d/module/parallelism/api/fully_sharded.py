@@ -6,6 +6,7 @@ from torch.distributed.fsdp import fully_shard, FSDPModule
 def _force_fsdp_grad_reduction_policy(module: FSDPModule):
     module.set_force_sum_reduction_for_comms(enable=True)
     module.set_gradient_divide_factor(1.0)
+    module.set_requires_all_reduce(False)
 
 
 def parallelize_fsdp(
