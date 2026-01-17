@@ -2,12 +2,12 @@ import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 
-from d9d.module.base import ModuleSupportsPipelining, ModuleLateInit, PipelineStageInfo, \
-    distribute_layers_for_pipeline_stage
+from d9d.module.base import ModuleLateInit
 from d9d.module.block.embedding import SplitTokenEmbeddings
 from d9d.module.block.head import SplitLanguageModellingHead
 from d9d.module.block.positional import RotaryEmbeddingProvider
 from d9d.module.model.qwen3_moe import Qwen3MoEParameters, Qwen3MoELayer, Qwen3MoEForCausalLMParameters
+from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo, distribute_layers_for_pipeline_stage
 
 
 def _aggregate_hidden_states(hidden_states: torch.Tensor, agg_mask: torch.Tensor):

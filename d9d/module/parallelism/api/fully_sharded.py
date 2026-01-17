@@ -20,9 +20,9 @@ def parallelize_fsdp(
 
     This function wraps the provided module with PyTorch's ``fully_shard`` API using
     the specified device mesh. Unlike standard FSDP usage, this function explicitly
-    configures the module to sum gradients across the mesh (divide factor = 1.0)
-    instead of averaging them. This is intended for d9d to handle gradient normalization
-    externally.
+    configures the module to sum gradients across the mesh
+    instead of averaging them and disables internal all-sum-reduce hooks.
+    This is intended for d9d to handle gradient normalization and reduction across replicas externally.
 
     Args:
         module: The module to shard.
