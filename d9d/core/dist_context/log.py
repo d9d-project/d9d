@@ -2,7 +2,7 @@ import logging
 import sys
 
 
-def build_dist_logger(qualifier: str) -> logging.Logger:
+def build_dist_logger(qualifier: str, level: int) -> logging.Logger:
     """
     Configures and returns a logger instance for d9d.
 
@@ -11,16 +11,17 @@ def build_dist_logger(qualifier: str) -> logging.Logger:
 
     Args:
         qualifier: A string identifying the current rank's position in the mesh.
+        level: Log level to set by default
 
     Returns:
         A configured logging.Logger instance.
     """
 
     dist_logger = logging.getLogger('d9d')
-    dist_logger.setLevel(logging.INFO)
+    dist_logger.setLevel(level)
     dist_logger.handlers.clear()
     ch = logging.StreamHandler(sys.stdout)
-    ch.setLevel(logging.INFO)
+    ch.setLevel(level)
     formatter = logging.Formatter(
         f"[d9d] [{qualifier}] %(asctime)s - %(levelname)s - %(message)s"
     )

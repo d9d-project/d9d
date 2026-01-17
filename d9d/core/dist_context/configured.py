@@ -46,7 +46,7 @@ class DistributedContext:
     must be derived from this context to ensure consistency.
     """
 
-    def __init__(self, params: 'DeviceMeshParameters'):
+    def __init__(self, params: 'DeviceMeshParameters', log_level: int):
         self._params = params
 
         if params.is_distributed:
@@ -61,12 +61,13 @@ class DistributedContext:
                 f'dps:{regular_mesh.get_local_rank("dp_shard")}-'
                 f'cps:{regular_mesh.get_local_rank("cp_shard")}-'
                 f'cpr:{regular_mesh.get_local_rank("cp_replicate")}-'
-                f'tp:{regular_mesh.get_local_rank("tp")}'
+                f'tp:{regular_mesh.get_local_rank("tp")}',
+                level=log_level
             )
         else:
             self._meshes = None
             self._num_nodes = 1
-            self._logger = build_dist_logger('local')
+            self._logger = build_dist_logger('local', level=log_level)
 
 
         self._local_rank = int(os.environ.get('LOCAL_RANK', '0'))

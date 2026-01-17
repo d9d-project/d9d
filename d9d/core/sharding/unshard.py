@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any, List, Sequence
 import torch
 import torch.utils._pytree as pytree
 from torch.distributed.tensor import Shard
@@ -6,66 +6,85 @@ from torch.distributed.tensor import Shard
 from d9d.core.sharding import ShardingSpec
 
 
-def _unshard_leaf(item: Any, spec: Any) -> Any:
-    """Concatenates a sequence of tensors if the spec is a Shard."""
-
+def _unshard_leaf_from_group(
+        group: Sequence[Any],
+        spec: Any
+) -> Any:
+    """Helper to merge a group of items from different ranks into one."""
     if spec is None:
-        return item
+        # Replicated: All ranks should have the same item.
+        # We simply return the first one.
+        return group[0]
 
     if not isinstance(spec, Shard):
         raise ValueError(f'Unknown sharding spec object type: {type(spec)}')
 
-    if not isinstance(item, (tuple, list)):
-        raise ValueError(
-            f"Expected a sequence (tuple/list) of tensors to unshard for spec {spec}, "
-            f"but got {type(item)}. This often indicates a mismatch between "
-            "the sharding spec structure and the sharded data structure."
-        )
+    # Validation: Items must be tensors
+    if not isinstance(group[0], torch.Tensor):
+        raise ValueError(f"Expected Tensors for Shard spec, got {type(group[0])}")
 
-    if len(item) == 0:
-        raise ValueError(f"Found empty sequence of shards for spec {spec}")
-
-    return torch.cat(item, dim=spec.dim)
+    return torch.cat(group, dim=spec.dim)
 
 
 def unshard_tree(
-        tree: Any,
+        sharded_trees: Sequence[Any],
         sharding_spec: ShardingSpec
 ) -> Any:
     """
-    Reconstructs a PyTree of tensors by concatenating shards.
+    Combines a sequence of PyTrees (one per rank) into a single global PyTree.
 
-    This function uses structural definitions from ``sharding_spec`` to traverse
-    the ``tree``. It descends into the ``tree`` only as deep as the
-    ``sharding_spec`` goes. If the spec has aleaf leaf (either ``Shard`` or ``None``),
-    the corresponding substructure in ``tree`` is treated as a single unit
-    (e.g., a tuple of shards) and passed to the concatenation logic.
+    This is the inverse of ``shard_tree``. It iterates over the provided trees,
+    gathering corresponding leaves from each rank.
+
+    If the spec for a leaf is ``Shard(dim)``, the tensors from all ranks are
+    concatenated along that dimension.
+    If the spec is ``None``, it assumes the data is replicated and takes the
+    item from the first rank.
 
     Args:
-        tree: The structure containing sequences of tensor shards.
-        sharding_spec: A structure matching 'tree' containing ``Shard`` objects or None.
+        sharded_trees: A sequence (list or tuple) of PyTrees. There must be
+            one tree for each shard rank, and they must all share the same
+            structure as ``sharding_spec``.
+        sharding_spec: A structure matching the input trees containing
+            ``Shard`` objects or None.
 
     Returns:
-        A new PyTree where sequences of shards have been concatenated back into
-        single tensors.
+        A single PyTree where distinct shards have been merged into full tensors.
 
     Raises:
-        ValueError: If tree structures do not match, or if a ``Shard`` spec is
-            applied to a non-sequence item.
+        ValueError: If ``sharded_trees`` is empty, or if unit structures do
+            not match the spec.
     """
-    spec_leaves, spec_struct = pytree.tree_flatten(sharding_spec)
+    if not sharded_trees:
+        raise ValueError("sharded_trees sequence cannot be empty")
 
-    try:
-        grouped_shards = spec_struct.flatten_up_to(tree)
-    except ValueError as e:
-        raise ValueError(
-            f"Structure of 'tree' does not match structure of 'sharding_spec'. "
-            f"Details: {e}"
-        ) from e
+    # 1. Flatten the spec
+    flat_spec, spec_struct = pytree.tree_flatten(sharding_spec)
 
+    # 2. Flatten all input trees
+    # flat_shards_per_rank: List[List[Any]] -> One list of leaves per rank
+    flat_shards_per_rank = []
+    for i, tree in enumerate(sharded_trees):
+        leaves, struct = pytree.tree_flatten(tree)
+        if len(leaves) != len(flat_spec):
+            raise ValueError(
+                f"Structure mismatch at rank {i}: tree has {len(leaves)} leaves "
+                f"but spec has {len(flat_spec)}."
+            )
+        # Note: We assume 'struct' matches 'spec_struct' if lengths match
+        # because pytree traversal is deterministic.
+        flat_shards_per_rank.append(leaves)
+
+    # 3. Transpose: Sequence[List[Any]] -> List[Sequence[Any]]
+    # We want to group the i-th leaf from all ranks together
+    # grouped_leaves[i] = (leaf_i_rank0, leaf_i_rank1, ...)
+    grouped_leaves = list(zip(*flat_shards_per_rank))
+
+    # 4. Merge groups
     reconstructed_leaves = [
-        _unshard_leaf(group, spec)
-        for group, spec in zip(grouped_shards, spec_leaves)
+        _unshard_leaf_from_group(group, spec)
+        for group, spec in zip(grouped_leaves, flat_spec)
     ]
 
+    # 5. Reconstruct single tree
     return spec_struct.unflatten(reconstructed_leaves)

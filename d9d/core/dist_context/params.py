@@ -1,3 +1,4 @@
+import logging
 from typing import Self
 
 from pydantic import BaseModel, model_validator
@@ -99,7 +100,7 @@ class DeviceMeshParameters(BaseModel):
             )
         return self
 
-    def build(self) -> 'DistributedContext':
+    def build(self, log_level: int = logging.INFO) -> 'DistributedContext':
         """
         Initializes the DistributedContext using these parameters.
 
@@ -107,4 +108,4 @@ class DeviceMeshParameters(BaseModel):
             A new DistributedContext instance containing the initialized device meshes.
         """
 
-        return DistributedContext(self)
+        return DistributedContext(self, log_level)
