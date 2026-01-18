@@ -6,13 +6,12 @@ title: Gradient Synchronization
 
 ## About
 
-The `d9d.internals.grad_sync` package provides low-level primitives for synchronizing gradients in distributed training setups utilizing `DTensor`.
-
-Unlike standard PyTorch `DistributedDataParallel` which assumes a uniform communication strategy for the entire model, this package is designed to work with heterogeneous distributions often found in ND-parallelism (e.g., mixtures of Data, Tensor, Sequence, and Pipeline parallelism). It inspects `DTensor` placements to automatically determine which dimensions require reduction (all-reduce) and groups parameters into efficient communication buckets.
-
 !!! warning "Warning:" 
     If you are utilizing the standard `d9d` training infrastructure, you **do not** need to call these functions manually. The framework automatically handles gradient synchronization. This package is primarily intended for users extending `d9d`.
 
+The `d9d.internals.grad_sync` package provides low-level primitives for synchronizing gradients in distributed training setups utilizing `DTensor`.
+
+Unlike standard PyTorch `DistributedDataParallel` which assumes a uniform communication strategy for the entire model, this package is designed to work with heterogeneous distributions often found in ND-parallelism (e.g., mixtures of Data, Tensor, Sequence, and Pipeline parallelism). It inspects `DTensor` placements to automatically determine which dimensions require reduction (all-reduce) and groups parameters into efficient communication buckets.
 
 ## Core Concepts
 
