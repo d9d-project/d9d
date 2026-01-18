@@ -1,7 +1,7 @@
 import copy
 import dataclasses
 
-from d9d.pipelining.infra.schedule.component.runtime.action import ActionBase, ComposeAction, ForwardComputeAction, BackwardFullInputComputeAction, \
+from ..runtime.action import ActionBase, ComposeAction, ForwardComputeAction, BackwardFullInputComputeAction, \
     ForwardReceiveAction, BackwardReceiveAction, ForwardSendAction, BackwardSendAction
 
 

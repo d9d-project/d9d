@@ -26,5 +26,5 @@ __all__ = [
     "BackwardFullInputComputeAction",
     "BackwardWeightComputeAction",
     "ComposeAction",
-    "PipelineScheduleExecutor"
+    "PipelineScheduleExecutor",
 ]

@@ -1,6 +1,7 @@
-from d9d.pipelining.infra.schedule.component import PipelineProgramBuilder, ActionBase, \
-    build_stage_to_host_rank_topology, ScheduleStyle, ForwardComputeAction, BackwardFullInputComputeAction, \
-    add_communication_ops
+from ..component.program import ScheduleStyle, add_communication_ops, \
+    build_stage_to_host_rank_topology, PipelineProgramBuilder
+from ..component.runtime import BackwardFullInputComputeAction, ForwardComputeAction, \
+    ActionBase
 
 
 class LoopedBFSPipelineProgramBuilder(PipelineProgramBuilder):
@@ -14,17 +15,20 @@ class LoopedBFSPipelineProgramBuilder(PipelineProgramBuilder):
         https://arxiv.org/pdf/2211.05953
     """
 
-    def __init__(self, inference_mode: bool = False):
+    def __init__(self, num_stages_per_rank: int, inference_mode: bool = False):
         """
         Constructs the LoopedBFS builder.
 
         Args:
+            num_stages_per_rank: Number of stages per rank.
             inference_mode: If True, only forward passes are scheduled. If False,
                 both forward and backward passes are scheduled.
         """
+        self._num_stages_per_rank = num_stages_per_rank
         self._inference_mode = inference_mode
 
-    def compose(self, num_stages: int, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:
+    def compose(self, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:
+        num_stages = self._num_stages_per_rank * pp_size
         stage_to_rank = build_stage_to_host_rank_topology(
             pp_size=pp_size,
             num_stages=num_stages,
@@ -65,3 +69,11 @@ class LoopedBFSPipelineProgramBuilder(PipelineProgramBuilder):
             stage_to_rank=stage_to_rank,
             num_stages=num_stages
         )
+
+    @property
+    def num_stages_per_rank(self) -> int:
+        return self._num_stages_per_rank
+
+    @property
+    def topology_style(self) -> ScheduleStyle:
+        return ScheduleStyle.loop

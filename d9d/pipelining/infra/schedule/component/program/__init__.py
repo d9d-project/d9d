@@ -6,11 +6,13 @@ execution schedules for distributed pipelines.
 """
 
 from .base import PipelineProgramBuilder
-from .topology import ScheduleStyle, build_stage_to_host_rank_topology
+from .topology import ScheduleStyle, build_stage_to_host_rank_topology, invert_stage_to_host_rank_topology
 from .communications import add_communication_ops
 
 __all__ = [
+    "PipelineProgramBuilder",
     "ScheduleStyle",
     "build_stage_to_host_rank_topology",
+    "invert_stage_to_host_rank_topology",
     "add_communication_ops"
 ]

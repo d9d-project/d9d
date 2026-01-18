@@ -27,3 +27,6 @@ plugins:
             returns_multiple_items: false
           docstring_style: google
           show_source: false
+
+extra_css:
+  - style/style.css

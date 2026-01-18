@@ -1,9 +1,10 @@
 from collections import deque
 from typing import Deque
 
-from d9d.pipelining.infra.schedule.component import PipelineProgramBuilder, ActionBase, \
-    build_stage_to_host_rank_topology, ScheduleStyle, ForwardComputeAction, BackwardFullInputComputeAction, \
-    BackwardWeightComputeAction, ComposeAction, add_communication_ops
+from ..component.program import ScheduleStyle, add_communication_ops, \
+    build_stage_to_host_rank_topology, PipelineProgramBuilder
+from ..component.runtime import BackwardFullInputComputeAction, ForwardComputeAction, \
+    ActionBase, ComposeAction, BackwardWeightComputeAction
 
 
 class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
@@ -27,13 +28,10 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
         pass
 
     def compose(
-            self, num_stages: int, num_microbatches: int, pp_size: int
+            self, num_microbatches: int, pp_size: int
     ) -> dict[int, list[ActionBase]]:
-        if num_stages != pp_size * 2:
-            raise ValueError(
-                f"DualPipeV requires exactly 2 stages per rank (total {pp_size * 2}), "
-                f"but got {num_stages} stages for {pp_size} ranks."
-            )
+        num_stages = self.num_stages_per_rank * pp_size
+
         if num_microbatches < num_stages:
             raise ValueError(
                 f"DualPipeV requires num_microbatches ({num_microbatches}) >= "
@@ -204,3 +202,11 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
             stage_to_rank=stage_to_rank,
             num_stages=num_stages
         )
+
+    @property
+    def num_stages_per_rank(self) -> int:
+        return 2
+
+    @property
+    def topology_style(self) -> ScheduleStyle:
+        return ScheduleStyle.v

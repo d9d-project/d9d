@@ -4,12 +4,12 @@ import torch
 from torch.autograd.profiler import record_function
 
 from d9d.core.dist_context import DistributedContext, REGULAR_DOMAIN
-from d9d.core.sharding import ShardingSpec, shard_spec_on_dim, shard_tree
-from d9d.pipelining.api import PipelineSchedule
+from d9d.core.sharding import shard_spec_on_dim, shard_tree
+from d9d.pipelining.api import PipelineSchedule, PipelineShardingSpec
 from d9d.pipelining.infra.stage import PipelineStage
+from .action import ActionBase, ActionContext
 from .communications import PipelineCommunicationHandler
 from .loss import PipelineLossHandler, LossFn
-from d9d.pipelining.infra.schedule.component.runtime.action import ActionBase, ActionContext
 
 
 class PipelineScheduleExecutor(PipelineSchedule):
@@ -17,29 +17,27 @@ class PipelineScheduleExecutor(PipelineSchedule):
 
     def __init__(
             self,
-            dist_ctx: DistributedContext,
+            dist_context: DistributedContext,
             stages: list[PipelineStage],
             num_microbatches: int,
             loss_fn: LossFn,
 
             program: dict[int, list[ActionBase]],
-            input_data_sharding_spec: ShardingSpec | None = None,
-            input_kwargs_sharding_spec: ShardingSpec | None = None
+            sharding_spec: PipelineShardingSpec
     ):
         """
         Constructs the schedule executor.
 
         Args:
-            dist_ctx: The distributed context.
+            dist_context: The distributed context.
             stages: List of stages managed by this executor.
             num_microbatches: Number of microbatches the global batch is split.
             loss_fn: Function to compute loss.
             program: The execution plan mapping rank ID to a list of actions.
-            input_data_sharding_spec: Sharding specification for input tensors.
-            input_kwargs_sharding_spec: Sharding specification for kwargs.
+            sharding_spec: Sharding specification for input and output tensors.
         """
 
-        self._dist_ctx = dist_ctx
+        self._dist_ctx = dist_context
         self._stages = {stage.info.current_stage: stage for stage in stages}
         self._num_microbatches = num_microbatches
         self._program = program
@@ -52,8 +50,8 @@ class PipelineScheduleExecutor(PipelineSchedule):
         self._loss_handler = PipelineLossHandler(loss_fn)
 
         # these could be late-initialized on configure_buffers \/
-        self._input_data_sharding_spec = input_data_sharding_spec
-        self._input_kwargs_sharding_spec = input_kwargs_sharding_spec
+        self._input_data_sharding_spec = sharding_spec.input_data
+        self._input_kwargs_sharding_spec = sharding_spec.input_kwargs
 
 
     def configure_buffers(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):

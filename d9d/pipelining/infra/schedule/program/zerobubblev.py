@@ -1,13 +1,7 @@
-from d9d.pipelining.infra.schedule.component import (
-    PipelineProgramBuilder,
-    ActionBase,
-    ForwardComputeAction,
-    BackwardFullInputComputeAction,
-    BackwardWeightComputeAction,
-    ScheduleStyle,
-    build_stage_to_host_rank_topology,
-    add_communication_ops,
-)
+from ..component.program import ScheduleStyle, add_communication_ops, \
+    build_stage_to_host_rank_topology, PipelineProgramBuilder
+from ..component.runtime import BackwardFullInputComputeAction, ForwardComputeAction, \
+    ActionBase, BackwardWeightComputeAction
 
 
 class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
@@ -30,13 +24,9 @@ class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
         pass
 
     def compose(
-            self, num_stages: int, num_microbatches: int, pp_size: int
+            self, num_microbatches: int, pp_size: int
     ) -> dict[int, list[ActionBase]]:
-        if num_stages != 2 * pp_size:
-            raise ValueError(
-                f"ZBV schedule requires exactly 2 stages per rank (total {2 * pp_size}), "
-                f"but got {num_stages}."
-            )
+        num_stages = self.num_stages_per_rank * pp_size
 
         # 1. Topology
         # V-style: Rank 0 gets Stage 0 & Stage N-1. Rank 1 gets Stage 1 & Stage N-2...
@@ -220,3 +210,11 @@ class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
                 final_ops.append(action)
 
         return final_ops
+
+    @property
+    def num_stages_per_rank(self) -> int:
+        return 2
+
+    @property
+    def topology_style(self) -> ScheduleStyle:
+        return ScheduleStyle.v
