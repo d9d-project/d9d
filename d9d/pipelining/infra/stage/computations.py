@@ -3,10 +3,8 @@ from typing import Any
 
 import torch
 from torch import nn
-# TODO: usage of PyTorch internal API for backward, migrate to own if it will change a lot
-# TODO: generally it's a bad practice but i do not want to write my own backward passes :(
-from torch.distributed.pipelining._backward import stage_backward, stage_backward_input, stage_backward_weight
 
+from .splitgrad import stage_backward_full, stage_backward_input, ParamGroup, stage_backward_weight
 from .struct_helper import DictFlattener
 
 
@@ -120,7 +118,7 @@ class BackwardCacheInputForWeight:
     """
 
     inputs_grad: dict[str, torch.Tensor]
-    param_groups: list[dict[str, Any]] | None
+    param_groups: list[ParamGroup] | None
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)
@@ -188,10 +186,10 @@ class BackwardComputeHandler:
         inputs_flattener = DictFlattener(inputs.keys())
         outputs_flattener = DictFlattener(outputs.keys())
 
-        inputs_grad_linear = stage_backward(
-            stage_output=outputs_flattener.flatten(outputs),
+        inputs_grad_linear = stage_backward_full(
+            outputs=outputs_flattener.flatten(outputs),
             output_grads=outputs_flattener.flatten(outputs_grad),
-            input_values=inputs_flattener.flatten(inputs)
+            inputs=inputs_flattener.flatten(inputs)
         )
 
         self._cache[microbatch_index] = BackwardCacheFull(
@@ -233,9 +231,9 @@ class BackwardComputeHandler:
             )
         else:
             inputs_grad_linear, param_groups = stage_backward_input(
-                stage_outputs_or_loss=outputs_flattener.flatten(outputs),
+                outputs=outputs_flattener.flatten(outputs),
                 output_grads=outputs_flattener.flatten(outputs_grad),
-                input_values=inputs_flattener.flatten(inputs),
+                inputs=inputs_flattener.flatten(inputs),
                 weights=self._module.parameters()
             )
 
@@ -265,10 +263,10 @@ class BackwardComputeHandler:
 
         match prev_cache:
             case BackwardCacheInputForFull():
-                stage_backward(
-                    stage_output=prev_cache.stage_outputs_or_loss,
+                stage_backward_full(
+                    outputs=prev_cache.stage_outputs_or_loss,
                     output_grads=prev_cache.output_grads,
-                    input_values=prev_cache.input_values
+                    inputs=prev_cache.input_values
                 )
             case BackwardCacheInputForWeight():
                 stage_backward_weight(
