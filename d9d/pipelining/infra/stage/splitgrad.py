@@ -1,7 +1,6 @@
 from collections import deque, defaultdict
 from dataclasses import dataclass
-from typing import Iterator
-
+from typing import Iterator, Any
 import torch
 from torch import nn
 from torch.autograd.graph import Node, GradientEdge
@@ -166,7 +165,7 @@ def _make_capture_hook(group: ParamGroup, idx: int):
 class BackwardInputResult:
     input_grads: list[torch.Tensor] | None
     param_groups: list[ParamGroup]
-    grad_ownership_tokens: list[Node]
+    grad_ownership_tokens: list[Any]
 
 
 def stage_backward_input(
@@ -208,16 +207,15 @@ def stage_backward_input(
         final_input_grads.append(input_item.grad)
         input_item.grad = None
 
-    for t in outputs:
-        t.detach_()
-
     for handle in hook_handles:
         handle.remove()
 
     return BackwardInputResult(
         input_grads=final_input_grads,
         param_groups=param_groups,
-        grad_ownership_tokens=outputs_grad_fn
+        # TODO(max): we can keep only intermediate ownership tokens to both truncate the
+        # TODO(max): graph and do not deallocate C++ stuff
+        grad_ownership_tokens=outputs  # Keep the tensors alive!
     )
 
 
