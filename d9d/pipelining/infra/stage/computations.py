@@ -3,6 +3,7 @@ from typing import Any
 
 import torch
 from torch import nn
+from torch.autograd.graph import Node
 
 from .splitgrad import stage_backward_full, stage_backward_input, ParamGroup, stage_backward_weight
 from .struct_helper import DictFlattener
@@ -119,6 +120,7 @@ class BackwardCacheInputForWeight:
 
     inputs_grad: dict[str, torch.Tensor]
     param_groups: list[ParamGroup] | None
+    ownership_tokens: list[Node]
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)
@@ -216,7 +218,6 @@ class BackwardComputeHandler:
             outputs_grad: Gradients of the loss with respect to the outputs.
         """
 
-        # TODO: fix accumulation hooks being executed properly
         if microbatch_index in self._cache:
             raise ValueError(f'Double backward pass')
 
@@ -230,7 +231,7 @@ class BackwardComputeHandler:
                 input_values=inputs_flattener.flatten(inputs)
             )
         else:
-            inputs_grad_linear, param_groups = stage_backward_input(
+            results = stage_backward_input(
                 outputs=outputs_flattener.flatten(outputs),
                 output_grads=outputs_flattener.flatten(outputs_grad),
                 inputs=inputs_flattener.flatten(inputs),
@@ -238,8 +239,9 @@ class BackwardComputeHandler:
             )
 
             self._cache[microbatch_index] = BackwardCacheInputForWeight(
-                inputs_grad=inputs_flattener.unflatten(inputs_grad_linear),
-                param_groups=param_groups
+                inputs_grad=inputs_flattener.unflatten(results.input_grads),
+                param_groups=results.param_groups,
+                ownership_tokens=results.grad_ownership_tokens
             )
 
     def backward_weight(
@@ -255,7 +257,6 @@ class BackwardComputeHandler:
             microbatch_index: Identifier for the microbatch.
         """
 
-        # TODO: fix accumulation hooks being executed properly
         if microbatch_index not in self._cache:
             raise ValueError(f'S{self._stage_idx}BW{microbatch_index} - weight backward with no input backward before')
 

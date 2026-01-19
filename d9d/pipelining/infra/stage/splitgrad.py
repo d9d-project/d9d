@@ -38,7 +38,7 @@ class ParamGroup:
                Set to None after use to free memory.
     """
     params: set[Node]
-    intermediates: list[Node] | None
+    intermediates: list[GradientEdge] | None
     grads: list[torch.Tensor | None] | None = None
 
 
@@ -162,12 +162,19 @@ def _make_capture_hook(group: ParamGroup, idx: int):
     return _hook
 
 
+@dataclass
+class BackwardInputResult:
+    input_grads: list[torch.Tensor] | None
+    param_groups: list[ParamGroup]
+    grad_ownership_tokens: list[Node]
+
+
 def stage_backward_input(
         outputs: list[torch.Tensor],
         output_grads: list[torch.Tensor] | None,
         inputs: list[torch.Tensor],
         weights: Iterator[nn.Parameter],
-) -> tuple[tuple[torch.Tensor | None, ...], list[ParamGroup]]:
+) -> BackwardInputResult:
     outputs_grad_fn = [grad_fn for x in outputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
     inputs_grad_fn = [grad_fn for x in inputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
     weights_grad_fn = [grad_fn for x in weights if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
@@ -207,7 +214,11 @@ def stage_backward_input(
     for handle in hook_handles:
         handle.remove()
 
-    return tuple(final_input_grads), param_groups
+    return BackwardInputResult(
+        input_grads=final_input_grads,
+        param_groups=param_groups,
+        grad_ownership_tokens=outputs_grad_fn
+    )
 
 
 def stage_backward_weight(
