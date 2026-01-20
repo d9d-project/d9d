@@ -49,7 +49,7 @@ def tracker_from_config(config: AnyTrackerConfig) -> BaseTracker:
     tracker_type = _MAP[type(config)]
 
     if isinstance(tracker_type, _TrackerImportFailed):
-        raise ImportError(  # noqa: TRY004
+        raise ImportError(
             f"The tracker configuration {config.provider} could not be loaded - "
             f"ensure these dependencies are installed: {tracker_type.dependency}"
         ) from tracker_type.exception

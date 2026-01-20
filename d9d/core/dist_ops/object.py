@@ -1,4 +1,4 @@
-from typing import TypeVar
+from typing import TypeVar, cast
 
 import torch.distributed as dist
 
@@ -26,7 +26,9 @@ def gather_object(
     """
 
     if group.rank() == group_dst:
-        save_list = [None for _ in range(group.size())]
+        # We initialize with None, but we cast to list[T] because we know
+        # dist.gather_object will populate these slots with actual objects.
+        save_list = cast(list[T], [None for _ in range(group.size())])
     else:
         save_list = None
     dist.gather_object(
@@ -55,8 +57,9 @@ def all_gather_object(
     Returns:
         A list of objects containing the data gathered from all ranks.
     """
-
-    save_list = [None for _ in range(group.size())]
+    # We initialize with None, but we cast to list[T] because we know
+    # dist.gather_object will populate these slots with actual objects.
+    save_list = cast(list[T], [None for _ in range(group.size())])
     dist.all_gather_object(
         save_list,
         obj,

@@ -1,5 +1,6 @@
 import dataclasses
 from collections import defaultdict
+from typing import cast
 
 import torch
 from torch import nn
@@ -21,7 +22,7 @@ def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
         The DeviceMesh subset needed for reduction, or None if no reduction is needed.
     """
 
-    reduce_dims = set()
+    reduce_dims: set[int] = set()
 
     for dim_i, dim_placement in enumerate(data.placements):
         grad_placement = map_placement_for_grad_sync(dim_placement)
@@ -40,8 +41,10 @@ def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
 
     device_mesh: DeviceMesh = data.device_mesh
 
+    # we are sure that device mesh contain dim names so we cast(...)
+    mesh_dim_names = cast(tuple[str, ...], device_mesh.mesh_dim_names)
     reduce_mesh = device_mesh[tuple(
-        device_mesh.mesh_dim_names[dim_i] for dim_i in reduce_dims
+        mesh_dim_names[dim_i] for dim_i in reduce_dims
     )]
 
     return reduce_mesh
@@ -56,7 +59,7 @@ class _ParameterGroupMarker:
     group_i: int
     reduce_mesh: DeviceMesh | None
     device: torch.device
-    grad_dtype: torch.dtype
+    grad_dtype: torch.dtype | None
 
 
 def _group_params_for_buckets(
@@ -108,6 +111,9 @@ def _make_bucket(
     if group_marker.reduce_mesh is None:
         return LocalGradientBucket(parameters)
     else:
+        if group_marker.grad_dtype is None:
+            raise ValueError("Gradient dtype could not be None")
+
         return SyncGradientBucket(
             parameters=parameters,
             require_accumulations=require_accumulations,
@@ -142,7 +148,7 @@ def _fill_buckets(
 
     for param_group_marker, param_group in param_groups.items():
         current_bucket_size = 0
-        unfinished_bucket = []
+        unfinished_bucket: list[nn.Parameter] = []
         for param in param_group:
             param_bytes = param.numel() * param.element_size()
             if current_bucket_size + param_bytes >= bucket_size and unfinished_bucket:
@@ -194,7 +200,7 @@ class GradientSynchronizer:
         self._bucket_size_mb = bucket_size_mb
         self._require_accumulations = require_accumulations
 
-        self._buckets = []
+        self._buckets: list[AbstractGradientBucket] = []
 
     def bind(self):
         """

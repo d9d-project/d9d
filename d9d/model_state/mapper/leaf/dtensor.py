@@ -3,7 +3,7 @@ from collections.abc import Sequence
 import torch
 from torch._C._distributed import Placement
 from torch.distributed import DeviceMesh
-from torch.distributed.tensor import distribute_tensor
+from torch.distributed.tensor import DTensor, distribute_tensor
 
 from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
@@ -46,6 +46,11 @@ class ModelStateMapperGatherFullTensor(ModelStateMapper):
         return frozenset([StateGroup(inputs=frozenset([self._name]), outputs=frozenset([self._name]))])
 
     def apply(self, group: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
+        tensor = group[self._name]
+
+        if not isinstance(tensor, DTensor):
+            raise ValueError("Cannot gather anything but DTensor")
+
         return {
-            self._name: group[self._name].full_tensor()
+            self._name: tensor.full_tensor()
         }

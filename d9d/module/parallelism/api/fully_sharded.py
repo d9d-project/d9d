@@ -34,4 +34,6 @@ def parallelize_fsdp(
     """
 
     fully_shard(module, *args, mesh=mesh, **kwargs)
+    if not isinstance(module, FSDPModule):
+        raise RuntimeError("Torch FSDP did not convert the module into FSDPModule")
     _force_fsdp_grad_reduction_policy(module)

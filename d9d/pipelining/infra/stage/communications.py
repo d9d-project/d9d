@@ -116,7 +116,7 @@ class StageCommunicationHandler:
             input_stage_index: int | None,
             input_args: dict[str, torch.Tensor]
     ) -> dict[int, dict[str, StageInput]]:
-        handlers = {}
+        handlers: dict[int, dict[str, StageInput]] = {}
 
         for chunk_id in range(num_microbatches):
             handlers[chunk_id] = {}
@@ -141,7 +141,7 @@ class StageCommunicationHandler:
             output_stage_index: int | None,
             output_args: dict[str, torch.Tensor]
     ) -> dict[str, StageOutput]:
-        handlers = {}
+        handlers: dict[str, StageOutput] = {}
 
         for output_name in output_args:
             if output_stage_index is None:
@@ -180,8 +180,11 @@ class StageCommunicationHandler:
         """
 
         for input_name, input_value in inputs.items():
-            prev_requires_grad = self._input_handlers[microbatch_index][input_name].buffer.requires_grad
-            self._input_handlers[microbatch_index][input_name].buffer = input_value.detach().requires_grad_(
+            handler = self._input_handlers[microbatch_index][input_name]
+            if not isinstance(handler, ReceiveStageInput):
+                raise RuntimeError("Tried to set a buffer of no-receive stage input")
+            prev_requires_grad = handler.buffer.requires_grad
+            handler.buffer = input_value.detach().requires_grad_(
                 prev_requires_grad)
 
     def get_inputs(self, microbatch_index: int) -> dict[str, torch.Tensor]:
@@ -194,12 +197,14 @@ class StageCommunicationHandler:
         Returns:
             Dictionary mapping input names to tensors.
         """
+        outputs: dict[str, torch.Tensor] = {}
 
-        return {
-            input_name: input_info.buffer
-            for input_name, input_info
-            in self._input_handlers[microbatch_index].items()
-        }
+        for input_name, input_info in self._input_handlers[microbatch_index].items():
+            if not isinstance(input_info, ReceiveStageInput):
+                raise RuntimeError("Tried to get a buffer of no receive stage input")
+            outputs[input_name] = input_info.buffer
+
+        return outputs
 
     def create_receive_ops(self, microbatch_index: int) -> list[dist.P2POp]:
         """

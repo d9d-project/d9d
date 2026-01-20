@@ -30,7 +30,7 @@ class _StateLoadingFlow:
         self._index = self._load_index()
         self._groups_to_process = set(mapper.state_dependency_groups())
 
-        self._stored_states = {}
+        self._stored_states: dict[str, torch.Tensor] = {}
 
         self._check_index()
 
@@ -47,7 +47,7 @@ class _StateLoadingFlow:
         return index
 
     def _check_index(self):
-        will_process_inputs = set()
+        will_process_inputs: set[str] = set()
         for group in self._groups_to_process:
             will_process_inputs.update(group.inputs)
 

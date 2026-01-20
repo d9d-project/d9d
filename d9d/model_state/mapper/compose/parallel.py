@@ -23,8 +23,8 @@ class ModelStateMapperParallel(ModelStateMapper):
         all_groups = set()
         inputs_to_mapper = {}
 
-        seen_inputs = set()
-        seen_outputs = set()
+        seen_inputs: set[str] = set()
+        seen_outputs: set[str] = set()
         for mapper in mappers:
             sub_groups = mapper.state_dependency_groups()
 

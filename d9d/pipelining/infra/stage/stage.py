@@ -4,7 +4,7 @@ import torch
 import torch.distributed as dist
 from torch import nn
 
-from d9d.pipelining.api import PipelineStageInfo
+from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo
 
 from .communications import StageCommunicationHandler
 from .computations import BackwardComputeHandler, ForwardComputeHandler
@@ -82,6 +82,8 @@ class PipelineStage:
         next_stage_idx = None if self._info.is_current_stage_last else self._info.current_stage + 1
 
         with torch.device("meta"):
+            if not isinstance(self._module, ModuleSupportsPipelining):
+                raise TypeError("Module does not implement ModuleSupportsPipelining protocol")
             inputs_meta = self._module.infer_stage_inputs_from_pipeline_inputs(
                 inputs=pipeline_inputs,
                 n_microbatches=num_microbatches
@@ -128,6 +130,9 @@ class PipelineStage:
         Used for the V-shape schedulers.
         """
 
+        if self._forward_comm is None:
+            raise ValueError("You must configure stage buffers first")
+
         self._forward_comm.set_inputs_local(inputs, microbatch_index)
 
     def get_local_fwd_output(self, microbatch_index: int) -> dict[str, torch.Tensor]:
@@ -151,15 +156,24 @@ class PipelineStage:
         if not self._has_backward:
             raise ValueError()
 
+        if self._backward_comm is None:
+            raise ValueError("You must configure stage buffers first")
+
         self._backward_comm.set_inputs_local(inputs, microbatch_index)
 
     def get_fwd_recv_ops(self, microbatch_index: int) -> list[dist.P2POp]:
         """Returns P2P ops to receive forward inputs for the given microbatch."""
 
+        if self._forward_comm is None:
+            raise ValueError("You must configure stage buffers first")
+
         return self._forward_comm.create_receive_ops(microbatch_index)
 
     def get_fwd_send_ops(self, microbatch_index: int) -> list[dist.P2POp]:
         """Returns P2P ops to send forward outputs for the given microbatch."""
+
+        if self._forward_comm is None:
+            raise ValueError("You must configure stage buffers first")
 
         fwd_result = self._forward_comp.get_outputs(microbatch_index)
         return self._forward_comm.create_send_ops(fwd_result)
@@ -170,6 +184,9 @@ class PipelineStage:
         if not self._has_backward:
             return []
 
+        if self._backward_comm is None:
+            raise ValueError("You must configure stage buffers first")
+
         return self._backward_comm.create_receive_ops(microbatch_index)
 
     def get_bwd_send_ops(self, microbatch_index: int) -> list[dist.P2POp]:
@@ -177,6 +194,9 @@ class PipelineStage:
 
         if not self._has_backward:
             return []
+
+        if self._backward_comm is None:
+            raise ValueError("You must configure stage buffers first")
 
         bwd_result = self._backward_comp.pop_for_sending(microbatch_index)
         return self._backward_comm.create_send_ops(bwd_result)
@@ -201,6 +221,9 @@ class PipelineStage:
         Returns:
             The output tensors of the forward pass.
         """
+
+        if self._forward_comm is None:
+            raise ValueError("You must configure stage buffers first")
 
         if self._info.is_current_stage_first:
             inputs = pipeline_inputs
@@ -236,11 +259,19 @@ class PipelineStage:
         if not self._has_backward:
             raise ValueError()
 
+        if self._backward_comm is None:
+            raise ValueError("You must configure stage buffers first")
+
         inputs, fwd_outputs = self._forward_comp.pop_inputs_outputs(microbatch_index)
 
+        outputs: dict[str, torch.Tensor]
+        outputs_grad: dict[str, torch.Tensor] | None
+
         if self._info.is_current_stage_last:
+            if loss is None:
+                raise ValueError("Cannot perform backward on last stage without loss specified")
             outputs = {"loss": loss}
-            outputs_grad = {"loss": None}
+            outputs_grad = None
         else:
             outputs = fwd_outputs
             outputs_grad = self._backward_comm.get_inputs(microbatch_index)

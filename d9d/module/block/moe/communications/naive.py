@@ -1,4 +1,7 @@
+from typing import cast
+
 import torch
+from torch import Size
 
 from d9d.kernel.moe import (
     fused_indices_to_multihot,
@@ -20,7 +23,7 @@ class NoCommunicationHandler(ExpertCommunicationHandler):
         """Constructs the NoCommunicationHandler."""
         self._num_experts = num_experts
 
-        self._hidden_shape_before_permute = None
+        self._hidden_shape_before_permute: Size | None = None
         self._unpermute_mapping = None
 
     def dispatch(
@@ -42,7 +45,7 @@ class NoCommunicationHandler(ExpertCommunicationHandler):
             hidden_states,
             routing_probs,
             routing_map,
-            num_out_tokens=tokens_per_expert.sum().item()
+            num_out_tokens=cast(int, tokens_per_expert.sum().item())
         )
 
         self._unpermute_mapping = reverse_permute_map

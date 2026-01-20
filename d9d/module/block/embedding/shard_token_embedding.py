@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import cast
 
 import torch
 from torch import nn
@@ -71,7 +72,7 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
             Tensor of same shape as input_ids plus a last dimension of hidden_size.
         """
 
-        metadata_weight = next(iter(self.token_embedding.values())).weight
+        metadata_weight = cast(torch.Tensor, next(iter(self.token_embedding.values())).weight)
         # todo custom cuda kernel for indexing and filling?
 
         embed = torch.empty(

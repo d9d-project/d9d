@@ -1,5 +1,6 @@
 import os
 import random
+from typing import cast
 
 import numpy as np
 import torch
@@ -42,8 +43,13 @@ def set_seeds(
     random.seed(seed)
     np.random.seed(seed)
 
-    duplicate_seed_mesh = [name for name in mesh_regular.mesh_dim_names if name != distinct_seed_mesh_dim]
-    duplicate_seed_mesh = mesh_regular[duplicate_seed_mesh] if len(duplicate_seed_mesh) != 0 else None
+    duplicate_seed_mesh_dim = tuple(
+        name
+        for name
+        in cast(list[str], mesh_regular.mesh_dim_names)
+        if name != distinct_seed_mesh_dim
+    )
+    duplicate_seed_mesh = mesh_regular[duplicate_seed_mesh_dim] if len(duplicate_seed_mesh_dim) != 0 else None
 
     if duplicate_seed_mesh and duplicate_seed_mesh.get_coordinate() is not None:
         torch.distributed.tensor._random.manual_seed(seed, duplicate_seed_mesh)  # noqa: SLF001

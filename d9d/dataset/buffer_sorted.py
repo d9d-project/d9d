@@ -5,10 +5,10 @@ from typing import Any, Protocol, TypeVar
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.utils.data import Dataset
 
-TDatasetReturn_co = TypeVar("TDatasetReturn_co", covariant=True)
+_T_co = TypeVar("_T_co", covariant=True)
 
 
-class DatasetImplementingSortKeyProtocol(Protocol[TDatasetReturn_co]):
+class DatasetImplementingSortKeyProtocol(Protocol[_T_co]):
     """
     Protocol for datasets that support retrieval of a specific key for sorting purposes.
 
@@ -32,12 +32,12 @@ class DatasetImplementingSortKeyProtocol(Protocol[TDatasetReturn_co]):
         """
         ...
 
-    def __getitem__(self, item: int) -> TDatasetReturn_co:
+    def __getitem__(self, item: int) -> _T_co:
         """Retrieves the item at the specific index."""
         ...
 
 
-class BufferSortedDataset(Dataset, Stateful):
+class BufferSortedDataset(Dataset[_T_co], Stateful):
     """
     A dataset wrapper that groups items into buffers, sorts them, and yields them with local shuffling.
 
@@ -55,7 +55,7 @@ class BufferSortedDataset(Dataset, Stateful):
 
     def __init__(
             self,
-            base_dataset: DatasetImplementingSortKeyProtocol[TDatasetReturn_co],
+            base_dataset: DatasetImplementingSortKeyProtocol[_T_co],
             buffer_size: int,
             pack_size: int,
             init_seed: int | None = None
@@ -75,7 +75,7 @@ class BufferSortedDataset(Dataset, Stateful):
         self._buffer_size = buffer_size
         self._pack_size = pack_size
 
-        self._rng = random.Random(init_seed ^ 0x105E7)
+        self._rng = random.Random(init_seed ^ 0x105E7 if init_seed is not None else None)
         self._buffer_indices: list[int] = []
         self._buffer_idx: int = -1
 
@@ -90,18 +90,18 @@ class BufferSortedDataset(Dataset, Stateful):
         local_idx = list(range(len(base_idx)))
         local_idx = sorted(local_idx, key=lambda local_id: base_sort_keys[local_id])
 
-        local_idx = [
+        local_idx_batch = [
             local_idx[i: i + self._pack_size]
             for i in range(0, len(local_idx), self._pack_size)
         ]
-        self._rng.shuffle(local_idx)
-        local_idx = [y for x in local_idx for y in x]
+        self._rng.shuffle(local_idx_batch)
+        local_idx = [y for x in local_idx_batch for y in x]
 
         self._buffer_indices = [base_idx[local_id] for local_id in local_idx]
 
         self._buffer_idx = buffer_idx
 
-    def __getitem__(self, index: int) -> TDatasetReturn_co:
+    def __getitem__(self, index: int) -> _T_co:
         """
         Retrieves an item from the locally sorted/shuffled buffer.
 

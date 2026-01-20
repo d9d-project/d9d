@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import cast
 
 import torch
 from torch import nn
@@ -65,9 +66,11 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
             shape of the labels tensor.
         """
 
-        lm_head_weight = torch.cat(
-            [self.lm_head[split_name].weight for split_name in self._split_order], dim=0
+        lm_head_weights = cast(
+            list[torch.Tensor],
+            [self.lm_head[split_name].weight for split_name in self._split_order]
         )
+        lm_head_weight = torch.cat(lm_head_weights, dim=0)
 
         losses = linear_cross_entropy(
             hidden_states,

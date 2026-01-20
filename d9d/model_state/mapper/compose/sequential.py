@@ -1,3 +1,6 @@
+from collections.abc import Sequence
+from collections.abc import Set as AbstractSet
+
 import torch
 
 from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
@@ -86,8 +89,8 @@ class ModelStateMapperSequential(ModelStateMapper):
         return ModelStateMapperSequential._merge_groups(list(outputs_depend_on_inputs.items()))
 
     @staticmethod
-    def _merge_groups(groups: list[tuple[frozenset[str], frozenset[str]]]) -> frozenset[StateGroup]:
-        saved_groups: list[tuple[set, set]] = []
+    def _merge_groups(groups: Sequence[tuple[AbstractSet[str], AbstractSet[str]]]) -> frozenset[StateGroup]:
+        saved_groups: list[tuple[set[str], set[str]]] = []
 
         saved_groups_modified = True
         while saved_groups_modified:

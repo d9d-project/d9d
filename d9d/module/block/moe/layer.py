@@ -6,6 +6,7 @@ from d9d.module.base import ModuleLateInit
 from d9d.module.block.moe import GroupedSwiGLU, TopKRouter
 from d9d.module.block.moe.communications import (
     DeepEpCommunicationHandler,
+    ExpertCommunicationHandler,
     NoCommunicationHandler,
 )
 
@@ -53,7 +54,7 @@ class MoELayer(nn.Module, ModuleLateInit):
             intermediate_dim=intermediate_dim_grouped,
             num_experts=num_grouped_experts
         )
-        self._communicator = NoCommunicationHandler(num_grouped_experts)
+        self._communicator: ExpertCommunicationHandler = NoCommunicationHandler(num_grouped_experts)
 
         self._num_grouped_experts = num_grouped_experts
         self._hidden_dim = hidden_dim

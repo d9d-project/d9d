@@ -121,6 +121,15 @@ extend-select = [
     "RUF",
     "TRY"
 ]
+fixable = [
+    "F401",
+    "UP035",
+    "I001",
+    "E302",
+    "E303",
+    "Q000",
+    "RUF022"
+]
 ignore = [
     "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {name}
     "S311",  # Standard pseudo-random generators are not suitable for cryptographic purposes
@@ -150,6 +159,9 @@ ignore = [
     "FURB118",  # Use operator.{operator} instead of defining a {target}
     "FURB140",  # Use itertools.starmap instead of the generator
     "TRY003",  # Avoid specifying long messages outside the exception class
+    "TC006",  # Add quotes to type expression in typing.cast()
+    "TRY004",  # Prefer TypeError exception for invalid type
+    "PGH003"  # Use specific rule codes when ignoring {} issues
 ]
 
 [tool.ruff.lint.flake8-annotations]
@@ -160,6 +172,7 @@ suppress-none-returning = true
     "S101", # asserts allowed in tests...
     "D",  # no docs for tests sorry
     "ANN",  # no type annotations for tests
+    "SLF001"  # private access is ok for tests
 ]
 
 [tool.ruff.lint.pep8-naming]
@@ -177,6 +190,15 @@ files = [
 disable_error_code = ["import-untyped"]
 
 disallow_untyped_defs = false  # checked by ruff
+check_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "d9d.kernel.*",
+    "d9d.module.block.moe.communications.deepep.*"
+]
+ignore_errors = true
+
 
 [tool.pydantic-mypy]
 init_forbid_extra = true

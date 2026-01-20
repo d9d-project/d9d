@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import cast
 
 import torch
 import torch.distributed as dist
@@ -9,7 +10,7 @@ def gather(
         group: dist.ProcessGroup,
         group_dst: int,
         async_op: bool = False
-) -> list[torch.Tensor] | tuple[list[torch.Tensor] | None, dist.Work]:
+) -> list[torch.Tensor] | tuple[list[torch.Tensor] | None, dist.Work] | None:
     """
     Gathers tensors from the process group to a specific destination rank.
 
@@ -95,7 +96,7 @@ def _all_gather_shapes(
     )
     all_ndim_wait.wait()
 
-    all_shape = [torch.empty(ndim, dtype=torch.long, device=tensor.device) for ndim in all_ndim]
+    all_shape = [torch.empty(cast(int, ndim.item()), dtype=torch.long, device=tensor.device) for ndim in all_ndim]
     all_shape_wait = dist.all_gather(
         all_shape,
         torch.tensor(tensor.shape, dtype=torch.long, device=tensor.device),
@@ -171,8 +172,8 @@ def gather_variadic_shape(
     all_shape = _all_gather_shapes(tensor, group)
 
     if is_current_dst:
-        all_recv_futures = []
-        all_result = [None for _ in range(group.size())]
+        all_recv_futures: list[dist.Work] = []
+        all_result: list[torch.Tensor] = cast(list[torch.Tensor], [None for _ in range(group.size())])
         for group_src_i in range(group.size()):
             if group_src_i == group_dst:
                 all_result[group_src_i] = tensor
@@ -180,10 +181,12 @@ def gather_variadic_shape(
             all_result[group_src_i] = torch.empty(
                 tuple(all_shape[group_src_i]), dtype=tensor.dtype, device=tensor.device
             )
-            all_recv_futures.append(dist.irecv(all_result[group_src_i], group=group, group_src=group_src_i))
+            all_recv_future = dist.irecv(all_result[group_src_i], group=group, group_src=group_src_i)
+            all_recv_future = cast(dist.Work, all_recv_future)  # we know we are on dst rank
+            all_recv_futures.append(all_recv_future)
         for recv_future in all_recv_futures:
             recv_future.wait()
         return all_result
     else:
-        dist.isend(tensor=tensor, group=group, group_dst=0)
+        dist.isend(tensor=tensor, group=group, group_dst=group_dst)
         return None

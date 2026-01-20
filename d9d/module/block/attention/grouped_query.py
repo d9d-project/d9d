@@ -61,16 +61,17 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             num_attention_heads * head_dim, hidden_size, bias=False
         )
 
+        self.q_norm: nn.RMSNorm | None
+        self.k_norm: nn.RMSNorm | None
+
         if qk_norm_eps is not None:
             self.q_norm = nn.RMSNorm(normalized_shape=head_dim,
                                      eps=qk_norm_eps)
             self.k_norm = nn.RMSNorm(normalized_shape=head_dim,
                                      eps=qk_norm_eps)
-            self._is_qk_norm_enabled = True
         else:
             self.q_norm = None
             self.k_norm = None
-            self._is_qk_norm_enabled = False
 
         self.rope = RotaryEmbeddingApplicator()
         self.kernel = FlashSdpa()
@@ -99,12 +100,12 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         hidden_shape = (*input_shape, -1, self._head_dim)
 
         query_states = self.q_proj(hidden_states).view(hidden_shape)
-        if self._is_qk_norm_enabled:
+        if self.q_norm is not None:
             query_states = self.q_norm(query_states)
         query_states = query_states.transpose(1, 2)
 
         key_states = self.k_proj(hidden_states).view(hidden_shape)
-        if self._is_qk_norm_enabled:
+        if self.k_norm is not None:
             key_states = self.k_norm(key_states)
         key_states = key_states.transpose(1, 2)
 
@@ -132,5 +133,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         self.k_proj.reset_parameters()
         self.v_proj.reset_parameters()
         self.o_proj.reset_parameters()
-        self.q_norm.reset_parameters()
-        self.k_norm.reset_parameters()
+        if self.q_norm is not None:
+            self.q_norm.reset_parameters()
+        if self.k_norm is not None:
+            self.k_norm.reset_parameters()

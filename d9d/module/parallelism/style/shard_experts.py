@@ -27,14 +27,19 @@ class ShardMoESparseExpertsParallel(ParallelStyle):
     def __init__(self, shard_dim_name: str):
         self._shard_dim_name = shard_dim_name
 
-    def _partition_experts(self, module_name: str, mod: GroupedLinear, device_mesh: DeviceMesh):
+    def _partition_experts(self, module_name: str, mod: nn.Module, device_mesh: DeviceMesh):
         if not isinstance(mod, GroupedLinear):
             raise TypeError("This plan should be applied only on GroupedLinear")
+
+        mesh_dim_names = device_mesh.mesh_dim_names
+
+        if mesh_dim_names is None:
+            raise ValueError("This plan should be applied only on named DeviceMeshes")
 
         placements = [
             Shard(0) if dim_name == self._shard_dim_name else Replicate()
             for dim_name
-            in device_mesh.mesh_dim_names
+            in mesh_dim_names
         ]
         weight = nn.Parameter(
             distribute_tensor(mod.weight, device_mesh, placements),

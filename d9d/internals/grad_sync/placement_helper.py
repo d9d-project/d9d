@@ -55,6 +55,9 @@ def mark_grad_sync_complete(param: nn.Parameter):
         param: The parameter to update.
     """
 
+    if param.grad is None or not isinstance(param.grad, DTensor):
+        raise ValueError("Cannot mark gradient sync complete for tensor without dist gradient")
+
     param.grad = DTensor.from_local(
         param.grad.to_local(),
         device_mesh=param.grad.device_mesh,
@@ -70,6 +73,9 @@ def mark_grad_sync_awaiting(param: nn.Parameter):
     Args:
         param: The parameter to update.
     """
+
+    if param.grad is None or not isinstance(param.grad, DTensor):
+        raise ValueError("Cannot mark gradient sync awaiting for tensor without dist gradient")
 
     param.grad = DTensor.from_local(
         param.grad.to_local(),

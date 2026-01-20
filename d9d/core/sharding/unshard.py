@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import Any
+from typing import Any, cast
 
 import torch
 import torch.utils._pytree as pytree  # noqa: PLC2701
@@ -24,6 +24,8 @@ def _unshard_leaf_from_group(
     # Validation: Items must be tensors
     if not isinstance(group[0], torch.Tensor):
         raise TypeError(f"Expected Tensors for Shard spec, got {type(group[0])}")
+
+    group = cast(list[torch.Tensor], group)  # if first element is tensor - skip runtime checks
 
     return torch.cat(group, dim=spec.dim)
 

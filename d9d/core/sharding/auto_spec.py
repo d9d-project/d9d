@@ -12,7 +12,7 @@ def _tree_item_to_shard(item: Any, shard_on_dim: int) -> Shard | None:
         return None
     if item.ndim == 0:
         return None
-    if item.ndim < shard_on_dim:
+    if item.ndim <= shard_on_dim:
         raise ValueError(f"Cannot shard {item.ndim}-dimensional tensor on dim {shard_on_dim}")
     return Shard(shard_on_dim)
 

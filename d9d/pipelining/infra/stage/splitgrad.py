@@ -1,7 +1,7 @@
 from collections import defaultdict, deque
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import torch
 from torch import nn
@@ -10,9 +10,9 @@ from torch.autograd.graph import GradientEdge, Node
 
 def stage_backward_full(
         outputs: list[torch.Tensor],
-        output_grads: list[torch.Tensor],
+        output_grads: list[torch.Tensor] | None,
         inputs: list[torch.Tensor]
-) -> list[torch.Tensor]:
+) -> list[torch.Tensor | None]:
     torch.autograd.backward(
         tensors=outputs,
         grad_tensors=output_grads
@@ -39,7 +39,7 @@ class ParamGroup:
                Set to None after use to free memory.
     """
     params: set[Node]
-    intermediates: list[GradientEdge] | None
+    intermediates: list[Node] | None
     grads: list[torch.Tensor | None] | None = None
 
 
@@ -48,6 +48,7 @@ def _get_grad_fn_or_grad_acc(t: torch.Tensor) -> Node | None:
         # hack from pytorch codebase to create accumulation op
         viewed_t = t.view_as(t)
         grad_fn = viewed_t.grad_fn
+        grad_fn = cast(Node, grad_fn)
         return grad_fn.next_functions[0][0]
     else:
         return t.grad_fn
@@ -84,7 +85,7 @@ def _reverse_closure(
     """
     closure: set[Node] = set()
     visited_target_nodes = set()
-    to_visit = deque()
+    to_visit: deque[Node] = deque()
 
     for node in roots:
         if node is not None and node not in closure:
@@ -165,7 +166,7 @@ def _make_capture_hook(group: ParamGroup, idx: int) -> Callable[[torch.Tensor], 
 
 @dataclass
 class BackwardInputResult:
-    input_grads: list[torch.Tensor] | None
+    input_grads: list[torch.Tensor | None]
     param_groups: list[ParamGroup]
     grad_ownership_tokens: list[Any]
 
@@ -246,6 +247,7 @@ def stage_backward_weight(  # noqa: C901
         # Ensure we have data
         if group.grads and group.intermediates:
             for grads_tuple, intermediate in zip(group.grads, group.intermediates, strict=True):
+                non_none: list[torch.Tensor]
                 if isinstance(grads_tuple, (tuple, list)):
                     non_none = [g for g in grads_tuple if g is not None]
                 elif grads_tuple is not None:

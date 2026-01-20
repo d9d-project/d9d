@@ -33,6 +33,9 @@ class WeightedMeanMetric(Metric):
         ]
 
     def wait_sync(self, dist_context: DistributedContext):
+        if self._handles is None:
+            raise RuntimeError("Sync was not triggered before")
+
         for handle in self._handles:
             handle.wait()
         self._handles = None

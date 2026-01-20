@@ -40,6 +40,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
         super().__init__()
         self.gate = nn.Linear(dim, num_experts, bias=False)
 
+        self.expert_bias: nn.Buffer | None
         if enable_expert_bias:
             self.expert_bias = nn.Buffer(
                 torch.empty(num_experts, dtype=torch.float32),
@@ -80,11 +81,11 @@ class TopKRouter(nn.Module, ModuleLateInit):
         # select top-k
         if self.expert_bias is None:
             scores, selected_experts_indices = torch.topk(
-                scores, k=self.top_k, dim=-1
+                scores, k=self._top_k, dim=-1
             )
         else:
             _, selected_experts_indices = torch.topk(
-                scores + self.expert_bias, k=self.top_k, dim=-1
+                scores + self.expert_bias, k=self._top_k, dim=-1
             )
             scores = scores.gather(dim=-1, index=selected_experts_indices)
 

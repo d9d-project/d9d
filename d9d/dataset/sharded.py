@@ -1,10 +1,10 @@
 import math
+from collections.abc import Sized
 from enum import StrEnum
-from typing import Any
+from typing import Any, TypeVar
 
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.utils.data import Dataset
-from torch.utils.data.dataset import _T_co
 
 
 class ShardIndexingMode(StrEnum):
@@ -31,7 +31,10 @@ class ShardIndexingMode(StrEnum):
     chunked = "chunked"
 
 
-class ShardedDataset(Dataset, Stateful):
+_T_co = TypeVar("_T_co", covariant=True)
+
+
+class ShardedDataset(Dataset[_T_co], Stateful):
     """
     A dataset wrapper that acts as a view onto a specific shard of the underlying dataset.
 
@@ -42,7 +45,7 @@ class ShardedDataset(Dataset, Stateful):
 
     def __init__(
             self,
-            dataset: Dataset,
+            dataset: Dataset[_T_co],
             total_shards: int,
             current_shard: int,
             indexing_mode: ShardIndexingMode,
@@ -60,6 +63,9 @@ class ShardedDataset(Dataset, Stateful):
                 so that all shards report the same length. The last standard element is repeated.
         """
 
+        if not isinstance(dataset, Sized):
+            raise ValueError("Dataset should implement __len__ method")
+
         self._dataset = dataset
 
         self._total_shards = total_shards
@@ -71,7 +77,7 @@ class ShardedDataset(Dataset, Stateful):
     def _compute_real_index_sequential(self, index: int) -> int:
         return index * self._total_shards + self._current_shard
 
-    def _get_base_index_unsafe(self, index: int) -> _T_co:
+    def _get_base_index_unsafe(self, index: int) -> int:
         """
         Calculates the underlying dataset index for a given shard index,
         without boundary checking.
@@ -87,6 +93,8 @@ class ShardedDataset(Dataset, Stateful):
                 shard_start_offset = ceil_len * self._current_shard
 
                 return shard_start_offset + index
+            case _:
+                raise ValueError(f"Unknown shard indexing mode: {self._indexing_mode}")
 
     def __getitem__(self, index: int) -> _T_co:
         """
@@ -144,7 +152,7 @@ class ShardedDataset(Dataset, Stateful):
         self._current_shard = state_dict["current_shard"]
 
     def state_dict(self) -> dict[str, Any]:
-        dct = {
+        dct: dict[str, Any] = {
             "total_shards": self._total_shards,
             "current_shard": self._current_shard
         }

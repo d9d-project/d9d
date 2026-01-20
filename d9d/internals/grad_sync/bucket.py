@@ -1,4 +1,5 @@
 import abc
+from typing import cast
 
 import torch
 import torch.distributed as dist
@@ -89,6 +90,8 @@ class LocalGradientBucket(AbstractGradientBucket):
         """
 
         for param in self._params:
+            if param.grad is None:
+                raise ValueError("Grad should be bound to buffer")
             param.grad.zero_()
 
 
@@ -164,6 +167,9 @@ class SyncGradientBucket(AbstractGradientBucket):
             reduce_mesh: DeviceMesh on which reduction happens.
         """
 
+        if not all(isinstance(x.data, DTensor) for x in parameters):
+            raise ValueError("All parameters passed in synchronizable bucket should contain DTensor data")
+
         self._params = parameters
         self._accum_counter = AccumulationCounter(require_accumulations, parameters)
         self._device = device
@@ -180,7 +186,7 @@ class SyncGradientBucket(AbstractGradientBucket):
         Allocates the flat buffer and redirects parameter gradients to view into it.
         """
 
-        buffer_size = sum(param.data.to_local().numel() for param in self._params)
+        buffer_size = sum(cast(DTensor, param.data).to_local().numel() for param in self._params)
 
         self._buffer = torch.zeros(
             (buffer_size,),
@@ -191,7 +197,7 @@ class SyncGradientBucket(AbstractGradientBucket):
         offset = 0
 
         for param in self._params:
-            data: DTensor = param.data
+            data = cast(DTensor, param.data)
             local_param = data.to_local()
 
             local_grad = self._buffer[offset:offset + local_param.numel()].view(local_param.shape)
@@ -258,6 +264,9 @@ class SyncGradientBucket(AbstractGradientBucket):
         Removes all registered hooks.
         """
 
+        if self._hooks is None:
+            return
+
         for hook in self._hooks:
             hook.remove()
         self._hooks = None
@@ -277,6 +286,9 @@ class SyncGradientBucket(AbstractGradientBucket):
         Blocks until the async reduction job is complete and marks sync as done.
         """
 
+        if self._reduce_job is None:
+            raise ValueError("Cannot wait for bucket that was not pending sync")
+
         self._reduce_job.wait()
 
         for param in self._params:
@@ -291,10 +303,11 @@ class SyncGradientBucket(AbstractGradientBucket):
             ValueError: If the buffer is not initialized (call bind first).
         """
 
-        if self._buffer is None:
+        buffer = self._buffer
+        if buffer is None:
             raise ValueError("Buffer is not initialized")
 
-        self._buffer.zero_()
+        buffer.zero_()
         self._accum_counter.reset()
         for param in self._params:
             mark_grad_sync_awaiting(param)

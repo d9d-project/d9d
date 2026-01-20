@@ -1,6 +1,5 @@
-from .swiglu import SwiGLU, SwiGLUParameters
+from .swiglu import SwiGLU
 
 __all__ = [
-    "SwiGLU",
-    "SwiGLUParameters"
+    "SwiGLU"
 ]

@@ -64,7 +64,7 @@ class DistributedContext:
                 level=log_level
             )
         else:
-            self._meshes = None
+            self._meshes = {}
             self._num_nodes = 1
             self._logger = build_dist_logger("local", level=log_level)
 

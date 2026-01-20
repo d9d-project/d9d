@@ -130,7 +130,7 @@ class BackwardCacheInputForWeight:
 @dataclasses.dataclass(kw_only=True, slots=True)
 class BackwardCacheInputForFull:
     stage_outputs_or_loss: list[torch.Tensor]
-    output_grads: list[torch.Tensor]
+    output_grads: list[torch.Tensor] | None
     input_values: list[torch.Tensor]
 
 
@@ -140,7 +140,7 @@ class BackwardCacheFull:
     State preserved after calculating weight gradients.
     """
 
-    inputs_grad: dict[str, torch.Tensor]
+    inputs_grad: dict[str, torch.Tensor | None]
 
 
 class BackwardComputeHandler:
@@ -194,7 +194,7 @@ class BackwardComputeHandler:
 
         inputs_grad_linear = stage_backward_full(
             outputs=outputs_flattener.flatten(outputs),
-            output_grads=outputs_flattener.flatten(outputs_grad),
+            output_grads=outputs_flattener.flatten(outputs_grad) if outputs_grad is not None else None,
             inputs=inputs_flattener.flatten(inputs)
         )
 
@@ -231,13 +231,13 @@ class BackwardComputeHandler:
         if is_first_stage:
             self._cache[microbatch_index] = BackwardCacheInputForFull(
                 stage_outputs_or_loss=outputs_flattener.flatten(outputs),
-                output_grads=outputs_flattener.flatten(outputs_grad),
+                output_grads=outputs_flattener.flatten(outputs_grad) if outputs_grad is not None else None,
                 input_values=inputs_flattener.flatten(inputs)
             )
         else:
             results = stage_backward_input(
                 outputs=outputs_flattener.flatten(outputs),
-                output_grads=outputs_flattener.flatten(outputs_grad),
+                output_grads=outputs_flattener.flatten(outputs_grad) if outputs_grad is not None else None,
                 inputs=inputs_flattener.flatten(inputs),
                 weights=self._module.parameters()
             )
@@ -293,8 +293,12 @@ class BackwardComputeHandler:
         """
         cached = self._cache[microbatch_index]
 
-        # Pop only if it is BW
-        if isinstance(cached, BackwardCacheFull):
-            del self._cache[microbatch_index]
+        match cached:
+            case BackwardCacheFull():
+                del self._cache[microbatch_index]
+            case BackwardCacheInputForWeight():
+                pass
+            case _:
+                raise ValueError("You should call either backward_full or backward_input before popping cached grad")
 
         return cached.inputs_grad

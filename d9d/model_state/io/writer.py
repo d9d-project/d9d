@@ -1,6 +1,7 @@
 import warnings
 from collections.abc import Iterable
 from pathlib import Path
+from typing import cast
 
 import torch
 from safetensors.torch import save_file
@@ -37,10 +38,10 @@ class _StateWritingFlowLocal:
 
         self._groups_to_process = set(mapper.state_dependency_groups())
 
-        self._available_source_states = {}
+        self._available_source_states: dict[str, torch.Tensor] = {}
 
         self._total_size = 0
-        self._pending_write_tensors = {}
+        self._pending_write_tensors: dict[str, torch.Tensor] = {}
         self._current_shard_size = 0
 
         self._sharding_rank = sharding_rank
@@ -204,6 +205,9 @@ def write_model_state_local(
         sharding_rank=0,
         is_current_process_rank_master=True
     ).write(state_generator=state_generator)
+
+    idx = cast(ModelStateIndex, idx)  # we are sure is_current_process_rank_master=True
+
     _finalize_master(dest_dir, [idx])
 
 
@@ -242,9 +246,9 @@ def write_model_state_distributed(
         is_current_process_rank_master=True
     ).write(state_generator=state_generator)
     gather_idx = all_gather_object(current_idx, process_group)
-    gather_idx = [x for x in gather_idx if x is not None]
+    gather_idx_filter = [x for x in gather_idx if x is not None]
     if process_group.rank() == 0:
-        _finalize_master(dest_dir, gather_idx)
+        _finalize_master(dest_dir, gather_idx_filter)
 
 
 def write_model_state_pipeline_parallel(
@@ -277,10 +281,16 @@ def write_model_state_pipeline_parallel(
     """
 
     pipeline_rank = device_mesh[pipeline_dim_name].get_rank()
+
+    mesh_dim_names = device_mesh.mesh_dim_names
+    coords = device_mesh.get_coordinate()
+    if mesh_dim_names is None or coords is None:
+        raise ValueError("Cannot save state using a DeviceMesh with no dim names or coords")
+
     non_pipeline_coord_sum = sum(
         coord
         for name, coord
-        in zip(device_mesh.mesh_dim_names, device_mesh.get_coordinate(), strict=True)
+        in zip(mesh_dim_names, coords, strict=True)
         if name != pipeline_dim_name
     )
     master_within_pipeline_rank = non_pipeline_coord_sum == 0
@@ -294,6 +304,6 @@ def write_model_state_pipeline_parallel(
         is_current_process_rank_master=master_within_pipeline_rank
     ).write(state_generator=state_generator)
     gather_idx = all_gather_object(current_idx, device_mesh.get_group(0))
-    gather_idx = [x for x in gather_idx if x is not None]
+    gather_idx_filter = [x for x in gather_idx if x is not None]
     if pipeline_rank == 0 and master_within_pipeline_rank:
-        _finalize_master(dest_dir, gather_idx)
+        _finalize_master(dest_dir, gather_idx_filter)
