@@ -1,6 +1,8 @@
-from typing import Any, List, Sequence
+from collections.abc import Sequence
+from typing import Any
+
 import torch
-import torch.utils._pytree as pytree
+import torch.utils._pytree as pytree  # noqa: PLC2701
 from torch.distributed.tensor import Shard
 
 from d9d.core.sharding import ShardingSpec
@@ -17,11 +19,11 @@ def _unshard_leaf_from_group(
         return group[0]
 
     if not isinstance(spec, Shard):
-        raise ValueError(f'Unknown sharding spec object type: {type(spec)}')
+        raise TypeError(f"Unknown sharding spec object type: {type(spec)}")
 
     # Validation: Items must be tensors
     if not isinstance(group[0], torch.Tensor):
-        raise ValueError(f"Expected Tensors for Shard spec, got {type(group[0])}")
+        raise TypeError(f"Expected Tensors for Shard spec, got {type(group[0])}")
 
     return torch.cat(group, dim=spec.dim)
 
@@ -65,7 +67,7 @@ def unshard_tree(
     # flat_shards_per_rank: List[List[Any]] -> One list of leaves per rank
     flat_shards_per_rank = []
     for i, tree in enumerate(sharded_trees):
-        leaves, struct = pytree.tree_flatten(tree)
+        leaves, _ = pytree.tree_flatten(tree)
         if len(leaves) != len(flat_spec):
             raise ValueError(
                 f"Structure mismatch at rank {i}: tree has {len(leaves)} leaves "
@@ -78,12 +80,12 @@ def unshard_tree(
     # 3. Transpose: Sequence[List[Any]] -> List[Sequence[Any]]
     # We want to group the i-th leaf from all ranks together
     # grouped_leaves[i] = (leaf_i_rank0, leaf_i_rank1, ...)
-    grouped_leaves = list(zip(*flat_shards_per_rank))
+    grouped_leaves = list(zip(*flat_shards_per_rank, strict=True))
 
     # 4. Merge groups
     reconstructed_leaves = [
         _unshard_leaf_from_group(group, spec)
-        for group, spec in zip(grouped_leaves, flat_spec)
+        for group, spec in zip(grouped_leaves, flat_spec, strict=True)
     ]
 
     # 5. Reconstruct single tree

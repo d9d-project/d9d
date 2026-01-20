@@ -1,10 +1,11 @@
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Literal, Self, Generator, Any
+from typing import Any, Literal, Self
 
 import torch
 from pydantic import BaseModel
 
-from d9d.tracker import BaseTrackerRun, BaseTracker, RunConfig
+from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig
 
 
 class NullTrackerConfig(BaseModel):
@@ -15,7 +16,7 @@ class NullTrackerConfig(BaseModel):
         provider: Discriminator field, must be 'null'.
     """
 
-    provider: Literal['null'] = 'null'
+    provider: Literal["null"] = "null"
 
 
 class NullRun(BaseTrackerRun):

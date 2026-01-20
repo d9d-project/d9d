@@ -1,10 +1,17 @@
 from collections import defaultdict, deque
-from typing import Deque
 
-from ..component.program import ScheduleStyle, add_communication_ops, \
-    build_stage_to_host_rank_topology, PipelineProgramBuilder
-from ..component.runtime import BackwardFullInputComputeAction, ForwardComputeAction, \
-    ActionBase, BackwardWeightComputeAction
+from ..component.program import (
+    PipelineProgramBuilder,
+    ScheduleStyle,
+    add_communication_ops,
+    build_stage_to_host_rank_topology,
+)
+from ..component.runtime import (
+    ActionBase,
+    BackwardFullInputComputeAction,
+    BackwardWeightComputeAction,
+    ForwardComputeAction,
+)
 
 
 class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
@@ -106,7 +113,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
             num_stages=num_stages,
         )
 
-    def _generate_rank_schedule(
+    def _generate_rank_schedule(  # noqa: C901
             self,
             rank: int,
             pp_size: int,
@@ -126,7 +133,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
 
         # FIFO Queue for deferred weight gradients in Zero Bubble
         # Stores: (stage_idx, microbatch_idx)
-        pending_weights: Deque[tuple[int, int]] = deque()
+        pending_weights: deque[tuple[int, int]] = deque()
 
         # -- Helpers --
 
@@ -138,7 +145,9 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
             return (op_idx // microbatches_per_round) % self._num_stages_per_rank
 
         def get_bwd_local_idx(op_idx: int, warmup_offset: int) -> int:
-            return self._num_stages_per_rank - 1 - ((op_idx - warmup_offset) // microbatches_per_round) % self._num_stages_per_rank
+            return (self._num_stages_per_rank
+                    - 1
+                    - ((op_idx - warmup_offset) // microbatches_per_round) % self._num_stages_per_rank)
 
         def emit_forward(op_idx: int):
             local_idx = get_fwd_local_idx(op_idx)

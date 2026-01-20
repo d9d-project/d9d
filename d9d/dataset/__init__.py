@@ -6,7 +6,8 @@ from .buffer_sorted import BufferSortedDataset, DatasetImplementingSortKeyProtoc
 from .sharded import ShardedDataset, ShardIndexingMode
 
 __all__ = [
-    "BufferSortedDataset", "DatasetImplementingSortKeyProtocol",
-    "ShardedDataset", "ShardIndexingMode"
+    "BufferSortedDataset",
+    "DatasetImplementingSortKeyProtocol",
+    "ShardIndexingMode",
+    "ShardedDataset"
 ]
-

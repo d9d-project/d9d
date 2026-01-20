@@ -6,11 +6,11 @@ parallelism strategies to PyTorch modules compatible with the d9d ecosystem.
 """
 
 from .expert_parallel import parallelize_expert_parallel
-from .replicate_parallel import parallelize_replicate
 from .fully_sharded import parallelize_fsdp
+from .replicate_parallel import parallelize_replicate
 
 __all__ = [
     "parallelize_expert_parallel",
-    "parallelize_replicate",
-    "parallelize_fsdp"
+    "parallelize_fsdp",
+    "parallelize_replicate"
 ]

@@ -1,6 +1,10 @@
 import torch
 
-from d9d.kernel.moe import fused_indices_to_multihot, moe_unpermute_mask, moe_permute_with_probs
+from d9d.kernel.moe import (
+    fused_indices_to_multihot,
+    moe_permute_with_probs,
+    moe_unpermute_mask,
+)
 from d9d.module.block.moe.communications import ExpertCommunicationHandler
 
 

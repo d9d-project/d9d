@@ -3,13 +3,13 @@ from typing import Any
 
 import torch
 
-
 # TODO: feature - support any PyTrees as pipeline parameters
 
 
 class PipelineSchedule(abc.ABC):
     """Abstract base class defining the interface for pipeline execution schedules."""
 
+    @abc.abstractmethod
     def configure_buffers(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
         """
         Configures internal state and buffers based on input shapes.
@@ -24,6 +24,7 @@ class PipelineSchedule(abc.ABC):
 
         ...
 
+    @abc.abstractmethod
     def step(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
         """
         Executes a single pipeline step using the provided inputs.

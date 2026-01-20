@@ -15,7 +15,7 @@ class AimConfig(BaseModel):
         system_tracking_interval: Interval in seconds for system monitoring.
     """
 
-    provider: Literal['aim'] = 'aim'
+    provider: Literal["aim"] = "aim"
 
     repo: str
     log_system_params: bool = True

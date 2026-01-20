@@ -1,5 +1,5 @@
 from torch import Tensor, nn
-from torch.distributed.tensor import Placement, Shard, Replicate, Partial, DTensor
+from torch.distributed.tensor import DTensor, Partial, Placement, Replicate, Shard
 
 
 def map_placement_for_grad_sync(placement: Placement) -> Placement:
@@ -23,9 +23,9 @@ def map_placement_for_grad_sync(placement: Placement) -> Placement:
         case Shard():
             return placement
         case Replicate():
-            return Partial('sum')
+            return Partial("sum")
         case _:
-            raise ValueError(f'Unknown placement {placement}')
+            raise ValueError(f"Unknown placement {placement}")
 
 
 def dist_grad_from_local(data: DTensor, local_grad: Tensor):
@@ -99,4 +99,4 @@ def map_placement_for_grad_after_sync(placement: Placement) -> Placement:
         case Partial():
             return Replicate()
         case _:
-            raise ValueError(f'Unknown placement {placement}')
+            raise ValueError(f"Unknown placement {placement}")

@@ -1,21 +1,35 @@
 import dataclasses
-from typing import Callable, TypeVar
+from collections.abc import Callable
+from typing import TypeVar
 
 from torch import nn
 
-from .config import PipelineScheduleGPipeConfig, PipelineSchedule1F1BConfig, PipelineScheduleInferenceConfig, \
-    PipelineScheduleDualPipeVConfig, PipelineScheduleLoopedBFSConfig, PipelineScheduleZeroBubbleVConfig, \
-    AnyPipelineScheduleConfig
-from ..api import PipelineSchedule, PipelineStageInfo, PipelineShardingSpec
-from ..infra.schedule.component.program import invert_stage_to_host_rank_topology, PipelineProgramBuilder, \
-    build_stage_to_host_rank_topology
+from ...core.dist_context import REGULAR_DOMAIN, DistributedContext
+from ..api import PipelineSchedule, PipelineShardingSpec, PipelineStageInfo
+from ..infra.schedule.component.program import (
+    PipelineProgramBuilder,
+    build_stage_to_host_rank_topology,
+    invert_stage_to_host_rank_topology,
+)
 from ..infra.schedule.component.runtime import PipelineScheduleExecutor
-from ..infra.schedule.program import LoopedBFSPipelineProgramBuilder, Interleaved1F1BPipelineProgramBuilder, \
-    DualPipeVPipelineProgramBuilder, ZeroBubbleVPipelineProgramBuilder
+from ..infra.schedule.program import (
+    DualPipeVPipelineProgramBuilder,
+    Interleaved1F1BPipelineProgramBuilder,
+    LoopedBFSPipelineProgramBuilder,
+    ZeroBubbleVPipelineProgramBuilder,
+)
 from ..infra.stage import PipelineStage
-from ...core.dist_context import DistributedContext, REGULAR_DOMAIN
+from .config import (
+    AnyPipelineScheduleConfig,
+    PipelineSchedule1F1BConfig,
+    PipelineScheduleDualPipeVConfig,
+    PipelineScheduleGPipeConfig,
+    PipelineScheduleInferenceConfig,
+    PipelineScheduleLoopedBFSConfig,
+    PipelineScheduleZeroBubbleVConfig,
+)
 
-TConfig = TypeVar('TConfig', bound=AnyPipelineScheduleConfig)
+TConfig = TypeVar("TConfig", bound=AnyPipelineScheduleConfig)
 
 _CONFIG_TO_PROGRAM_REGISTRY: dict[type[TConfig], Callable[[TConfig], PipelineProgramBuilder]] = {
     PipelineScheduleGPipeConfig: (
@@ -84,7 +98,7 @@ def build_schedule(
     """
 
     program_builder = _CONFIG_TO_PROGRAM_REGISTRY[type(schedule_config)](schedule_config)
-    mesh = dist_context.mesh_for(REGULAR_DOMAIN)['pp']
+    mesh = dist_context.mesh_for(REGULAR_DOMAIN)["pp"]
 
     num_stages = program_builder.num_stages_per_rank * mesh.size()
 
@@ -95,7 +109,6 @@ def build_schedule(
     )
     host_to_stage = invert_stage_to_host_rank_topology(stage_to_host)
     this_rank_stages = host_to_stage[mesh.get_local_rank()]
-
 
     stages = []
     modules = []

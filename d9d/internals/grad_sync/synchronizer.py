@@ -6,7 +6,7 @@ from torch import nn
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor, Partial, Shard
 
-from .bucket import AbstractGradientBucket, SyncGradientBucket, LocalGradientBucket
+from .bucket import AbstractGradientBucket, LocalGradientBucket, SyncGradientBucket
 from .placement_helper import map_placement_for_grad_sync
 
 
@@ -27,13 +27,13 @@ def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
         grad_placement = map_placement_for_grad_sync(dim_placement)
         match grad_placement:
             case Partial():
-                if grad_placement.reduce_op != 'sum':
-                    raise ValueError(f'Unknown grad placement: {grad_placement}')
+                if grad_placement.reduce_op != "sum":
+                    raise ValueError(f"Unknown grad placement: {grad_placement}")
                 reduce_dims.add(dim_i)
             case Shard():
                 pass
             case _:
-                raise ValueError(f'Unknown grad placement: {grad_placement}')
+                raise ValueError(f"Unknown grad placement: {grad_placement}")
 
     if len(reduce_dims) == 0:
         return None
@@ -80,7 +80,7 @@ def _group_params_for_buckets(
                 continue
 
             if not isinstance(param.data, DTensor):
-                raise ValueError('All params should be DTensors in a distributed setup')
+                raise TypeError("All params should be DTensors in a distributed setup")
 
             reduce_mesh = _find_reduce_mesh(param.data)
 

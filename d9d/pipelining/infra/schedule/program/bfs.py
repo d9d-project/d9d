@@ -1,7 +1,14 @@
-from ..component.program import ScheduleStyle, add_communication_ops, \
-    build_stage_to_host_rank_topology, PipelineProgramBuilder
-from ..component.runtime import BackwardFullInputComputeAction, ForwardComputeAction, \
-    ActionBase
+from ..component.program import (
+    PipelineProgramBuilder,
+    ScheduleStyle,
+    add_communication_ops,
+    build_stage_to_host_rank_topology,
+)
+from ..component.runtime import (
+    ActionBase,
+    BackwardFullInputComputeAction,
+    ForwardComputeAction,
+)
 
 
 class LoopedBFSPipelineProgramBuilder(PipelineProgramBuilder):

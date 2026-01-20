@@ -8,4 +8,3 @@ class ModuleLateInit(Protocol):
 
     def reset_parameters(self):
         """Resets the module parameters (i.e. performs random initialization)."""
-        pass

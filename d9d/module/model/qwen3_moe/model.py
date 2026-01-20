@@ -6,8 +6,16 @@ from d9d.module.base import ModuleLateInit
 from d9d.module.block.embedding import SplitTokenEmbeddings
 from d9d.module.block.head import SplitLanguageModellingHead
 from d9d.module.block.positional import RotaryEmbeddingProvider
-from d9d.module.model.qwen3_moe import Qwen3MoEParameters, Qwen3MoELayer, Qwen3MoEForCausalLMParameters
-from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo, distribute_layers_for_pipeline_stage
+from d9d.module.model.qwen3_moe import (
+    Qwen3MoEForCausalLMParameters,
+    Qwen3MoELayer,
+    Qwen3MoEParameters,
+)
+from d9d.pipelining.api import (
+    ModuleSupportsPipelining,
+    PipelineStageInfo,
+    distribute_layers_for_pipeline_stage,
+)
 
 
 def _aggregate_hidden_states(hidden_states: torch.Tensor, agg_mask: torch.Tensor):
@@ -147,16 +155,15 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         if self._stage.is_current_stage_last:
             last_hidden_states = self.norm(last_hidden_states)
 
-
         outputs = {
-            'hidden_states': last_hidden_states
+            "hidden_states": last_hidden_states
         }
 
         if self._output_hidden_states_snapshot:
             hidden_states_to_output = torch.stack(hidden_states_to_output, dim=0)
             if hidden_states_snapshot is not None:
                 hidden_states_to_output = torch.cat([hidden_states_snapshot, hidden_states_to_output], dim=0)
-            outputs['hidden_states_snapshot'] = hidden_states_to_output
+            outputs["hidden_states_snapshot"] = hidden_states_to_output
 
         return outputs
 
@@ -200,26 +207,26 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
     def infer_stage_inputs_from_pipeline_inputs(
             self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
-        input_ids = inputs['input_ids']
+        input_ids = inputs["input_ids"]
 
         pp_inputs = {}
 
         # for calculation - input ids or prev hidden state
         if self._stage.is_current_stage_first:
-            pp_inputs['input_ids'] = torch.empty(
+            pp_inputs["input_ids"] = torch.empty(
                 (input_ids.shape[0] // n_microbatches, input_ids.shape[1]),
                 dtype=torch.long,
                 device=input_ids.device
             )
         else:
-            pp_inputs['hidden_states'] = torch.empty(
+            pp_inputs["hidden_states"] = torch.empty(
                 (input_ids.shape[0] // n_microbatches, input_ids.shape[1], self._hidden_size),
                 dtype=self.output_dtype(),
                 device=input_ids.device
             )
             if self._output_hidden_states_snapshot:
                 num_layers_before = self._num_layers_before + 1  # 1 for embedding
-                pp_inputs['hidden_states_snapshot'] = torch.empty(
+                pp_inputs["hidden_states_snapshot"] = torch.empty(
                     (num_layers_before, input_ids.shape[0] // n_microbatches, self._hidden_size),
                     dtype=self.output_dtype(),
                     device=input_ids.device
@@ -230,11 +237,11 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
     def infer_stage_outputs_from_pipeline_inputs(
             self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
-        input_ids = inputs['input_ids']
+        input_ids = inputs["input_ids"]
 
         # for calculation - last hidden state
         pp_outputs = {
-            'hidden_states': torch.empty(
+            "hidden_states": torch.empty(
                 (input_ids.shape[0] // n_microbatches, input_ids.shape[1], self._hidden_size),
                 dtype=self.output_dtype(),
                 device=input_ids.device
@@ -246,7 +253,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             num_layers_before = self._num_layers_before + 1
             num_layers_current = len(self.layers)
             num_layers_after = num_layers_before + num_layers_current
-            pp_outputs['hidden_states_snapshot'] = torch.empty(
+            pp_outputs["hidden_states_snapshot"] = torch.empty(
                 (num_layers_after, input_ids.shape[0] // n_microbatches, self._hidden_size),
                 dtype=self.output_dtype(),
                 device=input_ids.device
@@ -335,10 +342,10 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         )
         if self._stage.is_current_stage_last:
             lm_out = self.lm_head(
-                hidden_states=model_outputs['hidden_states'],
+                hidden_states=model_outputs["hidden_states"],
                 labels=labels
             )
-            model_outputs['logps'] = lm_out
+            model_outputs["logps"] = lm_out
         return model_outputs
 
     def reset_parameters(self):
@@ -377,6 +384,6 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(inputs, n_microbatches)
 
         if self._stage.is_current_stage_last:
-            pp_outputs['logps'] = torch.empty(inputs['input_ids'].shape, dtype=torch.float32)
+            pp_outputs["logps"] = torch.empty(inputs["input_ids"].shape, dtype=torch.float32)
 
         return pp_outputs

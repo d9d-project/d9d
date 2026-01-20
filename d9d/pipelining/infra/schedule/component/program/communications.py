@@ -1,8 +1,16 @@
 import copy
 import dataclasses
 
-from ..runtime.action import ActionBase, ComposeAction, ForwardComputeAction, BackwardFullInputComputeAction, \
-    ForwardReceiveAction, BackwardReceiveAction, ForwardSendAction, BackwardSendAction
+from ..runtime.action import (
+    ActionBase,
+    BackwardFullInputComputeAction,
+    BackwardReceiveAction,
+    BackwardSendAction,
+    ComposeAction,
+    ForwardComputeAction,
+    ForwardReceiveAction,
+    ForwardSendAction,
+)
 
 
 def _get_sub_actions(action: ActionBase) -> tuple[ActionBase, ...]:
@@ -162,7 +170,9 @@ def add_communication_ops(
             sub_actions = _get_sub_actions(current_action)
 
             # Check readiness
-            if not check_action_communication_dependencies_fulfilled(current_action, completed_events[rank], num_stages):
+            if not check_action_communication_dependencies_fulfilled(
+                    current_action, completed_events[rank], num_stages
+            ):
                 continue
 
             # Execute

@@ -2,7 +2,7 @@ from typing import TypeVar
 
 import torch.distributed as dist
 
-T = TypeVar('T')
+T = TypeVar("T")
 
 
 def gather_object(

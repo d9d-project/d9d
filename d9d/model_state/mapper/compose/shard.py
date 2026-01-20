@@ -25,7 +25,7 @@ class ModelStateMapperShard(ModelStateMapper):
 
     @staticmethod
     def _shard_groups(groups: frozenset[StateGroup], n_shards: int, shard: int) -> frozenset[StateGroup]:
-        groups_sorted = sorted(list(groups), key=lambda x: sorted(list(x.inputs)))
+        groups_sorted = sorted(groups, key=lambda x: sorted(x.inputs))
         groups_shard = [x for i, x in enumerate(groups_sorted) if i % n_shards == shard]
         return frozenset(groups_shard)
 

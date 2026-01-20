@@ -41,8 +41,8 @@ class ActionWorkType(StrEnum):
         communicate: Indicates the action involves network I/O components (send, receive).
     """
 
-    compute = 'compute'
-    communicate = 'communicate'
+    compute = "compute"
+    communicate = "communicate"
 
 
 class ActionBase(abc.ABC):
@@ -107,7 +107,7 @@ class ForwardSendAction(ActionBase):
         return False
 
     def __str__(self) -> str:
-        return f'{self.stage_idx}SEND_F{self.microbatch_idx}'
+        return f"{self.stage_idx}SEND_F{self.microbatch_idx}"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -135,7 +135,7 @@ class BackwardSendAction(ActionBase):
         return True
 
     def __str__(self) -> str:
-        return f'{self.stage_idx}SEND_B{self.microbatch_idx}'
+        return f"{self.stage_idx}SEND_B{self.microbatch_idx}"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -163,7 +163,7 @@ class ForwardReceiveAction(ActionBase):
         return True
 
     def __str__(self) -> str:
-        return f'{self.stage_idx}RECV_F{self.microbatch_idx}'
+        return f"{self.stage_idx}RECV_F{self.microbatch_idx}"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -191,7 +191,7 @@ class BackwardReceiveAction(ActionBase):
         return True
 
     def __str__(self) -> str:
-        return f'{self.stage_idx}RECV_B{self.microbatch_idx}'
+        return f"{self.stage_idx}RECV_B{self.microbatch_idx}"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -211,7 +211,7 @@ class ForwardComputeAction(ActionBase):
         # todo check unsharded
         stage = ctx.stages[self.stage_idx]
 
-        if not stage.info.is_current_stage_first and not self.stage_idx - 1 in ctx.stages:
+        if not stage.info.is_current_stage_first and self.stage_idx - 1 not in ctx.stages:
             ctx.communications.wait_fwd_recv(self.stage_idx, self.microbatch_idx)
 
         stage.forward_one_chunk(
@@ -239,7 +239,7 @@ class ForwardComputeAction(ActionBase):
         return False
 
     def __str__(self) -> str:
-        return f'{self.stage_idx}F{self.microbatch_idx}'
+        return f"{self.stage_idx}F{self.microbatch_idx}"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -263,7 +263,7 @@ class BackwardFullInputComputeAction(ActionBase):
         # todo unshard
         stage = ctx.stages[self.stage_idx]
 
-        if not stage.info.is_current_stage_last and not self.stage_idx + 1 in ctx.stages:
+        if not stage.info.is_current_stage_last and self.stage_idx + 1 not in ctx.stages:
             ctx.communications.wait_bwd_recv(self.stage_idx, self.microbatch_idx)
 
         if stage.info.is_current_stage_last and ctx.loss is not None:
@@ -292,8 +292,8 @@ class BackwardFullInputComputeAction(ActionBase):
         return True
 
     def __str__(self) -> str:
-        letter = 'B' if self.full_backward else 'I'
-        return f'{self.stage_idx}{letter}{self.microbatch_idx}'
+        letter = "B" if self.full_backward else "I"
+        return f"{self.stage_idx}{letter}{self.microbatch_idx}"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -326,7 +326,7 @@ class BackwardWeightComputeAction(ActionBase):
         return True
 
     def __str__(self) -> str:
-        return f'{self.stage_idx}W{self.microbatch_idx}'
+        return f"{self.stage_idx}W{self.microbatch_idx}"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -348,9 +348,9 @@ class ComposeAction(ActionBase):
 
     @property
     def work_type(self) -> ActionWorkType:
-        sub_work_types = set(x.work_type for x in self.actions)
+        sub_work_types = {x.work_type for x in self.actions}
         if len(sub_work_types) != 1:
-            raise ValueError('')
+            raise ValueError("")
         return next(iter(sub_work_types))
 
     @property
@@ -358,4 +358,4 @@ class ComposeAction(ActionBase):
         return any(x.has_backward_work for x in self.actions)
 
     def __str__(self) -> str:
-        return '|'.join(map(str, self.actions))
+        return "|".join(map(str, self.actions))

@@ -1,6 +1,6 @@
 import torch
 
-from d9d.model_state.mapper.abc import StateGroup, ModelStateMapper
+from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperIdentity(ModelStateMapper):

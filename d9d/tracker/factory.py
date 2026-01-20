@@ -7,7 +7,7 @@ from .base import BaseTracker
 from .provider.aim.config import AimConfig
 from .provider.null import NullTracker, NullTrackerConfig
 
-AnyTrackerConfig = Annotated[AimConfig | NullTrackerConfig, Field(discriminator='provider')]
+AnyTrackerConfig = Annotated[AimConfig | NullTrackerConfig, Field(discriminator="provider")]
 
 
 @dataclasses.dataclass
@@ -25,7 +25,7 @@ try:
 
     _MAP[AimConfig] = AimTracker
 except ImportError as e:
-    _MAP[AimConfig] = _TrackerImportFailed(dependency='aim', exception=e)
+    _MAP[AimConfig] = _TrackerImportFailed(dependency="aim", exception=e)
 
 
 def tracker_from_config(config: AnyTrackerConfig):
@@ -49,9 +49,9 @@ def tracker_from_config(config: AnyTrackerConfig):
     tracker_type = _MAP[type(config)]
 
     if isinstance(tracker_type, _TrackerImportFailed):
-        raise ImportError(
-            f'The tracker configuration {config.provider} could not be loaded - '
-            f'ensure these dependencies are installed: {tracker_type.dependency}'
+        raise ImportError(  # noqa: TRY004
+            f"The tracker configuration {config.provider} could not be loaded - "
+            f"ensure these dependencies are installed: {tracker_type.dependency}"
         ) from tracker_type.exception
 
     return tracker_type.from_config(config)

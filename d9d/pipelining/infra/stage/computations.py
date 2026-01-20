@@ -5,9 +5,13 @@ import torch
 from torch import nn
 from torch.autograd.graph import Node
 
-from .splitgrad import stage_backward_full, stage_backward_input, ParamGroup, stage_backward_weight
+from .splitgrad import (
+    ParamGroup,
+    stage_backward_full,
+    stage_backward_input,
+    stage_backward_weight,
+)
 from .struct_helper import DictFlattener
-
 
 # TODO/NOTICE: We WILL NOT disable FSDP's resharding for microbatches since it will modify
 # TODO/NOTICE: its behavior in an unexpected way. Perhaps we need better FSDP resharding policy handler?
@@ -73,7 +77,7 @@ class ForwardComputeHandler:
         try:
             output = self._module(**inputs, **kwargs)
         except Exception as e:
-            raise RuntimeError(f'S{self._stage_idx}B{microbatch_index} failed to run forward') from e
+            raise RuntimeError(f"S{self._stage_idx}B{microbatch_index} failed to run forward") from e
 
         self._cache[microbatch_index] = ForwardCache(
             inputs=inputs,
@@ -183,7 +187,7 @@ class BackwardComputeHandler:
         """
 
         if microbatch_index in self._cache:
-            raise ValueError(f'S{self._stage_idx}B{microbatch_index} double backward')
+            raise ValueError(f"S{self._stage_idx}B{microbatch_index} double backward")
 
         inputs_flattener = DictFlattener(inputs.keys())
         outputs_flattener = DictFlattener(outputs.keys())
@@ -219,7 +223,7 @@ class BackwardComputeHandler:
         """
 
         if microbatch_index in self._cache:
-            raise ValueError(f'Double backward pass')
+            raise ValueError("Double backward pass")
 
         inputs_flattener = DictFlattener(inputs.keys())
         outputs_flattener = DictFlattener(outputs.keys())
@@ -258,7 +262,7 @@ class BackwardComputeHandler:
         """
 
         if microbatch_index not in self._cache:
-            raise ValueError(f'S{self._stage_idx}BW{microbatch_index} - weight backward with no input backward before')
+            raise ValueError(f"S{self._stage_idx}BW{microbatch_index} - weight backward with no input backward before")
 
         prev_cache = self._cache.pop(microbatch_index)
 
@@ -275,8 +279,7 @@ class BackwardComputeHandler:
                     param_groups=prev_cache.param_groups
                 )
             case _:
-                raise ValueError('Previous backward was not input backward')
-
+                raise ValueError("Previous backward was not input backward")
 
     def pop_for_sending(self, microbatch_index: int) -> dict[str, torch.Tensor]:
         """

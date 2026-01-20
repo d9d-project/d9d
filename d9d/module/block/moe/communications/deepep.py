@@ -2,7 +2,7 @@ import torch
 from deep_ep import Buffer, EventOverlap
 
 from d9d.kernel.moe.indices_to_multihot import fused_indices_to_multihot
-from d9d.kernel.moe.permute_with_probs import moe_unpermute_mask, moe_permute_with_probs
+from d9d.kernel.moe.permute_with_probs import moe_permute_with_probs, moe_unpermute_mask
 from d9d.module.block.moe.communications import ExpertCommunicationHandler
 
 # see https://github.com/deepseek-ai/DeepEP/blob/main/README.md for examples
@@ -34,7 +34,7 @@ def init_deepep_buffer(group: torch.distributed.ProcessGroup, hidden_bytes: int)
         hidden_bytes: Size of a single hidden state vector in bytes.
     """
 
-    global _buffer
+    global _buffer  # noqa: PLW0603
     num_nvl_bytes, num_rdma_bytes = 0, 0
     for config in (
             Buffer.get_dispatch_config(group.size()),
@@ -225,7 +225,8 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
 
         init_deepep_buffer(group, hidden_size * hidden_dtype.itemsize)
 
-        assert self._num_experts % group.size() == 0
+        if self._num_experts % group.size() != 0:
+            raise ValueError("num_experts must be divisible by distributed group size")
 
         self._num_experts_per_shard = self._num_experts // group.size()
 

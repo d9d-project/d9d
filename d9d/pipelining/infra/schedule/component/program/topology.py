@@ -11,8 +11,8 @@ class ScheduleStyle(StrEnum):
         v: Assigns stages in a zig-zag V-shape pattern. Useful for interleaved 1F1B schedules.
     """
 
-    loop = 'loop'
-    v = 'v'
+    loop = "loop"
+    v = "v"
 
 
 def build_stage_to_host_rank_topology(

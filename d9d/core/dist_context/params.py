@@ -81,7 +81,7 @@ class DeviceMeshParameters(BaseModel):
                 self.has_tensor_parallel
         )
 
-    @model_validator(mode='after')
+    @model_validator(mode="after")
     def _check_ep_divisibility(self) -> Self:
         """Validates that DP/CP/TP dimensions can support the requested EP/ETP degrees."""
         dp_cp_tp_degree = (
@@ -100,7 +100,7 @@ class DeviceMeshParameters(BaseModel):
             )
         return self
 
-    def build(self, log_level: int = logging.INFO) -> 'DistributedContext':
+    def build(self, log_level: int = logging.INFO) -> "DistributedContext":
         """
         Initializes the DistributedContext using these parameters.
 

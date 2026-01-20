@@ -20,14 +20,14 @@ class PipelinedLRScheduler(LRSchedulerProtocol):
     def state_dict(self) -> dict[str, Any]:
         pp_rank = self._mesh_pp.get_local_rank()
         return {
-            f'pp_{pp_rank}_stage_{i}': scheduler.state_dict()
+            f"pp_{pp_rank}_stage_{i}": scheduler.state_dict()
             for i, scheduler in enumerate(self._schedulers)
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         pp_rank = self._mesh_pp.get_local_rank()
         for i, scheduler in enumerate(self._schedulers):
-            scheduler.load_state_dict(state_dict[f'pp_{pp_rank}_stage_{i}'])
+            scheduler.load_state_dict(state_dict[f"pp_{pp_rank}_stage_{i}"])
 
     def step(self) -> None:
         for scheduler in self._schedulers:

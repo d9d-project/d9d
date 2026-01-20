@@ -1,6 +1,6 @@
 from torch import nn
 from torch.distributed import DeviceMesh
-from torch.distributed.tensor import Replicate, Partial
+from torch.distributed.tensor import Partial, Replicate
 from torch.distributed.tensor.parallel import parallelize_module
 
 from d9d.module.parallelism.style import ToLocalParallel
@@ -30,5 +30,5 @@ def parallelize_replicate(
 
     parallelize_module(module, mesh, ToLocalParallel(
         param_placement=tuple(Replicate() for _ in range(mesh.ndim)),
-        grad_placement=tuple(Partial('sum') for _ in range(mesh.ndim))
+        grad_placement=tuple(Partial("sum") for _ in range(mesh.ndim))
     ))

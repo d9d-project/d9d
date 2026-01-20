@@ -1,10 +1,8 @@
 import torch
 from liger_kernel.ops.swiglu import LigerSiLUMulFunction
-from pydantic import BaseModel
 from torch import nn
 
 from d9d.module.base import ModuleLateInit
-
 
 # TODO: migrate from liger to custom silu mul
 

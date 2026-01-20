@@ -1,10 +1,9 @@
 import pytest
-
 from d9d.pipelining.api import PipelineStageInfo, distribute_layers_for_pipeline_stage
 
 
 @pytest.mark.parametrize(
-    "num_layers,num_stages,pre,post,expected_distribution",
+    ("num_layers", "num_stages", "pre", "post", "expected_distribution"),
     [
         # Standard, symmetric case
         # 24 layers, 4 stages, 1 pre, 1 post.
@@ -61,7 +60,7 @@ def test_distribute_layers_scenarios(
 
 
 @pytest.mark.parametrize(
-    "num_layers,num_stages,pre,post",
+    ("num_layers", "num_stages", "pre", "post"),
     [
         # Zero layers to distribute.
         (0, 4, 1, 1),

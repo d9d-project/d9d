@@ -17,10 +17,10 @@ class ExpertCommunicationHandler(abc.ABC):
         Prepares and routes local hidden states to their target experts (possibly on other workers).
 
         This process involves:
-        
-        1. All-to-All Communication: Transfers hidden states to workers containing the assigned experts. States 
+
+        1. All-to-All Communication: Transfers hidden states to workers containing the assigned experts. States
         assigned to multiple experts are replicated.
-        
+
         2. Permutation: Sorts tokens by expert ID to prepare for Grouped GEMM.
 
         Args:
@@ -30,7 +30,7 @@ class ExpertCommunicationHandler(abc.ABC):
 
         Returns:
             A tuple containing:
-            
+
             - Permuted hidden states received by this rank. Shape: `(num_received_tokens, hidden_size)`.
             - Permuted weights matching the hidden states order. Shape: `(num_received_tokens)`.
             - Expert count tensor indicating how many tokens each local expert received. Shape: `(num_local_experts)`.

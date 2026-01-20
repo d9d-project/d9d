@@ -1,6 +1,6 @@
 from torch import nn
 from torch.distributed import DeviceMesh
-from torch.distributed.fsdp import fully_shard, FSDPModule
+from torch.distributed.fsdp import FSDPModule, fully_shard
 
 
 def _force_fsdp_grad_reduction_policy(module: FSDPModule):
@@ -31,5 +31,5 @@ def parallelize_fsdp(
         **kwargs: Additional keyword arguments passed to ``fully_shard``.
     """
 
-    fully_shard(module, mesh=mesh, *args, **kwargs)
+    fully_shard(module, *args, mesh=mesh, **kwargs)
     _force_fsdp_grad_reduction_policy(module)

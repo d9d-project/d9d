@@ -1,16 +1,24 @@
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import torch
 from torch import nn
-from torch.distributed import DeviceMesh, ProcessGroup
+from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor
 
-from d9d.model_state.io import write_model_state_local, write_model_state_pipeline_parallel, \
-    write_model_state_distributed
+from d9d.model_state.io import (
+    write_model_state_local,
+    write_model_state_pipeline_parallel,
+)
 from d9d.model_state.mapper import ModelStateMapper
-from d9d.model_state.mapper.compose import ModelStateMapperSequential, ModelStateMapperParallel
-from d9d.model_state.mapper.leaf import ModelStateMapperGatherFullTensor, ModelStateMapperIdentity
+from d9d.model_state.mapper.compose import (
+    ModelStateMapperParallel,
+    ModelStateMapperSequential,
+)
+from d9d.model_state.mapper.leaf import (
+    ModelStateMapperGatherFullTensor,
+    ModelStateMapperIdentity,
+)
 
 
 def _build_extraction_mapper(name: str, state: torch.Tensor) -> ModelStateMapper:
@@ -35,8 +43,7 @@ def _augment_mapper_for_extraction(models: list[nn.Module], mapper: ModelStateMa
 
 def _state_generator(models: list[nn.Module]) -> Iterable[tuple[str, torch.Tensor]]:
     for model in models:
-        for name, value in model.state_dict().items():
-            yield name, value
+        yield from model.state_dict().items()
 
 
 def save_model_state(

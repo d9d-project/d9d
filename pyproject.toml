@@ -1,0 +1,165 @@
+[project]
+name = "d9d"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Maxim Afanasyev", email = "mr.applexz@gmail.com"}
+]
+license = {text = "Apache-2.0"}
+readme = "README.md"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+    "pydantic (>=2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.group.dev.dependencies]
+triton = {path = "packages/triton-3.6.0+git9844da95-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"}
+torch = {path = "packages/torch-2.11.0.dev20251223+cu128-cp311-cp311-manylinux_2_28_x86_64.whl"}
+numpy = "^2.4.0"
+cut-cross-entropy = {path = "packages/cut_cross_entropy-25.9.3-py3-none-any.whl"}
+deep-ep = {path = "packages/deep_ep-1.2.1+9af0e0d-cp311-cp311-linux_x86_64.whl"}
+nv-grouped-gemm = {path = "packages/nv_grouped_gemm-1.1.4.post8-cp311-cp311-linux_x86_64.whl"}
+liger-kernel = "^0.6.4"
+mkdocs = "^1.6.1"
+mkdocstrings = {extras = ["python"], version = "^1.0.0"}
+mkdocs-material = "^9.7.1"
+safetensors = "^0.7.0"
+tqdm = "^4.67.1"
+mkdocs-shadcn = "^0.9.8"
+pymdown-extensions = "^10.19.1"
+pygments = "^2.19.2"
+ruff = "^0.14.13"
+
+
+[tool.poetry.group.trackers.dependencies]
+aim = "<4.0.0"
+
+
+[tool.poetry.group.test.dependencies]
+pytest = "^9.0.2"
+coverage = "^7.13.1"
+
+
+[tool.pytest.ini_options]
+markers = [
+    "local: no torchrun",
+    "distributed: run using torchrun",
+]
+
+[tool.ruff]
+src = ["d9d"]
+target-version = "py311"
+include = [
+    "d9d/**/*.py",
+    "test/**/*.py",
+]
+exclude = [
+    "d9d/kernel/cce/**.py",
+    "d9d/kernel/moe/**.py",
+]
+line-length = 120
+indent-width = 4
+
+[tool.ruff.lint]
+preview = true
+extend-select = [
+    "YTT",
+    "ANN",
+    "ASYNC",
+    "S",
+    "BLE",
+    "FBT003",
+    "B",
+    "A",
+    "COM",
+    "C4",
+    "DTZ",
+    "T10",
+    "EXE",
+    "FA",
+    "INT",
+    "ISC",
+    "ICN",  # we may configure it later
+    "LOG",
+    "G",
+    "INP",
+    "PIE",
+    "T20",
+    "PYI",
+    "PT",
+    "Q",
+    "RET",
+    "SLF",
+    "SIM",
+    "SLOT",
+    # "TD", # enable later
+    "TC",
+    "PTH",
+    "FLY",
+    "I",
+    "C90",
+    "N",
+    "PERF102",
+    "PERF203",
+    "PERF402",
+    "E",
+    "W",
+    "F",
+    "PGH",
+    "PLC",
+    "PLE",
+    "PLR",
+    "PLW",
+    "UP",
+    "FURB",
+    "RUF",
+    "TRY"
+]
+ignore = [
+    "ANN",
+    "S311",  # Standard pseudo-random generators are not suitable for cryptographic purposes
+    "COM812",  # we do not use trailing commas everywhere
+    "C420",  # Unnecessary dict comprehension for iterable; use dict.fromkeys instead
+    "C416",  # Unnecessary {kind} comprehension (rewrite using {kind}())
+    "G004",  # Logging statement uses f-string
+    "PIE808",  #  	Unnecessary start argument in range
+    "PT011",  # pytest.raises({exception}) is too broad, set the match parameter or use a more specific exception
+    "PT012",  # pytest.raises() block should contain a single simple statement
+    "RET504",  # Unnecessary assignment to {name} before return statement
+    "RET505",  # Unnecessary {branch} after return statement
+    "SIM103",  # Return the condition {condition} directly
+    "SIM108",  # Use ternary operator {contents} instead of if-else-bloc
+    "TC002",  # Move third-party import {} into a type-checking block
+    "PLR2004",  # Magic value used in comparison, consider replacing {value} with a constant variable
+    "PLR6301",  # Method {method_name} could be a function, class method, or static method
+    "PLR0904",  # Too many
+    "PLR0911",
+    "PLR0912",
+    "PLR0913",
+    "PLR0914",
+    "PLR0915",
+    "PLR0916",
+    "PLR0917",
+    "PLR6104",  # Use {operator} to perform an augmented assignment directly
+    "FURB118",  # Use operator.{operator} instead of defining a {target}
+    "FURB140",  # Use itertools.starmap instead of the generator
+    "TRY003",  # Avoid specifying long messages outside the exception class
+]
+
+[tool.ruff.lint.per-file-ignores]
+"test/*.py" = [
+    "S101", # asserts allowed in tests...
+    "D",  # no docs for tests sorry
+]
+
+[tool.ruff.lint.pep8-naming]
+extend-ignore-names = ["F"]  # pytorch nn.functional :)
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

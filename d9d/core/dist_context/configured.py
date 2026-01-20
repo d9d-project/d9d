@@ -8,18 +8,18 @@ from typing import TYPE_CHECKING
 import torch
 from torch.distributed import DeviceMesh
 
-from .log import build_dist_logger
 from .device_mesh_domains import ALL_DOMAIN_PROVIDERS, REGULAR_DOMAIN
+from .log import build_dist_logger
 
 if TYPE_CHECKING:
     from .params import DeviceMeshParameters
 
 
 def _resolve_master_addr() -> str:
-    if 'MASTER_ADDR' not in os.environ:
-        return '127.0.0.1'
+    if "MASTER_ADDR" not in os.environ:
+        return "127.0.0.1"
 
-    master_addr = os.environ['MASTER_ADDR']
+    master_addr = os.environ["MASTER_ADDR"]
 
     try:
         return socket.gethostbyname(master_addr)
@@ -27,12 +27,11 @@ def _resolve_master_addr() -> str:
         return master_addr
 
 
-def _build_mesh_domains(params: 'DeviceMeshParameters') -> dict[str, DeviceMesh]:
+def _build_mesh_domains(params: "DeviceMeshParameters") -> dict[str, DeviceMesh]:
     return {
         provider.name: provider.build_mesh(params)
         for provider in ALL_DOMAIN_PROVIDERS
     }
-
 
 
 class DistributedContext:
@@ -46,7 +45,7 @@ class DistributedContext:
     must be derived from this context to ensure consistency.
     """
 
-    def __init__(self, params: 'DeviceMeshParameters', log_level: int):
+    def __init__(self, params: "DeviceMeshParameters", log_level: int):
         self._params = params
 
         if params.is_distributed:
@@ -67,11 +66,10 @@ class DistributedContext:
         else:
             self._meshes = None
             self._num_nodes = 1
-            self._logger = build_dist_logger('local', level=log_level)
+            self._logger = build_dist_logger("local", level=log_level)
 
-
-        self._local_rank = int(os.environ.get('LOCAL_RANK', '0'))
-        self._global_rank = int(os.environ.get('RANK', '0'))
+        self._local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+        self._global_rank = int(os.environ.get("RANK", "0"))
 
         self._node_rank = self._global_rank // torch.cuda.device_count()
 
@@ -111,7 +109,7 @@ class DistributedContext:
         """
 
         if domain not in self._meshes:
-            raise ValueError(f'Domain {domain} does not exist')
+            raise ValueError(f"Domain {domain} does not exist")
         return self._meshes[domain]
 
     @property
@@ -140,7 +138,7 @@ class DistributedContext:
             timeout_seconds: New timeout duration in seconds.
         """
 
-        self.logger.info(f'Setting global timeout to {timeout_seconds} seconds')
+        self.logger.info(f"Setting global timeout to {timeout_seconds} seconds")
         self.wait_world()
 
         groups: list[torch.distributed.ProcessGroup | None] = [None]
@@ -149,7 +147,7 @@ class DistributedContext:
                 groups.append(mesh.get_group(dim))
 
         for group in groups:
-            torch.distributed.distributed_c10d._set_pg_timeout(datetime.timedelta(seconds=timeout_seconds), group)
+            torch.distributed.distributed_c10d._set_pg_timeout(datetime.timedelta(seconds=timeout_seconds), group)  # noqa: SLF001
 
     @contextmanager
     def local_main_process_first(self):
@@ -191,7 +189,7 @@ class DistributedContext:
         return self._current_device
 
     @property
-    def mesh_params(self) -> 'DeviceMeshParameters':
+    def mesh_params(self) -> "DeviceMeshParameters":
         """Returns the parameters used to initialize this context."""
 
         return self._params

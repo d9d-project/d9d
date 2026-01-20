@@ -1,4 +1,4 @@
-from typing import runtime_checkable, Protocol
+from typing import Protocol, runtime_checkable
 
 from torch.distributed.checkpoint.stateful import Stateful
 

@@ -27,4 +27,4 @@ class ModelStateIndex(BaseModel):
     weight_map: dict[str, str]
 
 
-MODEL_STATE_INDEX_FILE_NAME = 'model.safetensors.index.json'
+MODEL_STATE_INDEX_FILE_NAME = "model.safetensors.index.json"

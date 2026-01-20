@@ -1,9 +1,7 @@
 import torch
-from torch import nn
-from torch.nn.attention import sdpa_kernel, SDPBackend
-
-
 import torch.nn.functional as F
+from torch import nn
+from torch.nn.attention import SDPBackend, sdpa_kernel
 
 
 class FlashSdpa(nn.Module):

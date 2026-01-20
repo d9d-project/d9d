@@ -10,8 +10,8 @@ from .sequential import ModelStateMapperSequential
 from .shard import ModelStateMapperShard
 
 __all__ = [
-    "filter_empty_mappers",
     "ModelStateMapperParallel",
     "ModelStateMapperSequential",
-    "ModelStateMapperShard"
+    "ModelStateMapperShard",
+    "filter_empty_mappers"
 ]

@@ -17,8 +17,8 @@ class WeightedMeanMetric(Metric):
     def __init__(self):
         """Constructs a WeightedMeanMetric object."""
 
-        self._value = torch.scalar_tensor(0, device='cuda', dtype=torch.float32)
-        self._weight = torch.scalar_tensor(0, device='cuda', dtype=torch.float32)
+        self._value = torch.scalar_tensor(0, device="cuda", dtype=torch.float32)
+        self._weight = torch.scalar_tensor(0, device="cuda", dtype=torch.float32)
 
         self._handles: list[dist.Work] | None = None
 
@@ -58,10 +58,10 @@ class WeightedMeanMetric(Metric):
 
     def state_dict(self) -> dict[str, Any]:
         return {
-            'value': self._value,
-            'weight': self._weight
+            "value": self._value,
+            "weight": self._weight
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        self._value = state_dict['value']
-        self._weight = state_dict['weight']
+        self._value = state_dict["value"]
+        self._weight = state_dict["weight"]

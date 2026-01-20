@@ -21,7 +21,6 @@ class ModelStateMapperRename(ModelStateMapper):
         ])
 
     def apply(self, group: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        assert len(group) == 1
         return {
             self._name_to: group[self._name_from]
         }

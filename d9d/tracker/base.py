@@ -1,6 +1,7 @@
 import abc
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TypeVar, Generic, Self, Generator, Any
+from typing import Any, Generic, Self, TypeVar
 
 import torch
 from pydantic import BaseModel, Field

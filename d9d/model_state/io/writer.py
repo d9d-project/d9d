@@ -1,6 +1,6 @@
 import warnings
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 import torch
 from safetensors.torch import save_file
@@ -8,7 +8,11 @@ from torch.distributed import DeviceMesh, ProcessGroup
 from tqdm import tqdm
 
 from d9d.core.dist_ops import all_gather_object
-from d9d.model_state.io.dto import ModelStateIndex, ModelStateIndexMeta, MODEL_STATE_INDEX_FILE_NAME
+from d9d.model_state.io.dto import (
+    MODEL_STATE_INDEX_FILE_NAME,
+    ModelStateIndex,
+    ModelStateIndexMeta,
+)
 from d9d.model_state.mapper import ModelStateMapper
 
 
@@ -46,7 +50,7 @@ class _StateWritingFlowLocal:
         self._is_current_process_rank_master = is_current_process_rank_master
         total_num_outputs = len([out_name for group in self._groups_to_process for out_name in group.outputs])
         self._pbar = tqdm(
-            desc='Saving Model States',
+            desc="Saving Model States",
             total=total_num_outputs,
             disable=not (show_progress and is_current_process_rank_master)
         )
@@ -56,12 +60,12 @@ class _StateWritingFlowLocal:
             return
 
         local_shard_num = len(self._local_shard_idx_to_tmp_path) + 1
-        shard_tmp_path = self._dest_dir / f'.tmp-rank{self._sharding_rank}-shard-{local_shard_num}.safetensors'
+        shard_tmp_path = self._dest_dir / f".tmp-rank{self._sharding_rank}-shard-{local_shard_num}.safetensors"
 
         self._local_shard_idx_to_tmp_path[local_shard_num] = shard_tmp_path
         save_file(self._pending_write_tensors, str(shard_tmp_path))
 
-        for state_name in self._pending_write_tensors.keys():
+        for state_name in self._pending_write_tensors:
             self._weight_name_to_local_shard_idx[state_name] = local_shard_num
 
         self._pbar.update(len(self._pending_write_tensors))
@@ -91,7 +95,7 @@ class _StateWritingFlowLocal:
                     update_size = tensor.numel() * tensor.element_size()
 
                     if update_size > self._shard_size_bytes:
-                        raise ValueError(f'Cannot save state {name} that is larger than shard size')
+                        raise ValueError(f"Cannot save state {name} that is larger than shard size")
 
                     if self._current_shard_size + update_size > self._shard_size_bytes:
                         self._flush_shard()
@@ -112,7 +116,8 @@ class _StateWritingFlowLocal:
         if self._available_source_states:
             warnings.warn(
                 f"State Writing: The following source tensors were provided but not consumed by any "
-                f"mapper group and will be ignored: {sorted(self._available_source_states.keys())}"
+                f"mapper group and will be ignored: {sorted(self._available_source_states.keys())}",
+                stacklevel=2
             )
 
         weight_map_local = {
@@ -142,7 +147,7 @@ class _StateWritingFlowLocal:
 def _finalize_master(dest_dir: Path, indices: list[ModelStateIndex]):
     total_size = sum(index.metadata.total_size for index in indices)
     total_weight_map_local = dict(pair for index in indices for pair in index.weight_map.items())
-    shard_count = len(set(file_name for index in indices for _, file_name in index.weight_map.items()))
+    shard_count = len({file_name for index in indices for _, file_name in index.weight_map.items()})
 
     total_weight_map = {}
 
@@ -166,7 +171,7 @@ def _finalize_master(dest_dir: Path, indices: list[ModelStateIndex]):
             metadata=ModelStateIndexMeta(total_size=total_size),
             weight_map=total_weight_map
         ).model_dump_json(indent=4),
-        encoding='utf-8'
+        encoding="utf-8"
     )
 
 
@@ -242,7 +247,6 @@ def write_model_state_distributed(
         _finalize_master(dest_dir, gather_idx)
 
 
-
 def write_model_state_pipeline_parallel(
         dest_dir: Path,
         mapper: ModelStateMapper,
@@ -273,8 +277,12 @@ def write_model_state_pipeline_parallel(
     """
 
     pipeline_rank = device_mesh[pipeline_dim_name].get_rank()
-    non_pipeline_coord_sum = sum(coord for name, coord in zip(device_mesh.mesh_dim_names, device_mesh.get_coordinate())
-                                 if name != pipeline_dim_name)
+    non_pipeline_coord_sum = sum(
+        coord
+        for name, coord
+        in zip(device_mesh.mesh_dim_names, device_mesh.get_coordinate(), strict=True)
+        if name != pipeline_dim_name
+    )
     master_within_pipeline_rank = non_pipeline_coord_sum == 0
 
     current_idx = _StateWritingFlowLocal(

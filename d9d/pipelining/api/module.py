@@ -1,8 +1,7 @@
+import dataclasses
 import typing
 
 import torch
-
-import dataclasses
 
 
 @dataclasses.dataclass
@@ -96,8 +95,8 @@ def distribute_layers_for_pipeline_stage(
         actual_layers = layers - adjustment
 
         if actual_layers <= 0:
-            raise ValueError(f'Tried to distribute layers, but got {actual_layers} on '
-                             f'stage {proposed_stage.current_stage}. Perhaps the pipeline is too long for this model?')
+            raise ValueError(f"Tried to distribute layers, but got {actual_layers} on "
+                             f"stage {proposed_stage.current_stage}. Perhaps the pipeline is too long for this model?")
 
         layer_count_per_stage.append(actual_layers)
 

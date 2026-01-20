@@ -1,6 +1,11 @@
 from torch import nn
 from torch.distributed import DeviceMesh
-from torch.distributed.tensor import distribute_tensor, Shard, distribute_module, Replicate
+from torch.distributed.tensor import (
+    Replicate,
+    Shard,
+    distribute_module,
+    distribute_tensor,
+)
 from torch.distributed.tensor.parallel import ParallelStyle
 
 from d9d.module.block.moe import GroupedLinear, MoELayer
@@ -23,7 +28,8 @@ class ShardMoESparseExpertsParallel(ParallelStyle):
         self._shard_dim_name = shard_dim_name
 
     def _partition_experts(self, module_name: str, mod: GroupedLinear, device_mesh: DeviceMesh):
-        assert isinstance(mod, GroupedLinear)
+        if not isinstance(mod, GroupedLinear):
+            raise TypeError("This plan should be applied only on GroupedLinear")
 
         placements = [
             Shard(0) if dim_name == self._shard_dim_name else Replicate()
@@ -37,7 +43,8 @@ class ShardMoESparseExpertsParallel(ParallelStyle):
         mod.weight = weight
 
     def _apply(self, module: nn.Module, device_mesh: DeviceMesh) -> nn.Module:
-        assert isinstance(module, MoELayer)
+        if not isinstance(module, MoELayer):
+            raise TypeError("This plan should be applied only on MoELayer")
 
         module.enable_distributed_communicator(device_mesh.get_group())
 

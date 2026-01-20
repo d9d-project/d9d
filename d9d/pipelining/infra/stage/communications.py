@@ -1,8 +1,7 @@
 import dataclasses
 
-import torch.distributed as dist
-
 import torch
+import torch.distributed as dist
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)
@@ -28,8 +27,6 @@ class StartStageInput:
     (e.g., this is the first stage receiving data loader inputs).
     """
 
-    pass
-
 
 StageInput = ReceiveStageInput | StartStageInput
 
@@ -52,8 +49,6 @@ class EndStageOutput:
     Instruction indicating that the output of this stage is not sent anywhere
     (e.g., this is the last stage computing loss).
     """
-
-    pass
 
 
 StageOutput = SendStageOutput | EndStageOutput
@@ -130,13 +125,13 @@ class StageCommunicationHandler:
                     handlers[chunk_id][input_name] = StartStageInput()
                 else:
                     handlers[chunk_id][input_name] = ReceiveStageInput(
-                        name=f'{name}_recv_from_{input_stage_index}_to_{stage_index}[{chunk_id}][{input_name}]',
+                        name=f"{name}_recv_from_{input_stage_index}_to_{stage_index}[{chunk_id}][{input_name}]",
                         from_stage=input_stage_index,
                         buffer=torch.empty(
                             input_tensor_meta.size(),
                             dtype=input_tensor_meta.dtype,
                             layout=input_tensor_meta.layout,
-                            device='cuda'  # force device
+                            device="cuda"  # force device
                         )
                     )
         return handlers
@@ -148,7 +143,7 @@ class StageCommunicationHandler:
     ) -> dict[str, StageOutput]:
         handlers = {}
 
-        for output_name, output_tensor_meta in output_args.items():
+        for output_name in output_args:
             if output_stage_index is None:
                 handlers[output_name] = EndStageOutput()
             else:
@@ -221,7 +216,7 @@ class StageCommunicationHandler:
 
         inputs = self._input_handlers[microbatch_index]
         # sort ops by parameter names to ensure receive ops are ordered the same for send and recv
-        for input_name, input_info in sorted(inputs.items(), key=lambda x: x[0]):
+        for _input_name, input_info in sorted(inputs.items(), key=lambda x: x[0]):
             match input_info:
                 case StartStageInput():
                     pass

@@ -1,6 +1,8 @@
-from typing import TypeVar, Iterable, Sequence
+from collections.abc import Iterable, Sequence
+from typing import TypeVar
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class DictFlattener:
     """
@@ -40,5 +42,5 @@ class DictFlattener:
         Returns:
             A dictionary mapping original keys to the provided values.
         """
-        
+
         return {self._order_to_key[i]: out for i, out in enumerate(outputs)}

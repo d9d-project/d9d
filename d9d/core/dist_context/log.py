@@ -17,7 +17,7 @@ def build_dist_logger(qualifier: str, level: int) -> logging.Logger:
         A configured logging.Logger instance.
     """
 
-    dist_logger = logging.getLogger('d9d')
+    dist_logger = logging.getLogger("d9d")
     dist_logger.setLevel(level)
     dist_logger.handlers.clear()
     ch = logging.StreamHandler(sys.stdout)

@@ -14,7 +14,7 @@ class ModelStateMapperSelectChildModules(ModelStateMapper):
 
     def __init__(self, base_names: list[str], parent_name: str):
         self._base_names = base_names
-        self._parent_prefix = f'{parent_name}.'
+        self._parent_prefix = f"{parent_name}."
 
     def state_dependency_groups(self) -> frozenset[StateGroup]:
         return frozenset([
@@ -26,7 +26,6 @@ class ModelStateMapperSelectChildModules(ModelStateMapper):
         ])
 
     def apply(self, group: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        assert len(group) == 1
         name, value = next(iter(group.items()))
         if name.startswith(self._parent_prefix):
             return {

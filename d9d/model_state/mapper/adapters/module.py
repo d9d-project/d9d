@@ -18,5 +18,5 @@ def identity_mapper_from_module(module: nn.Module) -> ModelStateMapper:
     """
 
     return ModelStateMapperParallel(
-        [ModelStateMapperIdentity(key) for key in module.state_dict().keys()]
+        [ModelStateMapperIdentity(key) for key in module.state_dict()]
     )

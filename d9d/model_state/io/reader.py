@@ -1,12 +1,12 @@
 from collections import defaultdict
+from collections.abc import Generator, Iterable
 from pathlib import Path
-from typing import Generator, Iterable
 
 import torch
 from safetensors import safe_open
 from tqdm import tqdm
 
-from d9d.model_state.io.dto import ModelStateIndex, MODEL_STATE_INDEX_FILE_NAME
+from d9d.model_state.io.dto import MODEL_STATE_INDEX_FILE_NAME, ModelStateIndex
 from d9d.model_state.mapper import ModelStateMapper
 
 
@@ -35,14 +35,14 @@ class _StateLoadingFlow:
         self._check_index()
 
         self._pbar = tqdm(
-            desc='Loading Model States',
+            desc="Loading Model States",
             total=len([output_name for group in self._groups_to_process for output_name in group.outputs]),
             disable=not show_progress
         )
 
     def _load_index(self) -> ModelStateIndex:
         index_file = self._src_dir / MODEL_STATE_INDEX_FILE_NAME
-        index_data = index_file.read_text(encoding='utf-8')
+        index_data = index_file.read_text(encoding="utf-8")
         index = ModelStateIndex.model_validate_json(index_data)
         return index
 
@@ -73,8 +73,7 @@ class _StateLoadingFlow:
             loaded_states = self._mapper.apply(
                 {k: v for k, v in self._stored_states.items() if k in group.inputs}
             )
-            for state_name, state_value in loaded_states.items():
-                yield state_name, state_value
+            yield from loaded_states.items()
             self._pbar.update(len(loaded_states))
 
             for input_name in group.inputs:

@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 import torch
 from torch._C._distributed import Placement
@@ -24,8 +24,6 @@ class ModelStateMapperDistribute(ModelStateMapper):
         return frozenset([StateGroup(inputs=frozenset([self._name]), outputs=frozenset([self._name]))])
 
     def apply(self, group: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        assert len(group) == 1
-
         return {
             self._name: distribute_tensor(
                 group[self._name],
@@ -48,8 +46,6 @@ class ModelStateMapperGatherFullTensor(ModelStateMapper):
         return frozenset([StateGroup(inputs=frozenset([self._name]), outputs=frozenset([self._name]))])
 
     def apply(self, group: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        assert len(group) == 1
-
         return {
             self._name: group[self._name].full_tensor()
         }

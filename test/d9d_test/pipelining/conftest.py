@@ -1,10 +1,9 @@
 import pytest
+from d9d.core.dist_context import DeviceMeshParameters
 from torch.distributed import destroy_process_group
 
-from d9d.core.dist_context import DeviceMeshParameters
 
-
-@pytest.fixture(scope='session')
+@pytest.fixture(scope="session")
 def dist_ctx_pp():
     ctx = DeviceMeshParameters(
         pipeline_parallel=8,

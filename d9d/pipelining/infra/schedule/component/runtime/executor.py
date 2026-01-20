@@ -3,13 +3,14 @@ from typing import Any
 import torch
 from torch.autograd.profiler import record_function
 
-from d9d.core.dist_context import DistributedContext, REGULAR_DOMAIN
+from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
 from d9d.core.sharding import shard_spec_on_dim, shard_tree
 from d9d.pipelining.api import PipelineSchedule, PipelineShardingSpec
 from d9d.pipelining.infra.stage import PipelineStage
+
 from .action import ActionBase, ActionContext
 from .communications import PipelineCommunicationHandler
-from .loss import PipelineLossHandler, LossFn
+from .loss import LossFn, PipelineLossHandler
 
 
 class PipelineScheduleExecutor(PipelineSchedule):
@@ -53,7 +54,6 @@ class PipelineScheduleExecutor(PipelineSchedule):
         self._input_data_sharding_spec = sharding_spec.input_data
         self._input_kwargs_sharding_spec = sharding_spec.input_kwargs
 
-
     def configure_buffers(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
         if self._input_data_sharding_spec is None:
             self._input_data_sharding_spec = shard_spec_on_dim(inputs, dim=0)
@@ -68,8 +68,8 @@ class PipelineScheduleExecutor(PipelineSchedule):
             )
 
     def step(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
-        self._dist_ctx.logger.debug(f'Begin pipeline step')
-        pp_group = self._dist_ctx.mesh_for(REGULAR_DOMAIN).get_group('pp')
+        self._dist_ctx.logger.debug("Begin pipeline step")
+        pp_group = self._dist_ctx.mesh_for(REGULAR_DOMAIN).get_group("pp")
 
         for stage in self._stages.values():
             stage.reset()
@@ -92,7 +92,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
 
         for action in my_program:
             with record_function(str(action)):
-                self._dist_ctx.logger.debug(f'Running pipeline action {action}')
+                self._dist_ctx.logger.debug(f"Running pipeline action {action}")
                 action.apply(ActionContext(
                     loss=self._loss_handler,
                     stages=self._stages,
@@ -101,6 +101,6 @@ class PipelineScheduleExecutor(PipelineSchedule):
                     pipeline_kwargs_microbatches=kwargs
                 ))
 
-        self._dist_ctx.logger.debug(f'Waiting for potentially hanging PP send comms')
+        self._dist_ctx.logger.debug("Waiting for potentially hanging PP send comms")
         self._comm_handler.wait_send_all()  # finalize just in case
-        self._dist_ctx.logger.debug(f'End pipeline step')
+        self._dist_ctx.logger.debug("End pipeline step")

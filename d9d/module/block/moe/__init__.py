@@ -1,13 +1,13 @@
 """Provides building blocks for Mixture-of-Experts (MoE) architectures."""
 
-from .grouped_linear import GroupedLinear
 from .grouped_experts import GroupedSwiGLU
-from .router import TopKRouter
+from .grouped_linear import GroupedLinear
 from .layer import MoELayer
+from .router import TopKRouter
 
 __all__ = [
     "GroupedLinear",
     "GroupedSwiGLU",
-    "TopKRouter",
-    "MoELayer"
+    "MoELayer",
+    "TopKRouter"
 ]

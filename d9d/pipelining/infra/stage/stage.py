@@ -3,9 +3,10 @@ from typing import Any
 import torch
 import torch.distributed as dist
 
-from d9d.pipelining.api import PipelineStageInfo, ModuleSupportsPipelining
+from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo
+
 from .communications import StageCommunicationHandler
-from .computations import ForwardComputeHandler, BackwardComputeHandler
+from .computations import BackwardComputeHandler, ForwardComputeHandler
 
 
 class PipelineStage:
@@ -79,7 +80,7 @@ class PipelineStage:
         prev_stage_idx = None if self._info.is_current_stage_first else self._info.current_stage - 1
         next_stage_idx = None if self._info.is_current_stage_last else self._info.current_stage + 1
 
-        with torch.device('meta'):
+        with torch.device("meta"):
             inputs_meta = self._module.infer_stage_inputs_from_pipeline_inputs(
                 inputs=pipeline_inputs,
                 n_microbatches=num_microbatches
@@ -90,7 +91,7 @@ class PipelineStage:
             )
 
         self._forward_comm = StageCommunicationHandler(
-            name='fwd',
+            name="fwd",
             stage_index=self._info.current_stage,
             num_microbatches=num_microbatches,
             input_stage_index=prev_stage_idx,
@@ -106,7 +107,7 @@ class PipelineStage:
             # for grad - current stage receives OUTPUTS as inputs and sends INPUTS as outputs
             # because it is reversed forward
             self._backward_comm = StageCommunicationHandler(
-                name='bwd',
+                name="bwd",
                 stage_index=self._info.current_stage,
                 num_microbatches=num_microbatches,
                 input_stage_index=next_stage_idx,
@@ -237,8 +238,8 @@ class PipelineStage:
         inputs, fwd_outputs = self._forward_comp.pop_inputs_outputs(microbatch_index)
 
         if self._info.is_current_stage_last:
-            outputs = {'loss': loss}
-            outputs_grad = {'loss': None}
+            outputs = {"loss": loss}
+            outputs_grad = {"loss": None}
         else:
             outputs = fwd_outputs
             outputs_grad = self._backward_comm.get_inputs(microbatch_index)
@@ -261,7 +262,7 @@ class PipelineStage:
 
         if self._info.is_current_stage_last and not self._info.is_current_stage_first:
             for t in fwd_outputs.values():
-                if not t._is_view():
+                if not t._is_view():  # noqa: SLF001
                     t.detach_()
 
     def backward_weight_one_chunk(self, microbatch_index: int):

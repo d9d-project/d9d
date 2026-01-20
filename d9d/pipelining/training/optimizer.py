@@ -24,14 +24,14 @@ class PipelinedOptimizer(OptimizerProtocol):
     def state_dict(self) -> dict[str, Any]:
         pp_rank = self._mesh_pp.get_local_rank()
         return {
-            f'pp_{pp_rank}_stage_{i}': optimizer.state_dict()
+            f"pp_{pp_rank}_stage_{i}": optimizer.state_dict()
             for i, optimizer in enumerate(self._optimizers)
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         pp_rank = self._mesh_pp.get_local_rank()
         for i, optimizer in enumerate(self._optimizers):
-            optimizer.load_state_dict(state_dict[f'pp_{pp_rank}_stage_{i}'])
+            optimizer.load_state_dict(state_dict[f"pp_{pp_rank}_stage_{i}"])
 
     def step(self) -> None:
         for optimizer in self._optimizers:

@@ -7,7 +7,7 @@ def gather(
         group: dist.ProcessGroup,
         group_dst: int,
         async_op: bool = False
-) -> (list[torch.Tensor] | None) | tuple[list[torch.Tensor] | None, dist.Work]:
+) -> list[torch.Tensor] | tuple[list[torch.Tensor] | None, dist.Work]:
     """
     Gathers tensors from the process group to a specific destination rank.
 
@@ -84,7 +84,7 @@ def _all_gather_shapes(
         tensor: torch.Tensor,
         group: dist.ProcessGroup,
 ):
-    all_ndim = [torch.empty(tuple(), dtype=torch.long, device=tensor.device) for _ in range(group.size())]
+    all_ndim = [torch.empty((), dtype=torch.long, device=tensor.device) for _ in range(group.size())]
     all_ndim_wait = dist.all_gather(
         all_ndim,
         torch.tensor(tensor.ndim, dtype=torch.long, device=tensor.device),

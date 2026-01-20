@@ -1,8 +1,8 @@
 import os
 import random
 
-import torch
 import numpy as np
+import torch
 
 from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
 
@@ -35,7 +35,7 @@ def set_seeds(
     distinct_mesh = mesh_regular[distinct_seed_mesh_dim]
     seed = (seed + distinct_mesh.get_local_rank()) % 2**64
 
-    dist_context.logger.info(f'Set seed {seed}')
+    dist_context.logger.info(f"Set seed {seed}")
 
     torch.manual_seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed % 2**32)
@@ -43,7 +43,7 @@ def set_seeds(
     np.random.seed(seed)
 
     duplicate_seed_mesh = [name for name in mesh_regular.mesh_dim_names if name != distinct_seed_mesh_dim]
-    duplicate_seed_mesh = mesh_regular[duplicate_seed_mesh] if len(duplicate_seed_mesh) else None
+    duplicate_seed_mesh = mesh_regular[duplicate_seed_mesh] if len(duplicate_seed_mesh) != 0 else None
 
     if duplicate_seed_mesh and duplicate_seed_mesh.get_coordinate() is not None:
-        torch.distributed.tensor._random.manual_seed(seed, duplicate_seed_mesh)
+        torch.distributed.tensor._random.manual_seed(seed, duplicate_seed_mesh)  # noqa: SLF001

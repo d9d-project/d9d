@@ -1,13 +1,13 @@
-import dataclasses
-
 import torch
 from torch import nn
-from torch._C._distributed_c10d import ProcessGroup
+from torch.distributed import ProcessGroup
 
-from d9d.module.block.moe import TopKRouter, GroupedSwiGLU
-from d9d.module.block.moe.communications import NoCommunicationHandler, DeepEpCommunicationHandler
 from d9d.module.base import ModuleLateInit
-
+from d9d.module.block.moe import GroupedSwiGLU, TopKRouter
+from d9d.module.block.moe.communications import (
+    DeepEpCommunicationHandler,
+    NoCommunicationHandler,
+)
 
 # TODO: implement expert bias
 # TODO: shared experts

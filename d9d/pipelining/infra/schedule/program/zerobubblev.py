@@ -1,7 +1,15 @@
-from ..component.program import ScheduleStyle, add_communication_ops, \
-    build_stage_to_host_rank_topology, PipelineProgramBuilder
-from ..component.runtime import BackwardFullInputComputeAction, ForwardComputeAction, \
-    ActionBase, BackwardWeightComputeAction
+from ..component.program import (
+    PipelineProgramBuilder,
+    ScheduleStyle,
+    add_communication_ops,
+    build_stage_to_host_rank_topology,
+)
+from ..component.runtime import (
+    ActionBase,
+    BackwardFullInputComputeAction,
+    BackwardWeightComputeAction,
+    ForwardComputeAction,
+)
 
 
 class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
@@ -21,7 +29,6 @@ class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
 
     def __init__(self):
         """Constructs the ZBV builder."""
-        pass
 
     def compose(
             self, num_microbatches: int, pp_size: int
@@ -51,7 +58,7 @@ class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
             num_stages=num_stages
         )
 
-    def _generate_rank_schedule(
+    def _generate_rank_schedule(  # noqa: C901
             self,
             rank: int,
             pp_size: int,

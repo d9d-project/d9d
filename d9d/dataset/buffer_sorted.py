@@ -1,14 +1,14 @@
-import pickle
+import pickle  # noqa: S403
 import random
-from typing import Any, TypeVar, Protocol
+from typing import Any, Protocol, TypeVar
 
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.utils.data import Dataset
 
-TDatasetReturn = TypeVar('TDatasetReturn', covariant=True)
+TDatasetReturn_co = TypeVar("TDatasetReturn_co", covariant=True)
 
 
-class DatasetImplementingSortKeyProtocol(Protocol[TDatasetReturn]):
+class DatasetImplementingSortKeyProtocol(Protocol[TDatasetReturn_co]):
     """
     Protocol for datasets that support retrieval of a specific key for sorting purposes.
 
@@ -32,7 +32,7 @@ class DatasetImplementingSortKeyProtocol(Protocol[TDatasetReturn]):
         """
         ...
 
-    def __getitem__(self, item: int) -> TDatasetReturn:
+    def __getitem__(self, item: int) -> TDatasetReturn_co:
         """Retrieves the item at the specific index."""
         ...
 
@@ -45,7 +45,7 @@ class BufferSortedDataset(Dataset, Stateful):
     while maintaining enough randomness to ensure statistical variance in updates.
 
     Algorithm:
-    
+
     1. Select a range of indices (size `buffer_size`).
     2. Sort these indices based on `base_dataset.sort_key()`.
     3. Break the sorted list into packs of size `pack_size`.
@@ -55,7 +55,7 @@ class BufferSortedDataset(Dataset, Stateful):
 
     def __init__(
             self,
-            base_dataset: DatasetImplementingSortKeyProtocol[TDatasetReturn],
+            base_dataset: DatasetImplementingSortKeyProtocol[TDatasetReturn_co],
             buffer_size: int,
             pack_size: int,
             init_seed: int | None = None
@@ -82,13 +82,12 @@ class BufferSortedDataset(Dataset, Stateful):
     def _update_buffer_idx(self, buffer_idx: int):
         select_start = buffer_idx * self._buffer_size
         select_end = (buffer_idx + 1) * self._buffer_size
-        if select_end > len(self._base_dataset):
-            select_end = len(self._base_dataset)
+        select_end = min(select_end, len(self._base_dataset))
 
-        base_idx = [i for i in range(select_start, select_end)]
+        base_idx = list(range(select_start, select_end))
         base_sort_keys = [self._base_dataset.sort_key(idx) for idx in range(select_start, select_end)]
 
-        local_idx = [i for i in range(len(base_idx))]
+        local_idx = list(range(len(base_idx)))
         local_idx = sorted(local_idx, key=lambda local_id: base_sort_keys[local_id])
 
         local_idx = [
@@ -102,7 +101,7 @@ class BufferSortedDataset(Dataset, Stateful):
 
         self._buffer_idx = buffer_idx
 
-    def __getitem__(self, index: int) -> TDatasetReturn:
+    def __getitem__(self, index: int) -> TDatasetReturn_co:
         """
         Retrieves an item from the locally sorted/shuffled buffer.
 
@@ -128,17 +127,17 @@ class BufferSortedDataset(Dataset, Stateful):
 
     def state_dict(self) -> dict[str, Any]:
         ret = {
-            'seed': pickle.dumps(self._rng.getstate()),
-            'buffer_idx': self._buffer_idx,
-            'buffer_indices': self._buffer_indices,
+            "seed": pickle.dumps(self._rng.getstate()),
+            "buffer_idx": self._buffer_idx,
+            "buffer_indices": self._buffer_indices,
         }
         if isinstance(self._base_dataset, Stateful):
-            ret['base_dataset'] = self._base_dataset.state_dict()
+            ret["base_dataset"] = self._base_dataset.state_dict()
         return ret
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        self._rng.setstate(pickle.loads(state_dict['seed']))
-        self._buffer_idx = state_dict['buffer_idx']
-        self._buffer_indices = state_dict['buffer_indices']
+        self._rng.setstate(pickle.loads(state_dict["seed"]))  # noqa: S301
+        self._buffer_idx = state_dict["buffer_idx"]
+        self._buffer_indices = state_dict["buffer_indices"]
         if isinstance(self._base_dataset, Stateful):
-            self._base_dataset.load_state_dict(state_dict['base_dataset'])
+            self._base_dataset.load_state_dict(state_dict["base_dataset"])

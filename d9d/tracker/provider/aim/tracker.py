@@ -1,10 +1,11 @@
+from collections.abc import Generator
 from contextlib import contextmanager
-from typing import TypedDict, Self, Generator
+from typing import Self, TypedDict
 
 import torch
-from aim import Run, Distribution
+from aim import Distribution, Run
 
-from d9d.tracker import BaseTrackerRun, BaseTracker, RunConfig
+from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig
 
 from .config import AimConfig
 
@@ -79,11 +80,11 @@ class AimTracker(BaseTracker[AimConfig]):
         self._run = None
 
     def load_state_dict(self, state_dict: AimState) -> None:
-        self._restart_hash = state_dict['restart_hash']
+        self._restart_hash = state_dict["restart_hash"]
 
     def state_dict(self) -> AimState:
         return {
-            'restart_hash': self._restart_hash
+            "restart_hash": self._restart_hash
         }
 
     @contextmanager
@@ -97,7 +98,7 @@ class AimTracker(BaseTracker[AimConfig]):
         )
         run.name = properties.name
         run.description = properties.description
-        run['hparams'] = properties.hparams
+        run["hparams"] = properties.hparams
 
         self._restart_hash = run.hash
         self._run = run

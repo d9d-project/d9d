@@ -1,9 +1,9 @@
 import torch
 from torch import nn
 
+from d9d.module.base import ModuleLateInit
 from d9d.module.block.attention.sdpa import FlashSdpa
 from d9d.module.block.positional import RotaryEmbeddingApplicator
-from d9d.module.base import ModuleLateInit
 
 
 class GroupedQueryAttention(nn.Module, ModuleLateInit):
@@ -107,7 +107,6 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         if self._is_qk_norm_enabled:
             key_states = self.k_norm(key_states)
         key_states = key_states.transpose(1, 2)
-
 
         value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
 

@@ -1,9 +1,11 @@
-from collections import deque, defaultdict
+from collections import defaultdict, deque
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Iterator, Any
+from typing import Any
+
 import torch
 from torch import nn
-from torch.autograd.graph import Node, GradientEdge
+from torch.autograd.graph import GradientEdge, Node
 
 
 def stage_backward_full(
@@ -56,7 +58,7 @@ def _construct_reverse_graph(roots: list[Node]) -> dict[Node, list[Node]]:
     Builds a reverse adjacency list (Input -> Output) via BFS from the roots.
     """
     reverse_graph = defaultdict(list)
-    valid_roots = set(x for x in roots if x is not None)
+    valid_roots = {x for x in roots if x is not None}
     to_visit = deque(valid_roots)
     visited = set(valid_roots)
 
@@ -219,7 +221,7 @@ def stage_backward_input(
     )
 
 
-def stage_backward_weight(
+def stage_backward_weight(  # noqa: C901
         weights: Iterator[nn.Parameter],
         param_groups: list[ParamGroup],
         retain_graph: bool = False
@@ -243,7 +245,7 @@ def stage_backward_weight(
 
         # Ensure we have data
         if group.grads and group.intermediates:
-            for grads_tuple, intermediate in zip(group.grads, group.intermediates):
+            for grads_tuple, intermediate in zip(group.grads, group.intermediates, strict=True):
                 if isinstance(grads_tuple, (tuple, list)):
                     non_none = [g for g in grads_tuple if g is not None]
                 elif grads_tuple is not None:

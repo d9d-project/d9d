@@ -27,8 +27,8 @@ class ShardIndexingMode(StrEnum):
             shard3: 12, 13
     """
 
-    sequential = 'sequential'
-    chunked = 'chunked'
+    sequential = "sequential"
+    chunked = "chunked"
 
 
 class ShardedDataset(Dataset, Stateful):
@@ -78,11 +78,11 @@ class ShardedDataset(Dataset, Stateful):
         """
 
         match self._indexing_mode:
-            case 'sequential':
+            case "sequential":
                 base_index = index * self._total_shards + self._current_shard
 
                 return base_index
-            case 'chunked':
+            case "chunked":
                 ceil_len = math.ceil(len(self._dataset) / self._total_shards)
                 shard_start_offset = ceil_len * self._current_shard
 
@@ -127,25 +127,27 @@ class ShardedDataset(Dataset, Stateful):
                 return shards_full + 1 if self._current_shard < shards_remainder else shards_full
             case ShardIndexingMode.chunked:
                 is_shard_last = self._current_shard == self._total_shards - 1
-                return ceil_len if not is_shard_last or shards_remainder == 0 else ceil_len - (self._total_shards - shards_remainder)
+                if not is_shard_last or shards_remainder == 0:
+                    return ceil_len
+                else:
+                    return ceil_len - (self._total_shards - shards_remainder)
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         if isinstance(self._dataset, Stateful):
-            self._dataset.load_state_dict(state_dict['dataset'])
+            self._dataset.load_state_dict(state_dict["dataset"])
 
         # check whether env mismatched
-        if state_dict['total_shards'] != self._total_shards:
-            raise ValueError(f'Shard count mismatch')
-        self._total_shards = state_dict['total_shards']
+        if state_dict["total_shards"] != self._total_shards:
+            raise ValueError("Shard count mismatch")
+        self._total_shards = state_dict["total_shards"]
 
-        self._current_shard = state_dict['current_shard']
+        self._current_shard = state_dict["current_shard"]
 
     def state_dict(self) -> dict[str, Any]:
         dct = {
-            'total_shards': self._total_shards,
-            'current_shard': self._current_shard
+            "total_shards": self._total_shards,
+            "current_shard": self._current_shard
         }
         if isinstance(self._dataset, Stateful):
-            dct['dataset'] = self._dataset.state_dict()
+            dct["dataset"] = self._dataset.state_dict()
         return dct
-

@@ -1,13 +1,17 @@
 import abc
 
 import torch
-from torch import nn, Tensor
-from torch.distributed import DeviceMesh
 import torch.distributed as dist
+from torch import Tensor, nn
+from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor
 from torch.utils.hooks import RemovableHandle
 
-from .placement_helper import mark_grad_sync_complete, mark_grad_sync_awaiting, dist_grad_from_local
+from .placement_helper import (
+    dist_grad_from_local,
+    mark_grad_sync_awaiting,
+    mark_grad_sync_complete,
+)
 
 
 class AbstractGradientBucket(abc.ABC):
@@ -27,8 +31,6 @@ class AbstractGradientBucket(abc.ABC):
         registering backward hooks, and preparing the gradients for accumulation.
         """
 
-        pass
-
     @abc.abstractmethod
     def unbind(self):
         """
@@ -37,23 +39,17 @@ class AbstractGradientBucket(abc.ABC):
         Removes hooks, deallocates buffers, and detaches gradients.
         """
 
-        pass
-
     @abc.abstractmethod
     def wait(self):
         """
         Waits for any asynchronous synchronization operations to complete.
         """
 
-        pass
-
     @abc.abstractmethod
     def zero_grad(self):
         """
         Zeros out the gradients and resets accumulation counters.
         """
-
-        pass
 
 
 class LocalGradientBucket(AbstractGradientBucket):
@@ -76,21 +72,15 @@ class LocalGradientBucket(AbstractGradientBucket):
         No-op for local buckets as they do not require special buffering.
         """
 
-        pass
-
     def unbind(self):
         """
         No-op for local buckets.
         """
 
-        pass
-
     def wait(self):
         """
         No-op as no async communication is performed.
         """
-
-        pass
 
     @torch.no_grad()
     def zero_grad(self):
@@ -124,7 +114,7 @@ class AccumulationCounter:
         Resets all counters to zero.
         """
 
-        self._param_to_sync_count = {param: 0 for param in self._param_to_sync_count.keys()}
+        self._param_to_sync_count = {param: 0 for param in self._param_to_sync_count}
 
     def update(self, param: nn.Parameter):
         """
@@ -179,7 +169,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         self._device = device
         self._grad_dtype = grad_dtype
         self._reduce_group: dist.ProcessGroup = reduce_mesh.get_group()
-
 
         self._buffer: Tensor | None = None
         self._hooks: list[RemovableHandle] | None = None
@@ -303,7 +292,7 @@ class SyncGradientBucket(AbstractGradientBucket):
         """
 
         if self._buffer is None:
-            raise ValueError('Buffer is not initialized')
+            raise ValueError("Buffer is not initialized")
 
         self._buffer.zero_()
         self._accum_counter.reset()

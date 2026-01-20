@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 import torch
 from torch import nn
@@ -74,7 +74,7 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
             lm_head_weight,
             labels,
             ignore_index=_IGNORE_INDEX,
-            reduction='none'
+            reduction="none"
         )
         return losses
 

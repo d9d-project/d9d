@@ -1,6 +1,6 @@
 from torch import nn
 from torch.distributed import DeviceMesh
-from torch.distributed.tensor import Placement, distribute_tensor, distribute_module
+from torch.distributed.tensor import Placement, distribute_module, distribute_tensor
 from torch.distributed.tensor.parallel import ParallelStyle
 
 
@@ -80,7 +80,5 @@ class ToLocalParallel(ParallelStyle):
                 self._distribute_params
             )
 
-
         master_module.register_forward_pre_hook(_ModulePatch(patched_classes))
         master_module.register_forward_hook(_ModulePatch(original_classes))
-
