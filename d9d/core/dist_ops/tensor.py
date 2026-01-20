@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import torch
 import torch.distributed as dist
 
@@ -83,7 +85,7 @@ def all_gather(
 def _all_gather_shapes(
         tensor: torch.Tensor,
         group: dist.ProcessGroup,
-):
+) -> Sequence[torch.Tensor]:
     all_ndim = [torch.empty((), dtype=torch.long, device=tensor.device) for _ in range(group.size())]
     all_ndim_wait = dist.all_gather(
         all_ndim,

@@ -2,8 +2,9 @@ from typing import Any
 
 import torch
 import torch.distributed as dist
+from torch import nn
 
-from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo
+from d9d.pipelining.api import PipelineStageInfo
 
 from .communications import StageCommunicationHandler
 from .computations import BackwardComputeHandler, ForwardComputeHandler
@@ -21,7 +22,7 @@ class PipelineStage:
     def __init__(
             self,
             info: PipelineStageInfo,
-            module: ModuleSupportsPipelining,
+            module: nn.Module,
             group: dist.ProcessGroup,
             stage_to_host_topology: dict[int, int]
     ):

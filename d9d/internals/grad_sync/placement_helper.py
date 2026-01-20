@@ -28,7 +28,7 @@ def map_placement_for_grad_sync(placement: Placement) -> Placement:
             raise ValueError(f"Unknown placement {placement}")
 
 
-def dist_grad_from_local(data: DTensor, local_grad: Tensor):
+def dist_grad_from_local(data: DTensor, local_grad: Tensor) -> DTensor:
     """
     Constructs a DTensor gradient from a local tensor using data placement info.
 

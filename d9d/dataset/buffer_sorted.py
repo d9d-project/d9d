@@ -120,7 +120,7 @@ class BufferSortedDataset(Dataset, Stateful):
 
         return self._base_dataset[take_id]
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the length of the base dataset."""
 
         return len(self._base_dataset)

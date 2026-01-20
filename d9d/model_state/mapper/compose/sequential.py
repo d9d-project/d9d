@@ -86,7 +86,7 @@ class ModelStateMapperSequential(ModelStateMapper):
         return ModelStateMapperSequential._merge_groups(list(outputs_depend_on_inputs.items()))
 
     @staticmethod
-    def _merge_groups(groups: list[tuple[frozenset[str], frozenset[str]]]):
+    def _merge_groups(groups: list[tuple[frozenset[str], frozenset[str]]]) -> frozenset[StateGroup]:
         saved_groups: list[tuple[set, set]] = []
 
         saved_groups_modified = True

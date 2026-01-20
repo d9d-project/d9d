@@ -68,7 +68,7 @@ class ShardedDataset(Dataset, Stateful):
         self._indexing_mode = indexing_mode
         self._pad_to_equal_size_across_shards = pad_to_equal_size_across_shards
 
-    def _compute_real_index_sequential(self, index: int):
+    def _compute_real_index_sequential(self, index: int) -> int:
         return index * self._total_shards + self._current_shard
 
     def _get_base_index_unsafe(self, index: int) -> _T_co:
@@ -78,11 +78,11 @@ class ShardedDataset(Dataset, Stateful):
         """
 
         match self._indexing_mode:
-            case "sequential":
+            case ShardIndexingMode.sequential:
                 base_index = index * self._total_shards + self._current_shard
 
                 return base_index
-            case "chunked":
+            case ShardIndexingMode.chunked:
                 ceil_len = math.ceil(len(self._dataset) / self._total_shards)
                 shard_start_offset = ceil_len * self._current_shard
 

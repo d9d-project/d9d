@@ -28,7 +28,7 @@ except ImportError as e:
     _MAP[AimConfig] = _TrackerImportFailed(dependency="aim", exception=e)
 
 
-def tracker_from_config(config: AnyTrackerConfig):
+def tracker_from_config(config: AnyTrackerConfig) -> BaseTracker:
     """
     Instantiates a specific tracker implementation based on the configuration.
 

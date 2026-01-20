@@ -1,5 +1,5 @@
 from collections import defaultdict, deque
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from typing import Any
 
@@ -151,7 +151,7 @@ def _get_param_groups(
     return unique_groups
 
 
-def _make_capture_hook(group: ParamGroup, idx: int):
+def _make_capture_hook(group: ParamGroup, idx: int) -> Callable[[torch.Tensor], None]:
     def _hook(grad_in: torch.Tensor):
         # Lazy init gradients list
         if group.grads is None and group.intermediates is not None:

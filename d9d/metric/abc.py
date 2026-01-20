@@ -1,4 +1,5 @@
 import abc
+from typing import Any
 
 import torch
 from torch.distributed.checkpoint.stateful import Stateful
@@ -16,7 +17,7 @@ class Metric(abc.ABC, Stateful):
     """
 
     @abc.abstractmethod
-    def update(self, *args, **kwargs):
+    def update(self, *args: Any, **kwargs: Any):
         """
         Updates the metric state with a new batch of data.
 

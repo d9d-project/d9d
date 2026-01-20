@@ -43,7 +43,7 @@ class Profiler:
         self._active = active_steps
         self._dist_context = dist_context
 
-    def _dump_trace(self, prof):
+    def _dump_trace(self, prof: tprof.profile):
         save_dir = self._save_dir / f"step_{prof.step_num}"
         save_dir.mkdir(parents=True, exist_ok=True)
         mesh_regular = self._dist_context.mesh_for(REGULAR_DOMAIN)

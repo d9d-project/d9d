@@ -2,6 +2,7 @@ import dataclasses
 from collections.abc import Callable
 from typing import TypeVar
 
+import torch
 from torch import nn
 
 from ...core.dist_context import REGULAR_DOMAIN, DistributedContext
@@ -68,7 +69,7 @@ def build_schedule(
         n_microbatches: int,
         schedule_config: AnyPipelineScheduleConfig,
         model_provider: Callable[[PipelineStageInfo], nn.Module],
-        loss_fn: Callable | None,
+        loss_fn: Callable[[dict[str, torch.Tensor], int], torch.Tensor] | None,
         sharding_spec: PipelineShardingSpec
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     """

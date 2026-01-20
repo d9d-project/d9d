@@ -7,7 +7,7 @@ from d9d.module.base import ModuleLateInit
 def _prepare_rope_inverse_frequencies(
         rope_base: int,
         inside_dim: int
-):
+) -> torch.Tensor:
     """
     Calculates inverse frequencies for RoPE calculation.
 

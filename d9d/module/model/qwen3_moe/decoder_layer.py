@@ -91,7 +91,7 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         self.mlp.reset_stats()
 
     @property
-    def moe_tokens_per_expert(self):
+    def moe_tokens_per_expert(self) -> torch.Tensor:
         """
         Returns the number of tokens routed to each expert.
         """

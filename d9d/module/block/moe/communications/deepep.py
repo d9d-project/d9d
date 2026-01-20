@@ -1,5 +1,8 @@
+from typing import Any
+
 import torch
 from deep_ep import Buffer, EventOverlap
+from torch.autograd.function import FunctionCtx
 
 from d9d.kernel.moe.indices_to_multihot import fused_indices_to_multihot
 from d9d.kernel.moe.permute_with_probs import moe_permute_with_probs, moe_unpermute_mask
@@ -62,7 +65,7 @@ class DeepEpDispatch(torch.autograd.Function):
 
     @staticmethod
     def forward(
-            ctx,
+            ctx: FunctionCtx,
             x: torch.Tensor,
             topk_idx: torch.Tensor,
             topk_weights: torch.Tensor,
@@ -125,13 +128,18 @@ class DeepEpDispatch(torch.autograd.Function):
 
     @staticmethod
     def backward(
-            ctx,
+            ctx: FunctionCtx,
             grad_recv_x: torch.Tensor,
             grad_recv_topk_idx: torch.Tensor,
             grad_recv_topk_weights: torch.Tensor,
-            grad_num_recv_tokens_per_expert_list,
-            grad_handle
-    ):
+            grad_num_recv_tokens_per_expert_list: list,
+            grad_handle: Any
+    ) -> tuple[
+        torch.Tensor,
+        None,
+        torch.Tensor,
+        None
+    ]:
         handle = ctx.handle
 
         prev_event = Buffer.capture()
@@ -159,10 +167,10 @@ class DeepEpCombine(torch.autograd.Function):
 
     @staticmethod
     def forward(
-            ctx,
+            ctx: FunctionCtx,
             x: torch.Tensor,
-            handle
-    ):
+            handle: Any
+    ) -> torch.Tensor:
         previous_event = Buffer.capture()
 
         combined_x, _, event = _buffer.combine(
@@ -180,7 +188,7 @@ class DeepEpCombine(torch.autograd.Function):
         return combined_x
 
     @staticmethod
-    def backward(ctx, grad_output: torch.Tensor):
+    def backward(ctx: FunctionCtx, grad_output: torch.Tensor) -> tuple[torch.Tensor, None]:
         handle = ctx.handle
 
         previous_event = Buffer.capture()

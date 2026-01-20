@@ -18,7 +18,7 @@ from d9d.pipelining.api import (
 )
 
 
-def _aggregate_hidden_states(hidden_states: torch.Tensor, agg_mask: torch.Tensor):
+def _aggregate_hidden_states(hidden_states: torch.Tensor, agg_mask: torch.Tensor) -> torch.Tensor:
     orig_dtype = hidden_states.dtype
     hidden_states = hidden_states.float()
     num_tokens = agg_mask.sum(dim=1)[:, None]
@@ -176,7 +176,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             self.layers[layer_name].reset_moe_stats()
 
     @property
-    def moe_tokens_per_expert(self):
+    def moe_tokens_per_expert(self) -> torch.Tensor:
         """
         Retrieves the number of tokens routed to each expert across all layers.
 
@@ -366,7 +366,7 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         self.model.reset_moe_stats()
 
     @property
-    def moe_tokens_per_expert(self):
+    def moe_tokens_per_expert(self) -> torch.Tensor:
         """
         Accesses MoE routing statistics from the backbone.
         """

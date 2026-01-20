@@ -1,3 +1,5 @@
+from typing import Any
+
 from torch import nn
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import Placement, distribute_module, distribute_tensor
@@ -26,7 +28,7 @@ class _ModulePatch:
     def __init__(self, class_mapper: dict[str, type]):
         self._class_mapper = class_mapper
 
-    def __call__(self, mod: nn.Module, *args, **kwargs):
+    def __call__(self, mod: nn.Module, *args: Any, **kwargs: Any):
         for submod_name, submod in mod.named_modules():
             submod.__class__ = self._class_mapper[submod_name]
 

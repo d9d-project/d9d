@@ -1,3 +1,5 @@
+from typing import Any
+
 from torch import nn
 from torch.distributed import DeviceMesh
 from torch.distributed.fsdp import FSDPModule, fully_shard
@@ -12,8 +14,8 @@ def _force_fsdp_grad_reduction_policy(module: FSDPModule):
 def parallelize_fsdp(
         module: nn.Module,
         mesh: DeviceMesh,
-        *args,
-        **kwargs
+        *args: Any,
+        **kwargs: Any
 ):
     """
     Applies Fully Sharded Data Parallel (FSDP) with forced gradient summation.

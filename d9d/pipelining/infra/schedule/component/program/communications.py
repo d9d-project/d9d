@@ -61,7 +61,7 @@ def check_action_communication_dependencies_fulfilled(
         action: ActionBase,
         rank_events: set[ActionBase],
         num_stages: int
-):
+) -> bool:
     """
     Checks if data dependencies (Receive or Local Compute) are met for an action.
 

@@ -21,8 +21,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
             dist_context: DistributedContext,
             stages: list[PipelineStage],
             num_microbatches: int,
-            loss_fn: LossFn,
-
+            loss_fn: LossFn | None,
             program: dict[int, list[ActionBase]],
             sharding_spec: PipelineShardingSpec
     ):
@@ -48,7 +47,10 @@ class PipelineScheduleExecutor(PipelineSchedule):
         ) for sub_program in program.values())
 
         self._comm_handler = PipelineCommunicationHandler(self._stages)
-        self._loss_handler = PipelineLossHandler(loss_fn)
+        if loss_fn is None:
+            self._loss_handler = None
+        else:
+            self._loss_handler = PipelineLossHandler(loss_fn)
 
         # these could be late-initialized on configure_buffers \/
         self._input_data_sharding_spec = sharding_spec.input_data
