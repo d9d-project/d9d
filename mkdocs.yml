@@ -1,4 +1,5 @@
 site_name: "d9d"
+site_url: "https://d9d-project.github.io/d9d/"
 
 theme:
   name: "shadcn"
