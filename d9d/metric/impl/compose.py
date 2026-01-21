@@ -35,3 +35,13 @@ class ComposeMetric(Metric[dict[str, Any]]):
     def to(self, device: str | torch.device | int):
         for metric in self._children.values():
             metric.to(device)
+
+    def state_dict(self) -> dict[str, Any]:
+        return {
+            metric_name: metric.state_dict()
+            for metric_name, metric in self._children.items()
+        }
+
+    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
+        for metric_name, metric in self._children.items():
+            metric.load_state_dict(state_dict[metric_name])
