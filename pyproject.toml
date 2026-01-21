@@ -25,14 +25,8 @@ cut-cross-entropy = {path = "packages/cut_cross_entropy-25.9.3-py3-none-any.whl"
 deep-ep = {path = "packages/deep_ep-1.2.1+9af0e0d-cp311-cp311-linux_x86_64.whl"}
 nv-grouped-gemm = {path = "packages/nv_grouped_gemm-1.1.4.post8-cp311-cp311-linux_x86_64.whl"}
 liger-kernel = "^0.6.4"
-mkdocs = "^1.6.1"
-mkdocstrings = {extras = ["python"], version = "^1.0.0"}
-mkdocs-material = "^9.7.1"
 safetensors = "^0.7.0"
 tqdm = "^4.67.1"
-mkdocs-shadcn = "^0.9.8"
-pymdown-extensions = "^10.19.1"
-pygments = "^2.19.2"
 ruff = "^0.14.13"
 mypy = "^1.19.1"
 
@@ -45,6 +39,14 @@ aim = "<4.0.0"
 pytest = "^9.0.2"
 coverage = "^7.13.1"
 
+
+
+[tool.poetry.group.docs.dependencies]
+mkdocs = "^1.6.1"
+mkdocstrings = "^1.0.1"
+mkdocs-shadcn = "^0.9.8"
+pymdown-extensions = "^10.20"
+pygments = "^2.19.2"
 
 [tool.pytest.ini_options]
 markers = [
