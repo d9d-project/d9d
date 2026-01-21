@@ -97,6 +97,8 @@ class DistributedContext:
                 Dimensions: ``('pp', 'dp_replicate', 'dp_cp_shard', 'cp_replicate', 'tp')``
             *   `batch` (`BATCH_DOMAIN`): Mesh optimized for distributing input data.
                 Dimensions: ``('pp', 'dp', 'cp', 'tp')``
+            *   `flat` (`FLAT_DOMAIN`): Mesh containing a single dimension with all the processes.
+                Dimensions: ``('world')``
 
         Args:
             domain: The name of the domain to retrieve.

@@ -6,6 +6,7 @@ from d9d.core.dist_context import (
     BATCH_DOMAIN,
     DENSE_DOMAIN,
     EXPERT_DOMAIN,
+    FLAT_DOMAIN,
     REGULAR_DOMAIN,
     DeviceMeshParameters,
 )
@@ -145,6 +146,10 @@ def test_mesh_topology_complex(dist_ctx_complex_topology):
     batch_mesh = ctx.mesh_for(BATCH_DOMAIN)
     assert batch_mesh.ndim == 4
     assert batch_mesh.mesh_dim_names == ("pp", "dp", "cp", "tp")
+
+    flat_mesh = ctx.mesh_for(FLAT_DOMAIN)
+    assert flat_mesh.ndim == 1
+    assert flat_mesh.mesh_dim_names == ("world",)
 
 
 @pytest.mark.distributed

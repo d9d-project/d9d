@@ -98,6 +98,14 @@ The underlying physical GPUs are immutable, but how we view them changes dependi
     3.  `cp`: Context Parallel
     4.  `tp`: Tensor Parallel
 
+
+### Flat Domain (`flat`)
+
+*   **Identifier**: `FLAT_DOMAIN` or `"flat"`
+*   **Purpose**: Mesh view with a single dimension.
+*   **Dimensions**:
+    1.  `world`: World Size
+
 ## Usage
 
 ### Initialization

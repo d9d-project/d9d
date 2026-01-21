@@ -77,10 +77,10 @@ class ExpertDomain(DeviceMeshDomain):
 
     def build_mesh(self, params: "DeviceMeshParameters") -> DeviceMesh:
         replicate_degree = (
-            params.data_parallel_replicate *
-            params.context_parallel_replicate *
-            params.data_parallel_shard *
-            params.context_parallel_shard
+                params.data_parallel_replicate *
+                params.context_parallel_replicate *
+                params.data_parallel_shard *
+                params.context_parallel_shard
         )
         return init_device_mesh(
             device_type="cuda",
@@ -151,4 +151,35 @@ class BatchDomain(DeviceMeshDomain):
         )
 
 
-ALL_DOMAIN_PROVIDERS: list[DeviceMeshDomain] = [RegularDomain(), DenseDomain(), ExpertDomain(), BatchDomain()]
+FLAT_DOMAIN = "flat"
+
+
+class FlatDomain(DeviceMeshDomain):
+    @property
+    def name(self) -> str:
+        return FLAT_DOMAIN
+
+    def build_mesh(self, params: "DeviceMeshParameters") -> DeviceMesh:
+        mesh_shape = (
+            params.pipeline_parallel *
+            params.data_parallel_replicate *
+            params.data_parallel_shard *
+            params.context_parallel_replicate *
+            params.context_parallel_shard *
+            params.tensor_parallel
+        )
+        return init_device_mesh(
+            device_type="cuda",
+            mesh_shape=(
+                mesh_shape,
+            ),
+            mesh_dim_names=(
+                "world",
+            )
+        )
+
+
+ALL_DOMAIN_PROVIDERS: list[DeviceMeshDomain] = [
+    RegularDomain(), DenseDomain(), ExpertDomain(), BatchDomain(),
+    FlatDomain()
+]
