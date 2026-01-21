@@ -8,11 +8,7 @@ from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor
 from torch.utils.hooks import RemovableHandle
 
-from .placement_helper import (
-    dist_grad_from_local,
-    mark_grad_sync_awaiting,
-    mark_grad_sync_complete,
-)
+from .placement_helper import dist_grad_from_local
 
 
 class AbstractGradientBucket(abc.ABC):
@@ -90,9 +86,7 @@ class LocalGradientBucket(AbstractGradientBucket):
         """
 
         for param in self._params:
-            if param.grad is None:
-                raise ValueError("Grad should be bound to buffer")
-            param.grad.zero_()
+            param.grad = None
 
 
 class AccumulationCounter:
@@ -291,8 +285,7 @@ class SyncGradientBucket(AbstractGradientBucket):
 
         self._reduce_job.wait()
 
-        for param in self._params:
-            mark_grad_sync_complete(param)
+        self._reduce_job = None
 
     @torch.no_grad()
     def zero_grad(self):
@@ -309,5 +302,3 @@ class SyncGradientBucket(AbstractGradientBucket):
 
         buffer.zero_()
         self._accum_counter.reset()
-        for param in self._params:
-            mark_grad_sync_awaiting(param)

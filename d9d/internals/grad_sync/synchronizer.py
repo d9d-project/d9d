@@ -5,10 +5,9 @@ from typing import cast
 import torch
 from torch import nn
 from torch.distributed import DeviceMesh
-from torch.distributed.tensor import DTensor, Partial, Shard
+from torch.distributed.tensor import DTensor, Replicate, Shard
 
 from .bucket import AbstractGradientBucket, LocalGradientBucket, SyncGradientBucket
-from .placement_helper import map_placement_for_grad_sync
 
 
 def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
@@ -25,16 +24,13 @@ def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
     reduce_dims: set[int] = set()
 
     for dim_i, dim_placement in enumerate(data.placements):
-        grad_placement = map_placement_for_grad_sync(dim_placement)
-        match grad_placement:
-            case Partial():
-                if grad_placement.reduce_op != "sum":
-                    raise ValueError(f"Unknown grad placement: {grad_placement}")
+        match dim_placement:
+            case Replicate():
                 reduce_dims.add(dim_i)
             case Shard():
                 pass
             case _:
-                raise ValueError(f"Unknown grad placement: {grad_placement}")
+                raise ValueError(f"Unknown grad placement: {dim_placement}")
 
     if len(reduce_dims) == 0:
         return None

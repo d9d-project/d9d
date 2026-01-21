@@ -32,13 +32,13 @@ Parameters are grouped automatically based on:
 In large-scale training, effective batch size is often increased by accumulating gradients over multiple micro-batches before performing an optimizer step. This package manages the lifecycle of distributed `DTensor` gradients during this accumulation phase without simple `no_sync` context managers.
 
 1.  **Local Accumulation**: 
-    During the backward pass of the first $N-1$ micro-batches, local gradients are accumulated into the bucket's buffer. Conceptually, while the parameter `DTensor` is `Replicate`d, these intermediate local gradients represent a `Partial(sum)` state across the Data Parallel mesh.
+    During the backward pass of the first $N-1$ micro-batches, local gradients are accumulated into the bucket's buffer. Conceptually, while the parameter `DTensor` is `Replicate`d, these intermediate local gradients also represent a `Replicate` (although contain different data) state across the Data Parallel mesh.
 
 2.  **Automatic Triggering**: 
     Each bucket maintains an internal counter. The `all_reduce` communication is *only* triggered when the specific parameter group has reached the `require_accumulations` count. This trigger happens automatically inside the backward hook of the *last* micro-batch, allowing communication to immediately overlap with the computation of remaining layers higher up in the model.
 
-3.  **Synchronization & Placement**: 
-    Once the asynchronous reduction completes, the flat buffer contains the globally summed gradient. The system then updates the `DTensor` metadata of the contained parameters to reflect that the data has transitioned from `Partial` back to `Replicate`, making them safe for the Optimizer to consume without involving synchronization later.
+3.  **Synchronization**: 
+    Once the asynchronous reduction completes, the flat buffer contains the globally summed gradient. Metadata of the contained parameter gradients is marked as `Replicate`, making them safe for the Optimizer to consume without involving synchronization later.
 
 ::: d9d.internals.grad_sync
     options:
