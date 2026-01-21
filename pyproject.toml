@@ -29,6 +29,7 @@ safetensors = "^0.7.0"
 tqdm = "^4.67.1"
 ruff = "^0.14.13"
 mypy = "^1.19.1"
+pre-commit = "^4.5.1"
 
 
 [tool.poetry.group.trackers.dependencies]
