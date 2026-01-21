@@ -7,7 +7,7 @@ import torch
 from d9d.core.dist_context import FLAT_DOMAIN
 from d9d.core.types import TensorTree
 from d9d.metric import Metric
-from d9d.metric.impl import WeightedMeanMetric
+from d9d.metric.impl import ComposeMetric, WeightedMeanMetric
 from torch.testing import assert_close
 from torch.utils._pytree import tree_map  # noqa: PLC2701
 
@@ -165,3 +165,65 @@ def test_metrics(dist_ctx_dpr8, case: MetricCase):
             expect = tree_map(lambda x: x.to("cuda"), step.expect)
             assert_close(metric.compute(), expect, equal_nan=True)
         metric.reset()
+
+
+@pytest.mark.distributed
+def test_compose_metric_distributed(dist_ctx_dpr8):
+    device = dist_ctx_dpr8.current_device
+    rank = dist_ctx_dpr8.mesh_for(FLAT_DOMAIN).get_rank()
+
+    # Setup
+    expect_device = torch.scalar_tensor(0, device=device).device
+    mean_a = WeightedMeanMetric()
+    mean_b = WeightedMeanMetric()
+    metric = ComposeMetric({"a": mean_a, "b": mean_b})
+
+    # to() propagation
+    metric.to(device)
+    assert mean_a.accumulated_weight.device == expect_device
+    assert mean_b.accumulated_weight.device == expect_device
+
+    # Validation logic (cannot update directly)
+    with pytest.raises(ValueError, match="Cannot update ComposeMetric directly"):
+        metric.update(1, 2)
+
+    # Update Children (Rank Dependent Data)
+    # Child A: Rank i adds value i, weight 1 -> Global Mean = 3.5 (for 8 ranks)
+    mean_a.update(
+        torch.tensor([float(rank)], device=device),
+        torch.tensor([1.0], device=device)
+    )
+    # Child B: Rank i adds value 2*i, weight 1 -> Global Mean = 7.0 (for 8 ranks)
+    mean_b.update(
+        torch.tensor([float(rank) * 2], device=device),
+        torch.tensor([1.0], device=device)
+    )
+
+    # Verify ComposeMetric delegates sync triggers to children
+    metric.trigger_sync(dist_ctx_dpr8)
+    metric.wait_sync(dist_ctx_dpr8)
+
+    # Compute Check (Global Aggregation)
+    expect_state = {
+        "a": torch.tensor(3.5, device=device),
+        "b": torch.tensor(7.0, device=device)
+    }
+    assert_close(metric.compute(), expect_state)
+
+    # State Dict / Reset / Load
+    # Save local state (contains specific rank data, e.g. Rank 0 has val=0)
+    old_state = tree_map(lambda x: x.clone(), metric.state_dict())
+
+    # Reset propagation
+    metric.reset()
+    assert_close(mean_a.accumulated_weight, torch.tensor(0.0, device=device))
+    assert_close(mean_b.accumulated_weight, torch.tensor(0.0, device=device))
+
+    # Restore state
+    metric.load_state_dict(old_state)
+
+    # We must sync again after loading state to re-populate global synced buffers
+    metric.trigger_sync(dist_ctx_dpr8)
+    metric.wait_sync(dist_ctx_dpr8)
+
+    assert_close(metric.compute(), expect_state)
