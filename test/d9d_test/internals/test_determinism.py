@@ -64,17 +64,17 @@ def test_set_seeds_local_determinism(dist_ctx_local):
 
 
 @pytest.mark.distributed
-def test_seed_variation_over_pp(dist_ctx_pp_dpr):
-    world_size = dist_ctx_pp_dpr.mesh_for(FLAT_DOMAIN).size()
-    pp_size = dist_ctx_pp_dpr.mesh_params.pipeline_parallel
-    non_pp_size = world_size // dist_ctx_pp_dpr.mesh_params.pipeline_parallel
+def test_seed_variation_over_pp(dist_ctx_pp4_dpr2):
+    world_size = dist_ctx_pp4_dpr2.mesh_for(FLAT_DOMAIN).size()
+    pp_size = dist_ctx_pp4_dpr2.mesh_params.pipeline_parallel
+    non_pp_size = world_size // dist_ctx_pp4_dpr2.mesh_params.pipeline_parallel
 
-    set_seeds(dist_ctx_pp_dpr, seed=42)
+    set_seeds(dist_ctx_pp4_dpr2, seed=42)
 
     # Generate a random number on each rank
     local_state = _get_random_states()
 
-    all_states = all_gather_object(local_state, group=dist_ctx_pp_dpr.mesh_for(FLAT_DOMAIN).get_group())
+    all_states = all_gather_object(local_state, group=dist_ctx_pp4_dpr2.mesh_for(FLAT_DOMAIN).get_group())
     all_states_by_pp = [all_states[pp_rank * non_pp_size: (pp_rank + 1) * non_pp_size] for pp_rank in range(pp_size)]
 
     for pp_batch in all_states_by_pp:

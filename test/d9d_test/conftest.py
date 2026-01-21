@@ -23,7 +23,7 @@ def destroy_process_group_fixture():
 
 
 @pytest.fixture(scope="session")
-def dist_ctx_dpr():
+def dist_ctx_dpr8():
     return DeviceMeshParameters(
         pipeline_parallel=1,
         tensor_parallel=1,
@@ -49,7 +49,7 @@ def dist_ctx_pp():
 
 
 @pytest.fixture(scope="session")
-def dist_ctx_pp_dpr():
+def dist_ctx_pp4_dpr2():
     return DeviceMeshParameters(
         pipeline_parallel=4,
         context_parallel_shard=1,
@@ -75,9 +75,9 @@ def dist_ctx_local():
 
 
 @pytest.fixture
-def shared_tmp_dir(dist_ctx_dpr) -> Generator[Path, None, None]:
-    reg_domain = dist_ctx_dpr.mesh_for(REGULAR_DOMAIN)["dp_replicate"]
-    if dist_ctx_dpr.is_main_process:
+def shared_tmp_dir(dist_ctx_dpr8) -> Generator[Path, None, None]:
+    reg_domain = dist_ctx_dpr8.mesh_for(REGULAR_DOMAIN)["dp_replicate"]
+    if dist_ctx_dpr8.is_main_process:
         with tempfile.TemporaryDirectory() as tmp_dir_str:
             tmp_dir = Path(tmp_dir_str)
             all_gather_object(tmp_dir, reg_domain.get_group())

@@ -6,8 +6,8 @@ from d9d.core.dist_context import REGULAR_DOMAIN
 
 
 @pytest.fixture(scope="session")
-def group(dist_ctx_dpr) -> dist.ProcessGroup:
-    return dist_ctx_dpr.mesh_for(REGULAR_DOMAIN).get_group("dp_replicate")
+def group(dist_ctx_dpr8) -> dist.ProcessGroup:
+    return dist_ctx_dpr8.mesh_for(REGULAR_DOMAIN).get_group("dp_replicate")
 
 
 def test_all_gather_object(group):

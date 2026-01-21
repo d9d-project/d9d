@@ -6,10 +6,6 @@ from torch import nn
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor
 
-from d9d.model_state.io import (
-    write_model_state_local,
-    write_model_state_pipeline_parallel,
-)
 from d9d.model_state.mapper import ModelStateMapper
 from d9d.model_state.mapper.compose import (
     ModelStateMapperParallel,
@@ -18,6 +14,11 @@ from d9d.model_state.mapper.compose import (
 from d9d.model_state.mapper.leaf import (
     ModelStateMapperGatherFullTensor,
     ModelStateMapperIdentity,
+)
+
+from .writer import (
+    write_model_state_local,
+    write_model_state_pipeline_parallel,
 )
 
 
@@ -29,13 +30,13 @@ def _build_extraction_mapper(name: str, state: torch.Tensor) -> ModelStateMapper
 
 
 def _augment_mapper_for_extraction(models: list[nn.Module], mapper: ModelStateMapper) -> ModelStateMapper:
-    states_to_load = {output for group in mapper.state_dependency_groups() for output in group.outputs}
+    states_to_save = {input_state for group in mapper.state_dependency_groups() for input_state in group.inputs}
 
     current_state_dict = {}
     for model in models:
         current_state_dict.update(model.state_dict())
     mapper = ModelStateMapperSequential([
-        ModelStateMapperParallel([_build_extraction_mapper(name, current_state_dict[name]) for name in states_to_load]),
+        ModelStateMapperParallel([_build_extraction_mapper(name, current_state_dict[name]) for name in states_to_save]),
         mapper
     ])
     return mapper

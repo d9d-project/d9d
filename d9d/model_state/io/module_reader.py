@@ -4,7 +4,6 @@ import torch
 from torch import nn
 from torch.distributed.tensor import DTensor
 
-from d9d.model_state.io import read_model_state
 from d9d.model_state.mapper import ModelStateMapper
 from d9d.model_state.mapper.compose import (
     ModelStateMapperParallel,
@@ -14,6 +13,8 @@ from d9d.model_state.mapper.leaf import (
     ModelStateMapperDistribute,
     ModelStateMapperIdentity,
 )
+
+from .reader import read_model_state
 
 
 def _build_injection_mapper(name: str, state: torch.Tensor) -> ModelStateMapper:

@@ -48,8 +48,8 @@ def _make_dtensor_param(
         (torch.bfloat16, torch.bfloat16)
     ]
 )
-def test_e2e(dist_ctx_dpr, tensor_specs, param_dtype, grad_dtype):
-    sync_mesh = dist_ctx_dpr.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+def test_e2e(dist_ctx_dpr8, tensor_specs, param_dtype, grad_dtype):
+    sync_mesh = dist_ctx_dpr8.mesh_for(DENSE_DOMAIN)["dp_replicate"]
     params = [
         _make_dtensor_param(
             shape=spec["shape"], value=1.0,

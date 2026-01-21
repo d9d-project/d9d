@@ -15,14 +15,14 @@ from d9d.internals.profiling import Profiler
         (4, 1, 1, 0, 8, (4, 8)),
     ]
 )
-def test_e2e(dist_ctx_dpr, shared_tmp_dir, period_steps, warmup_steps, active_steps, start_step, simulate_steps,
+def test_e2e(dist_ctx_dpr8, shared_tmp_dir, period_steps, warmup_steps, active_steps, start_step, simulate_steps,
              will_write_at):
     profiler_wrapper = Profiler(
         save_dir=shared_tmp_dir,
         period_steps=period_steps,
         warmup_steps=warmup_steps,
         active_steps=active_steps,
-        dist_context=dist_ctx_dpr
+        dist_context=dist_ctx_dpr8
     )
 
     # We must run exactly 'period_steps' to complete one cycle and trigger the dump
@@ -34,14 +34,14 @@ def test_e2e(dist_ctx_dpr, shared_tmp_dir, period_steps, warmup_steps, active_st
 
             prof.step()
 
-    dist_ctx_dpr.wait_world()
+    dist_ctx_dpr8.wait_world()
 
     for written_step in will_write_at:
         step_dir = shared_tmp_dir / f"step_{written_step}"
 
         assert step_dir.is_dir()
 
-        mesh = dist_ctx_dpr.mesh_for(REGULAR_DOMAIN)
+        mesh = dist_ctx_dpr8.mesh_for(REGULAR_DOMAIN)
         coord_str = "-".join(map(str, mesh.get_coordinate()))
 
         expected_filename_base = f"rank-{mesh.get_rank()}-coord-{coord_str}-trace"

@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import torch
 
 from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
@@ -17,15 +19,15 @@ class ModelStateMapperParallel(ModelStateMapper):
     to the sub-mapper responsible for those keys.
     """
 
-    def __init__(self, mappers: list[ModelStateMapper]):
-        mappers = filter_empty_mappers(mappers)
+    def __init__(self, mappers: Sequence[ModelStateMapper]):
+        mappers_lst = filter_empty_mappers(mappers)
 
         all_groups = set()
         inputs_to_mapper = {}
 
         seen_inputs: set[str] = set()
         seen_outputs: set[str] = set()
-        for mapper in mappers:
+        for mapper in mappers_lst:
             sub_groups = mapper.state_dependency_groups()
 
             for sub_group in sub_groups:
@@ -48,5 +50,9 @@ class ModelStateMapperParallel(ModelStateMapper):
 
     def apply(self, group: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         group_keys = frozenset(group.keys())
+
+        if group_keys not in self._inputs_to_mapper:
+            raise ValueError("Tried to run a parallel mapper with undefined group. Perhaps you sent groups that are "
+                             "not isolated?")
 
         return self._inputs_to_mapper[group_keys].apply(group)

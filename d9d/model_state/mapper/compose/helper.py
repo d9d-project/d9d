@@ -1,7 +1,9 @@
+from collections.abc import Sequence
+
 from d9d.model_state.mapper.abc import ModelStateMapper
 
 
-def filter_empty_mappers(mappers: list[ModelStateMapper]) -> list[ModelStateMapper]:
+def filter_empty_mappers(mappers: Sequence[ModelStateMapper]) -> list[ModelStateMapper]:
     """
     Filters out mappers that have no effect (no inputs and no outputs).
 
