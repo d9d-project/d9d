@@ -48,6 +48,32 @@ def dist_ctx_pp():
     ).build()
 
 
+@pytest.fixture(scope="session")
+def dist_ctx_pp_dpr():
+    return DeviceMeshParameters(
+        pipeline_parallel=4,
+        context_parallel_shard=1,
+        context_parallel_replicate=1,
+        expert_parallel=1,
+        tensor_parallel=1,
+        data_parallel_shard=1,
+        data_parallel_replicate=2
+    ).build()
+
+
+@pytest.fixture(scope="session")
+def dist_ctx_local():
+    return DeviceMeshParameters(
+        pipeline_parallel=1,
+        context_parallel_shard=1,
+        context_parallel_replicate=1,
+        expert_parallel=1,
+        tensor_parallel=1,
+        data_parallel_shard=1,
+        data_parallel_replicate=1
+    ).build()
+
+
 @pytest.fixture
 def shared_tmp_dir(dist_ctx_dpr) -> Generator[Path, None, None]:
     reg_domain = dist_ctx_dpr.mesh_for(REGULAR_DOMAIN)["dp_replicate"]

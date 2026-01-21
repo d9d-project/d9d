@@ -4,6 +4,7 @@ from typing import cast
 
 import numpy as np
 import torch
+import torch.distributed.tensor
 
 from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
 
@@ -31,10 +32,10 @@ def set_seeds(
             will share the seed.
     """
 
-    mesh_regular = dist_context.mesh_for(REGULAR_DOMAIN)
-
-    distinct_mesh = mesh_regular[distinct_seed_mesh_dim]
-    seed = (seed + distinct_mesh.get_local_rank()) % 2**64
+    # Mutate seed based on PP rank if distributed
+    if dist_context.mesh_params.is_distributed:
+        distinct_mesh = dist_context.mesh_for(REGULAR_DOMAIN)[distinct_seed_mesh_dim]
+        seed = (seed + distinct_mesh.get_local_rank()) % 2**64
 
     dist_context.logger.info(f"Set seed {seed}")
 
@@ -43,13 +44,16 @@ def set_seeds(
     random.seed(seed)
     np.random.seed(seed)
 
-    duplicate_seed_mesh_dim = tuple(
-        name
-        for name
-        in cast(list[str], mesh_regular.mesh_dim_names)
-        if name != distinct_seed_mesh_dim
-    )
-    duplicate_seed_mesh = mesh_regular[duplicate_seed_mesh_dim] if len(duplicate_seed_mesh_dim) != 0 else None
+    # Set DTensor seeding if distributed
+    if dist_context.mesh_params.is_distributed:
+        mesh_regular = dist_context.mesh_for(REGULAR_DOMAIN)
+        duplicate_seed_mesh_dim = tuple(
+            name
+            for name
+            in cast(list[str], mesh_regular.mesh_dim_names)
+            if name != distinct_seed_mesh_dim
+        )
+        duplicate_seed_mesh = mesh_regular[duplicate_seed_mesh_dim] if len(duplicate_seed_mesh_dim) != 0 else None
 
-    if duplicate_seed_mesh and duplicate_seed_mesh.get_coordinate() is not None:
-        torch.distributed.tensor._random.manual_seed(seed, duplicate_seed_mesh)  # noqa: SLF001
+        if duplicate_seed_mesh and duplicate_seed_mesh.get_coordinate() is not None:
+            torch.distributed.tensor._random.manual_seed(seed, duplicate_seed_mesh)  # noqa: SLF001
