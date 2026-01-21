@@ -13,7 +13,7 @@ def _build_to_local_patched_class(
 ) -> type:
     param_name_to_property = {
         param_name: property(
-            lambda self, pn=param_name: self._parameters[pn].to_local(grad_placements=grad_placement)
+            lambda self, pn=param_name: self._parameters[pn].to_local(grad_placements=grad_placement)  # type: ignore
         )
         for param_name in param_names
     }

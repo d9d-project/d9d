@@ -1,3 +1,6 @@
+from collections.abc import Mapping
+from typing import cast
+
 import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
@@ -5,6 +8,7 @@ from torch.utils.checkpoint import checkpoint
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.embedding import SplitTokenEmbeddings
 from d9d.module.block.head import SplitLanguageModellingHead
+from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode, create_hidden_states_aggregator
 from d9d.module.block.positional import RotaryEmbeddingProvider
 from d9d.module.model.qwen3_moe import (
     Qwen3MoEForCausalLMParameters,
@@ -18,15 +22,6 @@ from d9d.pipelining.api import (
 )
 
 
-def _aggregate_hidden_states(hidden_states: torch.Tensor, agg_mask: torch.Tensor) -> torch.Tensor:
-    orig_dtype = hidden_states.dtype
-    hidden_states = hidden_states.float()
-    num_tokens = agg_mask.sum(dim=1)[:, None]
-    masked_states = hidden_states * agg_mask[:, :, None]
-    averaged_states = masked_states.sum(dim=1) / num_tokens
-    return averaged_states.to(orig_dtype)
-
-
 class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
     """
     The Qwen3 Mixture-of-Experts (MoE) Transformer Decoder backbone.
@@ -38,7 +33,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             self,
             params: Qwen3MoEParameters,
             stage: PipelineStageInfo,
-            output_hidden_states_snapshot: bool,
+            hidden_states_snapshot_mode: HiddenStatesAggregationMode,
             enable_checkpointing: bool
     ):
         """
@@ -47,8 +42,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         Args:
             params: Configuration parameters for the full model.
             stage: Information about the pipeline stage this instance belongs to.
-            output_hidden_states_snapshot: If True, intermediate hidden states pooled by mask will be collected
-                and returned.
+            hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode
             enable_checkpointing: If True, enables activation checkpointing for transformer layers to save memory.
         """
 
@@ -72,9 +66,10 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
 
         self._num_layers_before = layer_start
         self._layers_iter = list(map(str, range(layer_start, layer_end)))
-        self.layers = nn.ModuleDict({
+        layers = nn.ModuleDict({
             str(layer_idx): Qwen3MoELayer(params=params.layer) for layer_idx in self._layers_iter
         })
+        self.layers: Mapping[str, Qwen3MoELayer] = cast(Mapping[str, Qwen3MoELayer], layers)
 
         self.rope_provider = RotaryEmbeddingProvider(
             max_position_ids=params.max_position_ids,
@@ -89,7 +84,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             )
 
         self._stage = stage
-        self._output_hidden_states_snapshot = output_hidden_states_snapshot
+        self._hidden_states_snapshot_mode = hidden_states_snapshot_mode
         self._hidden_size = params.layer.hidden_size
         self._enable_checkpointing = enable_checkpointing
 
@@ -124,15 +119,14 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
 
         Returns:
             A dictionary containing:
-            *   'hidden_states': The output of the last layer in this stage.
-            *   'hidden_states_snapshot': (Optional) The updated snapshot tensor.
+                *   'hidden_states': The output of the last layer in this stage.
+                *   'hidden_states_snapshot': (Optional) The updated snapshot tensor.
         """
-        hidden_states_to_output = []
+        state_aggregator = create_hidden_states_aggregator(self._hidden_states_snapshot_mode, hidden_states_agg_mask)
 
         if input_ids is not None:
             last_hidden_states = self.embed_tokens(input_ids)
-            if self._output_hidden_states_snapshot:
-                hidden_states_to_output.append(_aggregate_hidden_states(last_hidden_states, hidden_states_agg_mask))
+            state_aggregator.add_hidden_states(last_hidden_states)
         else:
             last_hidden_states = hidden_states
 
@@ -149,23 +143,15 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             else:
                 last_hidden_states = decoder_layer(last_hidden_states, rope_params)
 
-            if self._output_hidden_states_snapshot:
-                hidden_states_to_output.append(_aggregate_hidden_states(last_hidden_states, hidden_states_agg_mask))
+            state_aggregator.add_hidden_states(last_hidden_states)
 
         if self._stage.is_current_stage_last:
             last_hidden_states = self.norm(last_hidden_states)
 
-        outputs = {
-            "hidden_states": last_hidden_states
+        return {
+            "hidden_states": last_hidden_states,
+            "hidden_states_snapshot": state_aggregator.pack_with_snapshot(hidden_states_snapshot)
         }
-
-        if self._output_hidden_states_snapshot:
-            hidden_states_to_output = torch.stack(hidden_states_to_output, dim=0)
-            if hidden_states_snapshot is not None:
-                hidden_states_to_output = torch.cat([hidden_states_snapshot, hidden_states_to_output], dim=0)
-            outputs["hidden_states_snapshot"] = hidden_states_to_output
-
-        return outputs
 
     def reset_moe_stats(self):
         """
@@ -224,7 +210,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
                 dtype=self.output_dtype(),
                 device=input_ids.device
             )
-            if self._output_hidden_states_snapshot:
+            if self._hidden_states_snapshot_mode != HiddenStatesAggregationMode.no:
                 num_layers_before = self._num_layers_before + 1  # 1 for embedding
                 pp_inputs["hidden_states_snapshot"] = torch.empty(
                     (num_layers_before, input_ids.shape[0] // n_microbatches, self._hidden_size),
@@ -249,7 +235,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         }
 
         # for state caching
-        if self._output_hidden_states_snapshot:
+        if self._hidden_states_snapshot_mode != HiddenStatesAggregationMode.no:
             num_layers_before = self._num_layers_before + 1
             num_layers_current = len(self.layers)
             num_layers_after = num_layers_before + num_layers_current
@@ -273,7 +259,7 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             self,
             params: Qwen3MoEForCausalLMParameters,
             stage: PipelineStageInfo,
-            output_hidden_states_snapshot: bool,
+            hidden_states_snapshot_mode: HiddenStatesAggregationMode,
             enable_checkpointing: bool
     ):
         """
@@ -282,28 +268,28 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         Args:
             params: Full model configuration parameters.
             stage: Pipeline stage information for this instance.
-            output_hidden_states_snapshot: Whether to capture aggregated hidden states.
+            hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode.
             enable_checkpointing: Whether to enable activation checkpointing.
         """
 
         super().__init__()
 
         self.model = Qwen3MoEModel(
-            params,
+            params.model,
             stage,
-            output_hidden_states_snapshot=output_hidden_states_snapshot,
+            hidden_states_snapshot_mode=hidden_states_snapshot_mode,
             enable_checkpointing=enable_checkpointing
         )
 
         if stage.is_current_stage_last:
             self.lm_head = SplitLanguageModellingHead(
-                split_vocab_size=params.split_vocab_size,
-                split_order=params.split_vocab_order,
-                hidden_size=params.hidden_size
+                split_vocab_size=params.model.split_vocab_size,
+                split_order=params.model.split_vocab_order,
+                hidden_size=params.model.layer.hidden_size
             )
 
         self._stage = stage
-        self._hidden_size = params.hidden_size
+        self._hidden_size = params.model.layer.hidden_size
 
     def forward(
             self,

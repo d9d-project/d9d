@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import cast
 
 import torch
@@ -52,10 +52,11 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
 
         super().__init__()
 
-        self.token_embedding = nn.ModuleDict({
+        token_embedding = nn.ModuleDict({
             split_name: nn.Embedding(vocab_size, hidden_size)
             for split_name, vocab_size in split_vocab_size.items()
         })
+        self.token_embedding: Mapping[str, nn.Embedding] = cast(Mapping[str, nn.Embedding], token_embedding)
 
         self._id_start, self._id_end = _build_token_start_end_indices(split_vocab_size, split_order)
         self._hidden_size = hidden_size
@@ -72,7 +73,7 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
             Tensor of same shape as input_ids plus a last dimension of hidden_size.
         """
 
-        metadata_weight = cast(torch.Tensor, next(iter(self.token_embedding.values())).weight)
+        metadata_weight = next(iter(self.token_embedding.values())).weight
         # todo custom cuda kernel for indexing and filling?
 
         embed = torch.empty(

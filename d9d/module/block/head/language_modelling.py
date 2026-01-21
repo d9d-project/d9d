@@ -1,4 +1,4 @@
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import cast
 
 import torch
@@ -41,10 +41,12 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
 
         super().__init__()
 
-        self.lm_head = nn.ModuleDict({
+        lm_head = nn.ModuleDict({
             split_name: nn.Linear(hidden_size, vocab_size, bias=False)
             for split_name, vocab_size in split_vocab_size.items()
         })
+
+        self.lm_head: Mapping[str, nn.Linear] = cast(Mapping[str, nn.Linear], lm_head)
         self._split_order = split_order
         self._hidden_size = hidden_size
 
@@ -66,11 +68,7 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
             shape of the labels tensor.
         """
 
-        lm_head_weights = cast(
-            list[torch.Tensor],
-            [self.lm_head[split_name].weight for split_name in self._split_order]
-        )
-        lm_head_weight = torch.cat(lm_head_weights, dim=0)
+        lm_head_weight = torch.cat([self.lm_head[split_name].weight for split_name in self._split_order], dim=0)
 
         losses = linear_cross_entropy(
             hidden_states,

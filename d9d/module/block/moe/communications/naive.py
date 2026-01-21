@@ -24,7 +24,7 @@ class NoCommunicationHandler(ExpertCommunicationHandler):
         self._num_experts = num_experts
 
         self._hidden_shape_before_permute: Size | None = None
-        self._unpermute_mapping = None
+        self._unpermute_mapping: torch.Tensor | None = None
 
     def dispatch(
             self,
@@ -53,6 +53,9 @@ class NoCommunicationHandler(ExpertCommunicationHandler):
         return hidden_states, routing_probs, tokens_per_expert
 
     def combine(self, hidden_states: torch.Tensor) -> torch.Tensor:
+        if self._unpermute_mapping is None:
+            raise ValueError("Cannot run combine before running dispatch!")
+
         hidden_states = moe_unpermute_mask(
             hidden_states,
             self._unpermute_mapping,
