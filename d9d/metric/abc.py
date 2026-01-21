@@ -1,13 +1,16 @@
 import abc
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import torch
 from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.core.dist_context import DistributedContext
+from d9d.core.types import TensorTree
+
+TComputeResult = TypeVar("TComputeResult", bound=TensorTree)
 
 
-class Metric(abc.ABC, Stateful):
+class Metric(abc.ABC, Stateful, Generic[TComputeResult]):
     """
     Abstract base class for all metrics.
 
@@ -26,8 +29,6 @@ class Metric(abc.ABC, Stateful):
             **kwargs: Keyword arguments required by the specific metric implementation.
         """
 
-        ...
-
     @abc.abstractmethod
     def trigger_sync(self, dist_context: DistributedContext):
         """
@@ -39,8 +40,6 @@ class Metric(abc.ABC, Stateful):
         Args:
             dist_context: The distributed context.
         """
-
-        ...
 
     @abc.abstractmethod
     def wait_sync(self, dist_context: DistributedContext):
@@ -54,18 +53,16 @@ class Metric(abc.ABC, Stateful):
             dist_context: The distributed context.
         """
 
-        ...
-
     @abc.abstractmethod
-    def compute(self) -> torch.Tensor:
+    def compute(self) -> TComputeResult:
         """
         Computes the current value of the metric.
 
         Returns:
-            The computed metric value.
+            The computed metric result (of type `TComputeResult`).
+                This can be a single `torch.Tensor` or `PyTree` structure (dict, list, etc.)
+                containing tensors, depending on how the subclass was typed.
         """
-
-        ...
 
     @abc.abstractmethod
     def reset(self):
@@ -73,4 +70,10 @@ class Metric(abc.ABC, Stateful):
         Resets the internal state of the metric to the initial values.
         """
 
-        ...
+    def to(self, device: str | torch.device | int):
+        """
+        Moves a metric state to a specified device.
+
+        Args:
+            device: The device to move the metric state to.
+        """

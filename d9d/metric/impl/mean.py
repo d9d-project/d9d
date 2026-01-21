@@ -7,7 +7,7 @@ from d9d.core.dist_context import DistributedContext
 from d9d.metric import Metric
 
 
-class WeightedMeanMetric(Metric):
+class WeightedMeanMetric(Metric[torch.Tensor]):
     """
     Computes the weighted mean of values.
 
@@ -17,8 +17,9 @@ class WeightedMeanMetric(Metric):
     def __init__(self):
         """Constructs a WeightedMeanMetric object."""
 
-        self._value = torch.scalar_tensor(0, device="cuda", dtype=torch.float32)
-        self._weight = torch.scalar_tensor(0, device="cuda", dtype=torch.float32)
+        super().__init__()
+        self._value = torch.scalar_tensor(0, dtype=torch.float32)
+        self._weight = torch.scalar_tensor(0, dtype=torch.float32)
 
         self._handles: list[dist.Work] | None = None
 
@@ -47,6 +48,10 @@ class WeightedMeanMetric(Metric):
         self._value.fill_(0)
         self._weight.fill_(0)
         self._handles = None
+
+    def to(self, device: str | torch.device | int):
+        self._weight = self._weight.to(device)
+        self._value = self._value.to(device)
 
     @property
     def accumulated_weight(self) -> torch.Tensor:

@@ -75,9 +75,9 @@ from typing import Any
 from d9d.metric import Metric
 from d9d.core.dist_context import DistributedContext
 
-class MaxMetric(Metric):
+class MaxMetric(Metric[torch.Tensor]):
     def __init__(self):
-        self._max_val = torch.tensor(float('-inf'), device='cuda')
+        self._max_val = torch.tensor(float('-inf'))
         self._handle: dist.Work | None = None
 
     def update(self, value: torch.Tensor):
@@ -102,6 +102,9 @@ class MaxMetric(Metric):
     def reset(self):
         self._max_val.fill_(float('-inf'))
         self._handle = None
+        
+    def to(self, device: str | torch.device | int):
+        self._max_val = self._max_val.to(device)
 
     # Stateful Protocol for Checkpointing
     def state_dict(self) -> dict[str, Any]:
