@@ -76,7 +76,7 @@ class AimTracker(BaseTracker[AimConfig]):
     def __init__(self, config: AimConfig):
         self._config = config
 
-        self._restart_hash = None
+        self._restart_hash: str | None = None
         self._run: Run | None = None
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
