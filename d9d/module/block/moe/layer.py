@@ -3,12 +3,14 @@ from torch import nn
 from torch.distributed import ProcessGroup
 
 from d9d.module.base import ModuleLateInit
-from d9d.module.block.moe import GroupedSwiGLU, TopKRouter
-from d9d.module.block.moe.communications import (
+
+from .communications import (
     DeepEpCommunicationHandler,
     ExpertCommunicationHandler,
     NoCommunicationHandler,
 )
+from .grouped_experts import GroupedSwiGLU
+from .router import TopKRouter
 
 # TODO: implement expert bias
 # TODO: shared experts

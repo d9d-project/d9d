@@ -86,7 +86,7 @@ class ExpertDomain(DeviceMeshDomain):
             device_type="cuda",
             mesh_shape=(
                 params.pipeline_parallel,
-                replicate_degree,
+                replicate_degree // params.expert_parallel,
                 params.expert_parallel
             ),
             mesh_dim_names=(

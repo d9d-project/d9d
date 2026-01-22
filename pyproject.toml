@@ -30,6 +30,7 @@ tqdm = "^4.67.1"
 ruff = "^0.14.13"
 mypy = "^1.19.1"
 pre-commit = "^4.5.1"
+transformers = "^4.57.6"
 
 
 [tool.poetry.group.trackers.dependencies]
