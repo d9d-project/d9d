@@ -4,10 +4,13 @@ import torch
 import torch.utils._pytree as pytree  # noqa: PLC2701
 from torch.distributed.tensor import Shard
 
-ShardingSpec = Any
+from d9d.core.types import PyTree
+
+ShardingSpecLeaf = Shard | None
+ShardingSpec = PyTree[ShardingSpecLeaf]
 
 
-def _tree_item_to_shard(item: Any, shard_on_dim: int) -> Shard | None:
+def _tree_item_to_shard(item: Any, shard_on_dim: int) -> ShardingSpecLeaf:
     if not isinstance(item, torch.Tensor):
         return None
     if item.ndim == 0:
@@ -17,7 +20,7 @@ def _tree_item_to_shard(item: Any, shard_on_dim: int) -> Shard | None:
     return Shard(shard_on_dim)
 
 
-def shard_spec_on_dim(tree: Any, dim: int) -> ShardingSpec:
+def shard_spec_on_dim(tree: PyTree[Any], dim: int) -> ShardingSpec:
     """
     Creates a sharding specification to split all tensors in the tree on a specific dimension.
 
@@ -38,7 +41,7 @@ def shard_spec_on_dim(tree: Any, dim: int) -> ShardingSpec:
     return pytree.tree_map(lambda x: _tree_item_to_shard(x, dim), tree)
 
 
-def shard_spec_nothing(tree: Any) -> ShardingSpec:
+def shard_spec_nothing(tree: PyTree[Any]) -> ShardingSpec:
     """
     Creates a sharding specification where no sharding is performed.
 

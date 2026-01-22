@@ -1,6 +1,5 @@
 import dataclasses
 from collections.abc import Callable
-from typing import TypeVar
 
 import torch
 from torch import nn
@@ -8,51 +7,15 @@ from torch import nn
 from ...core.dist_context import REGULAR_DOMAIN, DistributedContext
 from ..api import PipelineSchedule, PipelineShardingSpec, PipelineStageInfo
 from ..infra.schedule.component.program import (
-    PipelineProgramBuilder,
     build_stage_to_host_rank_topology,
     invert_stage_to_host_rank_topology,
 )
 from ..infra.schedule.component.runtime import PipelineScheduleExecutor
-from ..infra.schedule.program import (
-    DualPipeVPipelineProgramBuilder,
-    Interleaved1F1BPipelineProgramBuilder,
-    LoopedBFSPipelineProgramBuilder,
-    ZeroBubbleVPipelineProgramBuilder,
-)
 from ..infra.stage import PipelineStage
 from .config import (
     AnyPipelineScheduleConfig,
-    PipelineSchedule1F1BConfig,
-    PipelineScheduleDualPipeVConfig,
-    PipelineScheduleGPipeConfig,
-    PipelineScheduleInferenceConfig,
-    PipelineScheduleLoopedBFSConfig,
-    PipelineScheduleZeroBubbleVConfig,
 )
-
-TConfig = TypeVar("TConfig", bound=AnyPipelineScheduleConfig)
-
-_CONFIG_TO_PROGRAM_REGISTRY: dict[type[TConfig], Callable[[TConfig], PipelineProgramBuilder]] = {
-    PipelineScheduleGPipeConfig: (
-        lambda cfg: LoopedBFSPipelineProgramBuilder(num_stages_per_rank=1, inference_mode=False)
-    ),
-    PipelineScheduleInferenceConfig: (
-        lambda cfg: LoopedBFSPipelineProgramBuilder(num_stages_per_rank=1, inference_mode=True)
-    ),
-    PipelineScheduleLoopedBFSConfig: (
-        lambda cfg: LoopedBFSPipelineProgramBuilder(num_stages_per_rank=cfg.num_stages_per_rank, inference_mode=False)
-    ),
-    PipelineSchedule1F1BConfig: (
-        lambda cfg: Interleaved1F1BPipelineProgramBuilder(num_stages_per_rank=cfg.num_stages_per_rank,
-                                                          enable_zero_bubble=cfg.zero_bubble)
-    ),
-    PipelineScheduleDualPipeVConfig: (
-        lambda cfg: DualPipeVPipelineProgramBuilder()
-    ),
-    PipelineScheduleZeroBubbleVConfig: (
-        lambda cfg: ZeroBubbleVPipelineProgramBuilder()
-    )
-}
+from .registry import PIPELINE_PROGRAM_REGISTRY
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -98,7 +61,7 @@ def build_schedule(
         2.  `list[nn.Module]`: The local PyTorch modules created for this rank.
     """
 
-    program_builder = _CONFIG_TO_PROGRAM_REGISTRY[type(schedule_config)](schedule_config)
+    program_builder = PIPELINE_PROGRAM_REGISTRY.program_for(schedule_config)
     mesh = dist_context.mesh_for(REGULAR_DOMAIN)["pp"]
 
     num_stages = program_builder.num_stages_per_rank * mesh.size()

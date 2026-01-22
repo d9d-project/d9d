@@ -13,3 +13,7 @@ lint:
 	@ruff check --fix
 	@echo "Running linting"
 	@ruff check
+
+mypy:
+	@echo "Running mypy"
+	@mypy

@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Any
+from collections.abc import Iterator, Sequence
+from typing import Any, cast
 
 import torch
 from torch import nn
@@ -123,7 +124,7 @@ class BackwardCacheInputForWeight:
     """
 
     inputs_grad: dict[str, torch.Tensor]
-    param_groups: list[ParamGroup] | None
+    param_groups: list[ParamGroup]
     ownership_tokens: list[Node]
 
 
@@ -168,6 +169,9 @@ class BackwardComputeHandler:
         self._module = module
 
         self._cache: dict[int, BackwardCacheInputForWeight | BackwardCacheInputForFull | BackwardCacheFull] = {}
+
+    def _parameters_with_grad(self) -> Iterator[nn.Parameter]:
+        return (param for param in self._module.parameters() if param.requires_grad)
 
     def backward_full(
             self,
@@ -239,11 +243,11 @@ class BackwardComputeHandler:
                 outputs=outputs_flattener.flatten(outputs),
                 output_grads=outputs_flattener.flatten(outputs_grad) if outputs_grad is not None else None,
                 inputs=inputs_flattener.flatten(inputs),
-                weights=self._module.parameters()
+                weights=self._parameters_with_grad()
             )
 
             self._cache[microbatch_index] = BackwardCacheInputForWeight(
-                inputs_grad=inputs_flattener.unflatten(results.input_grads),
+                inputs_grad=inputs_flattener.unflatten(cast(Sequence[torch.Tensor], results.input_grads)),
                 param_groups=results.param_groups,
                 ownership_tokens=results.grad_ownership_tokens
             )
@@ -275,7 +279,7 @@ class BackwardComputeHandler:
                 )
             case BackwardCacheInputForWeight():
                 stage_backward_weight(
-                    weights=self._module.parameters(),
+                    weights=self._parameters_with_grad(),
                     param_groups=prev_cache.param_groups
                 )
             case _:
@@ -301,4 +305,8 @@ class BackwardComputeHandler:
             case _:
                 raise ValueError("You should call either backward_full or backward_input before popping cached grad")
 
-        return cached.inputs_grad
+        for grad_value in cached.inputs_grad.values():
+            if grad_value is None:
+                raise ValueError("Cannot pop null gradient for sending! Perhaps malformed schedule?")
+
+        return cast(dict[str, torch.Tensor], cached.inputs_grad)

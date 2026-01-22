@@ -77,13 +77,13 @@ class PipelineScheduleExecutor(PipelineSchedule):
             stage.reset()
 
         # Shard inputs and kwargs to microbatches
-        inputs = shard_tree(
+        inputs_shard = shard_tree(
             inputs,
             num_shards=self._num_microbatches,
             sharding_spec=self._input_data_sharding_spec,
             enforce_even_split=True
         )
-        kwargs = shard_tree(
+        kwargs_shard = shard_tree(
             kwargs,
             num_shards=self._num_microbatches,
             sharding_spec=self._input_kwargs_sharding_spec,
@@ -99,8 +99,8 @@ class PipelineScheduleExecutor(PipelineSchedule):
                     loss=self._loss_handler,
                     stages=self._stages,
                     communications=self._comm_handler,
-                    pipeline_inputs_microbatches=inputs,
-                    pipeline_kwargs_microbatches=kwargs
+                    pipeline_inputs_microbatches=inputs_shard,
+                    pipeline_kwargs_microbatches=kwargs_shard
                 ))
 
         self._dist_ctx.logger.debug("Waiting for potentially hanging PP send comms")

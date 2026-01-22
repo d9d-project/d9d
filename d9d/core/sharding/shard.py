@@ -1,19 +1,23 @@
 from collections.abc import Sequence
-from typing import Any
+from typing import TypeVar
 
 import torch
 import torch.utils._pytree as pytree  # noqa: PLC2701
 from torch.distributed.tensor import Shard
 
 from d9d.core.sharding import ShardingSpec
+from d9d.core.types import PyTree
+
+TLeaf = TypeVar("TLeaf")
+TSameTree = TypeVar("TSameTree", bound=PyTree)
 
 
 def _shard_leaf_to_list(
-        item: Any,
-        spec: Any,
+        item: TLeaf,
+        spec: Shard | None,
         num_shards: int,
         enforce_even_split: bool
-) -> Sequence[Any]:
+) -> Sequence[TLeaf | torch.Tensor]:
     """Helper to split an item into a list of items for each rank."""
     if spec is None:
         # Replicated: strict copy reference for all shards
@@ -36,11 +40,11 @@ def _shard_leaf_to_list(
 
 
 def shard_tree(
-        tree: Any,
+        tree: TSameTree,
         sharding_spec: ShardingSpec,
         num_shards: int,
         enforce_even_split: bool
-) -> tuple[Any, ...]:
+) -> tuple[TSameTree, ...]:
     """
     Shards a PyTree into a tuple of PyTrees, one for each shard rank.
 

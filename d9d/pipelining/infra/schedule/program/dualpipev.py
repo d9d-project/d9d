@@ -38,7 +38,7 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
     def _build_for_rank(  # noqa: C901
             rank: int, stage_to_rank: dict[int, int], num_microbatches: int, pp_size: int
     ) -> list[ActionBase]:
-        compute_actions = []
+        compute_actions: list[ActionBase] = []
 
         # Identify local stages: s0 is Phase 0, s1 is Phase 1
         my_stages = sorted([s for s, r in stage_to_rank.items() if r == rank])

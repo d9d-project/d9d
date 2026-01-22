@@ -316,5 +316,7 @@ class PipelineStage:
     def reset(self):
         """Resets the internal state of communication handlers, clearing gradients on buffers."""
 
-        self._forward_comm.reset()
-        self._backward_comm.reset()
+        if self._forward_comm is not None:
+            self._forward_comm.reset()
+        if self._backward_comm is not None:
+            self._backward_comm.reset()

@@ -3,3 +3,4 @@
 /site/
 /dist/
 /logs/
+.mypy_cache/

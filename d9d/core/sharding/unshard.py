@@ -1,17 +1,21 @@
 from collections.abc import Sequence
-from typing import Any, cast
+from typing import TypeVar, cast
 
 import torch
 import torch.utils._pytree as pytree  # noqa: PLC2701
 from torch.distributed.tensor import Shard
 
-from d9d.core.sharding import ShardingSpec
+from d9d.core.sharding import ShardingSpec, ShardingSpecLeaf
+from d9d.core.types import PyTree
+
+TLeaf = TypeVar("TLeaf")
+TSameTree = TypeVar("TSameTree", bound=PyTree)
 
 
 def _unshard_leaf_from_group(
-        group: Sequence[Any],
-        spec: Any
-) -> Any:
+        group: Sequence[TLeaf],
+        spec: ShardingSpecLeaf
+) -> TLeaf | torch.Tensor:
     """Helper to merge a group of items from different ranks into one."""
     if spec is None:
         # Replicated: All ranks should have the same item.
@@ -25,15 +29,13 @@ def _unshard_leaf_from_group(
     if not isinstance(group[0], torch.Tensor):
         raise TypeError(f"Expected Tensors for Shard spec, got {type(group[0])}")
 
-    group = cast(list[torch.Tensor], group)  # if first element is tensor - skip runtime checks
-
-    return torch.cat(group, dim=spec.dim)
+    return torch.cat(cast(list[torch.Tensor], group), dim=spec.dim)
 
 
 def unshard_tree(
-        sharded_trees: Sequence[Any],
+        sharded_trees: Sequence[TSameTree],
         sharding_spec: ShardingSpec
-) -> Any:
+) -> TSameTree:
     """
     Combines a sequence of PyTrees (one per rank) into a single global PyTree.
 
