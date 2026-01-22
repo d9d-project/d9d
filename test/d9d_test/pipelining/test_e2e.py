@@ -61,9 +61,13 @@ def _do_standard_backward(stages: list[PipelineModel], x: torch.Tensor, y: torch
     "n_microbatches",
     [1, 2, 4, 8, 16, 32]
 )
+@pytest.mark.parametrize(
+    "freeze_w1",
+    [True, False]
+)
 def test_e2e(
         dist_ctx_pp: DistributedContext, schedule_config: AnyPipelineScheduleConfig, stages_per_rank: int,
-        n_microbatches: int
+        n_microbatches: int, freeze_w1: bool
 ):
     pp_mesh = dist_ctx_pp.mesh_for(REGULAR_DOMAIN)["pp"]
     n_stages = stages_per_rank * pp_mesh.size()
@@ -71,6 +75,9 @@ def test_e2e(
         pytest.skip("DualPipeV too small microbatch")
     x, y = build_pp_inputs(x_with_grad=False)
     full_stage_modules = [build_pp_model() for _ in range(n_stages)]
+    if freeze_w1:
+        for module in full_stage_modules:
+            module.w1.requires_grad = False
     snapshot = _do_standard_backward(full_stage_modules, x, y)
 
     hooks = [register_pp_hooks(x) for x in full_stage_modules]
@@ -108,10 +115,13 @@ def test_e2e(
         this_stage = full_stage_modules[this_stage_i]
         this_snapshot = snapshot[this_stage_i]
         this_hooks = hooks[this_stage_i]
-        assert torch.allclose(this_stage.w1.grad, this_snapshot["w1"], rtol=1e-3)
+        if freeze_w1:
+            assert this_stage.w1.grad is None
+        else:
+            assert torch.allclose(this_stage.w1.grad, this_snapshot["w1"], rtol=1e-3)
         assert torch.allclose(this_stage.w2.grad, this_snapshot["w2"], rtol=1e-3)
         assert torch.allclose(this_stage.w3.grad, this_snapshot["w3"], rtol=1e-3)
-        check_pp_hooks_ran(this_hooks, n_microbatches)
+        check_pp_hooks_ran(this_hooks, n_microbatches, override_w1=0 if freeze_w1 else None)
 
     for not_this_stage_i in not_this_rank_stages:
         not_this_stage = full_stage_modules[not_this_stage_i]

@@ -67,14 +67,20 @@ def register_pp_hooks(model: PipelineModel) -> dict[str, int]:
 
         return _update_counts
 
-    model.w1.register_post_accumulate_grad_hook(_make_hook("w1"))
-    model.w2.register_post_accumulate_grad_hook(_make_hook("w2"))
-    model.w3.register_post_accumulate_grad_hook(_make_hook("w3"))
+    if model.w1.requires_grad:
+        model.w1.register_post_accumulate_grad_hook(_make_hook("w1"))
+    if model.w2.requires_grad:
+        model.w2.register_post_accumulate_grad_hook(_make_hook("w2"))
+    if model.w3.requires_grad:
+        model.w3.register_post_accumulate_grad_hook(_make_hook("w3"))
     return counts
 
 
-def check_pp_hooks_ran(state: dict[str, int], count: int):
-    assert state["w1"] == count
+def check_pp_hooks_ran(state: dict[str, int], count: int, override_w1: int | None = None):
+    if override_w1 is not None:
+        assert state["w1"] == override_w1
+    else:
+        assert state["w1"] == count
     assert state["w2"] == count
     assert state["w3"] == count
 
