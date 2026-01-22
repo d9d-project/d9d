@@ -1,6 +1,6 @@
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Self, TypedDict
+from typing import Any, Self, TypedDict, cast
 
 import torch
 from aim import Distribution, Run
@@ -28,7 +28,7 @@ class AimRun(BaseTrackerRun):
     def __init__(self, run: Run):
         self._run = run
         self._step = 0
-        self._context = {}
+        self._context: dict[str, str] = {}
 
     def set_step(self, step: int):
         self._step = step
@@ -77,12 +77,13 @@ class AimTracker(BaseTracker[AimConfig]):
         self._config = config
 
         self._restart_hash = None
-        self._run = None
+        self._run: Run | None = None
 
-    def load_state_dict(self, state_dict: AimState) -> None:
-        self._restart_hash = state_dict["restart_hash"]
+    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
+        state = cast(AimState, state_dict)
+        self._restart_hash = state["restart_hash"]
 
-    def state_dict(self) -> AimState:
+    def state_dict(self) -> dict[str, Any]:
         return {
             "restart_hash": self._restart_hash
         }
