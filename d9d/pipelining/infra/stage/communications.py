@@ -249,8 +249,8 @@ class StageCommunicationHandler:
         ops = []
 
         # sort ops by parameter names to ensure receive ops are ordered the same for send and recv
-        for output_name, output_tensor in sorted(send_contents.items(), key=lambda x: x[0]):
-            output_info = self._output_handlers[output_name]
+        for output_name, output_info in sorted(self._output_handlers.items(), key=lambda x: x[0]):
+            output_tensor = send_contents[output_name]
 
             match output_info:
                 case EndStageOutput():

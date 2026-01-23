@@ -1,5 +1,5 @@
 import dataclasses
-from collections.abc import Iterator, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from typing import Any, cast
 
 import torch
@@ -79,6 +79,11 @@ class ForwardComputeHandler:
             output = self._module(**inputs, **kwargs)
         except Exception as e:
             raise RuntimeError(f"S{self._stage_idx}B{microbatch_index} failed to run forward") from e
+
+        if not isinstance(output, Mapping):
+            raise ValueError("Currently, pipelined models should output dict[str, torch.Tensor | None]")
+
+        output = {k: v for k, v in output.items() if v is not None}
 
         self._cache[microbatch_index] = ForwardCache(
             inputs=inputs,
