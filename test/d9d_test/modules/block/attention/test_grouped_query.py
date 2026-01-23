@@ -14,7 +14,7 @@ from transformers import Qwen3MoeConfig
 from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeAttention
 
 from d9d_test.modules.block.attention.util import (
-    check_grouped_query_attention_qwen3_moe,
+    check_grouped_query_attention_qwen3_moe_grad,
     clone_grouped_query_attention_qwen3_moe,
 )
 from d9d_test.modules.checkers import check_grad
@@ -108,7 +108,7 @@ def test_consistent_to_hf(dtype):
 
     check_grad(inputs.my_pre_tensor.grad, inputs.hf_pre_tensor.grad, is_dist=False, atol=1e-6, rtol=0.01)
 
-    check_grouped_query_attention_qwen3_moe(my, hf, is_dist=False)
+    check_grouped_query_attention_qwen3_moe_grad(my, hf, is_dist=False)
 
 
 class ContextParallelMode(StrEnum):
@@ -179,4 +179,4 @@ def test_consistent_to_hf_context_parallel(dtype, mode):
 
     check_grad(my_pre_dist.grad, inputs.hf_pre_tensor.grad, is_dist=True, atol=1e-5, rtol=0.01)
 
-    check_grouped_query_attention_qwen3_moe(my, hf, is_dist=True)
+    check_grouped_query_attention_qwen3_moe_grad(my, hf, is_dist=True)

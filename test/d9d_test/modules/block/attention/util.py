@@ -13,7 +13,7 @@ def clone_grouped_query_attention_qwen3_moe(my: GroupedQueryAttention, hf: Qwen3
     my.k_norm.weight.data = hf.k_norm.weight.data.detach().clone()
 
 
-def check_grouped_query_attention_qwen3_moe(my: GroupedQueryAttention, hf: Qwen3MoeAttention, is_dist: bool):
+def check_grouped_query_attention_qwen3_moe_grad(my: GroupedQueryAttention, hf: Qwen3MoeAttention, is_dist: bool):
     for my_grad, hf_grad in [
         (my.q_proj.weight.grad, hf.q_proj.weight.grad),
         (my.k_proj.weight.grad, hf.k_proj.weight.grad),

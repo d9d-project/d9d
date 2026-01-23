@@ -8,7 +8,7 @@ from torch.distributed.tensor import DTensor, Replicate, Shard, distribute_tenso
 from transformers import Qwen3MoeConfig
 from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeSparseMoeBlock
 
-from d9d_test.modules.block.moe.util import check_moe_grad_qwen3_moe, clone_moe_weights_qwen3_moe
+from d9d_test.modules.block.moe.util import check_moe_qwen3_moe_grad, clone_moe_weights_qwen3_moe
 from d9d_test.modules.checkers import check_grad
 
 _NUM_DEVICES = 8
@@ -66,7 +66,7 @@ def test_consistent_to_hf(dtype):
     hidden_states_my.mean().backward()
 
     check_grad(moe_my_pre.grad, moe_hf_pre.grad, is_dist=False, atol=1e-7, rtol=0.01)
-    check_moe_grad_qwen3_moe(moe_my, moe_hf, is_dist=False)
+    check_moe_qwen3_moe_grad(moe_my, moe_hf, is_dist=False)
 
 
 @pytest.mark.distributed
@@ -119,4 +119,4 @@ def test_consistent_to_hf_expert_parallel(dtype):
     assert torch.allclose(hidden_states_my, hidden_states_hf, atol=1e-3, rtol=0.01)
 
     check_grad(moe_my_pre_dist.grad, moe_hf_pre.grad, is_dist=True, atol=1e-7, rtol=0.01)
-    check_moe_grad_qwen3_moe(moe_my, moe_hf, is_dist=True)
+    check_moe_qwen3_moe_grad(moe_my, moe_hf, is_dist=True)
