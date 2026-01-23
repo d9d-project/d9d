@@ -10,16 +10,14 @@ from d9d.module.block.embedding import SplitTokenEmbeddings
 from d9d.module.block.head import SplitLanguageModellingHead
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode, create_hidden_states_aggregator
 from d9d.module.block.positional import RotaryEmbeddingProvider
-from d9d.module.model.qwen3_moe import (
-    Qwen3MoEForCausalLMParameters,
-    Qwen3MoELayer,
-    Qwen3MoEParameters,
-)
 from d9d.pipelining.api import (
     ModuleSupportsPipelining,
     PipelineStageInfo,
     distribute_layers_for_pipeline_stage,
 )
+
+from .decoder_layer import Qwen3MoELayer
+from .params import Qwen3MoEForCausalLMParameters, Qwen3MoEParameters
 
 
 class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):

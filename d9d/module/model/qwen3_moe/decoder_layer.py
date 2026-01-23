@@ -4,7 +4,8 @@ from torch import nn
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.attention import GroupedQueryAttention
 from d9d.module.block.moe import MoELayer
-from d9d.module.model.qwen3_moe import Qwen3MoELayerParameters
+
+from .params import Qwen3MoELayerParameters
 
 
 class Qwen3MoELayer(nn.Module, ModuleLateInit):
