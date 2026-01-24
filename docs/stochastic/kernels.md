@@ -1,8 +1,8 @@
 ---
-title: Stochastic Rounding
+title: Stochastic Rounding Kernels
 ---
 
-# Stochastic Rounding
+# Stochastic Rounding Kernels
 
 ## About
 
@@ -13,11 +13,15 @@ This method is statistically biased.
 
 This module provides highly optimized **Triton** kernels for performing stochastic casting.
 
-## Benchmarks
+## Benchmarks (H100)
 
 ### copy_fp32_to_bf16_stochastic_
 
 ![](./benchmark/copy_fp32_to_bf16_stochastic_.png)
+
+### adamw_stochastic_bf16_
+
+![](./benchmark/adamw_stochastic_bf16_.png)
 
 ::: d9d.kernel.stochastic
     options:

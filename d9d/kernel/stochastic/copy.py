@@ -2,6 +2,8 @@ import torch
 import triton
 import triton.language as tl
 
+from .ops import fp32_to_bf16_kernel
+
 
 @triton.autotune(
     configs=[
@@ -27,18 +29,14 @@ def _copy_fp32_to_bf16_kernel(
 
     # load source value (fp32)
     val_fp32 = tl.load(source_ptr + offsets, mask=mask)
-    val_ui32 = val_fp32.to(tl.uint32, bitcast=True)
 
-    # create random noise for last bits
-    rand_val = tl.randint(seed, offsets)
-    noise = rand_val.to(tl.uint32) & 0xFFFF
+    val_bf16 = fp32_to_bf16_kernel(
+        val_fp32=val_fp32,
+        offsets=offsets,
+        seed=seed
+    )
 
-    # add this noise (FP32)
-    val_ui32_noisy = val_ui32 + noise
-
-    # save in 16 bits
-    bf16_bits = (val_ui32_noisy >> 16).to(tl.int16)
-    tl.store(target_ptr + offsets, bf16_bits.to(tl.bfloat16, bitcast=True), mask=mask)
+    tl.store(target_ptr + offsets, val_bf16, mask=mask)
 
 
 def copy_fp32_to_bf16_stochastic_(
@@ -73,6 +71,7 @@ def copy_fp32_to_bf16_stochastic_(
 
     if not source.is_contiguous():
         source = source.contiguous()
+
     if not target.is_contiguous():
         raise ValueError("Since this is an in-place operation, target should be a contiguous tensor!")
 
