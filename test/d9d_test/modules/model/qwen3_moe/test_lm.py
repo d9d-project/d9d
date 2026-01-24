@@ -172,7 +172,6 @@ def test_consistent_to_hf_dist(checkpointing):
     my_loss_accum = []
 
     def _loss_fn(outputs, mb_index):
-        # weight = (labels_my_dp != -100).sum(dim=-1)[mb_index]
         ret = outputs["logps"].sum() / loss_scale_step_size
         my_loss_accum.append(ret.detach())
         return ret
