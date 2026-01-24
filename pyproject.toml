@@ -31,6 +31,8 @@ ruff = "^0.14.13"
 mypy = "^1.19.1"
 pre-commit = "^4.5.1"
 transformers = "^4.57.6"
+matplotlib = "^3.10.8"
+pandas = "^3.0.0"
 
 
 [tool.poetry.group.trackers.dependencies]
@@ -64,6 +66,7 @@ target-version = "py311"
 include = [
     "d9d/**/*.py",
     "test/**/*.py",
+    "benchmark/**/*.py"
 ]
 exclude = [
     "d9d/kernel/cce/**.py",
@@ -186,7 +189,10 @@ suppress-none-returning = true
 ]
 
 [tool.ruff.lint.pep8-naming]
-extend-ignore-names = ["F"]  # pytorch nn.functional :)
+extend-ignore-names = [
+    "F",  # pytorch nn.functional :)
+    "BLOCK_SIZE"  # triton kernels
+]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -204,7 +210,8 @@ check_untyped_defs = true
 
 [[tool.mypy.overrides]]
 module = [
-    "d9d.kernel.*",
+    "d9d.kernel.cce.*",
+    "d9d.kernel.moe.*",
     "d9d.module.block.moe.communications.deepep.*"
 ]
 ignore_errors = true
