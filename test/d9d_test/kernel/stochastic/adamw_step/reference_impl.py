@@ -12,7 +12,7 @@ def adamw_step_torch(
         eps: float,
         weight_decay: float,
         step: int
-):
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     p_f64 = p.to(torch.float32)
     g_f64 = g.to(torch.float32)
     m_f64 = m.to(torch.float32)
