@@ -12,10 +12,30 @@ TLeaf = TypeVar("TLeaf")
 TSameTree = TypeVar("TSameTree", bound=PyTree)
 
 
+def _unshard_list(
+        group: Sequence[list[TLeaf]],
+        spec: Shard
+) -> list[TLeaf]:
+    if spec.dim != 0:
+        raise ValueError(f"Lists can only be unsharded on dim 0, got {spec.dim}")
+
+    merged_list: list[TLeaf] = []
+    for x in group:
+        merged_list.extend(x)
+    return merged_list
+
+
+def _unshard_tensor(
+        group: list[torch.Tensor],
+        spec: Shard
+) -> torch.Tensor:
+    return torch.cat(group, dim=spec.dim)
+
+
 def _unshard_leaf_from_group(
         group: Sequence[TLeaf],
         spec: ShardingSpecLeaf
-) -> TLeaf | torch.Tensor:
+) -> TLeaf:
     """Helper to merge a group of items from different ranks into one."""
     if spec is None:
         # Replicated: All ranks should have the same item.
@@ -25,11 +45,19 @@ def _unshard_leaf_from_group(
     if not isinstance(spec, Shard):
         raise TypeError(f"Unknown sharding spec object type: {type(spec)}")
 
-    # Validation: Items must be tensors
-    if not isinstance(group[0], torch.Tensor):
-        raise TypeError(f"Expected Tensors for Shard spec, got {type(group[0])}")
-
-    return torch.cat(cast(list[torch.Tensor], group), dim=spec.dim)
+    first_item = group[0]
+    if isinstance(first_item, list):
+        return cast(TLeaf, _unshard_list(
+            cast(list[list[TLeaf]], group),
+            spec
+        ))
+    elif isinstance(first_item, torch.Tensor):
+        return cast(TLeaf, _unshard_tensor(
+            cast(list[torch.Tensor], group),
+            spec
+        ))
+    else:
+        raise TypeError(f"Expected Tensor or list instances, got {type(group[0])}")
 
 
 def unshard_tree(
@@ -64,33 +92,24 @@ def unshard_tree(
     if not sharded_trees:
         raise ValueError("sharded_trees sequence cannot be empty")
 
-    # 1. Flatten the spec
     flat_spec, spec_struct = pytree.tree_flatten(sharding_spec)
 
-    # 2. Flatten all input trees
-    # flat_shards_per_rank: List[List[Any]] -> One list of leaves per rank
     flat_shards_per_rank = []
     for i, tree in enumerate(sharded_trees):
-        leaves, _ = pytree.tree_flatten(tree)
-        if len(leaves) != len(flat_spec):
+        try:
+            leaves = spec_struct.flatten_up_to(tree)
+        except (ValueError, TypeError) as e:
             raise ValueError(
-                f"Structure mismatch at rank {i}: tree has {len(leaves)} leaves "
-                f"but spec has {len(flat_spec)}."
-            )
-        # Note: We assume 'struct' matches 'spec_struct' if lengths match
-        # because pytree traversal is deterministic.
+                f"Structure mismatch at shard {i}: tree does not match sharding spec structure"
+            ) from e
+
         flat_shards_per_rank.append(leaves)
 
-    # 3. Transpose: Sequence[List[Any]] -> List[Sequence[Any]]
-    # We want to group the i-th leaf from all ranks together
-    # grouped_leaves[i] = (leaf_i_rank0, leaf_i_rank1, ...)
     grouped_leaves = list(zip(*flat_shards_per_rank, strict=True))
 
-    # 4. Merge groups
     reconstructed_leaves = [
         _unshard_leaf_from_group(group, spec)
         for group, spec in zip(grouped_leaves, flat_spec, strict=True)
     ]
 
-    # 5. Reconstruct single tree
     return spec_struct.unflatten(reconstructed_leaves)

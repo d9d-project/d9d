@@ -1,5 +1,5 @@
 from collections.abc import Sequence
-from typing import TypeVar
+from typing import TypeVar, cast
 
 import torch
 import torch.utils._pytree as pytree  # noqa: PLC2701
@@ -12,21 +12,37 @@ TLeaf = TypeVar("TLeaf")
 TSameTree = TypeVar("TSameTree", bound=PyTree)
 
 
-def _shard_leaf_to_list(
-        item: TLeaf,
-        spec: Shard | None,
+def _shard_list(
+        item: list[TLeaf],
+        spec: Shard,
         num_shards: int,
         enforce_even_split: bool
-) -> Sequence[TLeaf | torch.Tensor]:
-    """Helper to split an item into a list of items for each rank."""
-    if spec is None:
-        # Replicated: strict copy reference for all shards
-        return [item] * num_shards
+) -> Sequence[list[TLeaf]]:
+    if spec.dim != 0:
+        raise ValueError(f"Lists can only be sharded on dim 0, got {spec.dim}")
 
-    if not isinstance(spec, Shard):
-        raise TypeError(f"Unknown sharding spec object type: {type(spec)}")
-    if not isinstance(item, torch.Tensor):
-        raise TypeError(f"Sharding spec found a Shard object, but the item was not a Tensor (got {type(item)})")
+    if enforce_even_split and len(item) % num_shards != 0:
+        raise ValueError(
+            f"Tried to shard a list with length {len(item)} "
+            f"to {num_shards} shards, but the length is not perfectly divisible."
+        )
+
+    shard_size, shard_extra = divmod(len(item), num_shards)
+    return [
+        item[
+            shard_id * shard_size + min(shard_id, shard_extra):
+            (shard_id + 1) * shard_size + min(shard_id + 1, shard_extra)
+        ]
+        for shard_id in range(num_shards)
+    ]
+
+
+def _shard_tensor(
+        item: torch.Tensor,
+        spec: Shard,
+        num_shards: int,
+        enforce_even_split: bool
+) -> Sequence[torch.Tensor]:
     if item.ndim == 0:
         raise ValueError("Found a 0-dim Tensor for sharding")
 
@@ -37,6 +53,40 @@ def _shard_leaf_to_list(
         )
 
     return torch.tensor_split(item, sections=num_shards, dim=spec.dim)
+
+
+def _shard_leaf_to_list(
+        item: TLeaf,
+        spec: Shard | None,
+        num_shards: int,
+        enforce_even_split: bool
+) -> Sequence[TLeaf]:
+    """Helper to split an item into a list of items for each rank."""
+    if spec is None:
+        # Replicated: strict copy reference for all shards
+        return [item] * num_shards
+
+    if not isinstance(spec, Shard):
+        raise TypeError(f"Unknown sharding spec object type: {type(spec)}")
+
+    if isinstance(item, torch.Tensor):
+        return cast(Sequence[TLeaf], _shard_tensor(
+            item=item,
+            num_shards=num_shards,
+            enforce_even_split=enforce_even_split,
+            spec=spec
+        ))
+    elif isinstance(item, list):
+        return cast(Sequence[TLeaf], _shard_list(
+            item=item,
+            num_shards=num_shards,
+            enforce_even_split=enforce_even_split,
+            spec=spec
+        ))
+    else:
+        raise TypeError(
+            f"Sharding spec found a Shard object, but the item was not a Tensor and not a list (got {type(item)})"
+        )
 
 
 def shard_tree(
@@ -73,28 +123,19 @@ def shard_tree(
         ValueError: If tree structures do not match, or valid sharding conditions
             are not met.
     """
-    # 1. Flatten inputs to process leaves linearly
-    flat_tree, tree_struct = pytree.tree_flatten(tree)
-    flat_spec, _ = pytree.tree_flatten(sharding_spec)
+    flat_spec, spec_struct = pytree.tree_flatten(sharding_spec)
 
-    # 2. Check structure compatibility (lengths must match)
-    if len(flat_tree) != len(flat_spec):
-        raise ValueError(
-            f"Tree structure mismatch: tree has {len(flat_tree)} leaves "
-            f"but spec has {len(flat_spec)} leaves."
-        )
+    try:
+        flat_tree = spec_struct.flatten_up_to(tree)
+    except (ValueError, TypeError) as e:
+        raise ValueError("Tree structure does not match sharding spec") from e
 
-    # 3. Process leaves: List[Any] -> List[Sequence[Any]]
-    # Each leaf becomes a sequence of length 'num_shards'
     sharded_leaves_per_node = [
         _shard_leaf_to_list(item, spec, num_shards, enforce_even_split)
         for item, spec in zip(flat_tree, flat_spec, strict=True)
     ]
 
-    # 4. Transpose: List[Sequence[Any]] -> Sequence[List[Any]]
-    # From "List of N-tuples" to "N-tuple of Lists"
-    # rank_leaves[i] contains all leaves for rank i
     rank_leaves = list(zip(*sharded_leaves_per_node, strict=True))
 
     # 5. Reconstruct N trees
-    return tuple(tree_struct.unflatten(leaves) for leaves in rank_leaves)
+    return tuple(spec_struct.unflatten(leaves) for leaves in rank_leaves)

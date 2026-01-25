@@ -13,7 +13,7 @@ from torch.distributed.tensor import Shard
 def test_shard_spec_nothing():
     spec = shard_spec_nothing({"a": torch.randn(4), "b": [torch.randn(2, 2), 42], "c": (1, 2)})
 
-    assert spec == {"a": None, "b": [None, None], "c": (None, None)}
+    assert spec == {"a": None, "b": None, "c": (None, None)}
 
 
 @pytest.mark.local
@@ -23,6 +23,7 @@ def test_shard_spec_on_dim():
         "too_small_rank": torch.randn(5),
         "scalar": torch.tensor(1.0),
         "not_tensor": "string_val",
+        "valid_list": [1, 2, 3, 4]
     }
 
     spec = shard_spec_on_dim(tree, 0)
@@ -30,7 +31,8 @@ def test_shard_spec_on_dim():
         "valid": Shard(0),
         "too_small_rank": Shard(0),
         "scalar": None,
-        "not_tensor": None
+        "not_tensor": None,
+        "valid_list": Shard(0)
     }
 
     with pytest.raises(ValueError):
@@ -71,11 +73,63 @@ def test_simple_tensor_uneven_split():
 
 
 @pytest.mark.local
-def test_enforce_even_split_raises():
-    data = torch.randn(10)
+def test_simple_list_sharding_even():
+    data = [1, 2, 3, 4, 5, 6]
     spec = Shard(0)
+    num_shards = 3
+
+    shards = shard_tree(data, spec, num_shards, enforce_even_split=True)
+    assert len(shards) == 3
+    assert shards[0] == [1, 2]
+    assert shards[1] == [3, 4]
+    assert shards[2] == [5, 6]
+
+    restored = unshard_tree(shards, spec)
+    assert restored == data
+
+
+@pytest.mark.local
+def test_simple_list_sharding_uneven():
+    data = ["a", "b", "c", "d", "e"]
+    spec = Shard(0)
+    num_shards = 2
+
+    # 5 items / 2 shards = 3 and 2
+    shards = shard_tree(data, spec, num_shards, enforce_even_split=False)
+
+    assert len(shards) == 2
+    assert len(shards[0]) + len(shards[1]) == 5
+
+    # Check specific split logic
+    assert shards[0] == ["a", "b", "c"]
+    assert shards[1] == ["d", "e"]
+
+    restored = unshard_tree(shards, spec)
+    assert restored == data
+
+
+@pytest.mark.local
+def test_list_of_objects_roundtrip():
+    o1, o2, o3 = {"id": 1}, {"id": 2}, {"id": 3}
+    data = [o1, o2, o3]
+    spec = Shard(0)
+
+    shards = shard_tree(data, spec, 3, enforce_even_split=True)
+    assert shards[0] == [o1]
+
+    restored = unshard_tree(shards, spec)
+    assert restored[0] is o1  # Check identity preservation
+
+
+@pytest.mark.local
+def test_enforce_even_split_raises():
+    spec = Shard(0)
+
     with pytest.raises(ValueError, match="perfectly divisible"):
-        shard_tree(data, spec, 3, enforce_even_split=True)
+        shard_tree(torch.randn(10), spec, 3, enforce_even_split=True)
+
+    with pytest.raises(ValueError, match="perfectly divisible"):
+        shard_tree([1, 2, 3, 4], spec, 3, enforce_even_split=True)
 
 
 @pytest.mark.local
@@ -96,32 +150,47 @@ def test_replication():
 @pytest.mark.local
 def test_complex_tree_mixed_sharding():
     tree = {
-        "model": {"layers": [torch.randn(4, 8), torch.randn(4, 8)], "bias": torch.randn(4)},
-        "meta": {"id": 123},
+        "model": {
+            "weights": torch.randn(4, 4),
+            "vocab_list": ["a", "b", "c", "d"],
+            "names": ["max", "mike"]
+        },
+        "meta": 123,
     }
 
-    spec = {"model": {"layers": [Shard(0), Shard(1)], "bias": None}, "meta": {"id": None}}
+    spec = {
+        "model": {
+            "weights": Shard(1),
+            "vocab_list": Shard(0),
+            "names": None
+        },
+        "meta": None
+    }
 
     num_shards = 2
     sharded_results = shard_tree(tree, spec, num_shards, enforce_even_split=True)
-
     assert len(sharded_results) == 2
-    shards = sharded_results
 
-    # Verify Rank 0 shapes
-    for shard in shards:
-        assert shard["model"]["layers"][0].shape == (2, 8)
-        assert shard["model"]["layers"][1].shape == (4, 4)
-        assert shard["model"]["bias"].shape == (4,)
-        assert shard["meta"]["id"] == 123
+    # Check Rank 0
+    r0 = sharded_results[0]
+    assert r0["model"]["weights"].shape == (4, 2)
+    assert r0["model"]["vocab_list"] == ["a", "b"]
+    assert r0["model"]["names"] == ["max", "mike"]
+    assert r0["meta"] == 123
+
+    # Check Rank 1
+    r1 = sharded_results[1]
+    assert r1["model"]["weights"].shape == (4, 2)
+    assert r1["model"]["vocab_list"] == ["c", "d"]
+    assert r1["model"]["names"] == ["max", "mike"]
+    assert r1["meta"] == 123
 
     # Roundtrip
     restored = unshard_tree(sharded_results, spec)
-
-    assert torch.equal(restored["model"]["layers"][0], tree["model"]["layers"][0])
-    assert torch.equal(restored["model"]["layers"][1], tree["model"]["layers"][1])
-    assert torch.equal(restored["model"]["bias"], tree["model"]["bias"])
-    assert restored["meta"]["id"] == tree["meta"]["id"]
+    assert torch.equal(restored["model"]["weights"], tree["model"]["weights"])
+    assert restored["model"]["vocab_list"] == ["a", "b", "c", "d"]
+    assert restored["model"]["names"] == ["max", "mike"]
+    assert restored["meta"] == 123
 
 
 @pytest.mark.local
@@ -129,7 +198,7 @@ def test_shard_structure_mismatch():
     tree = [torch.randn(2), torch.randn(2)]
     spec = [Shard(0)]
 
-    with pytest.raises(ValueError, match="Tree structure mismatch"):
+    with pytest.raises(ValueError, match="structure does not match"):
         shard_tree(tree, spec, 2, enforce_even_split=False)
 
 
@@ -147,7 +216,7 @@ def test_unshard_structure_mismatch_across_ranks():
     shard0 = [torch.randn(1), torch.randn(1)]
     shard1 = [torch.randn(1)]  # Missing one element
 
-    with pytest.raises(ValueError, match="Structure mismatch at rank 1"):
+    with pytest.raises(ValueError, match="Structure mismatch"):
         unshard_tree([shard0, shard1], spec)
 
 
@@ -166,4 +235,12 @@ def test_shard_non_tensor_with_shard_object():
     spec = Shard(0)
 
     with pytest.raises(TypeError, match="item was not a Tensor"):
+        shard_tree(data, spec, 2, enforce_even_split=False)
+
+
+@pytest.mark.local
+def test_list_invalid_dim_sharding():
+    data = [1, 2, 3, 4]
+    spec = Shard(1)
+    with pytest.raises(ValueError, match="dim 0"):
         shard_tree(data, spec, 2, enforce_even_split=False)
