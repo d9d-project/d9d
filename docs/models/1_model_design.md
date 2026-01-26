@@ -29,7 +29,7 @@ Instead, d9d promotes explicit composition like **HuggingFace Transformers** doe
 
 ### Pipelining-Aware Models
 
-Please see [Pipelining User API](../pipelining/1_user_api.md).
+Please see [Pipelining API](./3_pipeline_parallelism.md).
 
 ### Late Initialization
 

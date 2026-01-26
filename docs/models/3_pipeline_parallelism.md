@@ -1,8 +1,8 @@
 ---
-title: User API
+title: Pipeline Parallelism
 ---
 
-# User API
+# Pipeline Parallelism
 
 ## The d9d Approach
 

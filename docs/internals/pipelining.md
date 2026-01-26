@@ -1,8 +1,8 @@
 ---
-title: Internals
+title: Pipelining Internals
 ---
 
-# Internals
+# Pipelining Internals
 
 This section details the internals of the `d9d.pipelining` module. It is intended for those who wish to implement new layouts, schedules, or modify the execution engine.
 
