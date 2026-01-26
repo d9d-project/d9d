@@ -70,6 +70,9 @@ class PipelineScheduleExecutor(PipelineSchedule):
             )
 
     def step(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
+        if self._input_data_sharding_spec is None or self._input_kwargs_sharding_spec is None:
+            raise ValueError("Please configure sharding specs first")
+
         self._dist_ctx.logger.debug("Begin pipeline step")
         pp_group = self._dist_ctx.mesh_for(REGULAR_DOMAIN).get_group("pp")
 

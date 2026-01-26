@@ -3,10 +3,10 @@ from typing import TypeVar, cast
 
 import torch
 import torch.utils._pytree as pytree  # noqa: PLC2701
-from torch.distributed.tensor import Shard
 
-from d9d.core.sharding import ShardingSpec
 from d9d.core.types import PyTree
+
+from .spec import ShardingSpec, SpecReplicate, SpecShard
 
 TLeaf = TypeVar("TLeaf")
 TSameTree = TypeVar("TSameTree", bound=PyTree)
@@ -14,12 +14,19 @@ TSameTree = TypeVar("TSameTree", bound=PyTree)
 
 def _shard_list(
         item: list[TLeaf],
-        spec: Shard,
+        spec: SpecShard,
         num_shards: int,
         enforce_even_split: bool
-) -> Sequence[list[TLeaf]]:
+) -> Sequence[list[TLeaf] | TLeaf]:
     if spec.dim != 0:
         raise ValueError(f"Lists can only be sharded on dim 0, got {spec.dim}")
+
+    if spec.do_stack:
+        if len(item) != num_shards:
+            raise ValueError(
+                f"do_stack=True requires list length ({len(item)}) to match num_shards ({num_shards})"
+            )
+        return item
 
     if enforce_even_split and len(item) % num_shards != 0:
         raise ValueError(
@@ -39,12 +46,20 @@ def _shard_list(
 
 def _shard_tensor(
         item: torch.Tensor,
-        spec: Shard,
+        spec: SpecShard,
         num_shards: int,
         enforce_even_split: bool
 ) -> Sequence[torch.Tensor]:
     if item.ndim == 0:
         raise ValueError("Found a 0-dim Tensor for sharding")
+
+    if spec.do_stack:
+        if item.shape[spec.dim] != num_shards:
+            raise ValueError(
+                f"do_stack=True requires tensor shape[{spec.dim}] ({item.shape[spec.dim]}) "
+                f"to match num_shards ({num_shards})"
+            )
+        return torch.unbind(item, dim=spec.dim)
 
     if enforce_even_split and item.shape[spec.dim] % num_shards != 0:
         raise ValueError(
@@ -57,16 +72,16 @@ def _shard_tensor(
 
 def _shard_leaf_to_list(
         item: TLeaf,
-        spec: Shard | None,
+        spec: SpecShard | SpecReplicate,
         num_shards: int,
         enforce_even_split: bool
 ) -> Sequence[TLeaf]:
     """Helper to split an item into a list of items for each rank."""
-    if spec is None:
+    if isinstance(spec, SpecReplicate):
         # Replicated: strict copy reference for all shards
         return [item] * num_shards
 
-    if not isinstance(spec, Shard):
+    if not isinstance(spec, SpecShard):
         raise TypeError(f"Unknown sharding spec object type: {type(spec)}")
 
     if isinstance(item, torch.Tensor):
@@ -85,7 +100,7 @@ def _shard_leaf_to_list(
         ))
     else:
         raise TypeError(
-            f"Sharding spec found a Shard object, but the item was not a Tensor and not a list (got {type(item)})"
+            f"Sharding spec found a SpecShard object, but the item was not a Tensor and not a list (got {type(item)})"
         )
 
 
@@ -98,18 +113,17 @@ def shard_tree(
     """
     Shards a PyTree into a tuple of PyTrees, one for each shard rank.
 
-    This takes a single global data structure and splits it into ``num_shards``
+    This function takes a single global data structure and splits it into `num_shards`
     structures.
 
-    If a spec leaf is a ``Shard(dim)``, the tensor is split along that dimension,
-    and the ``i``-th slice goes to the ``i``-th output tree.
-    If a spec leaf is ``None``, the item is replicated (reference copy) to all
-    output trees.
+    *   If a spec leaf is a ``SpecShard(dim)``, the tensor or list is split along that dimension,
+        and the ``i``-th slice goes to the ``i``-th output tree.
+    *   If a spec leaf is ``SpecReplicate``, the item is replicated (reference copy) to all
+        output trees.
 
     Args:
         tree: The structure containing tensors to be sharded.
-        sharding_spec: A structure matching 'tree' containing ``Shard`` objects
-            or None.
+        sharding_spec: A structure matching 'tree' containing ``SpecShard`` or ``SpecReplicate`` objects.
         num_shards: The total number of shards to split the tensors into.
         enforce_even_split: If True, raises a ValueError if a tensor's dimension
             size is not perfectly divisible by ``num_shards``.
@@ -137,5 +151,4 @@ def shard_tree(
 
     rank_leaves = list(zip(*sharded_leaves_per_node, strict=True))
 
-    # 5. Reconstruct N trees
     return tuple(spec_struct.unflatten(leaves) for leaves in rank_leaves)
