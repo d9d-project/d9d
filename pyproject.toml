@@ -33,6 +33,7 @@ pre-commit = "^4.5.1"
 transformers = "^4.57.6"
 matplotlib = "^3.10.8"
 pandas = "^3.0.0"
+plotly = "^6.5.2"
 
 
 [tool.poetry.group.trackers.dependencies]
