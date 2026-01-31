@@ -98,7 +98,8 @@ def _group_params_for_buckets(
 def _make_bucket(
         require_accumulations: int,
         group_marker: _ParameterGroupMarker,
-        parameters: list[nn.Parameter]
+        parameters: list[nn.Parameter],
+        communicate_stream: torch.cuda.Stream
 ) -> AbstractGradientBucket:
     """
     Factory function to create the appropriate bucket type.
@@ -115,14 +116,16 @@ def _make_bucket(
             require_accumulations=require_accumulations,
             device=group_marker.device,
             grad_dtype=group_marker.grad_dtype,
-            reduce_mesh=group_marker.reduce_mesh
+            reduce_mesh=group_marker.reduce_mesh,
+            communicate_stream=communicate_stream
         )
 
 
 def _fill_buckets(
         param_groups: dict[_ParameterGroupMarker, list[nn.Parameter]],
         bucket_size_mb: int,
-        require_accumulations: int
+        require_accumulations: int,
+        communicate_stream: torch.cuda.Stream
 ) -> list[AbstractGradientBucket]:
     """
     Splits grouped parameters into buckets based on size constraints.
@@ -152,6 +155,7 @@ def _fill_buckets(
                     require_accumulations=require_accumulations,
                     group_marker=param_group_marker,
                     parameters=unfinished_bucket,
+                    communicate_stream=communicate_stream
                 ))
                 unfinished_bucket = []
                 current_bucket_size = 0
@@ -164,6 +168,7 @@ def _fill_buckets(
                 require_accumulations=require_accumulations,
                 group_marker=param_group_marker,
                 parameters=unfinished_bucket,
+                communicate_stream=communicate_stream
             ))
     return buckets
 
@@ -196,6 +201,8 @@ class GradientSynchronizer:
         self._bucket_size_mb = bucket_size_mb
         self._require_accumulations = require_accumulations
 
+        self._communicate_stream: torch.cuda.Stream | None = None
+        self._can_sync: bool
         self._buckets: list[AbstractGradientBucket] = []
 
     def bind(self):
@@ -206,10 +213,13 @@ class GradientSynchronizer:
         Must be called before the backward pass.
         """
 
+        stream = torch.cuda.Stream()
+        self._communicate_stream = stream
         self._buckets = _fill_buckets(
             _group_params_for_buckets(self._param_groups),
             bucket_size_mb=self._bucket_size_mb,
-            require_accumulations=self._require_accumulations
+            require_accumulations=self._require_accumulations,
+            communicate_stream=stream
         )
 
         for bucket in self._buckets:
@@ -226,14 +236,17 @@ class GradientSynchronizer:
             bucket.unbind()
 
         self._buckets = []
+        self._communicate_stream = None
 
     def wait(self):
         """
         Waits for all bucket operations (async reductions) to complete.
         """
 
+        torch.cuda.current_stream().wait_stream(self._communicate_stream)
+
         for bucket in self._buckets:
-            bucket.wait()
+            bucket.mark_sync()
 
     def zero_grad(self):
         """

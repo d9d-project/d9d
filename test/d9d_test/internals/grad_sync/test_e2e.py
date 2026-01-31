@@ -78,7 +78,7 @@ def test_e2e(dist_ctx_dpr8, tensor_specs, param_dtype, grad_dtype):
             (param.to_local() * rank).sum().backward()
 
         # it is 1 accumulation out of 2
-        with pytest.raises(ValueError):
+        with pytest.raises(ValueError, match="not ready"):
             sync.wait()
 
         for param in params:

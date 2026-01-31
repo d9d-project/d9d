@@ -37,15 +37,15 @@ class AbstractGradientBucket(abc.ABC):
         """
 
     @abc.abstractmethod
-    def wait(self):
-        """
-        Waits for any asynchronous synchronization operations to complete.
-        """
-
-    @abc.abstractmethod
     def zero_grad(self):
         """
         Zeros out the gradients and resets accumulation counters.
+        """
+
+    @abc.abstractmethod
+    def mark_sync(self):
+        """
+        Marks this bucket as synchronized.
         """
 
 
@@ -87,6 +87,11 @@ class LocalGradientBucket(AbstractGradientBucket):
 
         for param in self._params:
             param.grad = None
+
+    def mark_sync(self):
+        """
+        No-op for local buckets.
+        """
 
 
 class AccumulationCounter:
@@ -148,7 +153,8 @@ class SyncGradientBucket(AbstractGradientBucket):
             require_accumulations: int,
             device: torch.device,
             grad_dtype: torch.dtype,
-            reduce_mesh: DeviceMesh
+            reduce_mesh: DeviceMesh,
+            communicate_stream: torch.cuda.Stream
     ):
         """
         Constructs a SyncGradientBucket.
@@ -159,6 +165,7 @@ class SyncGradientBucket(AbstractGradientBucket):
             device: Device where parameters reside.
             grad_dtype: Data type for the gradients.
             reduce_mesh: DeviceMesh on which reduction happens.
+            communicate_stream: Stream where all the asynchronous communications will be scheduled
         """
 
         if not all(isinstance(x.data, DTensor) for x in parameters):
@@ -168,12 +175,14 @@ class SyncGradientBucket(AbstractGradientBucket):
         self._accum_counter = AccumulationCounter(require_accumulations, parameters)
         self._device = device
         self._grad_dtype = grad_dtype
-        self._reduce_group: dist.ProcessGroup = reduce_mesh.get_group()
+        # iterate from innermost to outermost group
+        self._reduce_groups: list[dist.ProcessGroup] = reduce_mesh.get_all_groups()[::-1]
 
         self._buffer: Tensor | None = None
         self._hooks: list[RemovableHandle] | None = None
 
-        self._reduce_job: dist.Work | None = None
+        self._communicate_stream = communicate_stream
+        self._ready_to_sync = False
 
     def _bind_buffer(self):
         """
@@ -217,12 +226,21 @@ class SyncGradientBucket(AbstractGradientBucket):
         if not self._accum_counter.is_ready():
             return
 
-        self._reduce_job = dist.all_reduce(
-            self._buffer,
-            op=dist.ReduceOp.SUM,
-            group=self._reduce_group,
-            async_op=True
-        )
+        if self._ready_to_sync:
+            raise ValueError("Tried to accumulate, but synchronization was not performed")
+
+        # wait for backward operation is complete
+        self._communicate_stream.wait_stream(torch.cuda.current_stream())
+        # execute all sync operations in sequential order (to ensure
+        # data safety), but in a DIFFERENT stream
+        with torch.cuda.stream(self._communicate_stream):
+            for group in self._reduce_groups:
+                dist.all_reduce(
+                    self._buffer,
+                    op=dist.ReduceOp.SUM,
+                    group=group
+                )
+        self._ready_to_sync = True
 
     def _bind_hooks(self):
         """
@@ -275,19 +293,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         self._unbind_hooks()
 
     @torch.no_grad()
-    def wait(self):
-        """
-        Blocks until the async reduction job is complete and marks sync as done.
-        """
-
-        if self._reduce_job is None:
-            raise ValueError("Cannot wait for bucket that was not pending sync")
-
-        self._reduce_job.wait()
-
-        self._reduce_job = None
-
-    @torch.no_grad()
     def zero_grad(self):
         """
         Zeros the contiguous buffer, resets counters, and marks params as awaiting sync.
@@ -302,3 +307,9 @@ class SyncGradientBucket(AbstractGradientBucket):
 
         buffer.zero_()
         self._accum_counter.reset()
+
+    def mark_sync(self):
+        if not self._ready_to_sync:
+            raise ValueError("This bucket is not ready for sync.")
+
+        self._ready_to_sync = False
