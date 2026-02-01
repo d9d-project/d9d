@@ -1,28 +1,32 @@
 import torch
+from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 from d9d.pipelining.api import ModuleSupportsPipelining
 from torch import nn
 
 
 class CustomMatmul(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, a, b):
-        with torch.no_grad():
-            ctx.save_for_backward(a, b)
-            return torch.matmul(a, b)
+    def forward(ctx, a, b, a_grad_direction, b_grad_direction):
+        ctx.save_for_backward(a, b)
+        ctx.a_grad_direction = a_grad_direction
+        ctx.b_grad_direction = b_grad_direction
+        return torch.matmul(a, b)
 
     @staticmethod
     def backward(ctx, grad_output):
-        with torch.no_grad():
-            a, b = ctx.saved_tensors
+        a, b = ctx.saved_tensors
 
-            grad_a = grad_b = None
+        grad_a = grad_b = None
 
-            if ctx.needs_input_grad[0]:
-                grad_a = torch.matmul(grad_output, b.transpose(-1, -2))
-            if ctx.needs_input_grad[1]:
-                grad_b = torch.matmul(a.transpose(-1, -2), grad_output)
+        compute_a = GLOBAL_GRAD_CONTEXT.check_direction(ctx.a_grad_direction)
+        compute_b = GLOBAL_GRAD_CONTEXT.check_direction(ctx.b_grad_direction)
 
-            return grad_a, grad_b
+        if ctx.needs_input_grad[0] and compute_a:
+            grad_a = torch.matmul(grad_output, b.transpose(-1, -2))
+        if ctx.needs_input_grad[1] and compute_b:
+            grad_b = torch.matmul(a.transpose(-1, -2), grad_output)
+
+        return grad_a, grad_b, None, None
 
 
 class PipelineModel(nn.Module, ModuleSupportsPipelining):
@@ -34,11 +38,11 @@ class PipelineModel(nn.Module, ModuleSupportsPipelining):
         self.act = nn.GELU()
 
     def forward(self, x: torch.Tensor, y: torch.Tensor):  # x is args (passed by), y is kwargs (inputs)
-        r = CustomMatmul.apply(x, self.w1)
+        r = CustomMatmul.apply(x, self.w1, GradDirection.inputs, GradDirection.weight)
         r = r * 1.05
         r = r @ self.w2
         r = self.act(r) + y
-        r = CustomMatmul.apply(r, self.w3)
+        r = CustomMatmul.apply(r, self.w3, GradDirection.inputs, GradDirection.weight)
         return {
             "x": r
         }

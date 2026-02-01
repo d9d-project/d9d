@@ -7,6 +7,8 @@ import torch
 from torch import nn
 from torch.autograd.graph import GradientEdge, Node
 
+from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+
 
 def stage_backward_full(
         outputs: list[torch.Tensor],
@@ -29,6 +31,8 @@ def stage_backward_full(
         A list of gradients corresponding to the `inputs`. If some input does not require gradient - its result will
             be None.
     """
+
+    GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.inputs, GradDirection.weight)
 
     torch.autograd.backward(
         tensors=outputs,
@@ -260,6 +264,8 @@ def stage_backward_input(
         and ownership tokens to maintain graph validity.
     """
 
+    GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.inputs)
+
     outputs_grad_fn = [grad_fn for x in outputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
     inputs_grad_fn = [grad_fn for x in inputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
     weights_grad_fn = [grad_fn for x in weights if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
@@ -325,6 +331,8 @@ def stage_backward_weight(  # noqa: C901
     Returns:
         A tuple of gradients corresponding to the provided `weights`.
     """
+
+    GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.weight)
 
     grad_acc_to_weight = {}
     all_weights = []  # Keep order

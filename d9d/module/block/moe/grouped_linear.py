@@ -1,10 +1,11 @@
 import math
 
 import torch
-from grouped_gemm.ops import gmm
 from torch import nn
 from torch.distributed.tensor import DTensor
 
+from d9d.core.autograd import GradDirection
+from d9d.kernel.gmm import gmm
 from d9d.module.base import ModuleLateInit
 
 
@@ -64,7 +65,13 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         if isinstance(weight, DTensor):
             weight = weight.to_local()
 
-        return gmm(x, weight, x_groups)
+        return gmm(
+            x,
+            weight,
+            x_groups,
+            a_grad_direction=GradDirection.inputs,
+            b_grad_direction=GradDirection.weight
+        )
 
     def reset_parameters(self):
         """Initializes weights using a uniform distribution based on input features."""
