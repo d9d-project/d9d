@@ -73,22 +73,26 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
             Tensor of same shape as input_ids plus a last dimension of hidden_size.
         """
 
-        metadata_weight = next(iter(self.token_embedding.values())).weight
-        # todo custom cuda kernel for indexing and filling?
-
-        embed = torch.empty(
-            size=(input_ids.shape[0], input_ids.shape[1], self._hidden_size),
-            device=metadata_weight.device,
-            dtype=metadata_weight.dtype,
-        )
+        output_embeds: torch.Tensor | None = None
 
         for split_name in self._split_order:
-            start_idx, end_idx = self._id_start[split_name], self._id_end[split_name]
-            is_split_mask = (input_ids >= start_idx) & (input_ids < end_idx)
-            split_embed = self.token_embedding[split_name](input_ids[is_split_mask] - start_idx)
-            embed[is_split_mask] = split_embed
+            start_idx = self._id_start[split_name]
+            end_idx = self._id_end[split_name]
+            layer = self.token_embedding[split_name]
+            mask = (input_ids >= start_idx) & (input_ids < end_idx)
 
-        return embed
+            safe_ids = torch.where(mask, input_ids - start_idx, 0)
+            masked_embed = layer(safe_ids) * mask[..., None]
+
+            if output_embeds is None:
+                output_embeds = masked_embed
+            else:
+                output_embeds = output_embeds + masked_embed
+
+        if output_embeds is None:
+            raise ValueError("Embeddings are empty - perhaps no splits were configured")
+
+        return output_embeds
 
     def reset_parameters(self):
         """
