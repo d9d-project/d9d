@@ -207,17 +207,17 @@ class BackwardComputeHandler:
             inputs=inputs_flattener.flatten(inputs)
         )
 
-        self._cache[microbatch_index] = BackwardCacheFull(
-            inputs_grad=inputs_flattener.unflatten(inputs_grad_linear)
-        )
+        if self._stage_idx != 0:
+            self._cache[microbatch_index] = BackwardCacheFull(
+                inputs_grad=inputs_flattener.unflatten(inputs_grad_linear)
+            )
 
     def backward_input(
             self,
             microbatch_index: int,
             inputs: dict[str, torch.Tensor],
             outputs: dict[str, torch.Tensor],
-            outputs_grad: dict[str, torch.Tensor] | None,
-            is_first_stage: bool
+            outputs_grad: dict[str, torch.Tensor] | None
     ):
         """
         Performs a partial backward pass to compute gradients with respect to inputs only.
@@ -237,7 +237,7 @@ class BackwardComputeHandler:
         inputs_flattener = DictFlattener(inputs.keys())
         outputs_flattener = DictFlattener(outputs.keys())
 
-        if is_first_stage:
+        if self._stage_idx == 0:
             self._cache[microbatch_index] = BackwardCacheInputForFull(
                 stage_outputs_or_loss=outputs_flattener.flatten(outputs),
                 output_grads=outputs_flattener.flatten(outputs_grad) if outputs_grad is not None else None,

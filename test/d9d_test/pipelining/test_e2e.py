@@ -11,6 +11,7 @@ from d9d.pipelining.factory import (
     PipelineScheduleZeroBubbleVConfig,
     build_schedule,
 )
+from d9d.pipelining.infra.stage import PipelineStage
 
 from d9d_test.pipelining.definitions import (
     PipelineModel,
@@ -121,6 +122,12 @@ def test_e2e(
             assert torch.allclose(this_stage.w1.grad, this_snapshot["w1"], rtol=1e-3)
         assert torch.allclose(this_stage.w2.grad, this_snapshot["w2"], rtol=1e-3)
         assert torch.allclose(this_stage.w3.grad, this_snapshot["w3"], rtol=1e-3)
+
+        # check that we have no dangling internal state
+        stage_object: PipelineStage = schedule_info.schedule._stages[this_stage_i]
+        assert len(stage_object._backward_comp._cache) == 0
+        assert len(stage_object._forward_comp._cache) == 0
+
         check_pp_hooks_ran(this_hooks, n_microbatches, override_w1=0 if freeze_w1 else None)
 
     for not_this_stage_i in not_this_rank_stages:

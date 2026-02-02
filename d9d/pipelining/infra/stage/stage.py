@@ -288,8 +288,7 @@ class PipelineStage:
                 microbatch_index=microbatch_index,
                 inputs=inputs,
                 outputs=outputs,
-                outputs_grad=outputs_grad,
-                is_first_stage=self._info.is_current_stage_first
+                outputs_grad=outputs_grad
             )
 
         if self._info.is_current_stage_last and not self._info.is_current_stage_first:
