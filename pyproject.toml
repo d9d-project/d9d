@@ -267,7 +267,7 @@ ignore_errors = true
 [tool.semantic_release]
 major_on_zero = false
 version_toml = ["pyproject.toml:project.version"]
-build_command = "pipx install poetry && poetry build"
+build_command = "pip install poetry && poetry build"
 commit_parser = "conventional"
 
 [tool.semantic_release.commit_parser_options]
