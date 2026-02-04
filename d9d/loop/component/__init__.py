@@ -9,10 +9,10 @@ from .job_profiler import JobProfiler
 from .model_stage_exporter import ModelStageExporter
 from .model_stage_factory import ModelStageFactory, TrackedModules
 from .optimizer_factory import OptimizerFactory
-from .pipeline_result_processing import LossComputer, ModelOutputsProcessor
+from .pipeline_result_processing import InferenceProcessor, LossComputer, PipelineOutputsProcessor
 from .stepper import Stepper
+from .task_operator import ForwardResult, TrainTaskOperator
 from .timeout_manager import TimeoutManager
-from .train_task_operator import ForwardResult, TrainTaskOperator
 
 __all__ = [
     "BatchMaths",
@@ -20,14 +20,15 @@ __all__ = [
     "ForwardResult",
     "GradientClipper",
     "GradientManager",
+    "InferenceProcessor",
     "JobLogger",
     "JobProfiler",
     "LossComputer",
     "ManualGarbageCollector",
-    "ModelOutputsProcessor",
     "ModelStageExporter",
     "ModelStageFactory",
     "OptimizerFactory",
+    "PipelineOutputsProcessor",
     "StateCheckpointer",
     "Stepper",
     "TimeoutManager",

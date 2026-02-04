@@ -1,3 +1,6 @@
+import abc
+from typing import Generic, TypeVar
+
 import torch
 
 from d9d.internals.pipeline_state import PipelineStateHandler
@@ -9,7 +12,20 @@ STATE_LOSS = "__internal_loss"
 STATE_LOSS_WEIGHT = "__internal_loss_weight"
 
 
-class LossComputer:
+TOutput = TypeVar("TOutput")
+
+
+class PipelineOutputsProcessor(abc.ABC, Generic[TOutput]):
+    @abc.abstractmethod
+    def __call__(
+            self,
+            pipeline_outputs: dict[str, torch.Tensor],
+            microbatch_idx: int
+    ) -> TOutput:
+        ...
+
+
+class LossComputer(PipelineOutputsProcessor[torch.Tensor]):
     """
     Handles the computation of loss values and their integration into the pipeline state.
 
@@ -41,7 +57,7 @@ class LossComputer:
     def __call__(
             self,
             pipeline_outputs: dict[str, torch.Tensor],
-            microbatch_idx: int | None
+            microbatch_idx: int
     ) -> torch.Tensor:
         """
         Computes the weighted loss for a specific sharded microbatch or the full microbatch.
@@ -61,12 +77,9 @@ class LossComputer:
             The calculated loss multiplied by its weight.
         """
 
-        if microbatch_idx is None:
-            state = self._state.global_state()
-        else:
-            state = self._state.sharded_state(
-                shard_id=microbatch_idx
-            )
+        state = self._state.sharded_state(
+            shard_id=microbatch_idx
+        )
 
         computation = self._task.compute_loss(ComputeLossContext(
             pipeline_results=pipeline_outputs,
@@ -86,11 +99,11 @@ class LossComputer:
         return loss * loss_weight
 
 
-class ModelOutputsProcessor:
+class InferenceProcessor(PipelineOutputsProcessor[None]):
     """
     Handles the processing of model outputs during inference or evaluation.
 
-    This component retrieves the appropriate state context (global or sharded)
+    This component retrieves the appropriate state context
     and delegates the output processing logic to the user-defined inference task.
     """
 
@@ -113,7 +126,7 @@ class ModelOutputsProcessor:
     def __call__(
             self,
             pipeline_outputs: dict[str, torch.Tensor],
-            microbatch_idx: int | None
+            microbatch_idx: int
     ) -> None:
         """
         Processes model outputs for a specific microbatch or full batch.
@@ -126,12 +139,9 @@ class ModelOutputsProcessor:
             microbatch_idx: Index of the current microbatch, or None if not using microbatching.
         """
 
-        if microbatch_idx is None:
-            state = self._state.global_state()
-        else:
-            state = self._state.sharded_state(
-                shard_id=microbatch_idx
-            )
+        state = self._state.sharded_state(
+            shard_id=microbatch_idx
+        )
 
         self._task.process_outputs(ProcessOutputsContext(
             pipeline_results=pipeline_outputs,

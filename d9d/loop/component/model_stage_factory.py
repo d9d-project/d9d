@@ -15,7 +15,7 @@ from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory.factory import PipelineScheduleInfo, build_schedule
 
 from .batch_maths import BatchMaths
-from .pipeline_result_processing import LossComputer, ModelOutputsProcessor
+from .pipeline_result_processing import PipelineOutputsProcessor
 
 StatefulPredicate = Callable[[str, torch.Tensor], bool]
 """Determines if a specific parameter or buffer should be included in the state dictionary."""
@@ -50,28 +50,6 @@ class TrackedModules(Stateful):
         self._dist_context = dist_context
         self._modules = modules
         self._stateful_predicate = stateful_predicate
-
-    def __call__(self, *args: Any, **kwargs: Any) -> Any:
-        """
-        Forwards execution to the only pipeline stage.
-
-        This method is only valid when pipeline parallelism is disabled.
-
-        Args:
-            *args: Positional arguments passed to the module.
-            **kwargs: Keyword arguments passed to the module.
-
-        Returns:
-            The output of the model execution.
-
-        Raises:
-            ValueError: If pipeline parallelism is configured.
-        """
-
-        if self._dist_context.mesh_params.has_pipeline_parallel:
-            raise ValueError("You cannot call tracked modules when using pipelining")
-
-        return self._modules[0](*args, **kwargs)
 
     @property
     def modules(self) -> list[nn.Module]:
@@ -159,8 +137,8 @@ class ModelStageFactory:
             dist_context: DistributedContext,
             batch_maths: BatchMaths,
             config_model: ModelStageFactoryConfig,
-            config_pipelining: PipeliningConfig | None,
-            pipeline_callback: LossComputer | ModelOutputsProcessor
+            config_pipelining: PipeliningConfig,
+            pipeline_callback: PipelineOutputsProcessor
     ):
         """Constructs a ModelStageFactory object."""
 
@@ -218,21 +196,13 @@ class ModelStageFactory:
 
     def build_pipeline_and_modules(
             self
-    ) -> tuple[PipelineScheduleInfo | None, TrackedModules]:
+    ) -> tuple[PipelineScheduleInfo, TrackedModules]:
         """
         Constructs the execution schedule and the model container.
 
-        If pipeline parallelism is enabled, this orchestrates the creation of a
-        distributed pipeline schedule.
-
-        Otherwise, it simply builds a standalone model stage.
-
         Returns:
-           The pipeline schedule information (or None if no pipelining).
+           The pipeline schedule information.
            The `TrackedModules` instance wrapping the created model stage(s).
-
-        Raises:
-           ValueError: If pipelining configuration is missing but a pipeline is requested.
         """
 
         if self._config_model.checkpoint_only_trainable_parameters:
@@ -240,20 +210,12 @@ class ModelStageFactory:
         else:
             stateful_predicate = _stateful_predicate_always
 
-        if self._dist_context.mesh_params.has_pipeline_parallel:
-            if self._config_pipelining is None:
-                raise ValueError("Pipelining is enabled, but not configured")
+        schedule, modules = build_schedule(
+            dist_context=self._dist_context,
+            n_microbatches=self._batch_maths.num_microbatches_pipelining,
+            schedule_config=self._config_pipelining.schedule,
+            model_provider=self._build_model_stage,
+            callback=self._pipeline_callback
+        )
 
-            schedule, modules = build_schedule(
-                dist_context=self._dist_context,
-                n_microbatches=self._batch_maths.num_microbatches_pipelining,
-                schedule_config=self._config_pipelining.schedule,
-                model_provider=self._build_model_stage,
-                callback=self._pipeline_callback
-            )
-
-            return schedule, TrackedModules(self._dist_context, modules, stateful_predicate)
-        else:
-            model = self._build_model_stage(PipelineStageInfo(num_stages=1, current_stage=0))
-
-            return None, TrackedModules(self._dist_context, [model], stateful_predicate)
+        return schedule, TrackedModules(self._dist_context, modules, stateful_predicate)

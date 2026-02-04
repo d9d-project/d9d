@@ -130,8 +130,7 @@ class TrainingConfigurator:
         task_operator = TrainTaskOperator(
             dist_context=dist_context,
             task=task,
-            pp_schedule=schedule,
-            tracked_modules=modules,
+            pipeline=schedule,
             loss_computer=loss_computer,
             pipeline_state=pipeline_state_handler,
             metrics=metrics

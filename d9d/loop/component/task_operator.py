@@ -5,11 +5,14 @@ import torch
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import PyTree
 from d9d.internals.pipeline_state import PipelineStateHandler
-from d9d.loop.control import BuildForwardInputsContext, BuildForwardInputsResult, TrainTask, UpdateMetricsContext
+from d9d.loop.control import (
+    BuildForwardInputsContext,
+    TrainTask,
+    UpdateMetricsContext,
+)
 from d9d.metric.impl import ComposeMetric
 from d9d.pipelining.factory.factory import PipelineScheduleInfo
 
-from .model_stage_factory import TrackedModules
 from .pipeline_result_processing import STATE_LOSS, STATE_LOSS_WEIGHT, LossComputer
 
 
@@ -40,8 +43,7 @@ class TrainTaskOperator:
             self,
             dist_context: DistributedContext,
             task: TrainTask,
-            pp_schedule: PipelineScheduleInfo | None,
-            tracked_modules: TrackedModules,
+            pipeline: PipelineScheduleInfo,
             loss_computer: LossComputer,
             pipeline_state: PipelineStateHandler,
             metrics: ComposeMetric
@@ -52,8 +54,7 @@ class TrainTaskOperator:
         Args:
             dist_context: The distributed context.
             task: The user-defined training task logic.
-            pp_schedule: Information about the pipeline schedule.
-            tracked_modules: The model modules being trained.
+            pipeline: Information about the pipeline schedule.
             loss_computer: Component responsible for calculating loss from outputs.
             pipeline_state: Handler for transient state storage during the step.
             metrics: Metric collection to update after the pass.
@@ -61,38 +62,10 @@ class TrainTaskOperator:
 
         self._dist_context = dist_context
         self._task = task
-        self._pp_schedule = pp_schedule
-        self._tracked_modules = tracked_modules
+        self._pipeline = pipeline
         self._loss_computer = loss_computer
         self._pipeline_state = pipeline_state
         self._metrics = metrics
-
-    def _forward_backward_pipelining(self, model_inputs: BuildForwardInputsResult):
-        if self._pp_schedule is None:
-            raise ValueError("Cannot run pipelined pass if pipelining is disabled")
-
-        self._pp_schedule.schedule.configure_buffers(
-            inputs=model_inputs.inputs,
-            kwargs=model_inputs.kwargs,
-            sharding_spec=model_inputs.pipeline_sharding_spec
-        )
-        self._pp_schedule.schedule.step(
-            inputs=model_inputs.inputs,
-            kwargs=model_inputs.kwargs
-        )
-
-    def _forward_backward_regular(self, model_inputs: BuildForwardInputsResult):
-        pipeline_outputs = self._tracked_modules(
-            **model_inputs.inputs,
-            **model_inputs.kwargs
-        )
-        loss = self._loss_computer(
-            pipeline_outputs=pipeline_outputs,
-            microbatch_idx=None
-        )
-        # free to avoid bwd peaking memory
-        del pipeline_outputs
-        loss.backward()
 
     def forward_backward(self, batch: PyTree) -> ForwardResult | None:
         """
@@ -124,20 +97,20 @@ class TrainTaskOperator:
                 )
             )
 
-            if self._dist_context.mesh_params.has_pipeline_parallel:
-                self._forward_backward_pipelining(model_inputs)
-            else:
-                self._forward_backward_regular(model_inputs)
+            self._pipeline.schedule.configure_buffers(
+                inputs=model_inputs.inputs,
+                kwargs=model_inputs.kwargs,
+                sharding_spec=model_inputs.pipeline_sharding_spec
+            )
+            self._pipeline.schedule.step(
+                inputs=model_inputs.inputs,
+                kwargs=model_inputs.kwargs
+            )
 
             # Update metrics if possible
 
             pipeline_state = self._pipeline_state.global_state()
-
-            if (
-                    self._dist_context.mesh_params.has_pipeline_parallel and
-                    self._pp_schedule is not None and
-                    not self._pp_schedule.has_last_stage
-            ):
+            if not self._pipeline.has_last_stage:
                 return None
 
             self._task.update_metrics(UpdateMetricsContext(

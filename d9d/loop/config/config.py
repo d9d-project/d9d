@@ -190,7 +190,7 @@ class TrainerConfig(BaseModel):
     batching: BatchingConfig
     data_loading: DataLoadingConfig
     logging: JobLoggerConfig
-    pipelining: PipeliningConfig | None
+    pipelining: PipeliningConfig
     model_stage_factory: ModelStageFactoryConfig
     determinism: DeterminismConfig
     gc: GarbageCollectionConfig
