@@ -5358,4 +5358,4 @@ visualization = ["plotly"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.15"
-content-hash = "651ea3d69b461aced91a1af4b3fc77a2d590eb1090bdfd55c470271c6da0457d"
+content-hash = "3035bd615744f97fec492bbbd601861f56fae3eb8818a2df4085fb601ce29cc4"
