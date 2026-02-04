@@ -32,12 +32,11 @@ def stage_backward_full(
             be None.
     """
 
-    GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.inputs, GradDirection.weight)
-
-    torch.autograd.backward(
-        tensors=outputs,
-        grad_tensors=output_grads
-    )
+    with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs, GradDirection.weight):
+        torch.autograd.backward(
+            tensors=outputs,
+            grad_tensors=output_grads
+        )
 
     input_grads = []
     for input_item in inputs:
@@ -264,8 +263,6 @@ def stage_backward_input(
         and ownership tokens to maintain graph validity.
     """
 
-    GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.inputs)
-
     outputs_grad_fn = [grad_fn for x in outputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
     inputs_grad_fn = [grad_fn for x in inputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
     weights_grad_fn = [grad_fn for x in weights if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
@@ -285,12 +282,13 @@ def stage_backward_input(
 
     inputs_requiring_grad = [inp for inp in inputs if inp.requires_grad]
 
-    torch.autograd.backward(
-        tensors=outputs,
-        grad_tensors=output_grads,
-        inputs=inputs_requiring_grad,
-        retain_graph=True,
-    )
+    with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs):
+        torch.autograd.backward(
+            tensors=outputs,
+            grad_tensors=output_grads,
+            inputs=inputs_requiring_grad,
+            retain_graph=True,
+        )
 
     final_input_grads = []
 
@@ -332,8 +330,6 @@ def stage_backward_weight(  # noqa: C901
         A tuple of gradients corresponding to the provided `weights`.
     """
 
-    GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.weight)
-
     grad_acc_to_weight = {}
     all_weights = []  # Keep order
 
@@ -367,12 +363,13 @@ def stage_backward_weight(  # noqa: C901
                     inputs_for_backward.append(grad_acc_to_weight[node])
 
             if inputs_for_backward:
-                torch.autograd.backward(
-                    tensors=valid_edges,
-                    grad_tensors=valid_grad_outputs,
-                    retain_graph=retain_graph,
-                    inputs=inputs_for_backward
-                )
+                with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.weight):
+                    torch.autograd.backward(
+                        tensors=valid_edges,
+                        grad_tensors=valid_grad_outputs,
+                        retain_graph=retain_graph,
+                        inputs=inputs_for_backward
+                    )
 
         # Break Cycle: Grads
         group.grads = None

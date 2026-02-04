@@ -4,12 +4,6 @@ from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 from d9d.module.block.moe import GroupedLinear
 
 
-@pytest.fixture(autouse=True)
-def reset_grad_context():
-    yield
-    GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.inputs, GradDirection.weight)
-
-
 @pytest.mark.local
 @pytest.mark.parametrize(
     ("direction", "expect_input_grad", "expect_weight_grad"),
@@ -42,12 +36,13 @@ def test_grouped_linear_grad_directions(direction, expect_input_grad, expect_wei
     loss = out.sum()
 
     if direction is not None:
-        GLOBAL_GRAD_CONTEXT.set_directions(direction)
+        directions = [direction]
     else:
         # Ensure both are enabled for the 'None' case test
-        GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.inputs, GradDirection.weight)
+        directions = [GradDirection.inputs, GradDirection.weight]
 
-    loss.backward()
+    with GLOBAL_GRAD_CONTEXT.with_directions(*directions):
+        loss.backward()
 
     if expect_input_grad:
         assert x.grad is not None

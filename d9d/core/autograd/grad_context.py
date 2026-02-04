@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from enum import StrEnum
 
 
@@ -58,15 +59,18 @@ class GlobalGradContext:
 
         return direction in self._enabled_directions
 
-    def set_directions(self, *directions: GradDirection):
+    @contextmanager
+    def with_directions(self, *directions: GradDirection):
         """
         Sets the enabled gradient directions, overriding the current state.
 
         Args:
             *directions: Variable number of GradDirection enums to enable.
         """
-
+        prev_directions = self._enabled_directions
         self._enabled_directions = set(directions)
+        yield
+        self._enabled_directions = prev_directions
 
 
 GLOBAL_GRAD_CONTEXT = GlobalGradContext()

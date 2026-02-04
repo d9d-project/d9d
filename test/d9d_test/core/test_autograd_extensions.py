@@ -10,8 +10,6 @@ from torch.autograd import Function
 @pytest.fixture(autouse=True)
 def reset_grad_context():
     yield
-    # Restore default state: both enabled
-    GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.inputs, GradDirection.weight)
     # Clear matmul log
     ControlledMatmul.execution_log.clear()
 
@@ -47,8 +45,8 @@ def test_default_state():
 )
 def test_check_direction(enabled_dirs, check_dir, expected):
     ctx = GlobalGradContext()
-    ctx.set_directions(*enabled_dirs)
-    assert ctx.check_direction(check_dir) is expected
+    with ctx.with_directions(*enabled_dirs):
+        assert ctx.check_direction(check_dir) is expected
 
 
 @pytest.mark.local
@@ -56,14 +54,14 @@ def test_set_directions_overwrite():
     ctx = GlobalGradContext()
 
     # Step 1: Enable Inputs only
-    ctx.set_directions(GradDirection.inputs)
-    assert ctx.check_direction(GradDirection.inputs)
-    assert not ctx.check_direction(GradDirection.weight)
+    with ctx.with_directions(GradDirection.inputs):
+        assert ctx.check_direction(GradDirection.inputs)
+        assert not ctx.check_direction(GradDirection.weight)
 
     # Step 2: Enable Weights only (should remove Inputs)
-    ctx.set_directions(GradDirection.weight)
-    assert not ctx.check_direction(GradDirection.inputs)
-    assert ctx.check_direction(GradDirection.weight)
+    with ctx.with_directions(GradDirection.weight):
+        assert not ctx.check_direction(GradDirection.inputs)
+        assert ctx.check_direction(GradDirection.weight)
 
 
 class ControlledMatmul(Function):
@@ -99,9 +97,8 @@ def test_integration_inputs_only():
     loss = out.sum()
 
     # Mimic the split-backward schedule: Only want input grads now
-    GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.inputs)
-
-    loss.backward()
+    with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs):
+        loss.backward()
 
     # Verify log
     assert "calc_inputs" in ControlledMatmul.execution_log
@@ -121,9 +118,8 @@ def test_integration_weights_only():
     loss = out.sum()
 
     # Mimic the split-backward schedule: Only want weight grads now
-    GLOBAL_GRAD_CONTEXT.set_directions(GradDirection.weight)
-
-    loss.backward()
+    with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.weight):
+        loss.backward()
 
     assert "calc_inputs" not in ControlledMatmul.execution_log
     assert "calc_weights" in ControlledMatmul.execution_log
