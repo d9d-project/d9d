@@ -3,6 +3,15 @@ import triton
 import triton.language as tl
 
 
+def _size_bucket(n_elements: int) -> int:
+    # different auto-tuning for small and asymptotically large kernels
+    # perhaps we could extend this in future?
+    if n_elements < 8192:
+        return 0
+    else:
+        return 1
+
+
 @triton.autotune(
     configs=[
         triton.Config({"BLOCK_SIZE": 1024}, num_warps=4),
@@ -11,7 +20,7 @@ import triton.language as tl
         triton.Config({"BLOCK_SIZE": 4096}, num_warps=8),
         triton.Config({"BLOCK_SIZE": 8192}, num_warps=8),
     ],
-    key=["n_elements"]
+    key=["size_bucket"]
 )
 @triton.jit
 def _silu_mul_kernel(
@@ -19,6 +28,7 @@ def _silu_mul_kernel(
         y_ptr: torch.Tensor,
         out_ptr: torch.Tensor,
         n_elements: int,
+        size_bucket: int,  # used for autotuning
         BLOCK_SIZE: tl.constexpr,
 ):
     # prepare
@@ -72,7 +82,8 @@ def silu_mul_forward(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
 
     _silu_mul_kernel[_grid](
         x, y, out,
-        n_elements
+        n_elements,
+        size_bucket=_size_bucket(n_elements)
     )
 
     return out
@@ -86,7 +97,7 @@ def silu_mul_forward(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         triton.Config({"BLOCK_SIZE": 4096}, num_warps=8),
         triton.Config({"BLOCK_SIZE": 8192}, num_warps=8),
     ],
-    key=["n_elements"]
+    key=["size_bucket"]
 )
 @triton.jit
 def _silu_mul_backward_kernel(
@@ -96,6 +107,7 @@ def _silu_mul_backward_kernel(
         grad_x_ptr: torch.Tensor,
         grad_y_ptr: torch.Tensor,
         n_elements: int,
+        size_bucket: int,  # used for autotuning
         BLOCK_SIZE: tl.constexpr
 ):
     # prepare
@@ -161,7 +173,8 @@ def silu_mul_backward(
     _silu_mul_backward_kernel[_grid](
         grad_output, x, y,
         grad_x, grad_y,
-        n_elements
+        n_elements,
+        size_bucket=_size_bucket(n_elements)
     )
 
     return grad_x, grad_y
