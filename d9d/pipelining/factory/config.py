@@ -81,3 +81,9 @@ AnyPipelineScheduleConfig = Annotated[
     PipelineScheduleDualPipeVConfig,
     Field(discriminator="schedule")
 ]
+"""Union of all supported pipeline schedule configuration types.
+
+This type alias uses a Pydantic discriminator on the ``schedule`` field to allow
+polymorphic validation and serialization of specific schedule configs (e.g.
+Inference, GPipe, 1F1B, ZeroBubble, etc.).
+"""

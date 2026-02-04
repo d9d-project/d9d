@@ -3,6 +3,8 @@ from typing import Any
 
 import torch
 
+from .sharding import PipelineShardingSpec
+
 # TODO: feature - support any PyTrees as pipeline parameters
 
 
@@ -10,7 +12,12 @@ class PipelineSchedule(abc.ABC):
     """Abstract base class defining the interface for pipeline execution schedules."""
 
     @abc.abstractmethod
-    def configure_buffers(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
+    def configure_buffers(
+            self,
+            inputs: dict[str, torch.Tensor],
+            kwargs: dict[str, Any],
+            sharding_spec: PipelineShardingSpec | None
+    ):
         """
         Configures internal state and buffers based on input shapes.
 
@@ -20,6 +27,8 @@ class PipelineSchedule(abc.ABC):
         Args:
             inputs: A dictionary of input tensors.
             kwargs: A dictionary of keyword arguments.
+            sharding_spec: A specification defining how inputs and kwargs should be split
+                into micro-batches. If None, assumes standard split-by-zero-dim behavior.
         """
 
         ...

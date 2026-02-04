@@ -10,7 +10,9 @@ The `d9d.lr_scheduler.piecewise` module provides a flexible, builder-based syste
 
 Instead of writing custom `LRScheduler` subclasses, manual functions for `LambdaLR` for every variation of piecewise schedule (i.e. "Warmup + Hold + Decay"), you can construct any such a schedule declaratively by chaining phases together.
 
-## Usage Example
+## Usage Examples
+
+### Python API
 
 Here is how to create a standard "Linear Warmup + Hold + Cosine Decay" schedule:
 
@@ -35,16 +37,54 @@ scheduler = (
 )
 ```
 
+### Pydantic API
+
+```python
+import json
+import torch
+from d9d.lr_scheduler.piecewise import PiecewiseSchedulerConfig, piecewise_scheduler_from_config
+
+optimizer: torch.optim.Optimizer = ...
+total_steps: int = 1000
+
+raw_config_json = """
+{
+    "initial_multiplier": 0.0,
+    "phases": [
+        {
+            "mode": "steps",
+            "steps": 100,
+            "target_multiplier": 1.0,
+            "curve": { "type": "linear" }
+        },
+        {
+            "mode": "rest",
+            "target_multiplier": 0.1,
+            "curve": { "type": "cosine" }
+        }
+    ]
+}
+"""
+
+scheduler_config = PiecewiseSchedulerConfig.model_validate_json(raw_config_json)
+
+scheduler = piecewise_scheduler_from_config(
+    config=scheduler_config,
+    optimizer=optimizer,
+    total_steps=total_steps
+)
+```
+
 ## Available Curves
 
 The following curve classes are available to interpolate values between phases:
 
-| Curve Class        | Description                                                                 |
-|:-------------------|:----------------------------------------------------------------------------|
-| `CurveLinear`      | Standard straight-line interpolation.                                       |
-| `CurveCosine`      | Half-period cosine interpolation (Cosine Annealing).                        |
-| `CurvePoly(power)` | Polynomial interpolation. `power=1` is linear, `power=2` is quadratic, etc. |
-| `CurveExponential` | Exponential (log-linear) interpolation.                                     |
+| Curve Class        | Curve Config    | Description                                                                 |
+|:-------------------|-----------------|:----------------------------------------------------------------------------|
+| `CurveLinear`      | `"linear"`      | Standard straight-line interpolation.                                       |
+| `CurveCosine`      | `"cosine"`      | Half-period cosine interpolation (Cosine Annealing).                        |
+| `CurvePoly(power)` | `"poly"`        | Polynomial interpolation. `power=1` is linear, `power=2` is quadratic, etc. |
+| `CurveExponential` | `"exponential"` | Exponential (log-linear) interpolation.                                     |
 
 ## API Reference
 

@@ -10,7 +10,7 @@ The `d9d.module.block.moe` package provides a complete, high-performance impleme
 
 ## Expert Parallelism
 
-For information on setting up Expert Parallelism, see [this page](TODO)
+For information on setting up Expert Parallelism, see [this page](../models/2_horizontal_parallelism.md).
 
 ## Features
 

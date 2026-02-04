@@ -43,16 +43,22 @@ class Profiler:
         self._active = active_steps
         self._dist_context = dist_context
 
+    def _get_save_file_name(self) -> str:
+        if self._dist_context.mesh_params.is_distributed:
+            mesh_regular = self._dist_context.mesh_for(REGULAR_DOMAIN)
+            coord = mesh_regular.get_coordinate()
+            if coord is None:
+                raise RuntimeError("Invalid mesh")
+            coord_str = "-".join(map(str, coord))
+            rank = mesh_regular.get_rank()
+            return f"rank-{rank}-coord-{coord_str}-trace.json"
+        else:
+            return "trace.json"
+
     def _dump_trace(self, prof: tprof.profile):
         save_dir = self._save_dir / f"step_{prof.step_num}"
         save_dir.mkdir(parents=True, exist_ok=True)
-        mesh_regular = self._dist_context.mesh_for(REGULAR_DOMAIN)
-        coord = mesh_regular.get_coordinate()
-        if coord is None:
-            raise RuntimeError("Invalid mesh")
-        coord_str = "-".join(map(str, coord))
-        rank = mesh_regular.get_rank()
-        save_file = save_dir / f"rank-{rank}-coord-{coord_str}-trace.json"
+        save_file = save_dir / self._get_save_file_name()
 
         begin = time.monotonic()
 

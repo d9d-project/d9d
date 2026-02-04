@@ -10,6 +10,7 @@ readme = "README.md"
 requires-python = ">=3.11,<3.15"
 dependencies = [
     "pydantic (>=2.0.0)",
+    "torchdata (>=0.11.0)",
 ]
 
 
@@ -34,10 +35,12 @@ transformers = "^4.57.6"
 matplotlib = "^3.10.8"
 pandas = "^3.0.0"
 plotly = "^6.5.2"
+datasets = "^4.5.0"
 
 
 [tool.poetry.group.trackers.dependencies]
 aim = "<4.0.0"
+setuptools = "^80.10.2"
 
 
 [tool.poetry.group.test.dependencies]
@@ -67,7 +70,8 @@ target-version = "py311"
 include = [
     "d9d/**/*.py",
     "test/**/*.py",
-    "benchmark/**/*.py"
+    "benchmark/**/*.py",
+    "example/**/*.py"
 ]
 exclude = [
     "d9d/kernel/cce/**.py",
@@ -188,6 +192,9 @@ suppress-none-returning = true
     "ANN",  # no type annotations for tests
     "SLF001"  # private access is ok for tests
 ]
+"example/*.py" = [
+    "INP001"  # no __init__.py
+]
 
 [tool.ruff.lint.pep8-naming]
 extend-ignore-names = [
@@ -202,7 +209,8 @@ indent-style = "space"
 [tool.mypy]
 plugins = "pydantic.mypy"
 files = [
-    "d9d"
+    "d9d",
+    "example"
 ]
 disable_error_code = ["import-untyped"]
 
