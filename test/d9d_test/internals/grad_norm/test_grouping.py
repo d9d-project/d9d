@@ -1,14 +1,19 @@
 import pytest
 import torch
-from d9d.core.dist_context import EXPERT_DOMAIN
+from d9d.core.dist_context import EXPERT_DOMAIN, DeviceMeshParameters
 from d9d.internals.grad_norm import group_parameters_for_norm
 from torch import nn
 from torch.distributed.tensor import Replicate, Shard, distribute_tensor
 
 
 @pytest.mark.distributed
-def test_grouping_mechanism(dist_ctx_pp4_dpr2):
-    ep_mesh = dist_ctx_pp4_dpr2.mesh_for(EXPERT_DOMAIN)
+def test_grouping_mechanism(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(
+        pipeline_parallel=4,
+        expert_parallel=2,
+        data_parallel_replicate=2
+    ))
+    ep_mesh = dist_ctx.mesh_for(EXPERT_DOMAIN)
 
     local_param = nn.Parameter(
         distribute_tensor(

@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 import torch
-from d9d.core.dist_context import FLAT_DOMAIN
+from d9d.core.dist_context import FLAT_DOMAIN, DeviceMeshParameters
 from d9d.core.types import TensorTree
 from d9d.metric import Metric
 from d9d.metric.impl import ComposeMetric, WeightedMeanMetric
@@ -134,8 +134,9 @@ class MetricCase:
     ]
 )
 @pytest.mark.distributed
-def test_metrics(dist_ctx_dpr8, case: MetricCase):
-    this_rank = dist_ctx_dpr8.mesh_for(FLAT_DOMAIN).get_rank()
+def test_metrics(dist_ctx_factory, case: MetricCase):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    this_rank = dist_ctx.mesh_for(FLAT_DOMAIN).get_rank()
     # do 2 roundabouts to test reset works
     metric = case.factory_fn()
     metric.to("cuda")
@@ -159,8 +160,8 @@ def test_metrics(dist_ctx_dpr8, case: MetricCase):
                 metric = case.factory_fn()
                 metric.load_state_dict(state)
 
-            metric.trigger_sync(dist_ctx_dpr8)
-            metric.wait_sync(dist_ctx_dpr8)
+            metric.trigger_sync(dist_ctx)
+            metric.wait_sync(dist_ctx)
 
             expect = tree_map(lambda x: x.to("cuda"), step.expect)
             assert_close(metric.compute(), expect, equal_nan=True)
@@ -168,9 +169,10 @@ def test_metrics(dist_ctx_dpr8, case: MetricCase):
 
 
 @pytest.mark.distributed
-def test_compose_metric_distributed(dist_ctx_dpr8):
-    device = dist_ctx_dpr8.current_device
-    rank = dist_ctx_dpr8.mesh_for(FLAT_DOMAIN).get_rank()
+def test_compose_metric_distributed(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    device = dist_ctx.current_device
+    rank = dist_ctx.mesh_for(FLAT_DOMAIN).get_rank()
 
     # Setup
     expect_device = torch.scalar_tensor(0, device=device).device
@@ -200,8 +202,8 @@ def test_compose_metric_distributed(dist_ctx_dpr8):
     )
 
     # Verify ComposeMetric delegates sync triggers to children
-    metric.trigger_sync(dist_ctx_dpr8)
-    metric.wait_sync(dist_ctx_dpr8)
+    metric.trigger_sync(dist_ctx)
+    metric.wait_sync(dist_ctx)
 
     # Compute Check (Global Aggregation)
     expect_state = {
@@ -223,7 +225,7 @@ def test_compose_metric_distributed(dist_ctx_dpr8):
     metric.load_state_dict(old_state)
 
     # We must sync again after loading state to re-populate global synced buffers
-    metric.trigger_sync(dist_ctx_dpr8)
-    metric.wait_sync(dist_ctx_dpr8)
+    metric.trigger_sync(dist_ctx)
+    metric.wait_sync(dist_ctx)
 
     assert_close(metric.compute(), expect_state)

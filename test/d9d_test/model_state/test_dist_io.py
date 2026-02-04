@@ -2,7 +2,7 @@ import json
 
 import pytest
 import torch
-from d9d.core.dist_context import FLAT_DOMAIN, REGULAR_DOMAIN
+from d9d.core.dist_context import FLAT_DOMAIN, REGULAR_DOMAIN, DeviceMeshParameters
 from d9d.model_state.io import (
     read_model_state,
     save_model_state_pipeline_parallel,
@@ -18,9 +18,10 @@ from torch import nn
 
 
 @pytest.mark.distributed
-def test_distributed_write_sharding(dist_ctx_dpr8, shared_tmp_dir):
-    rank = dist_ctx_dpr8.mesh_for(FLAT_DOMAIN).get_local_rank()
-    group = dist_ctx_dpr8.mesh_for(FLAT_DOMAIN).get_group()
+def test_distributed_write_sharding(dist_ctx_factory, shared_tmp_dir):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    rank = dist_ctx.mesh_for(FLAT_DOMAIN).get_local_rank()
+    group = dist_ctx.mesh_for(FLAT_DOMAIN).get_group()
 
     my_tensor = torch.scalar_tensor(rank, dtype=torch.float32)
     name = f"tensor_{rank}"
@@ -39,9 +40,9 @@ def test_distributed_write_sharding(dist_ctx_dpr8, shared_tmp_dir):
         show_progress=False
     )
 
-    dist_ctx_dpr8.wait_world()
+    dist_ctx.wait_world()
 
-    if dist_ctx_dpr8.is_main_process:
+    if dist_ctx.is_main_process:
         meta = json.loads((dest / MODEL_STATE_INDEX_FILE_NAME).read_text(encoding="utf-8"))
         assert meta == {
             "metadata": {"total_size": 32},
@@ -70,8 +71,13 @@ def test_distributed_write_sharding(dist_ctx_dpr8, shared_tmp_dir):
 
 
 @pytest.mark.distributed
-def test_pipeline_parallel_save(dist_ctx_pp4_dpr2, shared_tmp_dir):
-    mesh = dist_ctx_pp4_dpr2.mesh_for(REGULAR_DOMAIN)
+def test_pipeline_parallel_save(dist_ctx_factory, shared_tmp_dir):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(
+        pipeline_parallel=4,
+        expert_parallel=2,
+        data_parallel_replicate=2
+    ))
+    mesh = dist_ctx.mesh_for(REGULAR_DOMAIN)
     pp_mesh = mesh["pp"]
     global_rank = pp_mesh.get_rank()
 
@@ -92,9 +98,9 @@ def test_pipeline_parallel_save(dist_ctx_pp4_dpr2, shared_tmp_dir):
         show_progress=False
     )
 
-    dist_ctx_pp4_dpr2.wait_world()
+    dist_ctx.wait_world()
 
-    if dist_ctx_pp4_dpr2.is_main_process:
+    if dist_ctx.is_main_process:
         meta = json.loads((dest / MODEL_STATE_INDEX_FILE_NAME).read_text(encoding="utf-8"))
         assert meta == {
             "metadata": {"total_size": 16},

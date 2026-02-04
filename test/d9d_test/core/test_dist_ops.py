@@ -2,12 +2,13 @@ import pytest
 import torch
 import torch.distributed as dist
 from d9d.core import dist_ops
-from d9d.core.dist_context import REGULAR_DOMAIN
+from d9d.core.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
 
 
 @pytest.fixture(scope="session")
-def group(dist_ctx_dpr8) -> dist.ProcessGroup:
-    return dist_ctx_dpr8.mesh_for(REGULAR_DOMAIN).get_group("dp_replicate")
+def group(dist_ctx_factory) -> dist.ProcessGroup:
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    return dist_ctx.mesh_for(REGULAR_DOMAIN).get_group("dp_replicate")
 
 
 def test_all_gather_object(group):

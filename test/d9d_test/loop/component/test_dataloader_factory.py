@@ -2,6 +2,7 @@ import dataclasses
 
 import pytest
 import torch
+from d9d.core.dist_context import DeviceMeshParameters
 from d9d.loop.component.data_loader_factory import (
     DataLoaderFactory,
     IteratorBatchGroup,
@@ -126,7 +127,8 @@ def test_stateful_loader_checkpointing(tmp_path):
 @pytest.mark.parametrize("pin_memory", [True, False])
 @pytest.mark.parametrize("persistent_workers", [True, False])
 @pytest.mark.distributed
-def test_dataloader_e2e_integration(dist_ctx_dpr8, num_workers, pin_memory, persistent_workers):
+def test_dataloader_e2e_integration(dist_ctx_factory, num_workers, pin_memory, persistent_workers):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
     batch_maths = MockBatchMaths(
         data_loader_batch_size=2,
         num_microbatches_gradient_accumulation=2
@@ -144,7 +146,7 @@ def test_dataloader_e2e_integration(dist_ctx_dpr8, num_workers, pin_memory, pers
         )
 
     factory = DataLoaderFactory(
-        dist_context=dist_ctx_dpr8,
+        dist_context=dist_ctx,
         provider=provider,
         config_data_loading=loading_config,
         batch_maths=batch_maths

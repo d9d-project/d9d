@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.core.dist_context import REGULAR_DOMAIN
+from d9d.core.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
 from d9d.model_state.mapper import ModelStateMapper, StateGroup
 from d9d.model_state.mapper.compose import (
     ModelStateMapperParallel,
@@ -199,8 +199,13 @@ def test_stack_tensors_mapper():
 
 
 @pytest.mark.distributed
-def test_dtensor_mapper_logic(dist_ctx_pp4_dpr2):
-    mesh = dist_ctx_pp4_dpr2.mesh_for(REGULAR_DOMAIN)
+def test_dtensor_mapper_logic(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(
+        pipeline_parallel=4,
+        expert_parallel=2,
+        data_parallel_replicate=2
+    ))
+    mesh = dist_ctx.mesh_for(REGULAR_DOMAIN)
     dp_mesh = mesh["dp_replicate"]
 
     # 1. Test Distribute Mapper

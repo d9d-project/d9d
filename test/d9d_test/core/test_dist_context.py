@@ -96,40 +96,14 @@ def test_local_context_initialization():
         ctx.mesh_for(REGULAR_DOMAIN)
 
 
-@pytest.fixture
-def dist_ctx_complex_topology():
-    params = DeviceMeshParameters(
-        pipeline_parallel=1,
+@pytest.mark.distributed
+def test_mesh_topology_complex(dist_ctx_factory):
+    ctx = dist_ctx_factory(DeviceMeshParameters(
         data_parallel_replicate=2,
         data_parallel_shard=2,
-        context_parallel_replicate=1,
-        context_parallel_shard=1,
         tensor_parallel=2,
         expert_parallel=2,
-    )
-
-    ctx = params.build()
-    return ctx
-
-
-@pytest.fixture
-def dist_ctx_simple():
-    params = DeviceMeshParameters(
-        pipeline_parallel=1,
-        data_parallel_replicate=1,
-        data_parallel_shard=8,
-        context_parallel_replicate=1,
-        context_parallel_shard=1,
-        tensor_parallel=1,
-        expert_parallel=1,
-    )
-    ctx = params.build()
-    return ctx
-
-
-@pytest.mark.distributed
-def test_mesh_topology_complex(dist_ctx_complex_topology):
-    ctx = dist_ctx_complex_topology
+    ))
 
     regular_mesh = ctx.mesh_for(REGULAR_DOMAIN)
     assert regular_mesh.ndim == 6
@@ -153,8 +127,8 @@ def test_mesh_topology_complex(dist_ctx_complex_topology):
 
 
 @pytest.mark.distributed
-def test_sync_primitives(dist_ctx_simple):
-    ctx = dist_ctx_simple
+def test_sync_primitives(dist_ctx_factory):
+    ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_shard=8))
 
     # If this hangs, the test fails (Pytest timeout usually kills it)
     ctx.wait_world()
@@ -164,8 +138,8 @@ def test_sync_primitives(dist_ctx_simple):
 
 
 @pytest.mark.distributed
-def test_rank_assertions(dist_ctx_simple, shared_tmp_dir: Path):
-    ctx = dist_ctx_simple
+def test_rank_assertions(dist_ctx_factory, shared_tmp_dir: Path):
+    ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_shard=8))
 
     assert ctx.master_addr is not None
     assert len(ctx.master_addr) > 0

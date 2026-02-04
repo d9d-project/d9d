@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.core.dist_context import DENSE_DOMAIN
+from d9d.core.dist_context import DENSE_DOMAIN, DeviceMeshParameters
 from d9d.internals.grad_sync.synchronizer import GradientSynchronizer
 from torch import nn
 from torch.distributed import DeviceMesh
@@ -48,8 +48,9 @@ def _make_dtensor_param(
         (torch.bfloat16, torch.bfloat16)
     ]
 )
-def test_e2e(dist_ctx_dpr8, tensor_specs, param_dtype, grad_dtype):
-    sync_mesh = dist_ctx_dpr8.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    sync_mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
     params = [
         _make_dtensor_param(
             shape=spec["shape"], value=1.0,
