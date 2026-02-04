@@ -33,12 +33,6 @@ jobs:
         with:
           python-version: 3.11
 
-      - name: Install poetry
-        run: pipx install poetry
-
-      - name: Install Dependencies
-        run: poetry install --only dev
-
       - name: Semantic Version Release
         id: release
         # Adjust tag with desired version if applicable.
