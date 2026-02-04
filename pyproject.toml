@@ -1,13 +1,32 @@
 [project]
 name = "d9d"
 version = "0.1.0"
-description = ""
+description = "d9d - d[istribute]d - distributed training framework based on PyTorch that tries to be efficient yet hackable"
 authors = [
-    {name = "Maxim Afanasyev", email = "mr.applexz@gmail.com"}
+    {name = "Maksim Afanasyev", email = "mr.applexz@gmail.com"}
 ]
 license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+
+]
+
+[project.urls]
+Repository = "https://github.com/d9d-project/d9d"
+Documentation = "https://d9d-project.github.io/d9d"
+Homepage = "https://d9d-project.github.io/d9d"
+Issues = "https://github.com/d9d-project/d9d/issues"
 
 
 [build-system]
@@ -39,7 +58,7 @@ cut-cross-entropy = { version = ">=25.9.3", optional = true }  # For efficient C
 [tool.poetry.extras]
 aim = ["aim", "setuptools"]
 visualization = ["plotly"]
-moe = ["nv-grouped-gemm", "deep-ep", "liger-kernel"]
+moe = ["nv-grouped-gemm", "deep-ep"]
 cce = ["cut-cross-entropy"]
 
 
