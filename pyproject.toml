@@ -265,7 +265,8 @@ module = [
 ignore_errors = true
 
 [tool.semantic_release]
-major_on_zero = false
+allow_zero_version = true
+major_on_zero = true
 version_toml = ["pyproject.toml:project.version"]
 build_command = "pip install poetry && poetry build"
 commit_parser = "conventional"
