@@ -18,6 +18,15 @@ The top-level configuration object passed to `TrainingConfigurator`.
     options:
       heading_level: 3
 
+
+### InferenceConfig
+
+The top-level configuration object passed to `InferenceConfigurator`.
+
+::: d9d.loop.config.InferenceConfig
+    options:
+      heading_level: 3
+
 ## Sub-Configurations
 
 ### Diagnostics & Reproducibility

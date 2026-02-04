@@ -1,0 +1,88 @@
+{
+  "mesh": {
+    "pipeline_parallel": 4,
+    "data_parallel_replicate": 2,
+    "data_parallel_shard": 1,
+    "context_parallel_replicate": 1,
+    "context_parallel_shard": 1,
+    "tensor_parallel": 1,
+    "expert_parallel": 2
+  },
+  "data": {
+    "dataset": "../../example_data/dataset",
+    "split": "train",
+    "text_column": "text",
+    "use_samples": 100000,
+    "shuffle_seed": 42,
+    "tokenizer": "../../example_data/tokenizer.json",
+    "presort_buffer_size": 1000,
+    "num_proc": 16
+  },
+  "model_provider": {
+    "model": {
+      "model": {
+        "layer": {
+          "hidden_size": 768,
+          "intermediate_size": 576,
+          "num_experts": 128,
+          "experts_top_k": 8,
+          "num_attention_heads": 16,
+          "num_key_value_heads": 4,
+          "rms_norm_eps": 1e-06,
+          "head_dim": 128
+        },
+        "num_hidden_layers": 16,
+        "rope_base": 1000000.0,
+        "max_position_ids": 128000,
+        "split_vocab_size": {
+          "regular": 151643,
+          "special": 26
+        },
+        "split_vocab_order": [
+          "regular",
+          "special"
+        ],
+        "pipeline_num_virtual_layers_pre": 0,
+        "pipeline_num_virtual_layers_post": 1
+      }
+    },
+    "checkpointing": false
+  },
+  "inference": {
+    "batching": {
+      "global_batch_size": 32,
+      "microbatch_size": 8
+    },
+    "data_loading": {
+      "num_workers": 4,
+      "pin_memory": true,
+      "persistent_workers": false
+    },
+    "model_stage_factory": {
+      "source_checkpoint": null,
+      "checkpoint_only_trainable_parameters": false
+    },
+    "determinism": {
+      "base_seed": 1337
+    },
+    "gc": {
+      "period_steps": 10
+    },
+    "checkpointing": {
+      "save_dir": "../../example_data/checkpoint/inference_job",
+      "period_steps": 1000,
+      "num_to_keep": 3
+    },
+    "profiling": {
+      "enabled": false,
+      "traces_dir": "../../example_data/traces",
+      "period_steps": 10,
+      "warmup_steps": 5,
+      "active_steps": 1
+    },
+    "timeout": {
+      "init_timeout": 10000,
+      "step_timeout": 100
+    }
+  }
+}

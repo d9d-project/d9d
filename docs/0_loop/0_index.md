@@ -142,4 +142,6 @@ For every global step (`step`), the trainer performs the following actions in st
 
 ## API Reference
 
-::: d9d.loop.run
+::: d9d.loop.run.TrainingConfigurator
+
+::: d9d.loop.run.Trainer

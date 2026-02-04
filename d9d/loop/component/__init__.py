@@ -11,7 +11,7 @@ from .model_stage_factory import ModelStageFactory, TrackedModules
 from .optimizer_factory import OptimizerFactory
 from .pipeline_result_processing import InferenceProcessor, LossComputer, PipelineOutputsProcessor
 from .stepper import Stepper
-from .task_operator import ForwardResult, TrainTaskOperator
+from .task_operator import ForwardResult, InferenceTaskOperator, TrainTaskOperator
 from .timeout_manager import TimeoutManager
 
 __all__ = [
@@ -21,6 +21,7 @@ __all__ = [
     "GradientClipper",
     "GradientManager",
     "InferenceProcessor",
+    "InferenceTaskOperator",
     "JobLogger",
     "JobProfiler",
     "LossComputer",

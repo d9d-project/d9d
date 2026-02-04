@@ -131,7 +131,6 @@ class TrainingConfigurator:
             dist_context=dist_context,
             task=task,
             pipeline=schedule,
-            loss_computer=loss_computer,
             pipeline_state=pipeline_state_handler,
             metrics=metrics
         )

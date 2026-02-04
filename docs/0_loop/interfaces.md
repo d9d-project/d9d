@@ -30,7 +30,22 @@ It is responsible for logging metrics, mapping batch inputs before they are fed 
 
 **Exit**: `finalize(...)`.
 
-**State Management**: `state_dict(...)`, `load_state_dict(...)`
+**State Management**: `state_dict(...)`, `load_state_dict(...)`.
+
+### InferenceTask
+
+The `InferenceTask` defines the logic for a single inference step. 
+
+It is designed to handle the **forward-only** flow, processing the raw tensors synthesized by the model (e.g., logits, hidden states).
+
+**Lifecycle**: 
+
+1. `build_forward_inputs(...)` (called once) -> 
+2. `process_outputs(...)` (called once per pipeline microbatch).
+
+**Exit**: `finalize(...)`.
+
+**State Management**: `state_dict(...)`, `load_state_dict(...)`.
 
 ### Pipeline State
 

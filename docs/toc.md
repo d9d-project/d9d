@@ -9,11 +9,12 @@ The foundational primitives managing the cluster.
 
 
 ## 🚀 Execution Engine
-How to configure and run training jobs.
+How to configure and run jobs.
 
 *   **[Training Loop](./0_loop/0_index.md)**: The lifecycle of the `Trainer`, dependency injection, and execution flow.
+*   **[Inference Loop](./0_loop/infer.md)**: The lifecycle of distributed `Inference` and forward-only execution.
 *   **[Configuration](./0_loop/config.md)**: Pydantic schemas for configuring jobs, batching, and logging.
-*   **[Interfaces (Providers & Tasks)](./0_loop/interfaces.md)**: How to inject your custom Model, Dataset, and Step logic.
+*   **[Interfaces (Providers & Tasks)](./0_loop/interfaces.md)**: How to inject your custom Model, Dataset, and Step logic (Train & Infer).
 
 
 ## 💾 Data & State

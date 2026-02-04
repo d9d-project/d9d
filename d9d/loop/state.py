@@ -10,6 +10,7 @@ from d9d.loop.component import (
     BatchMaths,
     GradientClipper,
     GradientManager,
+    InferenceTaskOperator,
     JobLogger,
     JobProfiler,
     ManualGarbageCollector,
@@ -123,14 +124,16 @@ class TrainJobState(JobState):
 
 
 @dataclasses.dataclass(kw_only=True)
-class InferJobState(JobState):
+class InferenceJobState(JobState):
     """
     Container for the state of an inference job.
 
     Attributes:
         task: The specific inference task logic definition.
+        task_operator: Executor for running forward and backward passes.
     """
     task: InferenceTask
+    task_operator: InferenceTaskOperator
 
     def state_dict(self) -> dict[str, Any]:
         return {
