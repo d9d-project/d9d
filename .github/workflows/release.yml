@@ -49,15 +49,6 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.release.outputs.tag }}
 
-      - name: Publish to PyPI
-        if: steps.release.outputs.released == 'true'
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          # We use the built artifacts from the previous step
-          # PSR v9 runs the 'build_command' specified in pyproject.toml
-          # and usually outputs to dist/
-          packages_dir: dist/
-
       - name: Distribution Artifacts
         uses: actions/upload-artifact@v4
         with:
