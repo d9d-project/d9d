@@ -17,3 +17,7 @@ lint:
 mypy:
 	@echo "Running mypy"
 	@mypy
+
+mkdocs:
+	@echo "Starting docs server"
+	@poetry run mkdocs serve -a 0.0.0.0:8081 -w docs

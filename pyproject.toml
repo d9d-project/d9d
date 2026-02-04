@@ -8,48 +8,58 @@ authors = [
 license = {text = "Apache-2.0"}
 readme = "README.md"
 requires-python = ">=3.11,<3.15"
-dependencies = [
-    "pydantic (>=2.0.0)",
-    "torchdata (>=0.11.0)",
-]
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
+
+[tool.poetry.dependencies]
+pydantic = ">=2.0.0"
+torchdata = ">=0.11.0"
+safetensors = ">=0.7.0"
+tqdm = ">=4.0.0"
+triton = ">=3.6.0"
+torch = ">=2.10.0"
+
+numpy = { version = ">=2.0.0", optional = true }  # locking numpy seed (if it is installed)
+
+aim = { version = ">=3.0.0,<4.0.0", optional = true }  # Aim tracker integration
+setuptools = { version = ">=70.0.0", optional = true }  # Unset dependency for Aim
+
+plotly = { version = ">=6.0.0", optional = true }  # For visualizing LR schedulers
+
+nv-grouped-gemm = { version = ">=1.1.4", optional = true }  # For MoE, https://github.com/fanshiqing/grouped_gemm/
+deep-ep = { version = ">=1.2.1", optional = true }  # For MoE, https://github.com/deepseek-ai/DeepEP
+
+cut-cross-entropy = { version = ">=25.9.3", optional = true }  # For efficient CE, https://github.com/apple/ml-cross-entropy
+
+
+[tool.poetry.extras]
+aim = ["aim", "setuptools"]
+visualization = ["plotly"]
+moe = ["nv-grouped-gemm", "deep-ep", "liger-kernel"]
+cce = ["cut-cross-entropy"]
+
+
 [tool.poetry.group.dev.dependencies]
-triton = {path = "packages/triton-3.6.0+git9844da95-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl"}
-torch = {path = "packages/torch-2.11.0.dev20251223+cu128-cp311-cp311-manylinux_2_28_x86_64.whl"}
-numpy = "^2.4.0"
-cut-cross-entropy = {path = "packages/cut_cross_entropy-25.9.3-py3-none-any.whl"}
-deep-ep = {path = "packages/deep_ep-1.2.1+9af0e0d-cp311-cp311-linux_x86_64.whl"}
-nv-grouped-gemm = {path = "packages/nv_grouped_gemm-1.1.4.post8-cp311-cp311-linux_x86_64.whl"}
-liger-kernel = "^0.6.4"
-safetensors = "^0.7.0"
-tqdm = "^4.67.1"
 ruff = "^0.14.13"
 mypy = "^1.19.1"
 pre-commit = "^4.5.1"
-transformers = "^4.57.6"
-matplotlib = "^3.10.8"
-pandas = "^3.0.0"
-plotly = "^6.5.2"
-datasets = "^4.5.0"
 
 
-[tool.poetry.group.trackers.dependencies]
-aim = "<4.0.0"
-setuptools = "^80.10.2"
-
-
+# Group containing dependencies for running tests
 [tool.poetry.group.test.dependencies]
 pytest = "^9.0.2"
 coverage = "^7.13.1"
 pytest-instafail = "^0.5.0"
+pandas = "^3.0.0"  # for triton benchmarks
+matplotlib = "^3.10.8"  # for triton benchmarks
+transformers = "^4.57.6"  # for comparing models
 
 
-
+# Group containing dependencies for building documentation website
 [tool.poetry.group.docs.dependencies]
 mkdocs = "^1.6.1"
 mkdocstrings = {extras = ["python"], version = "^1.0.1"}
@@ -57,6 +67,18 @@ mkdocs-shadcn = "^0.9.8"
 pymdown-extensions = "^10.20"
 pygments = "^2.19.2"
 mkdocs-material = "^9.7.1"
+
+
+[tool.poetry.group.compat-local-overrides.dependencies]
+cut-cross-entropy = {path = "packages/cut_cross_entropy-25.9.3-py3-none-any.whl"}
+deep-ep = {path = "packages/deep_ep-1.2.1+9af0e0d-cp311-cp311-linux_x86_64.whl"}
+nv-grouped-gemm = {path = "packages/nv_grouped_gemm-1.1.4.post8-cp311-cp311-linux_x86_64.whl"}
+
+
+# Group containing dependencies for running example scripts
+[tool.poetry.group.examples.dependencies]
+datasets = "^4.5.0"
+
 
 [tool.pytest.ini_options]
 markers = [

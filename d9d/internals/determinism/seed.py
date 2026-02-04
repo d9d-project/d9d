@@ -2,7 +2,6 @@ import os
 import random
 from typing import cast
 
-import numpy as np
 import torch
 import torch.distributed.tensor
 
@@ -42,7 +41,12 @@ def set_seeds(
     torch.manual_seed(seed)
     os.environ["PYTHONHASHSEED"] = str(seed % 2**32)
     random.seed(seed)
-    np.random.seed(seed)
+
+    try:
+        import numpy as np  # noqa: PLC0415
+        np.random.seed(seed)
+    except ImportError:
+        pass
 
     # Set DTensor seeding if distributed
     if dist_context.mesh_params.is_distributed:
