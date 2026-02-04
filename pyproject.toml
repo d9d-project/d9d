@@ -66,9 +66,9 @@ cce = ["cut-cross-entropy"]
 ruff = "^0.14.13"
 mypy = "^1.19.1"
 pre-commit = "^4.5.1"
+python-semantic-release = "^10.5.3"
 
 
-# Group containing dependencies for running tests
 [tool.poetry.group.test.dependencies]
 pytest = "^9.0.2"
 coverage = "^7.13.1"
@@ -78,7 +78,6 @@ matplotlib = "^3.10.8"  # for triton benchmarks
 transformers = "^4.57.6"  # for comparing models
 
 
-# Group containing dependencies for building documentation website
 [tool.poetry.group.docs.dependencies]
 mkdocs = "^1.6.1"
 mkdocstrings = {extras = ["python"], version = "^1.0.1"}
@@ -94,7 +93,6 @@ deep-ep = {path = "packages/deep_ep-1.2.1+9af0e0d-cp311-cp311-linux_x86_64.whl"}
 nv-grouped-gemm = {path = "packages/nv_grouped_gemm-1.1.4.post8-cp311-cp311-linux_x86_64.whl"}
 
 
-# Group containing dependencies for running example scripts
 [tool.poetry.group.examples.dependencies]
 datasets = "^4.5.0"
 
@@ -265,3 +263,28 @@ module = [
     "d9d.module.block.moe.communications.deepep.*"
 ]
 ignore_errors = true
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+build_command = "poetry build"
+commit_parser = "conventional"
+
+[tool.semantic_release.commit_parser_options]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]
+parse_squash_commits = true
+ignore_merge_commits = true
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+    '''chore(?:\([^)]*?\))?: .+''',
+    '''ci(?:\([^)]*?\))?: .+''',
+    '''refactor(?:\([^)]*?\))?: .+''',
+    '''style(?:\([^)]*?\))?: .+''',
+    '''test(?:\([^)]*?\))?: .+''',
+    '''build\((?!deps\): .+)''',
+    '''Initial [Cc]ommit.*''',
+]
+
+[tool.semantic_release.remote]
+type = "github"
