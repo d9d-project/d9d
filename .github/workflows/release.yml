@@ -95,7 +95,7 @@ jobs:
           path: dist
 
       - name: Publish package distributions to PyPI
-        uses: pypa/gh-action-pypi-publish@@SHA1_HASH
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages-dir: dist
           print-hash: true
