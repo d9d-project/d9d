@@ -4,6 +4,7 @@ from typing import cast
 import torch
 import torch.distributed as dist
 from torch import Tensor, nn
+from torch.autograd.profiler import record_function
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor
 from torch.utils.hooks import RemovableHandle
@@ -229,18 +230,19 @@ class SyncGradientBucket(AbstractGradientBucket):
         if self._ready_to_sync:
             raise ValueError("Tried to accumulate, but synchronization was not performed")
 
-        # wait for backward operation is complete
-        self._communicate_stream.wait_stream(torch.cuda.current_stream())
-        # execute all sync operations in sequential order (to ensure
-        # data safety), but in a DIFFERENT stream
-        with torch.cuda.stream(self._communicate_stream):
-            for group in self._reduce_groups:
-                dist.all_reduce(
-                    self._buffer,
-                    op=dist.ReduceOp.SUM,
-                    group=group
-                )
-        self._ready_to_sync = True
+        with record_function("Gradient Sync"):
+            # wait for backward operation is complete
+            self._communicate_stream.wait_stream(torch.cuda.current_stream())
+            # execute all sync operations in sequential order (to ensure
+            # data safety), but in a DIFFERENT stream
+            with torch.cuda.stream(self._communicate_stream):
+                for group in self._reduce_groups:
+                    dist.all_reduce(
+                        self._buffer,
+                        op=dist.ReduceOp.SUM,
+                        group=group
+                    )
+            self._ready_to_sync = True
 
     def _bind_hooks(self):
         """

@@ -54,7 +54,7 @@ def dist_ctx_pp4_dpr2():
         pipeline_parallel=4,
         context_parallel_shard=1,
         context_parallel_replicate=1,
-        expert_parallel=1,
+        expert_parallel=2,
         tensor_parallel=1,
         data_parallel_shard=1,
         data_parallel_replicate=2

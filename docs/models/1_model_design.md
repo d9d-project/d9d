@@ -35,7 +35,7 @@ Please see [Pipelining API](./3_pipeline_parallelism.md).
 
 Constructing a large model on a single GPU (or even CPU RAM) often leads to immediate Out-Of-Memory (OOM) errors. `d9d` solves this via the `ModuleLateInit` protocol.
 
-It is safe to use modules implementing this protocol with d9d's native [Trainer](TODO) framework. 
+It is safe to use modules implementing this protocol with d9d's native [Trainer](../0_loop/0_index.md) framework. 
 
 The Trainer will instantiate modules on the `meta` device (consuming no memory), lay out the distributed topology and sharding strategy. 
 

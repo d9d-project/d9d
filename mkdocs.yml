@@ -1,8 +1,10 @@
 site_name: "d9d"
 site_url: "https://d9d-project.github.io/d9d/"
+repo_url: "https://github.com/d9d-project/d9d"
 
 theme:
   name: "shadcn"
+  icon: "https://avatars.githubusercontent.com/u/248787421"
   show_title: true
   pygments_style:
     light: a11y-light

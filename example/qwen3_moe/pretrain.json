@@ -1,0 +1,153 @@
+{
+  "mesh": {
+    "pipeline_parallel": 4,
+    "data_parallel_replicate": 2,
+    "data_parallel_shard": 1,
+    "context_parallel_replicate": 1,
+    "context_parallel_shard": 1,
+    "tensor_parallel": 1,
+    "expert_parallel": 2
+  },
+  "data": {
+    "dataset": "../../example_data/dataset",
+    "split": "train",
+    "text_column": "text",
+    "use_samples": 100000,
+    "shuffle_seed": 42,
+    "tokenizer": "../../example_data/tokenizer.json",
+    "presort_buffer_size": 1000,
+    "num_proc": 16
+  },
+  "model_provider": {
+    "model": {
+      "model": {
+        "layer": {
+          "hidden_size": 768,
+          "intermediate_size": 576,
+          "num_experts": 128,
+          "experts_top_k": 8,
+          "num_attention_heads": 16,
+          "num_key_value_heads": 4,
+          "rms_norm_eps": 1e-06,
+          "head_dim": 128
+        },
+        "num_hidden_layers": 16,
+        "rope_base": 1000000.0,
+        "max_position_ids": 128000,
+        "split_vocab_size": {
+          "regular": 151643,
+          "special": 26
+        },
+        "split_vocab_order": [
+          "regular",
+          "special"
+        ],
+        "pipeline_num_virtual_layers_pre": 0,
+        "pipeline_num_virtual_layers_post": 1
+      }
+    },
+    "checkpointing": false
+  },
+  "trainer": {
+    "run": {
+      "name": "qwen3-moe-pretrain",
+      "description": "A simple Qwen3-MoE pretrain run.",
+      "hparams": {
+        "write": "something"
+      }
+    },
+    "batching": {
+      "global_batch_size": 128,
+      "microbatch_size": 8
+    },
+    "data_loading": {
+      "num_workers": 4,
+      "pin_memory": true,
+      "persistent_workers": false
+    },
+    "logging": {
+      "period_steps": 5,
+      "tracker": {
+        "provider": "aim",
+        "repo": "../../example_data/logs"
+      }
+    },
+    "pipelining": {
+      "schedule": {
+        "schedule": "looped_bfs",
+        "num_stages_per_rank": 2
+      }
+    },
+    "model_stage_factory": {
+      "source_checkpoint": null,
+      "checkpoint_only_trainable_parameters": false
+    },
+    "determinism": {
+      "base_seed": 1337
+    },
+    "gc": {
+      "period_steps": 10
+    },
+    "checkpointing": {
+      "save_dir": "../../example_data/checkpoint",
+      "period_steps": 1000,
+      "num_to_keep": 3
+    },
+    "gradient_clipping": {
+      "max_norm": 5.0,
+      "log_total_steps": 5
+    },
+    "profiling": {
+      "enabled": false,
+      "traces_dir": "../../example_data/traces",
+      "period_steps": 10,
+      "warmup_steps": 5,
+      "active_steps": 1
+    },
+    "gradient_manager": {
+      "grad_dtype": "float32",
+      "bucket_size_mb": 32
+    },
+    "timeout": {
+      "init_timeout": 10000,
+      "step_timeout": 100
+    }
+  },
+  "optimizer": {
+    "name": "stochastic_adamw",
+    "lr": 2.5e-04,
+    "state_dtype": "bfloat16"
+  },
+  "lr_scheduler": {
+    "name": "piecewise",
+    "scheduler": {
+      "initial_multiplier": 0,
+      "phases": [
+        {
+          "mode": "percentage",
+          "percentage": 0.1,
+          "target_multiplier": 1.0,
+          "curve": {
+            "type": "linear"
+          }
+        },
+        {
+          "mode": "percentage",
+          "percentage": 0.7,
+          "target_multiplier": 1.0,
+          "curve": {
+            "type": "linear"
+          }
+        },
+        {
+          "mode": "rest",
+          "target_multiplier": 0.001,
+          "curve": {
+            "type": "cosine"
+          }
+        }
+      ]
+    }
+  },
+  "export_to": "../../example_data/model_export"
+}

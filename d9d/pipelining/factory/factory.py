@@ -5,7 +5,7 @@ import torch
 from torch import nn
 
 from ...core.dist_context import REGULAR_DOMAIN, DistributedContext
-from ..api import PipelineSchedule, PipelineShardingSpec, PipelineStageInfo
+from ..api import PipelineSchedule, PipelineStageInfo
 from ..infra.schedule.component.program import (
     build_stage_to_host_rank_topology,
     invert_stage_to_host_rank_topology,
@@ -33,7 +33,6 @@ def build_schedule(
         schedule_config: AnyPipelineScheduleConfig,
         model_provider: Callable[[PipelineStageInfo], nn.Module],
         loss_fn: Callable[[dict[str, torch.Tensor], int], torch.Tensor] | None,
-        sharding_spec: PipelineShardingSpec
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     """
     Constructs the pipeline schedule and instantiates model stages.
@@ -53,7 +52,6 @@ def build_schedule(
         model_provider: A factory function that accepts stage info and returns an `nn.Module`
             for that specific stage.
         loss_fn: Optional loss function. Required if training (backward pass needed).
-        sharding_spec: Specification for how data and states are sharded.
 
     Returns:
         A tuple containing:
@@ -106,8 +104,7 @@ def build_schedule(
         stages=stages,
         num_microbatches=n_microbatches,
         loss_fn=loss_fn,
-        program=program,
-        sharding_spec=sharding_spec
+        program=program
     )
 
     return PipelineScheduleInfo(

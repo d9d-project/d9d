@@ -75,7 +75,33 @@ It supports:
 *   **Chunked Sharding**: Contiguous blocks (`0, 1, 2...` for rank 0).
 *   **Optional Padding**: Ensuring all shards have exactly the same length. This is critical for distributed training loops where uneven dataset sizes can cause process hangs.
 
-#### Usage Example
+#### Usage Example (for Data Parallel)
+
+```python
+import torch
+from torch.utils.data import TensorDataset
+from d9d.core.dist_context import DistributedContext, BATCH_DOMAIN
+from d9d.dataset import shard_dataset_data_parallel, ShardIndexingMode
+
+# You can infer your Data Parallel size and rank from DistributedContext object 
+context: DistributedContext
+
+# Create Full Dataset
+base_ds = TensorDataset(torch.randn(100, 10))
+
+# Shard it
+sharded_ds = shard_dataset_data_parallel(
+    dataset=base_ds,
+    dist_context=context,
+    # Optional Parameters:
+    indexing_mode=ShardIndexingMode.chunked,
+    pad_to_equal_size_across_shards=True 
+)
+
+print(f"I am rank {dp_rank}, I see {len(sharded_ds)} items.")
+```
+
+#### Usage Example (Manual)
 
 ```python
 import torch
@@ -103,6 +129,40 @@ sharded_ds = ShardedDataset(
 )
 
 print(f"I am rank {dp_rank}, I see {len(sharded_ds)} items.")
+```
+
+### Padding Utilities
+
+When creating batches from variable-length sequences, tensors must be padded to the same length to form a valid tensor stack.
+
+`pad_stack_1d` provides a robust utility for this, specifically designed to help writing `collate_fn`.
+
+#### Usage Example
+
+```python
+import torch
+from d9d.dataset import pad_stack_1d, PaddingSide1D
+
+# Variable length sequences
+items = [
+    torch.tensor([1, 2, 3]),
+    torch.tensor([4]),
+    torch.tensor([5, 6])
+]
+
+# 1. Standard Right Padding
+batch = pad_stack_1d(items, pad_value=0, padding_side=PaddingSide1D.right)
+
+# 2. Left Padding 
+batch_gen = pad_stack_1d(items, pad_value=0, padding_side=PaddingSide1D.left)
+
+# 3. Aligned Padding
+# Ensures the dimensions are friendly to GPU kernels or for Context Parallel sharding
+batch_aligned = pad_stack_1d(
+    items, 
+    pad_value=0, 
+    pad_to_multiple_of=8
+)
 ```
 
 ::: d9d.dataset

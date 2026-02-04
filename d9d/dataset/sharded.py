@@ -6,6 +6,8 @@ from typing import Any, TypeVar
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.utils.data import Dataset
 
+from d9d.core.dist_context import BATCH_DOMAIN, DistributedContext
+
 
 class ShardIndexingMode(StrEnum):
     """
@@ -159,3 +161,35 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         if isinstance(self._dataset, Stateful):
             dct["dataset"] = self._dataset.state_dict()
         return dct
+
+
+def shard_dataset_data_parallel(
+        dataset: Dataset[_T_co],
+        dist_context: DistributedContext,
+        indexing_mode: ShardIndexingMode = ShardIndexingMode.sequential,
+        pad_to_equal_size_across_shards: bool = True
+) -> Dataset[_T_co]:
+    """
+    Wraps a dataset into a ShardedDataset based on the Data Parallel dimension of the distributed context.
+
+    This is a helper function to automatically determine the correct rank and world size
+    from the 'dp' (Data Parallel) mesh dimension within the batch domain DeviceMesh.
+
+    Args:
+        dataset: The source dataset to shard.
+        dist_context: The distributed context.
+        indexing_mode: The strategy for splitting data indices (sequential/round-robin or chunked).
+        pad_to_equal_size_across_shards: If True, ensures all shards have the same length by padding.
+
+    Returns:
+        A dataset instance representing the local shard.
+    """
+
+    dp_mesh = dist_context.mesh_for(BATCH_DOMAIN)["dp"]
+    return ShardedDataset(
+        dataset=dataset,
+        total_shards=dp_mesh.size(),
+        current_shard=dp_mesh.get_local_rank(),
+        indexing_mode=indexing_mode,
+        pad_to_equal_size_across_shards=pad_to_equal_size_across_shards
+    )

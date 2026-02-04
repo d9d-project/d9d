@@ -1,7 +1,6 @@
 from typing import Any
 
 from torch.distributed import DeviceMesh
-from torch.optim import Optimizer
 
 from d9d.core.protocol import OptimizerProtocol
 
@@ -15,7 +14,7 @@ class PipelinedOptimizer(OptimizerProtocol):
     This class aggregates them into a single interface.
     """
 
-    def __init__(self, mesh_pp: DeviceMesh, optimizers: list[Optimizer]):
+    def __init__(self, mesh_pp: DeviceMesh, optimizers: list[OptimizerProtocol]):
         super().__init__()
 
         self._mesh_pp = mesh_pp

@@ -15,9 +15,8 @@ def parallelize_replicate(
 
     This function configures the provided module to be fully replicated across the
     given device mesh. It utilizes the ``ToLocalParallel`` style, which manages
-    ``DTensor`` wrapping for parameters and gradients (via ``Replicate``
-    and ``Partial`` placements) while ensuring that the underlying computation
-    sees standard local tensors during the forward pass.
+    ``DTensor`` wrapping for parameters and gradients (via ``Replicate`` placements)
+    while ensuring that the underlying computation sees standard local tensors during the forward pass.
 
     This approach is effectively Data Parallelism managed via the DTensor
     APIs, allowing seamless integration of modules that require local tensor inputs

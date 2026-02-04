@@ -20,6 +20,7 @@ import torch
 from d9d.lr_scheduler.visualizer import visualize_lr_scheduler
 from d9d.lr_scheduler.piecewise import piecewise_schedule, CurveLinear, CurveCosine
 
+
 def create_scheduler(optimizer: torch.optim.Optimizer):
     return (
         piecewise_schedule(initial_multiplier=0.0, total_steps=100)
@@ -28,11 +29,12 @@ def create_scheduler(optimizer: torch.optim.Optimizer):
         .build(optimizer)
     )
 
+
 # Opens an interactive plot in browser/notebook
 visualize_lr_scheduler(
     factory=create_scheduler,
-    num_steps=100,      # Duration to simulate
-    init_lr=1e-3        # Base LR to visualize
+    num_steps=100,  # Duration to simulate
+    init_lr=1e-3  # Base LR to visualize
 )
 ```
 

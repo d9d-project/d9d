@@ -4,7 +4,7 @@ import torch
 from torch.autograd.profiler import record_function
 
 from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
-from d9d.core.sharding import shard_spec_on_dim, shard_tree
+from d9d.core.sharding import ShardingSpec, shard_spec_on_dim, shard_tree
 from d9d.pipelining.api import PipelineSchedule, PipelineShardingSpec
 from d9d.pipelining.infra.stage import PipelineStage
 
@@ -22,8 +22,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
             stages: list[PipelineStage],
             num_microbatches: int,
             loss_fn: LossFn | None,
-            program: dict[int, list[ActionBase]],
-            sharding_spec: PipelineShardingSpec
+            program: dict[int, list[ActionBase]]
     ):
         """
         Constructs the schedule executor.
@@ -34,7 +33,6 @@ class PipelineScheduleExecutor(PipelineSchedule):
             num_microbatches: Number of microbatches the global batch is split.
             loss_fn: Function to compute loss.
             program: The execution plan mapping rank ID to a list of actions.
-            sharding_spec: Sharding specification for input and output tensors.
         """
 
         self._dist_ctx = dist_context
@@ -52,14 +50,18 @@ class PipelineScheduleExecutor(PipelineSchedule):
         else:
             self._loss_handler = PipelineLossHandler(loss_fn)
 
-        # these could be late-initialized on configure_buffers \/
-        self._input_data_sharding_spec = sharding_spec.input_data
-        self._input_kwargs_sharding_spec = sharding_spec.input_kwargs
+        self._input_data_sharding_spec: ShardingSpec | None = None
+        self._input_kwargs_sharding_spec: ShardingSpec | None = None
 
-    def configure_buffers(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
-        if self._input_data_sharding_spec is None:
+    def configure_buffers(
+            self,
+            inputs: dict[str, torch.Tensor],
+            kwargs: dict[str, Any],
+            sharding_spec: PipelineShardingSpec | None
+    ):
+        if sharding_spec is None or sharding_spec.input_data is None:
             self._input_data_sharding_spec = shard_spec_on_dim(inputs, dim=0)
-        if self._input_kwargs_sharding_spec is None:
+        if sharding_spec is None or sharding_spec.input_kwargs is None:
             self._input_kwargs_sharding_spec = shard_spec_on_dim(kwargs, dim=0)
 
         for stage in self._stages.values():

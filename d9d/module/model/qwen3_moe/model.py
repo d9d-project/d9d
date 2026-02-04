@@ -57,8 +57,8 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         # was pipelined
         layer_start, layer_end = distribute_layers_for_pipeline_stage(
             num_layers=params.num_hidden_layers,
-            num_virtual_layers_pre=0,  # embeddings
-            num_virtual_layers_post=2,  # LM head
+            num_virtual_layers_pre=params.pipeline_num_virtual_layers_pre,  # embeddings
+            num_virtual_layers_post=params.pipeline_num_virtual_layers_post,  # LM head
             stage=stage
         )
 

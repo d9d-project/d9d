@@ -19,3 +19,8 @@ TensorTree: TypeAlias = PyTree[torch.Tensor]
 """
 A recursive tree structure where the leaf nodes are PyTorch Tensors.
 """
+
+ScalarTree: TypeAlias = PyTree[str | float | int | bool]
+"""
+A recursive tree structure where the leaf nodes are python scalars (str, float, int).
+"""
