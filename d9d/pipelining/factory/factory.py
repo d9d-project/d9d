@@ -1,11 +1,10 @@
 import dataclasses
 from collections.abc import Callable
 
-import torch
 from torch import nn
 
 from ...core.dist_context import REGULAR_DOMAIN, DistributedContext
-from ..api import PipelineSchedule, PipelineStageInfo
+from ..api import PipelineLossFn, PipelineResultFn, PipelineSchedule, PipelineStageInfo
 from ..infra.schedule.component.program import (
     build_stage_to_host_rank_topology,
     invert_stage_to_host_rank_topology,
@@ -32,7 +31,7 @@ def build_schedule(
         n_microbatches: int,
         schedule_config: AnyPipelineScheduleConfig,
         model_provider: Callable[[PipelineStageInfo], nn.Module],
-        loss_fn: Callable[[dict[str, torch.Tensor], int], torch.Tensor] | None,
+        callback: PipelineLossFn | PipelineResultFn,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     """
     Constructs the pipeline schedule and instantiates model stages.
@@ -51,12 +50,13 @@ def build_schedule(
         schedule_config: Configuration object determining the schedule strategy.
         model_provider: A factory function that accepts stage info and returns an `nn.Module`
             for that specific stage.
-        loss_fn: Optional loss function. Required if training (backward pass needed).
+        callback: Callback either computing loss function (if training) or just processing pipeline outputs
+            (if not training).
 
     Returns:
         A tuple containing:
-        1.  `PipelineScheduleInfo`: The executable schedule and metadata.
-        2.  `list[nn.Module]`: The local PyTorch modules created for this rank.
+            1.  `PipelineScheduleInfo`: The executable schedule and metadata.
+            2.  `list[nn.Module]`: The local PyTorch modules created for this rank.
     """
 
     program_builder = PIPELINE_PROGRAM_REGISTRY.program_for(schedule_config)
@@ -103,7 +103,7 @@ def build_schedule(
         dist_context=dist_context,
         stages=stages,
         num_microbatches=n_microbatches,
-        loss_fn=loss_fn,
+        callback=callback,
         program=program
     )
 

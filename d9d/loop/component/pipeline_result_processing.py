@@ -1,7 +1,7 @@
 import torch
 
 from d9d.internals.pipeline_state import PipelineStateHandler
-from d9d.loop.control import ComputeLossContext, TrainTask
+from d9d.loop.control import ComputeLossContext, InferenceTask, ProcessOutputsContext, TrainTask
 
 from .stepper import Stepper
 
@@ -38,7 +38,7 @@ class LossComputer:
         self._task = task
         self._stepper = stepper
 
-    def compute_loss_mul_weight(
+    def __call__(
             self,
             pipeline_outputs: dict[str, torch.Tensor],
             microbatch_idx: int | None
@@ -84,3 +84,56 @@ class LossComputer:
         state[STATE_LOSS_WEIGHT] = loss_weight[None]
 
         return loss * loss_weight
+
+
+class ModelOutputsProcessor:
+    """
+    Handles the processing of model outputs during inference or evaluation.
+
+    This component retrieves the appropriate state context (global or sharded)
+    and delegates the output processing logic to the user-defined inference task.
+    """
+
+    def __init__(
+            self,
+            state: PipelineStateHandler,
+            task: InferenceTask
+    ):
+        """
+        Constructs a new ModelOutputsProcessor.
+
+        Args:
+            state: Handler for managing global and sharded pipeline states.
+            task: The user-defined inference task containing processing logic.
+        """
+
+        self._state = state
+        self._task = task
+
+    def __call__(
+            self,
+            pipeline_outputs: dict[str, torch.Tensor],
+            microbatch_idx: int | None
+    ) -> None:
+        """
+        Processes model outputs for a specific microbatch or full batch.
+
+        This method retrieves the relevant state (scoped by microbatch index if provided)
+        and invokes the task's output processing logic.
+
+        Args:
+            pipeline_outputs: Dictionary containing model output tensors.
+            microbatch_idx: Index of the current microbatch, or None if not using microbatching.
+        """
+
+        if microbatch_idx is None:
+            state = self._state.global_state()
+        else:
+            state = self._state.sharded_state(
+                shard_id=microbatch_idx
+            )
+
+        self._task.process_outputs(ProcessOutputsContext(
+            pipeline_results=pipeline_outputs,
+            state=state
+        ))

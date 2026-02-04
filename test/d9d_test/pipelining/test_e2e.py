@@ -100,7 +100,7 @@ def test_e2e(
         n_microbatches=n_microbatches,
         schedule_config=schedule_config,
         model_provider=_model_provider,
-        loss_fn=_loss_fn
+        callback=_loss_fn
     )
 
     not_this_rank_stages = [i for i in range(len(full_stage_modules)) if i not in this_rank_stages]

@@ -221,15 +221,18 @@ schedule_info, modules = build_schedule(
     n_microbatches=32,
     schedule_config=schedule_config,
     model_provider=lambda stage: MyModelChunk(stage, model_config),  # Factory function
-    loss_fn=loss_handler.compute_loss,
-    sharding_spec=PipelineShardingSpec()  # Default sharding across dim 0
+    callback=loss_handler.compute_loss
 )
 
 # 3. Execution
 # The schedule object exposes a simple step API
 inputs = {"input_ids": ...}  # Full batch
 loss_handler.set_targets(...)  # Set targets for full batch
-schedule_info.schedule.configure_buffers(inputs, kwargs={})  # Pre-allocate buffers
+schedule_info.schedule.configure_buffers(  # Pre-allocate buffers
+    inputs, 
+    kwargs={}, 
+    sharding_spec=PipelineShardingSpec()
+)
 schedule_info.schedule.step(inputs, kwargs={})
 ```
 

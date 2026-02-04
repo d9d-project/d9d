@@ -7,8 +7,8 @@ import torch
 
 from d9d.pipelining.infra.stage import PipelineStage
 
+from .callback import PipelineLossHandler, PipelineResultHandler
 from .communications import PipelineCommunicationHandler
-from .loss import PipelineLossHandler
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)
@@ -21,7 +21,7 @@ class ActionContext:
         pipeline_kwargs_microbatches: The global keyword arguments sharded by microbatch.
         stages: A mapping of stage indices to their active PipelineStage instances.
         communications: The handler for P2P communications.
-        loss: The handler for loss computation, or None if not available.
+        callback: The handler for either loss computation or result processing.
     """
 
     pipeline_inputs_microbatches: tuple[dict[str, torch.Tensor], ...]
@@ -29,7 +29,7 @@ class ActionContext:
 
     stages: dict[int, PipelineStage]
     communications: PipelineCommunicationHandler
-    loss: PipelineLossHandler | None
+    callback: PipelineLossHandler | PipelineResultHandler
 
 
 class ActionWorkType(StrEnum):
@@ -208,7 +208,6 @@ class ForwardComputeAction(ActionBase):
     microbatch_idx: int
 
     def apply(self, ctx: ActionContext):
-        # todo check unsharded
         stage = ctx.stages[self.stage_idx]
 
         if not stage.info.is_current_stage_first and self.stage_idx - 1 not in ctx.stages:
@@ -221,8 +220,8 @@ class ForwardComputeAction(ActionBase):
         )
         result = stage.get_local_fwd_output(self.microbatch_idx)
 
-        if stage.info.is_current_stage_last and ctx.loss is not None:
-            ctx.loss.compute_loss(result, self.microbatch_idx)
+        if stage.info.is_current_stage_last:
+            ctx.callback.trigger(result, self.microbatch_idx)
 
         if not stage.info.is_current_stage_last and self.stage_idx + 1 in ctx.stages:
             ctx.stages[self.stage_idx + 1].set_local_fwd_input(
@@ -260,14 +259,13 @@ class BackwardFullInputComputeAction(ActionBase):
     full_backward: bool
 
     def apply(self, ctx: ActionContext):
-        # todo unshard
         stage = ctx.stages[self.stage_idx]
 
         if not stage.info.is_current_stage_last and self.stage_idx + 1 not in ctx.stages:
             ctx.communications.wait_bwd_recv(self.stage_idx, self.microbatch_idx)
 
-        if stage.info.is_current_stage_last and ctx.loss is not None:
-            loss = ctx.loss.acquire_loss(self.microbatch_idx)
+        if stage.info.is_current_stage_last and isinstance(ctx.callback, PipelineLossHandler):
+            loss = ctx.callback.acquire_loss(self.microbatch_idx)
         else:
             loss = None
 
@@ -310,7 +308,6 @@ class BackwardWeightComputeAction(ActionBase):
     microbatch_idx: int
 
     def apply(self, ctx: ActionContext):
-        # todo unshard
         stage = ctx.stages[self.stage_idx]
 
         stage.backward_weight_one_chunk(

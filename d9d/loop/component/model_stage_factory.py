@@ -15,7 +15,7 @@ from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory.factory import PipelineScheduleInfo, build_schedule
 
 from .batch_maths import BatchMaths
-from .loss_computer import LossComputer
+from .pipeline_result_processing import LossComputer, ModelOutputsProcessor
 
 StatefulPredicate = Callable[[str, torch.Tensor], bool]
 """Determines if a specific parameter or buffer should be included in the state dictionary."""
@@ -160,7 +160,7 @@ class ModelStageFactory:
             batch_maths: BatchMaths,
             config_model: ModelStageFactoryConfig,
             config_pipelining: PipeliningConfig | None,
-            loss_computer: LossComputer | None
+            pipeline_callback: LossComputer | ModelOutputsProcessor
     ):
         """Constructs a ModelStageFactory object."""
 
@@ -169,7 +169,7 @@ class ModelStageFactory:
         self._config_model = config_model
         self._config_pipelining = config_pipelining
         self._batch_maths = batch_maths
-        self._loss_computer = loss_computer
+        self._pipeline_callback = pipeline_callback
 
     def _build_model_stage(self, stage: PipelineStageInfo) -> nn.Module:
         # create a model with no real memory occupied
@@ -244,14 +244,12 @@ class ModelStageFactory:
             if self._config_pipelining is None:
                 raise ValueError("Pipelining is enabled, but not configured")
 
-            loss_fn = self._loss_computer.compute_loss_mul_weight if self._loss_computer is not None else None
-
             schedule, modules = build_schedule(
                 dist_context=self._dist_context,
                 n_microbatches=self._batch_maths.num_microbatches_pipelining,
                 schedule_config=self._config_pipelining.schedule,
                 model_provider=self._build_model_stage,
-                loss_fn=loss_fn
+                callback=self._pipeline_callback
             )
 
             return schedule, TrackedModules(self._dist_context, modules, stateful_predicate)

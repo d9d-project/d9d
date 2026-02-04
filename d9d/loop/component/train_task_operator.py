@@ -9,8 +9,8 @@ from d9d.loop.control import BuildForwardInputsContext, BuildForwardInputsResult
 from d9d.metric.impl import ComposeMetric
 from d9d.pipelining.factory.factory import PipelineScheduleInfo
 
-from .loss_computer import STATE_LOSS, STATE_LOSS_WEIGHT, LossComputer
 from .model_stage_factory import TrackedModules
+from .pipeline_result_processing import STATE_LOSS, STATE_LOSS_WEIGHT, LossComputer
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -86,7 +86,7 @@ class TrainTaskOperator:
             **model_inputs.inputs,
             **model_inputs.kwargs
         )
-        loss = self._loss_computer.compute_loss_mul_weight(
+        loss = self._loss_computer(
             pipeline_outputs=pipeline_outputs,
             microbatch_idx=None
         )

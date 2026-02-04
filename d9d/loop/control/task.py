@@ -252,11 +252,11 @@ class ProcessOutputsContext:
     Context data provided to process outputs during inference.
 
     Attributes:
-        outputs: The outputs returned by the model's forward pass.
+        pipeline_results: The outputs returned by the model's forward pass.
         state: The current state of the pipeline.
     """
 
-    outputs: dict[str, torch.Tensor]
+    pipeline_results: dict[str, torch.Tensor]
     state: "PipelineState"
 
 

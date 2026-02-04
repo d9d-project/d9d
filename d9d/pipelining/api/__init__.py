@@ -9,9 +9,12 @@ from .module import (
 )
 from .schedule import PipelineSchedule
 from .sharding import PipelineShardingSpec
+from .types import PipelineLossFn, PipelineResultFn
 
 __all__ = [
     "ModuleSupportsPipelining",
+    "PipelineLossFn",
+    "PipelineResultFn",
     "PipelineSchedule",
     "PipelineShardingSpec",
     "PipelineStageInfo",

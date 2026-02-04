@@ -185,7 +185,7 @@ def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
             local_model=local,
             checkpointing=checkpointing
         ),
-        loss_fn=_loss_fn
+        callback=_loss_fn
     )
 
     inputs_dist = {

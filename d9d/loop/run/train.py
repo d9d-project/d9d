@@ -121,7 +121,7 @@ class TrainingConfigurator:
             config_model=self._parameters.model_stage_factory,
             config_pipelining=self._parameters.pipelining,
             batch_maths=batch_maths,
-            loss_computer=loss_computer
+            pipeline_callback=loss_computer
         ).build_pipeline_and_modules()
 
         metrics = ComposeMetric(task.create_metrics(CreateMetricsContext()).metrics)

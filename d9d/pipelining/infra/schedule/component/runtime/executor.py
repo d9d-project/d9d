@@ -5,12 +5,12 @@ from torch.autograd.profiler import record_function
 
 from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
 from d9d.core.sharding import ShardingSpec, shard_spec_on_dim, shard_tree
-from d9d.pipelining.api import PipelineSchedule, PipelineShardingSpec
+from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedule, PipelineShardingSpec
 from d9d.pipelining.infra.stage import PipelineStage
 
 from .action import ActionBase, ActionContext
+from .callback import PipelineLossHandler, PipelineResultHandler
 from .communications import PipelineCommunicationHandler
-from .loss import LossFn, PipelineLossHandler
 
 
 class PipelineScheduleExecutor(PipelineSchedule):
@@ -21,7 +21,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
             dist_context: DistributedContext,
             stages: list[PipelineStage],
             num_microbatches: int,
-            loss_fn: LossFn | None,
+            callback: PipelineLossFn | PipelineResultFn,
             program: dict[int, list[ActionBase]]
     ):
         """
@@ -31,7 +31,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
             dist_context: The distributed context.
             stages: List of stages managed by this executor.
             num_microbatches: Number of microbatches the global batch is split.
-            loss_fn: Function to compute loss.
+            callback: Function to compute loss or process pipeline results.
             program: The execution plan mapping rank ID to a list of actions.
         """
 
@@ -45,10 +45,12 @@ class PipelineScheduleExecutor(PipelineSchedule):
         ) for sub_program in program.values())
 
         self._comm_handler = PipelineCommunicationHandler(self._stages)
-        if loss_fn is None:
-            self._loss_handler = None
+
+        self._callback: PipelineLossHandler | PipelineResultHandler
+        if self._has_backward:
+            self._callback = PipelineLossHandler(callback)
         else:
-            self._loss_handler = PipelineLossHandler(loss_fn)
+            self._callback = PipelineResultHandler(callback)
 
         self._input_data_sharding_spec: ShardingSpec | None = None
         self._input_kwargs_sharding_spec: ShardingSpec | None = None
@@ -101,7 +103,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
             with record_function(str(action)):
                 self._dist_ctx.logger.debug(f"Running pipeline action {action}")
                 action.apply(ActionContext(
-                    loss=self._loss_handler,
+                    callback=self._callback,
                     stages=self._stages,
                     communications=self._comm_handler,
                     pipeline_inputs_microbatches=inputs_shard,
