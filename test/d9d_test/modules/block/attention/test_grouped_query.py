@@ -1,15 +1,9 @@
 import dataclasses
-from enum import StrEnum
 
 import pytest
 import torch
-from d9d.core.dist_context import BATCH_DOMAIN, DENSE_DOMAIN, DeviceMeshParameters
 from d9d.module.block.attention import GroupedQueryAttention
-from d9d.module.parallelism.api import parallelize_fsdp, parallelize_replicate
 from torch import nn
-from torch.distributed.tensor import DTensor, Replicate, Shard, distribute_tensor
-from torch.distributed.tensor.experimental import context_parallel
-from torch.distributed.tensor.experimental._context_parallel import context_parallel_unshard  # noqa: PLC2701
 from transformers import Qwen3MoeConfig
 from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeAttention
 
@@ -53,6 +47,22 @@ def build_inputs(dtype: torch.dtype):
     )
 
 
+def build_my(dtype: torch.dtype):
+    torch.manual_seed(42)
+
+    attention_my = GroupedQueryAttention(
+        hidden_size=512,
+        num_attention_heads=16,
+        num_key_value_heads=4,
+        qk_norm_eps=1e-5,
+        head_dim=32,
+        is_causal=True
+    ).cuda().to(dtype)
+    attention_my.reset_parameters()
+
+    return attention_my
+
+
 def build_hf_my(dtype: torch.dtype):
     torch.manual_seed(42)
 
@@ -70,14 +80,8 @@ def build_hf_my(dtype: torch.dtype):
         layer_idx=0
     ).cuda().to(dtype)
 
-    attention_my = GroupedQueryAttention(
-        hidden_size=512,
-        num_attention_heads=16,
-        num_key_value_heads=4,
-        qk_norm_eps=1e-5,
-        head_dim=32,
-        is_causal=True
-    ).cuda().to(dtype)
+    attention_my = build_my(dtype)
+
     clone_grouped_query_attention_qwen3_moe(my=attention_my, hf=attention_hf)
 
     return attention_hf, attention_my
@@ -106,77 +110,8 @@ def test_consistent_to_hf(dtype):
     hidden_states_hf.mean().backward()
     hidden_states_my.mean().backward()
 
-    check_grad(inputs.my_pre_tensor.grad, inputs.hf_pre_tensor.grad, is_dist=False, atol=1e-6, rtol=0.01)
+    check_grad(inputs.my_pre_tensor.grad, inputs.hf_pre_tensor.grad, atol=1e-6, rtol=0.01)
 
-    check_grouped_query_attention_qwen3_moe_grad(my, hf, is_dist=False)
+    check_grouped_query_attention_qwen3_moe_grad(my, hf)
 
-
-class ContextParallelMode(StrEnum):
-    replicate = "replicate"
-    parallelize = "parallelize"
-
-
-@pytest.mark.distributed
-@pytest.mark.parametrize("dtype", [torch.bfloat16])
-@pytest.mark.parametrize("mode", list(ContextParallelMode))
-def test_consistent_to_hf_context_parallel(dtype, mode):
-    ctx = DeviceMeshParameters(
-        pipeline_parallel=1,
-        tensor_parallel=1,
-        expert_parallel=1,
-        data_parallel_shard=1,
-        context_parallel_shard=8 if mode == ContextParallelMode.parallelize else 1,
-        data_parallel_replicate=1,
-        context_parallel_replicate=8 if mode == ContextParallelMode.replicate else 1
-    ).build()
-    dense_mesh = ctx.mesh_for(DENSE_DOMAIN)
-    batch_mesh = ctx.mesh_for(BATCH_DOMAIN)
-
-    inputs = build_inputs(dtype)
-    hf, my = build_hf_my(dtype)
-
-    hidden_states_hf, _ = hf(
-        inputs.hidden_states + inputs.hf_pre_tensor,
-        attention_mask=inputs.attention_mask,
-        position_embeddings=inputs.rope
-    )
-    hidden_states_hf.mean().backward()
-
-    match mode:
-        case ContextParallelMode.replicate:
-            parallelize_replicate(my, dense_mesh["cp_replicate"])
-        case ContextParallelMode.parallelize:
-            parallelize_fsdp(my, dense_mesh["dp_cp_shard"])
-
-    my_pre_dist = distribute_tensor(
-        inputs.my_pre_tensor,
-        device_mesh=batch_mesh["cp"],
-        placements=[Replicate()]
-    )
-
-    with context_parallel(
-            batch_mesh["cp"], buffers=[inputs.hidden_states, inputs.rope[0], inputs.rope[1]], buffer_seq_dims=[1, 1, 1]
-    ):
-        assert inputs.hidden_states.shape == (2, 1024 // _NUM_DEVICES, 512)
-        inputs_my = (DTensor.from_local(
-            inputs.hidden_states,
-            device_mesh=batch_mesh["cp"],
-            placements=(Shard(1),)
-        ) + my_pre_dist).to_local()
-        hidden_states_my = my(
-            inputs_my,
-            attention_mask=None,
-            position_embeddings=inputs.rope
-        )
-        # we can divide because tokens split EVENLY: local [1 / N] ~ dist [1 / (N / 8)] / 8
-        (hidden_states_my.mean() / _NUM_DEVICES).backward()
-
-        hidden_states_my, = context_parallel_unshard(
-            batch_mesh["cp"], buffers=[hidden_states_my], seq_dims=[1]
-        )
-
-    assert torch.allclose(hidden_states_my, hidden_states_hf, atol=1e-2, rtol=1e-2)
-
-    check_grad(my_pre_dist.grad, inputs.hf_pre_tensor.grad, is_dist=True, atol=1e-5, rtol=0.01)
-
-    check_grouped_query_attention_qwen3_moe_grad(my, hf, is_dist=True)
+# TODO(max): add context parallel test with new context parallelism API

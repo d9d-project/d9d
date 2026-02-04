@@ -26,7 +26,7 @@ def _optional_expert(weight: nn.Parameter):
         return weight.grad.T
 
 
-def check_moe_qwen3_moe_grad(my: MoELayer, hf: Qwen3MoeSparseMoeBlock, is_dist: bool):
+def check_moe_qwen3_moe_grad(my: MoELayer, hf: Qwen3MoeSparseMoeBlock):
     for my_grad, hf_grad in [
         (my.router.gate.weight.grad, hf.gate.weight.grad),
         (my.grouped_experts.gate_proj.weight.grad,
@@ -36,4 +36,4 @@ def check_moe_qwen3_moe_grad(my: MoELayer, hf: Qwen3MoeSparseMoeBlock, is_dist: 
         (my.grouped_experts.down_proj.weight.grad,
          torch.stack([_optional_expert(x.down_proj.weight) for x in hf.experts], dim=0))
     ]:
-        check_grad_distance(my_grad.flatten(start_dim=-2), hf_grad.flatten(start_dim=-2), is_dist)
+        check_grad_distance(my_grad.flatten(start_dim=-2), hf_grad.flatten(start_dim=-2))

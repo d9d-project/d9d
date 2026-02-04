@@ -1,7 +1,7 @@
 import logging
 from typing import Self
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, ConfigDict, model_validator
 
 from .configured import DistributedContext
 
@@ -20,17 +20,19 @@ class DeviceMeshParameters(BaseModel):
         expert_parallel: Degree of expert parallelism (EP/MoE).
     """
 
-    pipeline_parallel: int
+    model_config = ConfigDict(frozen=True)
 
-    data_parallel_replicate: int
-    data_parallel_shard: int
+    pipeline_parallel: int = 1
 
-    context_parallel_replicate: int
-    context_parallel_shard: int
+    data_parallel_replicate: int = 1
+    data_parallel_shard: int = 1
 
-    tensor_parallel: int
+    context_parallel_replicate: int = 1
+    context_parallel_shard: int = 1
 
-    expert_parallel: int
+    tensor_parallel: int = 1
+
+    expert_parallel: int = 1
 
     @property
     def has_pipeline_parallel(self) -> bool:

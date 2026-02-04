@@ -19,11 +19,11 @@ def clone_embeddings(my: SplitTokenEmbeddings, hf: nn.Embedding):
         prepend_size += part_size
 
 
-def check_embeddings_grad(my: SplitTokenEmbeddings, hf: nn.Embedding, is_dist: bool):
+def check_embeddings_grad(my: SplitTokenEmbeddings, hf: nn.Embedding):
     my_grad = torch.cat(
         [my.token_embedding[part_name].weight.grad for part_name in my._split_order],
         dim=0
     )
 
     hf_grad = hf.weight.grad
-    check_grad_distance(my_grad, hf_grad, is_dist=is_dist)
+    check_grad_distance(my_grad, hf_grad)

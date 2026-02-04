@@ -19,11 +19,11 @@ def clone_lm_head(my: SplitLanguageModellingHead, hf: nn.Linear):
         prepend_size += part_size
 
 
-def check_lm_head_grad(my: SplitLanguageModellingHead, hf: nn.Linear, is_dist: bool):
+def check_lm_head_grad(my: SplitLanguageModellingHead, hf: nn.Linear):
     my_grad = torch.cat(
         [my.lm_head[part_name].weight.grad for part_name in my._split_order],
         dim=0
     )
     hf_grad = hf.weight.grad
 
-    check_grad_distance(my_grad, hf_grad, is_dist=is_dist)
+    check_grad_distance(my_grad, hf_grad)

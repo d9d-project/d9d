@@ -1,13 +1,20 @@
 import pytest
 import torch
-from d9d.core.dist_context import BATCH_DOMAIN, DENSE_DOMAIN, EXPERT_DOMAIN, DeviceMeshParameters, DistributedContext
-from d9d.module.parallelism.api import parallelize_expert_parallel, parallelize_replicate
+import torch.distributed as dist
+from d9d.core.dist_context import BATCH_DOMAIN, DENSE_DOMAIN, DeviceMeshParameters, DistributedContext
+from d9d.module.parallelism.model.qwen3_moe import parallelize_qwen3_moe_for_causal_lm
 from d9d.pipelining.api import PipelineShardingSpec, PipelineStageInfo
-from d9d.pipelining.factory import PipelineScheduleLoopedBFSConfig, build_schedule
-from torch.distributed.tensor import DTensor, Partial, Replicate, Shard
+from d9d.pipelining.factory import (
+    PipelineScheduleGPipeConfig,
+    build_schedule,
+)
+from torch import nn
+from torch.distributed.tensor import DTensor, Replicate, Shard
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from transformers import Qwen3MoeConfig, Qwen3MoeForCausalLM
 
+from d9d_test.modules.checkers import check_grad_distance_all_local_dist, copy_params_local_to_dist
+from d9d_test.modules.grad_sync import sync_grads_manually
 from d9d_test.modules.model.qwen3_moe.factory import build_decoder, build_decoder_inputs_hf, build_decoder_inputs_my
 from d9d_test.modules.model.qwen3_moe.util import check_lm_model_grad, clone_lm_model_weights
 
@@ -75,61 +82,24 @@ def test_consistent_to_hf(checkpointing):
     outs_hf.loss.backward()
     loss_my.backward()
 
-    check_lm_model_grad(my, hf, is_dist=False, stage=stage_info)
+    check_lm_model_grad(my, hf, stage=stage_info)
 
 
 def _build_distributed_model(
         stage: PipelineStageInfo,
-        hf: Qwen3MoeForCausalLM,
         dist_ctx: DistributedContext,
+        local_model: nn.Module,
         stage_memo: list[tuple[PipelineStageInfo, Qwen3MoeForCausalLM]],
         checkpointing: bool
 ):
-    dense_mesh = dist_ctx.mesh_for(DENSE_DOMAIN)
-    expert_mesh = dist_ctx.mesh_for(EXPERT_DOMAIN)
     model = build_decoder(stage=stage, checkpointing=checkpointing)
-    clone_lm_model_weights(my=model, hf=hf, stage=stage)
-
-    if stage.is_current_stage_first:
-        parallelize_replicate(
-            model.model.embed_tokens,
-            mesh=dense_mesh["dp_replicate"],
-        )
-
-    if stage.is_current_stage_last:
-        parallelize_replicate(
-            model.model.norm,
-            mesh=dense_mesh["dp_replicate"],
-        )
-        parallelize_replicate(
-            model.lm_head,
-            mesh=dense_mesh["dp_replicate"],
-        )
-
-    for layer in model.model.layers.values():
-        parallelize_expert_parallel(
-            layer.mlp,
-            mesh_experts=expert_mesh[["ep_replicate", "ep_shard"]]
-        )
-        parallelize_replicate(
-            layer.self_attn,
-            mesh=dense_mesh["dp_replicate"],
-        )
-        parallelize_replicate(
-            layer.input_layernorm,
-            mesh=dense_mesh["dp_replicate"],
-        )
-        parallelize_replicate(
-            layer.post_attention_layernorm,
-            mesh=dense_mesh["dp_replicate"],
-        )
-
-    stage_memo.append((stage, model))
-
+    parallelize_qwen3_moe_for_causal_lm(dist_ctx, model, stage)
+    copy_params_local_to_dist(local=local_model, dist=model)
+    stage_memo.append(model)
     return model
 
 
-def _shard_virtual_dp(tensor: torch.Tensor, dist_ctx: DistributedContext) -> DTensor:
+def _shard_virtual_dp(tensor: torch.Tensor, dist_ctx: DistributedContext) -> torch.Tensor:
     return DTensor.from_local(
         tensor,
         device_mesh=dist_ctx.mesh_for(BATCH_DOMAIN)["dp"],
@@ -139,8 +109,9 @@ def _shard_virtual_dp(tensor: torch.Tensor, dist_ctx: DistributedContext) -> DTe
 
 @pytest.mark.distributed
 @pytest.mark.parametrize("checkpointing", [True, False])
-def test_consistent_to_hf_dist(checkpointing):
-    dist_ctx = DeviceMeshParameters(
+@pytest.mark.parametrize("mesh", [
+    # PP + DPR / EP
+    DeviceMeshParameters(
         pipeline_parallel=2,
         expert_parallel=4,
         tensor_parallel=1,
@@ -148,73 +119,104 @@ def test_consistent_to_hf_dist(checkpointing):
         data_parallel_shard=1,
         data_parallel_replicate=4,
         context_parallel_replicate=1
-    ).build()
-    dense_mesh = dist_ctx.mesh_for(DENSE_DOMAIN)
+    ),
+    # PP + DPS / EP
+    DeviceMeshParameters(
+        pipeline_parallel=2,
+        expert_parallel=4,
+        tensor_parallel=1,
+        context_parallel_shard=1,
+        data_parallel_shard=4,
+        data_parallel_replicate=1,
+        context_parallel_replicate=1
+    ),
+    # PP + DPR + DPS / EP
+    DeviceMeshParameters(
+        pipeline_parallel=2,
+        expert_parallel=4,
+        tensor_parallel=1,
+        context_parallel_shard=1,
+        data_parallel_shard=2,
+        data_parallel_replicate=2,
+        context_parallel_replicate=1
+    ),
+    # PP + DPR + DPS / EP + R
+    DeviceMeshParameters(
+        pipeline_parallel=2,
+        expert_parallel=2,
+        tensor_parallel=1,
+        context_parallel_shard=1,
+        data_parallel_shard=2,
+        data_parallel_replicate=2,
+        context_parallel_replicate=1
+    ),
+])
+def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(mesh)
 
-    hf = build_hf_model()
     stage_memo = []
 
-    input_ids_hf, position_ids_hf, labels_hf = build_decoder_inputs_hf()
-    outs_hf = hf(
-        input_ids=input_ids_hf,
-        position_ids=position_ids_hf,
-        labels=labels_hf,
-    )
-    outs_hf.loss.backward()
+    local = build_decoder(stage=PipelineStageInfo(num_stages=1, current_stage=0), checkpointing=checkpointing)
+    input_ids, position_ids, labels = build_decoder_inputs_my()
+    loss_div = (labels != -100).sum()
+    outs_local = local(input_ids=input_ids, position_ids=position_ids, labels=labels)
+    loss_local = outs_local["logps"].sum() / loss_div
+    loss_local.backward()
 
-    input_ids_my, position_ids_my, labels_my = build_decoder_inputs_my()
-    input_ids_my_dp = _shard_virtual_dp(input_ids_my, dist_ctx)
-    position_ids_my_dp = _shard_virtual_dp(position_ids_my, dist_ctx)
-    labels_my_dp = _shard_virtual_dp(labels_my, dist_ctx)
+    input_ids_dist = _shard_virtual_dp(input_ids, dist_ctx)
+    position_ids_dist = _shard_virtual_dp(position_ids, dist_ctx)
+    labels_dist = _shard_virtual_dp(labels, dist_ctx)
 
-    loss_scale_step_size = (labels_my != -100).sum().item()
+    loss_dist_accum = []
 
-    my_loss_accum = []
-
-    def _loss_fn(outputs, mb_index):
-        ret = outputs["logps"].sum() / loss_scale_step_size
-        my_loss_accum.append(ret.detach())
+    def _loss_fn(outputs, _):
+        ret = outputs["logps"].sum() / loss_div
+        loss_dist_accum.append(ret.detach())
         return ret
 
     schedule, _ = build_schedule(
         dist_ctx,
         n_microbatches=2,
-        schedule_config=PipelineScheduleLoopedBFSConfig(
-            num_stages_per_rank=2
-        ),
+        schedule_config=PipelineScheduleGPipeConfig(),
         model_provider=lambda stg: _build_distributed_model(
             stage=stg,
-            hf=hf,
             dist_ctx=dist_ctx,
             stage_memo=stage_memo,
+            local_model=local,
             checkpointing=checkpointing
         ),
         loss_fn=_loss_fn,
         sharding_spec=PipelineShardingSpec()
     )
 
-    inputs_my_dp = {
-        "input_ids": input_ids_my_dp
+    inputs_dist = {
+        "input_ids": input_ids_dist
     }
-    kwargs_my_dp = {
-        "position_ids": position_ids_my_dp,
-        "labels": labels_my_dp
+    kwargs_dist = {
+        "position_ids": position_ids_dist,
+        "labels": labels_dist
     }
 
-    schedule.schedule.configure_buffers(inputs_my_dp, kwargs_my_dp)
+    schedule.schedule.configure_buffers(inputs_dist, kwargs_dist)
 
     schedule.schedule.step(
-        inputs_my_dp,
-        kwargs_my_dp
+        inputs_dist,
+        kwargs_dist
     )
 
-    if dense_mesh.get_local_rank("pp") == 1:
-        loss_my = DTensor.from_local(
-            torch.tensor(my_loss_accum).sum(),
-            device_mesh=dense_mesh["dp_replicate"],
-            placements=(Partial("sum"),)
-        ).full_tensor()
-        assert torch.allclose(outs_hf.loss, loss_my, atol=1e-4, rtol=0.001)
+    pp_mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["pp"]
 
-    for stage, stage_model in stage_memo:
-        check_lm_model_grad(my=stage_model, hf=hf, is_dist=True, stage=stage)
+    if pp_mesh.get_local_rank() == pp_mesh.size() - 1:
+        loss_dist = torch.tensor(loss_dist_accum, device="cuda").sum()
+        for group in dist_ctx.mesh_for(DENSE_DOMAIN)[
+            "dp_replicate", "dp_cp_shard", "cp_replicate", "tp"
+        ].get_all_groups():
+            dist.all_reduce(loss_dist, op=dist.ReduceOp.SUM, group=group)
+        assert torch.allclose(loss_local, loss_dist, atol=1e-4, rtol=0.001)
+
+    for stage_model in stage_memo:
+        sync_grads_manually(stage_model)
+        check_grad_distance_all_local_dist(
+            local=local,
+            dist=stage_model
+        )

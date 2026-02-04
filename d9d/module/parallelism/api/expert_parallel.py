@@ -1,5 +1,5 @@
 from torch.distributed import DeviceMesh
-from torch.distributed.tensor import Partial, Replicate
+from torch.distributed.tensor import Replicate
 from torch.distributed.tensor.parallel import parallelize_module
 
 from d9d.module.block.moe import MoELayer
@@ -32,5 +32,5 @@ def parallelize_expert_parallel(
     parallelize_module(module, mesh_experts, ShardMoESparseExpertsParallel(shard_dim_name=expert_shard_dim))
     parallelize_module(module.router, mesh_experts, ToLocalParallel(
         param_placement=tuple(Replicate() for _ in range(mesh_experts.ndim)),
-        grad_placement=tuple(Partial("sum") for _ in range(mesh_experts.ndim))
+        grad_placement=tuple(Replicate() for _ in range(mesh_experts.ndim))
     ))

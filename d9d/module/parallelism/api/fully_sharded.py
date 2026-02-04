@@ -33,6 +33,10 @@ def parallelize_fsdp(
         **kwargs: Additional keyword arguments passed to ``fully_shard``.
     """
 
+    if mesh.ndim != 1:
+        raise ValueError("FSDP mesh should contain exactly one dimension - for HSDP, please apply "
+                         "parallelize_replicate(...) first!")
+
     fully_shard(module, *args, mesh=mesh, **kwargs)
     if not isinstance(module, FSDPModule):
         raise RuntimeError("Torch FSDP did not convert the module into FSDPModule")

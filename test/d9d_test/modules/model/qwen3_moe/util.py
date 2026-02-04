@@ -38,40 +38,37 @@ def clone_lm_model_weights(my: Qwen3MoEForCausalLM, hf: Qwen3MoeForCausalLM, sta
         clone_lm_head(my.lm_head, hf.lm_head)
 
 
-def check_layer_grad(my: Qwen3MoELayer, hf: Qwen3MoeDecoderLayer, is_dist: bool):
-    check_grouped_query_attention_qwen3_moe_grad(my.self_attn, hf.self_attn, is_dist=is_dist)
-    check_moe_qwen3_moe_grad(my.mlp, hf.mlp, is_dist=is_dist)
+def check_layer_grad(my: Qwen3MoELayer, hf: Qwen3MoeDecoderLayer):
+    check_grouped_query_attention_qwen3_moe_grad(my.self_attn, hf.self_attn)
+    check_moe_qwen3_moe_grad(my.mlp, hf.mlp)
     check_grad_distance(
         my.post_attention_layernorm.weight.grad[None, :],
-        hf.post_attention_layernorm.weight.grad[None, :],
-        is_dist=is_dist
+        hf.post_attention_layernorm.weight.grad[None, :]
     )
     check_grad_distance(
         my.input_layernorm.weight.grad[None, :],
-        hf.input_layernorm.weight.grad[None, :],
-        is_dist=is_dist
+        hf.input_layernorm.weight.grad[None, :]
     )
 
 
-def check_model_grad(my: Qwen3MoEModel, hf: Qwen3MoeModel, is_dist: bool, stage: PipelineStageInfo):
+def check_model_grad(my: Qwen3MoEModel, hf: Qwen3MoeModel, stage: PipelineStageInfo):
     if stage.is_current_stage_first:
-        check_embeddings_grad(my.embed_tokens, hf.embed_tokens, is_dist=is_dist)
+        check_embeddings_grad(my.embed_tokens, hf.embed_tokens)
 
     for layer_i, layer_my in my.layers.items():
         layer_i_int = int(layer_i)
         layer_hf = hf.layers[layer_i_int]
-        check_layer_grad(layer_my, layer_hf, is_dist=is_dist)
+        check_layer_grad(layer_my, layer_hf)
 
     if stage.is_current_stage_last:
         check_grad_distance(
             my.norm.weight.grad[None, :],
-            hf.norm.weight.grad[None, :],
-            is_dist=is_dist
+            hf.norm.weight.grad[None, :]
         )
 
 
-def check_lm_model_grad(my: Qwen3MoEForCausalLM, hf: Qwen3MoeForCausalLM, is_dist: bool, stage: PipelineStageInfo):
+def check_lm_model_grad(my: Qwen3MoEForCausalLM, hf: Qwen3MoeForCausalLM, stage: PipelineStageInfo):
     if stage.is_current_stage_last:
-        check_lm_head_grad(my.lm_head, hf.lm_head, is_dist=is_dist)
+        check_lm_head_grad(my.lm_head, hf.lm_head)
 
-    check_model_grad(my.model, hf.model, is_dist=is_dist, stage=stage)
+    check_model_grad(my.model, hf.model, stage=stage)

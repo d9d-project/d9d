@@ -1,11 +1,11 @@
 import tempfile
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 from typing import cast
 
 import pytest
 import torch
-from d9d.core.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
+from d9d.core.dist_context import REGULAR_DOMAIN, DeviceMeshParameters, DistributedContext
 from d9d.core.dist_ops import all_gather_object
 from torch.distributed import GroupMember, destroy_process_group
 
@@ -59,6 +59,18 @@ def dist_ctx_pp4_dpr2():
         data_parallel_shard=1,
         data_parallel_replicate=2
     ).build()
+
+
+@pytest.fixture(scope="session")
+def dist_ctx_factory() -> Callable[[DeviceMeshParameters], DistributedContext]:
+    cache: dict[DeviceMeshParameters, DistributedContext] = {}
+
+    def _get_context(params: DeviceMeshParameters) -> DistributedContext:
+        if params not in cache:
+            cache[params] = params.build()
+        return cache[params]
+
+    return _get_context
 
 
 @pytest.fixture(scope="session")
