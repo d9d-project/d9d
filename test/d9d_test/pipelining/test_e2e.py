@@ -1,7 +1,7 @@
 import pytest
 import torch
 from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
-from d9d.pipelining.api import PipelineShardingSpec, PipelineStageInfo
+from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import (
     AnyPipelineScheduleConfig,
     PipelineSchedule1F1BConfig,
@@ -99,13 +99,12 @@ def test_e2e(
         n_microbatches=n_microbatches,
         schedule_config=schedule_config,
         model_provider=_model_provider,
-        loss_fn=_loss_fn,
-        sharding_spec=PipelineShardingSpec()
+        loss_fn=_loss_fn
     )
 
     not_this_rank_stages = [i for i in range(len(full_stage_modules)) if i not in this_rank_stages]
 
-    schedule_info.schedule.configure_buffers(inputs={"x": x}, kwargs={"y": y})
+    schedule_info.schedule.configure_buffers(inputs={"x": x}, kwargs={"y": y}, sharding_spec=None)
 
     schedule_info.schedule.step(inputs={"x": x}, kwargs={"y": y})
 

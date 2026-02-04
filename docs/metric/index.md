@@ -56,7 +56,7 @@ A Metric in `d9d` follows a specific lifecycle:
 
 Typically, you want to just instantiate and update metrics within your Trainable object. 
 
-See related examples in [Trainable](TODO) documentation.
+See related examples in [Trainer](../0_loop/interfaces.md) documentation.
 
 ### Implementing a Custom Metric
 

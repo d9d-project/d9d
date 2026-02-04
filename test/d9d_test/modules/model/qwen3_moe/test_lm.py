@@ -185,8 +185,7 @@ def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
             local_model=local,
             checkpointing=checkpointing
         ),
-        loss_fn=_loss_fn,
-        sharding_spec=PipelineShardingSpec()
+        loss_fn=_loss_fn
     )
 
     inputs_dist = {
@@ -197,7 +196,7 @@ def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
         "labels": labels_dist
     }
 
-    schedule.schedule.configure_buffers(inputs_dist, kwargs_dist)
+    schedule.schedule.configure_buffers(inputs_dist, kwargs_dist, sharding_spec=PipelineShardingSpec())
 
     schedule.schedule.step(
         inputs_dist,

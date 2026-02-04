@@ -7,7 +7,8 @@ from torch import nn
 from d9d.kernel.cce import linear_cross_entropy
 from d9d.module.base import ModuleLateInit
 
-_IGNORE_INDEX = -100
+LM_IGNORE_INDEX = -100
+"""Index ignored by LM head while calculating logps"""
 
 
 class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
@@ -74,7 +75,7 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
             hidden_states,
             lm_head_weight,
             labels,
-            ignore_index=_IGNORE_INDEX,
+            ignore_index=LM_IGNORE_INDEX,
             reduction="none"
         )
         return losses

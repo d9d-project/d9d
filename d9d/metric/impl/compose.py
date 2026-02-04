@@ -14,6 +14,13 @@ class ComposeMetric(Metric[dict[str, Any]]):
     def update(self, *args: Any, **kwargs: Any):
         raise ValueError("Cannot update ComposeMetric directly - you can only update its children")
 
+    def __getitem__(self, item: str) -> Metric:
+        return self._children[item]
+
+    @property
+    def children(self) -> Mapping[str, Metric]:
+        return self._children
+
     def trigger_sync(self, dist_context: DistributedContext):
         for metric in self._children.values():
             metric.trigger_sync(dist_context)

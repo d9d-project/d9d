@@ -37,6 +37,12 @@ class Qwen3MoEParameters(BaseModel):
         max_position_ids: Maximum sequence length.
         split_vocab_size: A dictionary mapping vocabulary segment names to their sizes.
         split_vocab_order: The sequence in which vocabulary splits are correctly ordered.
+        pipeline_num_virtual_layers_pre: The number of 'virtual' layers representing the
+            computational cost of modules on the *first* stage, before the main
+            layers (e.g., token and positional embeddings).
+        pipeline_num_virtual_layers_post: The number of 'virtual' layers representing the
+            computational cost of modules on the *last* stage, after the main
+            layers (e.g., the final layer normalization and LM head).
     """
 
     layer: Qwen3MoELayerParameters
@@ -47,6 +53,9 @@ class Qwen3MoEParameters(BaseModel):
 
     split_vocab_size: dict[str, int]
     split_vocab_order: list[str]
+
+    pipeline_num_virtual_layers_pre: int = 0
+    pipeline_num_virtual_layers_post: int = 0
 
 
 class Qwen3MoEForCausalLMParameters(BaseModel):

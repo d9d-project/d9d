@@ -163,7 +163,7 @@ my_spec = PipelineShardingSpec(
 
 ### Usage within the Trainer
 
-Pipelining is available in the [Trainer](TODO) framework. When configuring the Trainer, simply provide an `AnyPipelineScheduleConfig` in your training arguments. The Trainer handles the construction of the schedule and the distribution of layers automatically.
+Pipelining is available in the [Trainer](../0_loop/0_index.md) framework. When configuring the Trainer, simply provide an `AnyPipelineScheduleConfig` in your training arguments. The Trainer handles the construction of the schedule and the distribution of layers automatically.
 
 ### Advanced - Manual Usage
 
