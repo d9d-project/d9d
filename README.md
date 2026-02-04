@@ -1,8 +1,28 @@
+---
+title: Home
+---
+
 # The d9d Project
 
 **d9d** is a distributed training framework built on top of PyTorch 2.0. It aims to be hackable, modular, and efficient, designed to scale from single-GPU debugging to massive clusters running 6D-Parallelism.
 
 [LET'S START TRAINING 🚀](https://d9d-project.github.io/d9d/)
+
+## Installation
+
+Just use your favourite package manager:
+```bash
+pip install d9d
+poetry add d9d
+uv add d9d
+```
+
+### Extras
+
+* `d9d[aim]`: [Aim](https://aimstack.io/) experiment tracker integration.
+* `d9d[visualization]`: Plotting libraries required to some advanced visualization functionality.
+* `d9d[moe]`: Efficient Mixture of Experts GPU kernels. You should build and install some dependencies manually before installation: [DeepEP](https://github.com/deepseek-ai/DeepEP), [grouped-gemm](https://github.com/fanshiqing/grouped_gemm/).
+* `d9d[cce]`: Efficient Fused Cross-Entropy kernels. You should build and install some dependencies manually before installation: [Cut Cross Entropy](https://github.com/apple/ml-cross-entropy).
 
 ## Why another framework?
 
