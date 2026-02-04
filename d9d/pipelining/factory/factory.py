@@ -9,10 +9,11 @@ from ..infra.schedule.component.program import (
     build_stage_to_host_rank_topology,
     invert_stage_to_host_rank_topology,
 )
-from ..infra.schedule.component.runtime import PipelineScheduleExecutor
+from ..infra.schedule.component.runtime import OfflinePipelineExecutor, PipelineScheduleExecutor
 from ..infra.stage import PipelineStage
 from .config import (
     AnyPipelineScheduleConfig,
+    PipelineScheduleInferenceConfig,
 )
 from .registry import PIPELINE_PROGRAM_REGISTRY
 
@@ -26,39 +27,31 @@ class PipelineScheduleInfo:
     has_last_stage: bool
 
 
-def build_schedule(
+def _build_schedule_local(
+        schedule_config: AnyPipelineScheduleConfig,
+        model_provider: Callable[[PipelineStageInfo], nn.Module],
+        callback: PipelineLossFn | PipelineResultFn
+) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
+    stage_info = PipelineStageInfo(num_stages=1, current_stage=0)
+
+    model = model_provider(stage_info)
+    has_backward = not isinstance(schedule_config, PipelineScheduleInferenceConfig)
+    scheduler = OfflinePipelineExecutor(model=model, callback=callback, do_backward=has_backward)
+
+    return PipelineScheduleInfo(
+        schedule=scheduler,
+        has_first_stage=True,
+        has_last_stage=True
+    ), [model]
+
+
+def _build_schedule_distributed(
         dist_context: DistributedContext,
         n_microbatches: int,
         schedule_config: AnyPipelineScheduleConfig,
         model_provider: Callable[[PipelineStageInfo], nn.Module],
         callback: PipelineLossFn | PipelineResultFn,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
-    """
-    Constructs the pipeline schedule and instantiates model stages.
-
-    This function coordinates the creation of the distributed pipeline. It:
-    1.  Selects the appropriate `PipelineProgramBuilder` based on the config.
-    2.  Calculates the global stage topology mapping stages to ranks.
-    3.  Instantiates the local model stages for the current rank using `model_provider`.
-    4.  Wraps models in `PipelineStage` containers.
-    5.  Generates the execution program (action list).
-    6.  Builds the runtime executor.
-
-    Args:
-        dist_context: The distributed context.
-        n_microbatches: Number of microbatches per global step.
-        schedule_config: Configuration object determining the schedule strategy.
-        model_provider: A factory function that accepts stage info and returns an `nn.Module`
-            for that specific stage.
-        callback: Callback either computing loss function (if training) or just processing pipeline outputs
-            (if not training).
-
-    Returns:
-        A tuple containing:
-            1.  `PipelineScheduleInfo`: The executable schedule and metadata.
-            2.  `list[nn.Module]`: The local PyTorch modules created for this rank.
-    """
-
     program_builder = PIPELINE_PROGRAM_REGISTRY.program_for(schedule_config)
     mesh = dist_context.mesh_for(REGULAR_DOMAIN)["pp"]
 
@@ -112,3 +105,49 @@ def build_schedule(
         has_first_stage=has_first_stage,
         has_last_stage=has_last_stage
     ), modules
+
+
+def build_schedule(
+        dist_context: DistributedContext,
+        n_microbatches: int,
+        schedule_config: AnyPipelineScheduleConfig,
+        model_provider: Callable[[PipelineStageInfo], nn.Module],
+        callback: PipelineLossFn | PipelineResultFn,
+) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
+    """
+    Constructs the pipeline schedule and instantiates model stages.
+
+    This function coordinates the creation of the pipeline. If the context is
+    distributed, it builds a parallel schedule (`PipelineScheduleExecutor`) by
+    calculating topology and creating stages for the current rank. If the
+    context is local, it builds an offline schedule (`OfflinePipelineExecutor`)
+    for direct execution.
+
+    Args:
+        dist_context: The distributed context.
+        n_microbatches: Number of microbatches per global step.
+        schedule_config: Configuration object determining the schedule strategy.
+        model_provider: A factory function that accepts stage info and returns an `nn.Module`
+            for that specific stage.
+        callback: Callback either computing loss function (if training) or just processing pipeline outputs
+            (if not training).
+
+    Returns:
+        A tuple containing the schedule info (executor and metadata) and a list
+        of local PyTorch modules created for this rank.
+    """
+
+    if dist_context.mesh_params.is_distributed:
+        return _build_schedule_distributed(
+            dist_context=dist_context,
+            n_microbatches=n_microbatches,
+            schedule_config=schedule_config,
+            model_provider=model_provider,
+            callback=callback
+        )
+    else:
+        return _build_schedule_local(
+            schedule_config=schedule_config,
+            model_provider=model_provider,
+            callback=callback
+        )

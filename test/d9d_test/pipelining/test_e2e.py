@@ -11,6 +11,7 @@ from d9d.pipelining.factory import (
     PipelineScheduleZeroBubbleVConfig,
     build_schedule,
 )
+from d9d.pipelining.infra.schedule.component.runtime import OfflinePipelineExecutor
 from d9d.pipelining.infra.stage import PipelineStage
 
 from d9d_test.pipelining.definitions import (
@@ -137,3 +138,55 @@ def test_e2e(
         assert not_this_stage.w2.grad is None
         assert not_this_stage.w3.grad is None
         check_pp_hooks_ran(not_this_hooks, 0)
+
+
+@pytest.mark.local
+@pytest.mark.parametrize("freeze_w1", [True, False])
+def test_e2e_local(dist_ctx_factory, freeze_w1: bool):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters())
+
+    x, y = build_pp_inputs(x_with_grad=False)
+    model = build_pp_model()
+
+    if freeze_w1:
+        model.w1.requires_grad = False
+
+    snapshot = _do_standard_backward([model], x, y)
+
+    def _model_provider(stage_info: PipelineStageInfo):
+        assert stage_info.num_stages == 1
+        assert stage_info.current_stage == 0
+        return model
+
+    def _loss_fn(result: dict[str, torch.Tensor], microbatch_idx: int):
+        assert microbatch_idx == 0
+        return result["x"].sum()
+
+    schedule_config = PipelineScheduleGPipeConfig()
+
+    schedule_info, modules = build_schedule(
+        dist_context=dist_ctx,
+        n_microbatches=4,  # This number is ignored by OfflinePipelineExecutor logic regarding flow
+        schedule_config=schedule_config,
+        model_provider=_model_provider,
+        callback=_loss_fn
+    )
+
+    assert isinstance(schedule_info.schedule, OfflinePipelineExecutor)
+    assert len(modules) == 1
+    assert modules[0] is model
+    assert schedule_info.has_first_stage
+    assert schedule_info.has_last_stage
+
+    # configure_buffers is a no-op for Offline executor, but we call it to ensure API compliance
+    schedule_info.schedule.configure_buffers(inputs={"x": x}, kwargs={"y": y}, sharding_spec=None)
+
+    schedule_info.schedule.step(inputs={"x": x}, kwargs={"y": y})
+
+    if freeze_w1:
+        assert model.w1.grad is None
+    else:
+        assert torch.allclose(model.w1.grad, snapshot[0]["w1"], rtol=1e-3)
+
+    assert torch.allclose(model.w2.grad, snapshot[0]["w2"], rtol=1e-3)
+    assert torch.allclose(model.w3.grad, snapshot[0]["w3"], rtol=1e-3)

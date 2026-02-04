@@ -14,6 +14,7 @@ from .action import (
     ForwardSendAction,
 )
 from .executor import PipelineScheduleExecutor
+from .offline import OfflinePipelineExecutor
 
 __all__ = [
     "ActionBase",
@@ -25,5 +26,6 @@ __all__ = [
     "ForwardComputeAction",
     "ForwardReceiveAction",
     "ForwardSendAction",
+    "OfflinePipelineExecutor",
     "PipelineScheduleExecutor"
 ]
