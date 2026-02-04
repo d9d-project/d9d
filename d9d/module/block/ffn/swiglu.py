@@ -1,10 +1,8 @@
 import torch
-from liger_kernel.ops.swiglu import LigerSiLUMulFunction
 from torch import nn
 
+from d9d.kernel.swiglu import silu_mul
 from d9d.module.base import ModuleLateInit
-
-# TODO: migrate from liger to custom silu mul
 
 
 class SwiGLU(nn.Module, ModuleLateInit):
@@ -48,7 +46,7 @@ class SwiGLU(nn.Module, ModuleLateInit):
         """
 
         return self.down_proj(
-            LigerSiLUMulFunction.apply(
+            silu_mul(
                 self.gate_proj(x),
                 self.up_proj(x)
             )

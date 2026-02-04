@@ -1,12 +1,10 @@
 import torch
-from liger_kernel.ops.swiglu import LigerSiLUMulFunction
 from torch import nn
 
+from d9d.kernel.swiglu import silu_mul
 from d9d.module.base import ModuleLateInit
 
 from .grouped_linear import GroupedLinear
-
-# TODO: migrate fused SiLU from liger kernel to custom impl (or use those written by SGL team)
 
 
 class GroupedSwiGLU(nn.Module, ModuleLateInit):
@@ -66,7 +64,7 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
 
         probs = permuted_probs[:, None].to(permuted_x.dtype)
         values = self.down_proj(
-            LigerSiLUMulFunction.apply(
+            silu_mul(
                 self.gate_proj(permuted_x, tokens_per_expert),
                 self.up_proj(permuted_x, tokens_per_expert)
             ),

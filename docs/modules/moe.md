@@ -34,6 +34,12 @@ It computes routing probabilities in FP32 to ensure numeric stability.
 
 Instead of looping over experts, it uses [Grouped GEMM](https://github.com/fanshiqing/grouped_gemm/) kernels to execute all experts in parallel, regardless of how many tokens each expert received.
 
+Uses efficient fused SiLU-Mul kernel.
+
+#### Kernel Benchmarks (BF16, H100)
+
+![](./benchmark/silu_mul_bf16.png)
+
 ### Shared Experts
 
 Currently not supported, feel free to contribute :)
