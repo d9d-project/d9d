@@ -62,10 +62,13 @@ class GlobalGradContext:
     @contextmanager
     def with_directions(self, *directions: GradDirection):
         """
-        Sets the enabled gradient directions, overriding the current state.
+        Context manager that sets the enabled gradient directions.
+
+        This overrides the current state for the duration of the context
+        and restores the previous state afterwards.
 
         Args:
-            *directions: Variable number of GradDirection enums to enable.
+            *directions: The gradient directions to enable.
         """
         prev_directions = self._enabled_directions
         self._enabled_directions = set(directions)

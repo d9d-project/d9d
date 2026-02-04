@@ -19,7 +19,7 @@ d9d enforces a **DTensor-first** philosophy. We mandate that every trainable par
 This constraint simplifies the system architecture significantly:
 
 *   **Universal Checkpointing**: The checkpointing engine does not need to know about specific parallel strategies (like "This is DP" or "This is TP"). It simply inspects the `DTensor.placements` attribute to automatically determine how to gather, deduplicate, and save tensors.
-*   **Native Synchronization**: Gradient synchronization for replicated parameters is handled entirely by the [d9d internals](../internals/grad_sync.md).
+*   **Native Synchronization**: Gradient synchronization for replicated parameters is handled entirely by the [d9d internals](../internals/grad_sync.md), that now knows which tensor dimensions are Replicated.
 
 ### Composition over Monoliths
 
@@ -55,11 +55,22 @@ Mixture of Experts (MoE) requires a unique parallel strategy where:
 `parallelize_fsdp` provides a thin wrapper around PyTorch's native `fully_shard`.
 
 **Difference from standard FSDP:**
-Standard FSDP averages gradients across the mesh (Sum / WorldSize) by default. d9d's wrapper forces the gradients being *summed* rather than *averaged*. This is required for our gradient accumulation logic that is handled externally.
+
+* Standard FSDP averages gradients across the mesh (Sum / WorldSize) by default. d9d's wrapper forces the gradients being *summed* rather than *averaged*. This is required for our gradient accumulation logic that is handled externally.
+* `parallelize_fsdp` strictly requires a 1D DeviceMesh. To use it in multi-dimensional meshes (e.g., combining Replication and Sharding), use `parallelize_hsdp` or apply `parallelize_replicate` to the other dimensions manually first.
+
+### Hybrid Sharded Data Parallel (HSDP)
+
+`parallelize_hsdp` is a high-level composite strategy for mixing Full Sharding with Replicate Parallel.
+
+`parallelize_hsdp` accepts a multi-dimensional mesh and a target `shard_dim`. It identifies all dimensions *other than* `shard_dim` as **Replication Dimensions**. 
+It applies `parallelize_replicate` to the replication dimensions.
+It applies `parallelize_fsdp` to the specific sharding dimension.
+
 
 ## Usage Examples
 
-### Applying Replicate Parallelism
+### Replicate Parallelism
 
 ```python
 import torch
@@ -104,7 +115,7 @@ parallelize_expert_parallel(
 )
 ```
 
-### Applying FSDP/HSDP
+### Applying FSDP
 
 ```python
 import torch
@@ -123,17 +134,32 @@ dense_mesh = ctx.mesh_for(DENSE_DOMAIN)
 
 # 4. Parallelize
 
-# If using replicate context parallel - you need to manually replicate along its dimension
-# since PyTorch FSDP only supports 2D DeviceMesh, but can be composed with other parallelisms
-parallelize_replicate(
-    model,
-    mesh=dense_mesh['cp_replicate']
-)
-
-# Like regular fully_shard(...), first dimension is for replication, second dimension is for sharding
 parallelize_fsdp(
     model, 
-    mesh=dense_mesh[['dp_replicate', 'dp_cp_shard']]
+    mesh=dense_mesh['dp_cp_shard']
+)
+```
+
+### Applying HSDP
+```python
+import torch
+from d9d.core.dist_context import DistributedContext, DENSE_DOMAIN
+from d9d.module.parallelism.api import parallelize_hsdp
+
+# 1. Create a Distributed Context
+ctx: DistributedContext = ...
+
+# 2. Get Mesh
+dense_mesh = ctx.mesh_for(DENSE_DOMAIN)  # pp x dp_replicate x dp_cp_shard x cp_replicate x tp
+
+# 3. Define Model
+model = MyCustomLayer(...)
+
+# 4. Parallelize
+parallelize_hsdp(
+    model,
+    mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"],
+    shard_dim="dp_cp_shard"
 )
 ```
 
