@@ -37,7 +37,7 @@ class DataLoaderKwargs(TypedDict, total=False):
 
 
 def _move_to_device(data: PyTree, device: torch.types.Device) -> PyTree:
-    return pytree.tree_map(lambda x: x.to(device), data)
+    return pytree.tree_map(lambda x: x.to(device) if isinstance(x, torch.Tensor) else x, data)
 
 
 class IteratorBatchGroup(Iterator):

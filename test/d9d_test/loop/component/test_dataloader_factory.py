@@ -47,7 +47,10 @@ def simple_collate(batch):
 )
 @pytest.mark.local
 def test_iterator_batch_group(num_items, batch_group_size, expected_groups):
-    data = [torch.tensor(i, device="cpu") for i in range(num_items)]
+    data = [
+        {"val": torch.tensor(i, device="cpu"), "meta": f"id_{i}"}
+        for i in range(num_items)
+    ]
     base_iter = iter(data)
     device = torch.tensor(0).to("cuda").device
 
@@ -59,9 +62,14 @@ def test_iterator_batch_group(num_items, batch_group_size, expected_groups):
     for group_iter in grouper:
         group_size = 0
         for item in group_iter:
-            assert item.device == device
+            # Check non-tensor data passed through untouched (no crash)
+            assert item["meta"] == f"id_{total_counter}"
 
-            item_cpu = item.item()
+            # Check tensor data was moved to device
+            tensor_part = item["val"]
+            assert tensor_part.device == device
+
+            item_cpu = tensor_part.item()
             assert item_cpu == total_counter
             total_counter += 1
 
