@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.2.1 (2026-02-05)
+
+### Bug Fixes
+
+- Allow empty gradients in GradientManager
+  ([`7a63fb6`](https://github.com/d9d-project/d9d/commit/7a63fb615a539f2ad3135d6a307be35aadd2c222))
+
+
 ## v0.2.0 (2026-02-04)
 
 ### Bug Fixes
