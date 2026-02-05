@@ -47,10 +47,12 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
     Algorithm:
 
     1. Select a range of indices (size `buffer_size`).
-    2. Sort these indices based on `base_dataset.sort_key()`.
-    3. Break the sorted list into packs of size `pack_size`.
-    4. Shuffle the order of these packs.
-    5. Flatten the list and serve items.
+    2. Generate sort keys: (base_dataset.sort_key(), random_tie_breaker).
+    3. Sort indices by this tuple.
+    4. Group sorted list into packs of size `pack_size`.
+    5. Shuffle the order of these packs (inter-pack shuffle).
+    6. Shuffle the items within these packs (intra-pack shuffle).
+    7. Flatten and serve.
     """
 
     def __init__(
@@ -61,16 +63,12 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
             init_seed: int | None = None
     ):
         """
-        Constructs a BufferSortedDataset object.
-
         Args:
-            base_dataset: The underlying dataset implementing the `DatasetImplementingSortKeyProtocol` protocol.
+            base_dataset: The underlying dataset.
             buffer_size: The number of items to load into the buffer for sorting.
-            pack_size: The size of local groups (batches/micro-batches) that remain
-                contiguous after sorting, but are shuffled relative to other packs.
-            init_seed: Seed for the random number generator used for shuffling packs.
+            pack_size: The size of local groups (batches/micro-batches).
+            init_seed: Seed for the random number generator.
         """
-
         self._base_dataset = base_dataset
         self._buffer_size = buffer_size
         self._pack_size = pack_size
@@ -85,44 +83,39 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
         select_end = min(select_end, len(self._base_dataset))
 
         base_idx = list(range(select_start, select_end))
-        base_sort_keys = [self._base_dataset.sort_key(idx) for idx in range(select_start, select_end)]
+
+        sort_keys = [
+            (self._base_dataset.sort_key(idx), self._rng.random())  # use random tiebreaker
+            for idx in base_idx
+        ]
 
         local_idx = list(range(len(base_idx)))
-        local_idx = sorted(local_idx, key=lambda local_id: base_sort_keys[local_id])
+        local_idx.sort(key=lambda i: sort_keys[i])
 
-        local_idx_batch = [
+        local_idx_packs = [
             local_idx[i: i + self._pack_size]
             for i in range(0, len(local_idx), self._pack_size)
         ]
-        self._rng.shuffle(local_idx_batch)
-        local_idx = [y for x in local_idx_batch for y in x]
 
-        self._buffer_indices = [base_idx[local_id] for local_id in local_idx]
+        self._rng.shuffle(local_idx_packs)
 
+        for pack in local_idx_packs:
+            self._rng.shuffle(pack)
+
+        flat_local_idx = [y for x in local_idx_packs for y in x]
+
+        self._buffer_indices = [base_idx[local_id] for local_id in flat_local_idx]
         self._buffer_idx = buffer_idx
 
     def __getitem__(self, index: int) -> _T_co:
-        """
-        Retrieves an item from the locally sorted/shuffled buffer.
-
-        Args:
-            index: The global index.
-
-        Returns:
-            The dataset item.
-        """
-
         needs_buffer_idx = index // self._buffer_size
         if self._buffer_idx != needs_buffer_idx:
             self._update_buffer_idx(needs_buffer_idx)
 
         take_id = self._buffer_indices[index % self._buffer_size]
-
         return self._base_dataset[take_id]
 
     def __len__(self) -> int:
-        """Returns the length of the base dataset."""
-
         return len(self._base_dataset)
 
     def state_dict(self) -> dict[str, Any]:

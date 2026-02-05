@@ -66,18 +66,30 @@ def test_buffer_sorted_dataset_coverage_and_len(dataset_len: int, buffer_size: i
 
 @pytest.mark.local
 def test_buffer_sorted_dataset_sorting_logic():
+    # We want to verify that items are grouped by magnitude, even if shuffled locally
     raw_data = [100, 10, 200, 20]
     base_dataset = MockSortableDataset(raw_data)
 
-    # Pack size 2 divides buffer exactly into 2 packs
+    # Buffer=4 covers all data. Pack=2 creates two groups:
+    # Sorted Items: [10, 20, 100, 200]
+    # Expected Packs: {10, 20} and {100, 200}
     dataset = BufferSortedDataset(base_dataset, buffer_size=4, pack_size=2, init_seed=42)
 
     outputs = [dataset[i] for i in range(4)]
 
-    valid_permutation_1 = [10, 20, 100, 200]
-    valid_permutation_2 = [100, 200, 10, 20]
+    # Because of Intra-pack shuffle, we can't compare lists directly.
+    # We slice the output into pack-sized chunks and convert to sets.
+    chunk_1 = set(outputs[0:2])
+    chunk_2 = set(outputs[2:4])
 
-    assert outputs in (valid_permutation_1, valid_permutation_2)
+    expected_pack_small = {10, 20}
+    expected_pack_large = {100, 200}
+
+    # Because of Inter-pack shuffle, either pack could come first.
+    # We verify that we have exactly these two sets.
+    assert chunk_1 in (expected_pack_small, expected_pack_large)
+    assert chunk_2 in (expected_pack_small, expected_pack_large)
+    assert chunk_1 != chunk_2
 
 
 @pytest.mark.local

@@ -25,7 +25,7 @@ d9d provides explicit composable wrappers rather than relying on implicit "magic
 
 In NLP and Sequence processing, batches often contain items of varying lengths. Standard random sampling forces the batch to be padded to the length of the longest sequence, wasting computational resources on padding tokens.
 
-`BufferSortedDataset` implements a "Smart Bucketing" strategy that ensures that items within a specific micro-batch have similar lengths (minimizing padding), while the order of micro-batches remains random enough to preserve training stability.
+`BufferSortedDataset` implements a "Smart Bucketing" strategy to balance efficiency and statistical variance. It ensures that items within a specific micro-batch have similar lengths (minimizing padding), while preventing the data stream from becoming strictly deterministic or sorted.
 
 #### Usage Example
 
@@ -50,7 +50,7 @@ class MyTextDataset(Dataset):
     def sort_key(self, index):
         return len(self.data[index])
 
-# Create Base Dataset
+# Create Base Dataset (Ideally globally shuffled beforehand)
 raw_data = ["short", "very very very long phrase", "tiny", "medium size"] * 100
 base_ds = MyTextDataset(raw_data)
 
