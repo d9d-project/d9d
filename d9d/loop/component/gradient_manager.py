@@ -78,8 +78,12 @@ class GradientManager:
         self._grads_to_scale = None
 
     def _scale_grads(self):
+        if self._grads_to_scale is None:
+            raise ValueError("You should bind the manager first.")
+
         scale_factor = 1.0 / self._loss.accumulated_weight
-        torch._foreach_mul_(self._grads_to_scale, scale_factor)
+        if len(self._grads_to_scale) > 0:
+            torch._foreach_mul_(self._grads_to_scale, scale_factor)
 
     @contextmanager
     def install(self):
