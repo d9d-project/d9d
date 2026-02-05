@@ -129,7 +129,8 @@ class DistributedContext:
     def wait_world(self):
         """Blocks process execution until all ranks reach this point."""
 
-        torch.distributed.barrier(device_ids=[torch.cuda.current_device()])
+        if self._params.is_distributed:
+            torch.distributed.barrier(device_ids=[torch.cuda.current_device()])
         torch.cuda.synchronize()
 
     def set_timeout(self, timeout_seconds: float):
@@ -139,6 +140,9 @@ class DistributedContext:
         Args:
             timeout_seconds: New timeout duration in seconds.
         """
+
+        if not self._params.is_distributed:  # does nothing for local setups
+            return
 
         self.logger.info(f"Setting global timeout to {timeout_seconds} seconds")
         self.wait_world()

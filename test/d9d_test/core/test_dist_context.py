@@ -137,6 +137,17 @@ def test_sync_primitives(dist_ctx_factory):
     ctx.wait_world()
 
 
+@pytest.mark.local
+def test_sync_primitives_offline(dist_ctx_factory):
+    ctx = dist_ctx_factory(DeviceMeshParameters())
+
+    # both wait and timeout shall not crash
+    ctx.wait_world()
+
+    ctx.set_timeout(10.0)
+    ctx.wait_world()
+
+
 @pytest.mark.distributed
 def test_rank_assertions(dist_ctx_factory, shared_tmp_dir: Path):
     ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_shard=8))

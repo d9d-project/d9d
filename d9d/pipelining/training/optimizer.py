@@ -14,21 +14,21 @@ class PipelinedOptimizer(OptimizerProtocol):
     This class aggregates them into a single interface.
     """
 
-    def __init__(self, mesh_pp: DeviceMesh, optimizers: list[OptimizerProtocol]):
+    def __init__(self, mesh_pp: DeviceMesh | None, optimizers: list[OptimizerProtocol]):
         super().__init__()
 
-        self._mesh_pp = mesh_pp
+        self._pp_rank = mesh_pp.get_local_rank() if mesh_pp is not None else 0
         self._optimizers = optimizers
 
     def state_dict(self) -> dict[str, Any]:
-        pp_rank = self._mesh_pp.get_local_rank()
+        pp_rank = self._pp_rank
         return {
             f"pp_{pp_rank}_stage_{i}": optimizer.state_dict()
             for i, optimizer in enumerate(self._optimizers)
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        pp_rank = self._mesh_pp.get_local_rank()
+        pp_rank = self._pp_rank
         for i, optimizer in enumerate(self._optimizers):
             optimizer.load_state_dict(state_dict[f"pp_{pp_rank}_stage_{i}"])
 

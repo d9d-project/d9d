@@ -127,8 +127,9 @@ class GradientManager:
 
         self._grad_sync.wait()
 
-        self._loss.trigger_sync(self._dist_context)
-        self._loss.wait_sync(self._dist_context)
+        if self._dist_context.mesh_params.is_distributed:
+            self._loss.trigger_sync(self._dist_context)
+            self._loss.wait_sync(self._dist_context)
         self._scale_grads()
 
     def compute_global_loss(self) -> torch.Tensor:

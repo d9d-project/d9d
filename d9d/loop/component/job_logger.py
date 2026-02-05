@@ -104,7 +104,8 @@ class JobLogger(Stateful):
         if not self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
             return
 
-        self._metrics.trigger_sync(self._dist_context)
+        if self._dist_context.mesh_params.is_distributed:
+            self._metrics.trigger_sync(self._dist_context)
 
     def log(self, run: BaseTrackerRun, loss_value: torch.Tensor):
         """
@@ -126,7 +127,8 @@ class JobLogger(Stateful):
         if not self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
             return
 
-        self._metrics.wait_sync(self._dist_context)
+        if self._dist_context.mesh_params.is_distributed:
+            self._metrics.wait_sync(self._dist_context)
 
         results_tree = self._metrics.compute()
         results_tree = pytree.tree_map(lambda x: x.item(), results_tree)

@@ -78,10 +78,10 @@ def _group_params_for_buckets(
             if not param.requires_grad:
                 continue
 
-            if not isinstance(param.data, DTensor):
-                raise TypeError("All params should be DTensors in a distributed setup")
-
-            reduce_mesh = _find_reduce_mesh(param.data)
+            if isinstance(param.data, DTensor):
+                reduce_mesh = _find_reduce_mesh(param.data)
+            else:
+                reduce_mesh = None
 
             group = _ParameterGroupMarker(
                 group_i=param_group_i,

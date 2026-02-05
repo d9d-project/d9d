@@ -78,11 +78,16 @@ class GradientClipper:
         if self._parameter_groups is None:
             raise ValueError("Parameter groups are not configured")
 
+        if self._dist_context.mesh_params.is_distributed:
+            pp_mesh = self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"]
+        else:
+            pp_mesh = None
+
         grad_norm = clip_grad_norm_distributed_(
             parameter_groups=self._parameter_groups,
             max_norm=self._config.max_norm,
             norm_type=2.0,
-            pp_mesh=self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"],
+            pp_mesh=pp_mesh,
         )
 
         if should_log:

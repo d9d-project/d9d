@@ -47,6 +47,12 @@ class TrackedModules(Stateful):
             stateful_predicate: StatefulPredicate
     ):
         """Constructs a TrackedModules object."""
+
+        if dist_context.mesh_params.is_distributed:
+            self._pp_rank = dist_context.mesh_for(REGULAR_DOMAIN)["pp"].get_local_rank()
+        else:
+            self._pp_rank = 0
+
         self._dist_context = dist_context
         self._modules = modules
         self._stateful_predicate = stateful_predicate
@@ -82,9 +88,8 @@ class TrackedModules(Stateful):
             A dictionary containing the states of all managed modules.
         """
 
-        pp_rank = self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"].get_local_rank()
         ret = {
-            f"pp_{pp_rank}_stage_{i}": self._state_dict_stage(module)
+            f"pp_{self._pp_rank}_stage_{i}": self._state_dict_stage(module)
             for i, module in enumerate(self._modules)
         }
         return ret
@@ -114,9 +119,8 @@ class TrackedModules(Stateful):
                 based on the allow-list predicate.
         """
 
-        pp_rank = self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"].get_local_rank()
         for i, module in enumerate(self._modules):
-            self._load_state_dict_stage(module, state_dict[f"pp_{pp_rank}_stage_{i}"])
+            self._load_state_dict_stage(module, state_dict[f"pp_{self._pp_rank}_stage_{i}"])
 
 
 class ModelStageFactory:

@@ -37,7 +37,10 @@ class BatchMaths:
         self._config_pipelining = config_pipelining
 
         global_batch = self._config_batching.global_batch_size
-        dp_size = self._dist_context.mesh_for(BATCH_DOMAIN)["dp"].size()
+        if self._dist_context.mesh_params.is_distributed:
+            dp_size = self._dist_context.mesh_for(BATCH_DOMAIN)["dp"].size()
+        else:
+            dp_size = 1
         microbatch_size = self._config_batching.microbatch_size
 
         global_microbatch = dp_size * microbatch_size

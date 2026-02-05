@@ -207,6 +207,11 @@ class DataLoaderFactory:
             batch_maths=self._batch_maths
         ))
 
+        if self._dist_context.mesh_params.is_distributed:
+            dp_rank = self._dist_context.mesh_for(BATCH_DOMAIN)["dp"].get_local_rank()
+        else:
+            dp_rank = 0
+
         return StatefulDataLoaderDataParallelAware(
             result.dataset,
             collate_fn=result.collator,
@@ -215,7 +220,7 @@ class DataLoaderFactory:
             persistent_workers=self._config_data_loading.persistent_workers,
             pin_memory=self._config_data_loading.pin_memory,
             batch_size=batch_size,
-            dp_rank=self._dist_context.mesh_for(BATCH_DOMAIN)["dp"].size(),
+            dp_rank=dp_rank,
             device="cuda",
             drop_last=drop_last
         )

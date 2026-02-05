@@ -185,11 +185,18 @@ def shard_dataset_data_parallel(
         A dataset instance representing the local shard.
     """
 
-    dp_mesh = dist_context.mesh_for(BATCH_DOMAIN)["dp"]
+    if dist_context.mesh_params.is_distributed:
+        dp_mesh = dist_context.mesh_for(BATCH_DOMAIN)["dp"]
+        n_shards = dp_mesh.size()
+        current_shard = dp_mesh.get_local_rank()
+    else:
+        n_shards = 1
+        current_shard = 0
+
     return ShardedDataset(
         dataset=dataset,
-        total_shards=dp_mesh.size(),
-        current_shard=dp_mesh.get_local_rank(),
+        total_shards=n_shards,
+        current_shard=current_shard,
         indexing_mode=indexing_mode,
         pad_to_equal_size_across_shards=pad_to_equal_size_across_shards
     )

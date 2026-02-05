@@ -116,3 +116,44 @@ def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype):
     for param in params:
         assert param._post_accumulate_grad_hooks is None or len(param._post_accumulate_grad_hooks) == 0
         assert param.grad is None
+
+
+@pytest.mark.local
+def test_e2e_local():
+    params = [nn.Parameter(torch.randn(10, 10)) for _ in range(5)]
+    for p in params:
+        p.grad_dtype = torch.float32
+
+    sync = GradientSynchronizer(
+        param_groups=[params],
+        bucket_size_mb=1,
+        require_accumulations=2
+    )
+
+    sync.bind()
+
+    # Iteration 1
+    loss = sum(p.sum() for p in params)
+    loss.backward()
+
+    for p in params:
+        assert p.grad is not None
+        assert torch.is_tensor(p.grad)
+
+    # Wait should be a no-op for local buckets
+    sync.wait()
+
+    # Iteration 2 (Accumulation)
+    loss = sum(p.sum() for p in params)
+    loss.backward()
+
+    # Gradients should be accumulated (x2)
+    sync.wait()
+
+    # 4. Zero Grad
+    sync.zero_grad()
+    for p in params:
+        assert p.grad is None
+
+    # 5. Cleanup
+    sync.unbind()

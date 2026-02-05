@@ -77,12 +77,18 @@ class OptimizerFactory:
                 )
             )
             lr_schedulers.append(scheduler)
+
+        if self._dist_context.mesh_params.is_distributed:
+            mesh_pp = self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"]
+        else:
+            mesh_pp = None
+
         pipe_optimizer = PipelinedOptimizer(
-            mesh_pp=self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"],
+            mesh_pp=mesh_pp,
             optimizers=optimizers
         )
         pipe_scheduler = PipelinedLRScheduler(
-            mesh_pp=self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"],
+            mesh_pp=mesh_pp,
             schedulers=lr_schedulers
         )
         return pipe_optimizer, pipe_scheduler

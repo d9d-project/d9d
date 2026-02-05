@@ -1,7 +1,8 @@
-from typing import Any
+from typing import Any, cast
 
 import pytest
-from d9d.dataset import ShardedDataset, ShardIndexingMode
+from d9d.core.dist_context import DeviceMeshParameters
+from d9d.dataset import ShardedDataset, ShardIndexingMode, shard_dataset_data_parallel
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.utils.data import Dataset
 
@@ -120,3 +121,51 @@ def test_config_validation():
     with pytest.raises(ValueError, match="Dataset should implement __len__"):
         ShardedDataset(UnsizedDataset(), 2, 0, ShardIndexingMode.sequential,
                        pad_to_equal_size_across_shards=False)
+
+
+@pytest.mark.local
+def test_shard_dataset_factory_non_distributed(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters())
+
+    dataset = SimpleDataset(100)
+    sharded = shard_dataset_data_parallel(
+        dataset,
+        dist_ctx,
+        indexing_mode=ShardIndexingMode.chunked,
+        pad_to_equal_size_across_shards=True
+    )
+
+    assert isinstance(sharded, ShardedDataset)
+    assert sharded._total_shards == 1
+    assert sharded._current_shard == 0
+    assert len(sharded) == 100
+    assert sharded[99] == 99
+
+
+@pytest.mark.distributed
+def test_shard_dataset_factory_distributed(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dataset = SimpleDataset(16)  # 16 items, 8 shards -> 2 items/shard
+
+    sharded = shard_dataset_data_parallel(
+        dataset,
+        dist_ctx,
+        indexing_mode=ShardIndexingMode.sequential,
+        pad_to_equal_size_across_shards=False
+    )
+
+    sharded = cast(ShardedDataset, sharded)
+
+    assert sharded._total_shards == 8
+
+    dp_mesh = dist_ctx.mesh_for("batch")["dp"]
+    expected_rank = dp_mesh.get_local_rank()
+
+    assert sharded._current_shard == expected_rank
+
+    local_items = [sharded[i] for i in range(len(sharded))]
+
+    assert len(local_items) == 2
+
+    assert local_items[0] == expected_rank
+    assert local_items[1] == expected_rank + 8
