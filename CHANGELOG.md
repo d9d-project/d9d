@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v0.2.3 (2026-02-05)
+
+### Bug Fixes
+
+- Allow running the train loop in local mode (no NCCL init at all)
+  ([`b0c0a0e`](https://github.com/d9d-project/d9d/commit/b0c0a0eab97470791551fca169dcb485ccc12681))
+
+- BufferedSortedDataset now uses random value as a sorting tie-breaker and sorts data within a pack
+  ([`ed1f439`](https://github.com/d9d-project/d9d/commit/ed1f439eb07b19a9b08d745e620cff02a8670d28))
+
+- Non-tensor objects now process correctly using IteratorBatchGroup
+  ([`58ec446`](https://github.com/d9d-project/d9d/commit/58ec446f515d91e4fd7376cdc76399903bc4efc4))
+
+
 ## v0.2.2 (2026-02-05)
 
 ### Bug Fixes
