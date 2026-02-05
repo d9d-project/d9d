@@ -81,7 +81,7 @@ class StochasticAdamW(Optimizer):
             raise ValueError(f"Invalid beta parameter at index 0: {betas[0]}")
         if not 0.0 <= betas[1] < 1.0:
             raise ValueError(f"Invalid beta parameter at index 1: {betas[1]}")
-        if weight_decay <= 0:
+        if weight_decay < 0:
             raise ValueError(f"Invalid weight_decay value: {weight_decay}")
 
         if generator is None:
