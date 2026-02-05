@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.2.2 (2026-02-05)
+
+### Bug Fixes
+
+- Allow zero weight_decay for Stochastic AdamW
+  ([`38587a9`](https://github.com/d9d-project/d9d/commit/38587a9eb1d1b9048d11b0c22ee4011b96cabc3a))
+
+
 ## v0.2.1 (2026-02-05)
 
 ### Bug Fixes

@@ -1,6 +1,6 @@
 [project]
 name = "d9d"
-version = "0.2.1"
+version = "0.2.2"
 description = "d9d - d[istribute]d - distributed training framework based on PyTorch that tries to be efficient yet hackable"
 authors = [
     {name = "Maksim Afanasyev", email = "mr.applexz@gmail.com"}
