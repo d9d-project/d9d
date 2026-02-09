@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.2.4 (2026-02-09)
+
+### Bug Fixes
+
+- Use init timeout for loop dependency injection
+  ([`ca0e322`](https://github.com/d9d-project/d9d/commit/ca0e322347a1b2083ad9ca11a98442b456139037))
+
+
 ## v0.2.3 (2026-02-05)
 
 ### Bug Fixes
