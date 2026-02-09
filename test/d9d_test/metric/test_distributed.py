@@ -8,7 +8,7 @@ import torch
 from d9d.core.dist_context import FLAT_DOMAIN, DeviceMeshParameters
 from d9d.core.types import TensorTree
 from d9d.metric import Metric
-from d9d.metric.impl import ComposeMetric, WeightedMeanMetric
+from d9d.metric.impl import ComposeMetric, SumMetric, WeightedMeanMetric
 from torch.testing import assert_close
 from torch.utils._pytree import tree_map  # noqa: PLC2701
 
@@ -129,6 +129,34 @@ class MetricCase:
                         ParamsPerRank(args=(torch.tensor(6.0), torch.tensor(1.0))),
                         ParamsPerRank(args=(torch.tensor(7.0), torch.tensor(1.0))),
                     ]
+                )
+            ]
+        ),
+        # Case: SumMetric Simple Distributed Sum
+        # Each rank adds 10. Total 8 ranks. Expected sum = 80.
+        MetricCase(
+            factory_fn=SumMetric,
+            initial_expect=torch.tensor(0.0),
+            steps=[
+                MetricStep(
+                    expect=torch.tensor(80.0),
+                    params=[ParamsPerRank(args=(torch.tensor(10.0),)) for _ in range(8)]
+                ),
+                MetricStep(
+                    expect=torch.tensor(160.0),
+                    params=[ParamsPerRank(args=(torch.tensor(10.0),)) for _ in range(8)]
+                )
+            ]
+        ),
+        # Case: SumMetric Rank-dependent
+        # Rank i adds i. Sum 0..7 = 28.
+        MetricCase(
+            factory_fn=SumMetric,
+            initial_expect=torch.tensor(0.0),
+            steps=[
+                MetricStep(
+                    expect=torch.tensor(28.0),
+                    params=[ParamsPerRank(args=(torch.tensor(float(i)),)) for i in range(8)]
                 )
             ]
         )

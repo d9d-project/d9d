@@ -7,7 +7,7 @@ import pytest
 import torch
 from d9d.core.types import TensorTree
 from d9d.metric import Metric
-from d9d.metric.impl import ComposeMetric, WeightedMeanMetric
+from d9d.metric.impl import ComposeMetric, SumMetric, WeightedMeanMetric
 from torch.testing import assert_close
 from torch.utils._pytree import tree_map  # noqa: PLC2701
 
@@ -114,6 +114,43 @@ class MetricCase:
                 ),
             ]
         ),
+        # Case: SumMetric Basic
+        MetricCase(
+            factory_fn=SumMetric,
+            initial_expect=torch.tensor(0.0),
+            steps=[
+                MetricStep(
+                    # Simple accumulation
+                    args=(torch.tensor([1.0]),),
+                    expect=torch.tensor(1.0)
+                ),
+                MetricStep(
+                    # Accumulate a vector (should sum components)
+                    args=(torch.tensor([2.0, 3.0]),),
+                    expect=torch.tensor(6.0)  # 1 + 2 + 3
+                ),
+                MetricStep(
+                    # Accumulate a matrix
+                    args=(torch.tensor([[1.0, 1.0], [2.0, 2.0]]),),
+                    expect=torch.tensor(12.0)  # 6 + (1+1+2+2)
+                )
+            ]
+        ),
+        # Case: SumMetric Empty
+        MetricCase(
+            factory_fn=SumMetric,
+            initial_expect=torch.tensor(0.0),
+            steps=[
+                MetricStep(
+                    args=(torch.tensor([]),),
+                    expect=torch.tensor(0.0)
+                ),
+                MetricStep(
+                    args=(torch.tensor([10.5]),),
+                    expect=torch.tensor(10.5)
+                )
+            ]
+        )
     ]
 )
 @pytest.mark.local
