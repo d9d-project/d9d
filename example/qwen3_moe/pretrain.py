@@ -19,6 +19,8 @@ from d9d.loop.control import (
     BuildForwardInputsResult,
     ComputeLossContext,
     ComputeLossResult,
+    CreateMetricsContext,
+    CreateMetricsResult,
     DatasetProvider,
     InitializeDatasetContext,
     InitializeDatasetResult,
@@ -29,8 +31,10 @@ from d9d.loop.control import (
     PrepareExportModelStageContext,
     PrepareExportModelStageResult,
     TrainTask,
+    UpdateMetricsContext,
 )
 from d9d.loop.run import TrainingConfigurator
+from d9d.metric.impl import SumMetric
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
 from d9d.module.block.head import LM_IGNORE_INDEX
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
@@ -251,6 +255,14 @@ class SFTTask(TrainTask[dict[str, torch.Tensor]]):
     def dump_hparams(self) -> ScalarTree:
         return super().dump_hparams()
 
+    def create_metrics(self, ctx: CreateMetricsContext) -> CreateMetricsResult:
+        return CreateMetricsResult(metrics={
+            "num_tokens": SumMetric()
+        })
+
+    def update_metrics(self, ctx: UpdateMetricsContext):
+        ctx.metrics["num_tokens"].update(ctx.state["num_tokens"])
+
     def compute_loss(self, ctx: ComputeLossContext) -> ComputeLossResult:
         # Retrieve log_probs calculated by the model pipeline
         logps = ctx.pipeline_results["logps"]
@@ -258,6 +270,8 @@ class SFTTask(TrainTask[dict[str, torch.Tensor]]):
         # Calculate number of valid tokens (ignoring the -100 padding)
         # This is crucial for variable length batches.
         num_loss_tokens = (ctx.state["labels"] != LM_IGNORE_INDEX).sum()
+
+        ctx.state["num_tokens"] = num_loss_tokens
 
         # Calculate average loss per valid token
         total_loss = logps.sum() / num_loss_tokens
