@@ -1,3 +1,4 @@
+import copy
 import dataclasses
 from collections.abc import Callable
 from typing import Any
@@ -179,7 +180,7 @@ def test_compose_metric(device: str):
     assert_close(metric.compute(), expect_state)
 
     # prepare state
-    old_state = tree_map(lambda x: x.clone(), metric.state_dict())
+    old_state = tree_map(lambda x: x.clone() if isinstance(x, torch.Tensor) else copy.deepcopy(x), metric.state_dict())
 
     # reset propagation
     metric.reset()

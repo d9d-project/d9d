@@ -12,7 +12,7 @@ The foundational primitives managing the cluster.
 How to configure and run jobs.
 
 *   **[Training Loop](./0_loop/0_index.md)**: The lifecycle of the `Trainer`, dependency injection, and execution flow.
-*   **[Inference Loop](./0_loop/infer.md)**: The lifecycle of distributed `Inference` and forward-only execution.
+*   **[Inference Loop](./0_loop/1_inference_loop.md)**: The lifecycle of distributed `Inference` and forward-only execution.
 *   **[Configuration](./0_loop/config.md)**: Pydantic schemas for configuring jobs, batching, and logging.
 *   **[Interfaces (Providers & Tasks)](./0_loop/interfaces.md)**: How to inject your custom Model, Dataset, and Step logic (Train & Infer).
 
@@ -53,7 +53,9 @@ Parameter-Efficient Fine-Tuning framework.
 
 ## 📈 Optimization & Metrics
 
-*   **[Metrics](./metric/index.md)**: Distributed-aware statistic accumulation.
+*   **[Metrics](./metric/0_index.md)**: Distributed-aware statistic accumulation.
+*   **[Implemented Metrics](./metric/implemented.md)**: Ready-to-use metric implementations.
+*   **[Custom Metrics](./metric/custom.md)**: Implementing custom metrics.
 *   **[Experiment Tracking](./internals/tracker_integration.md)**: Integration with logging backends (WandB, Aim).
 *   **[Piecewise Scheduler](./lr_scheduler/piecewise.md)**: Composable LR schedules and [Visualization](./lr_scheduler/visualization.md).
 *   **[Stochastic Optimizers](./optimizer/stochastic.md)**: Low-precision training using stochastic rounding.
@@ -65,6 +67,7 @@ Deep dive into the engine room.
 *   **[Pipelining Internals](./internals/pipelining.md)**: How the VM and Schedules work.
 *   **[Gradient Sync](./internals/grad_sync.md)**: Custom backward hooks for overlapping comms.
 *   **[Gradient Norm & Clipping](./internals/grad_norm.md)**: Correct global norm calculation across hybrid meshes.
+*   **[Metric Collection](./internals/metric_collector.md)**: Custom overlapped metric synchronization & computation.
 *   **[Pipeline State](./internals/pipeline_state.md)**: Context switching between Global and Microbatch scopes.
 *   **[Determinism](./internals/determinism.md)**.
 *   **[Profiling](./internals/profiling.md)**.

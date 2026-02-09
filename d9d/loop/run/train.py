@@ -131,7 +131,6 @@ class TrainingConfigurator:
         ).build_pipeline_and_modules()
 
         metrics = ComposeMetric(task.create_metrics(CreateMetricsContext()).metrics)
-        metrics.to("cuda")
 
         task_operator = TrainTaskOperator(
             dist_context=dist_context,
@@ -282,7 +281,8 @@ class Trainer:
             self._state.garbage_collector as gc,
             self._state.profiler.open() as profiler,
             self._state.gradient_manager.install(),
-            self._state.gradient_clipper.install()
+            self._state.gradient_clipper.install(),
+            self._state.logger.install()
         ):
             run.set_context({"stage": "train"})
 

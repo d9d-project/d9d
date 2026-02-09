@@ -21,13 +21,9 @@ class ComposeMetric(Metric[dict[str, Any]]):
     def children(self) -> Mapping[str, Metric]:
         return self._children
 
-    def trigger_sync(self, dist_context: DistributedContext):
+    def sync(self, dist_context: DistributedContext):
         for metric in self._children.values():
-            metric.trigger_sync(dist_context)
-
-    def wait_sync(self, dist_context: DistributedContext):
-        for metric in self._children.values():
-            metric.wait_sync(dist_context)
+            metric.sync(dist_context)
 
     def compute(self) -> dict[str, Any]:
         return {

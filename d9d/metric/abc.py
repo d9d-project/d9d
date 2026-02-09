@@ -30,24 +30,12 @@ class Metric(abc.ABC, Stateful, Generic[TComputeResult]):
         """
 
     @abc.abstractmethod
-    def trigger_sync(self, dist_context: DistributedContext):
+    def sync(self, dist_context: DistributedContext):
         """
-        Initiates the synchronization of the metric state across distributed processes.
+        Synchronizes the metric state across distributed processes.
 
-        This method should start the collective operations (e.g., all-reduce) required
-        to aggregate statistics, but should not block waiting for completion if possible.
-
-        Args:
-            dist_context: The distributed context.
-        """
-
-    @abc.abstractmethod
-    def wait_sync(self, dist_context: DistributedContext):
-        """
-        Waits for the synchronization initiated by `trigger_sync` to complete.
-
-        After this method returns, the metric state must be fully aggregated and
-        consistent across ranks.
+        This method aggregates statistics from all ranks (e.g., via all-reduce)
+        to ensure the metric state is consistent globally.
 
         Args:
             dist_context: The distributed context.

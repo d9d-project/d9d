@@ -1,3 +1,4 @@
+import copy
 import dataclasses
 from collections.abc import Callable
 from typing import Any
@@ -160,8 +161,7 @@ def test_metrics(dist_ctx_factory, case: MetricCase):
                 metric = case.factory_fn()
                 metric.load_state_dict(state)
 
-            metric.trigger_sync(dist_ctx)
-            metric.wait_sync(dist_ctx)
+            metric.sync(dist_ctx)
 
             expect = tree_map(lambda x: x.to("cuda"), step.expect)
             assert_close(metric.compute(), expect, equal_nan=True)
@@ -202,8 +202,7 @@ def test_compose_metric_distributed(dist_ctx_factory):
     )
 
     # Verify ComposeMetric delegates sync triggers to children
-    metric.trigger_sync(dist_ctx)
-    metric.wait_sync(dist_ctx)
+    metric.sync(dist_ctx)
 
     # Compute Check (Global Aggregation)
     expect_state = {
@@ -214,7 +213,7 @@ def test_compose_metric_distributed(dist_ctx_factory):
 
     # State Dict / Reset / Load
     # Save local state (contains specific rank data, e.g. Rank 0 has val=0)
-    old_state = tree_map(lambda x: x.clone(), metric.state_dict())
+    old_state = tree_map(lambda x: x.clone() if isinstance(x, torch.Tensor) else copy.deepcopy(x), metric.state_dict())
 
     # Reset propagation
     metric.reset()
@@ -225,7 +224,6 @@ def test_compose_metric_distributed(dist_ctx_factory):
     metric.load_state_dict(old_state)
 
     # We must sync again after loading state to re-populate global synced buffers
-    metric.trigger_sync(dist_ctx)
-    metric.wait_sync(dist_ctx)
+    metric.sync(dist_ctx)
 
     assert_close(metric.compute(), expect_state)

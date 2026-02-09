@@ -112,7 +112,7 @@ For every global step (`step`), the trainer performs the following actions in st
     * We delegate to `TrainTask` to accumulate local metrics (e.g., token counts, accuracy) into the `Metric` state.
 
 2.  **Metric Synchronization**
-    *   **Metric Sync Trigger**: `JobLogger` triggers an async reduction of all metrics across the world. [More info](../metric/index.md).
+    *   **Metric Sync Trigger**: `JobLogger` triggers an async reduction of all metrics across the world. [More info](../metric/0_index.md).
 
 3.  **Gradient Synchronization**
     *   **Wait & Scale**: The `GradientManager` waits for all backward hooks to finish. It synchronizes the *total weighted loss* across the world to determine the scaling factor, then divides all gradients by this factor (essential for correct averaging when batch sizes vary due to masking/packing). [More info](../internals/grad_sync.md).

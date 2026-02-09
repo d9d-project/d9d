@@ -8,6 +8,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import PyTree, ScalarTree
+from d9d.internals.metric_collector import AsyncMetricCollector
 from d9d.internals.state import load_state_dict_main_process, state_dict_main_process
 from d9d.loop.config import JobLoggerConfig
 from d9d.metric.impl import ComposeMetric
@@ -67,11 +68,11 @@ class JobLogger(Stateful):
             metrics: The composite metric collection to be computed and logged.
             stepper: Object tracking the current global step.
             run_config: Run configuration.
+            additional_hparams: Supplemental hyperparameters to log for this run.
         """
 
         self._dist_context = dist_context
         self._config = config
-        self._metrics = metrics
         self._stepper = stepper
         self._run_config = run_config.model_copy(deep=True, update={"hparams": {
             "run": run_config.hparams,
@@ -79,6 +80,7 @@ class JobLogger(Stateful):
         }})
 
         self._tracker = self._build_tracker()
+        self._metric_collector = AsyncMetricCollector(metrics)
 
     def _build_tracker(self) -> BaseTracker:
         if self._dist_context.is_main_process:
@@ -88,8 +90,28 @@ class JobLogger(Stateful):
 
     @contextmanager
     def new_run(self) -> Generator[BaseTrackerRun, None, None]:
+        """
+        Creates a context manager for a new experiment run.
+
+        Yields:
+            The active tracker run interface.
+        """
+
         with self._tracker.open(self._run_config) as run:
             yield run
+
+    @contextmanager
+    def install(self):
+        """
+        Prepares the metric collector resources (e.g., CUDA streams).
+
+        This context manager ensures async metrics are bound to the device before
+        usage and unbound afterwards.
+        """
+
+        self._metric_collector.bind()
+        yield
+        self._metric_collector.unbind()
 
     def trigger_sync(self):
         """
@@ -104,18 +126,16 @@ class JobLogger(Stateful):
         if not self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
             return
 
-        if self._dist_context.mesh_params.is_distributed:
-            self._metrics.trigger_sync(self._dist_context)
+        self._metric_collector.schedule_collection(self._dist_context)
 
     def log(self, run: BaseTrackerRun, loss_value: torch.Tensor):
         """
-        Logs the current loss and conditionally processes aggregated metrics.
+        Logs the current loss and conditional metric results.
 
         This method always logs the provided loss value. Periodically (determined
-        by the stepper and configuration), it waits for the synchronization of
-        metrics to complete (initiated by `trigger_sync`), computes their values,
-        flattens the result structure, logs them to the tracker, and resets the
-        metrics for the next window.
+        by the stepper configuration), it retrieves the asynchronous results from
+        the metric collector (initiated by `trigger_sync`), flattens the result
+        structure, and logs them to the tracker.
 
         Args:
             run: The active tracker run interface for sending data.
@@ -127,17 +147,11 @@ class JobLogger(Stateful):
         if not self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
             return
 
-        if self._dist_context.mesh_params.is_distributed:
-            self._metrics.wait_sync(self._dist_context)
-
-        results_tree = self._metrics.compute()
-        results_tree = pytree.tree_map(lambda x: x.item(), results_tree)
+        results_tree = self._metric_collector.collect_results()
         results_flat = _flatten_pytree_for_metrics(results_tree)
 
         for name, value in results_flat.items():
             run.scalar(name, value)
-
-        self._metrics.reset()
 
     def state_dict(self) -> dict[str, Any]:
         return {

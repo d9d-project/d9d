@@ -43,7 +43,9 @@ def shared_tmp_dir(dist_ctx_factory) -> Generator[Path, None, None]:
             tmp_dir = Path(tmp_dir_str)
             all_gather_object(tmp_dir, reg_domain.get_group())
             yield tmp_dir
+            dist_ctx.wait_world()  # wait before destroying the directory
     else:
         tmp_dir = next(x for x in all_gather_object(None, reg_domain.get_group()) if x is not None)
         tmp_dir = cast(Path, tmp_dir)  # we know it is received
         yield tmp_dir
+        dist_ctx.wait_world()  # wait before destroying the directory
