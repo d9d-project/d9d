@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v0.3.0 (2026-02-09)
+
+### Features
+
+- SumMetric
+  ([`c17e243`](https://github.com/d9d-project/d9d/commit/c17e24321105def019bef3c2b30c72eb2b8e1f43))
+
+- Use separate CUDA stream to simplify metric sync & compute
+  ([`2d8d877`](https://github.com/d9d-project/d9d/commit/2d8d877cc815a93a1ba36ca2f6754d59adff501f))
+
+
 ## v0.2.4 (2026-02-09)
 
 ### Bug Fixes
