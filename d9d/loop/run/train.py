@@ -81,6 +81,12 @@ class TrainingConfigurator:
 
         set_seeds(dist_context, seed=self._parameters.determinism.base_seed)
 
+        timeout_manager = TimeoutManager(
+            dist_context=dist_context,
+            config=self._parameters.timeout
+        )
+        timeout_manager.set_init()
+
         task = self._task_provider(TrainTaskProviderContext(
             dist_context=dist_context
         ))
@@ -183,11 +189,6 @@ class TrainingConfigurator:
             config=self._parameters.gradient_manager
         )
 
-        timeout_manager = TimeoutManager(
-            dist_context=dist_context,
-            config=self._parameters.timeout
-        )
-
         job_logger = JobLogger(
             dist_context=dist_context,
             config=self._parameters.logging,
@@ -283,7 +284,6 @@ class Trainer:
             self._state.gradient_manager.install(),
             self._state.gradient_clipper.install()
         ):
-            self._state.timeout_manager.step()
             run.set_context({"stage": "train"})
 
             for batch_group in self._state.data_loader:
@@ -332,6 +332,8 @@ class Trainer:
 
                 if profiler:
                     profiler.step()
+
+                self._state.timeout_manager.set_periodic()
 
             self._state.task.finalize(FinalizeContext())
 
