@@ -72,6 +72,12 @@ class InferenceConfigurator:
 
         set_seeds(dist_context, seed=self._parameters.determinism.base_seed)
 
+        timeout_manager = TimeoutManager(
+            dist_context=dist_context,
+            config=self._parameters.timeout
+        )
+        timeout_manager.set_init()
+
         task = self._task_provider(InferenceTaskProviderContext(
             dist_context=dist_context
         ))
@@ -139,11 +145,6 @@ class InferenceConfigurator:
             dist_context=dist_context,
             stepper=stepper,
             config=self._parameters.profiling
-        )
-
-        timeout_manager = TimeoutManager(
-            dist_context=dist_context,
-            config=self._parameters.timeout
         )
 
         return InferenceJobState(
@@ -237,8 +238,6 @@ class Inference:
                 self._state.garbage_collector as gc,
                 self._state.profiler.open() as profiler
             ):
-                self._state.timeout_manager.step()
-
                 for batch_group in self._state.data_loader:
                     for batch in batch_group:
                         self._state.task_operator.forward(batch)
@@ -252,5 +251,7 @@ class Inference:
 
                     if profiler:
                         profiler.step()
+
+                    self._state.timeout_manager.set_periodic()
 
                 self._state.task.finalize(FinalizeContext())
