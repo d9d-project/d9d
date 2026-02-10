@@ -25,13 +25,17 @@ def _torch_reduce_op_for(op: MetricReduceOp) -> dist.ReduceOp.RedOpType:
             raise ValueError("Unknown metric reduce op")
 
 
-def _accumulate_inplace_(op: MetricReduceOp, accumulator: torch.Tensor, value: torch.Tensor):
+def _accumulate_inplace_(op: MetricReduceOp, accumulator: torch.Tensor, value: torch.Tensor | float | bool):
     match op:
         case MetricReduceOp.sum:
             accumulator.add_(value)
         case MetricReduceOp.max:
+            if not isinstance(value, torch.Tensor):
+                raise ValueError("Non-tensor inputs are not supported for `max` reduce op")
             accumulator.copy_(torch.maximum(accumulator, value))
         case MetricReduceOp.min:
+            if not isinstance(value, torch.Tensor):
+                raise ValueError("Non-tensor inputs are not supported for `min` reduce op")
             accumulator.copy_(torch.minimum(accumulator, value))
 
 
@@ -65,7 +69,7 @@ class MetricAccumulator(Stateful):
 
         self._is_synchronized = False
 
-    def update(self, value: torch.Tensor):
+    def update(self, value: torch.Tensor | float | bool):
         """Updates the local accumulator with a new value.
 
         This operation is performed in-place on the local tensor using the
