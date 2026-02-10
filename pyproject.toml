@@ -76,6 +76,7 @@ pytest-instafail = "^0.5.0"
 pandas = "^3.0.0"  # for triton benchmarks
 matplotlib = "^3.10.8"  # for triton benchmarks
 transformers = "^4.57.6"  # for comparing models
+scikit-learn = "^1.8.0"  # for comparing metrics
 
 
 [tool.poetry.group.docs.dependencies]
