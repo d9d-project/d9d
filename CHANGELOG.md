@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.4.0 (2026-02-10)
+
+### Features
+
+- Add BinaryAccuracy and BinaryAUROC (uses approximated but effective implementation!) metrics
+  ([`15f281b`](https://github.com/d9d-project/d9d/commit/15f281b1f8f2644d102f69b246cd1ce6ea993c1f))
+
+
 ## v0.3.0 (2026-02-09)
 
 ### Features
