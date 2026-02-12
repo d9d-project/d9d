@@ -1,0 +1,7 @@
+.table-wrapper td, .table-wrapper table th {
+    white-space: normal !important;
+}
+
+.table-wrapper {
+    overflow : visible !important;
+}
