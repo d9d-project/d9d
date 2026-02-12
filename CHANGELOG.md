@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.5.0 (2026-02-12)
+
+### Features
+
+- Add head for classification task
+  ([`56491a7`](https://github.com/d9d-project/d9d/commit/56491a712af4c1527b603665fdaca234d93c5639))
+
+
 ## v0.4.0 (2026-02-10)
 
 ### Features
