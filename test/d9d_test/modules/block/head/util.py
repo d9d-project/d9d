@@ -1,5 +1,5 @@
 import torch
-from d9d.module.block.head import SplitLanguageModellingHead
+from d9d.module.block.head import ClassificationHead, SplitLanguageModellingHead
 from torch import nn
 
 from d9d_test.modules.checkers import check_grad_distance
@@ -27,3 +27,11 @@ def check_lm_head_grad(my: SplitLanguageModellingHead, hf: nn.Linear):
     hf_grad = hf.weight.grad
 
     check_grad_distance(my_grad, hf_grad)
+
+
+def clone_classification_head(my: ClassificationHead, hf: nn.Linear):
+    my.score.weight.data = hf.weight.data.detach().clone()
+
+
+def check_classification_head_grad(my: ClassificationHead, hf: nn.Linear):
+    check_grad_distance(my.score.weight.grad, hf.weight.grad)

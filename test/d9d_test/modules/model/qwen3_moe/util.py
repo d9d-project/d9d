@@ -1,13 +1,23 @@
-from d9d.module.model.qwen3_moe import Qwen3MoEForCausalLM, Qwen3MoELayer, Qwen3MoEModel
+from d9d.module.model.qwen3_moe import Qwen3MoEForCausalLM, Qwen3MoEForClassification, Qwen3MoELayer, Qwen3MoEModel
 from d9d.pipelining.api import PipelineStageInfo
-from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeDecoderLayer, Qwen3MoeForCausalLM, Qwen3MoeModel
+from transformers.models.qwen3_moe.modeling_qwen3_moe import (
+    Qwen3MoeDecoderLayer,
+    Qwen3MoeForCausalLM,
+    Qwen3MoeForSequenceClassification,
+    Qwen3MoeModel,
+)
 
 from d9d_test.modules.block.attention.util import (
     check_grouped_query_attention_qwen3_moe_grad,
     clone_grouped_query_attention_qwen3_moe,
 )
 from d9d_test.modules.block.embedding.util import check_embeddings_grad, clone_embeddings
-from d9d_test.modules.block.head.util import check_lm_head_grad, clone_lm_head
+from d9d_test.modules.block.head.util import (
+    check_classification_head_grad,
+    check_lm_head_grad,
+    clone_classification_head,
+    clone_lm_head,
+)
 from d9d_test.modules.block.moe.util import check_moe_qwen3_moe_grad, clone_moe_weights_qwen3_moe
 from d9d_test.modules.checkers import check_grad_distance
 
@@ -36,6 +46,14 @@ def clone_lm_model_weights(my: Qwen3MoEForCausalLM, hf: Qwen3MoeForCausalLM, sta
     clone_model_weights(my.model, hf.model, stage=stage)
     if stage.is_current_stage_last:
         clone_lm_head(my.lm_head, hf.lm_head)
+
+
+def clone_cls_model_weights(
+        my: Qwen3MoEForClassification, hf: Qwen3MoeForSequenceClassification, stage: PipelineStageInfo
+):
+    clone_model_weights(my.model, hf.model, stage=stage)
+    if stage.is_current_stage_last:
+        clone_classification_head(my.cls_head, hf.score)
 
 
 def check_layer_grad(my: Qwen3MoELayer, hf: Qwen3MoeDecoderLayer):
@@ -70,5 +88,14 @@ def check_model_grad(my: Qwen3MoEModel, hf: Qwen3MoeModel, stage: PipelineStageI
 def check_lm_model_grad(my: Qwen3MoEForCausalLM, hf: Qwen3MoeForCausalLM, stage: PipelineStageInfo):
     if stage.is_current_stage_last:
         check_lm_head_grad(my.lm_head, hf.lm_head)
+
+    check_model_grad(my.model, hf.model, stage=stage)
+
+
+def check_cls_model_grad(
+        my: Qwen3MoEForClassification, hf: Qwen3MoeForSequenceClassification, stage: PipelineStageInfo
+):
+    if stage.is_current_stage_last:
+        check_classification_head_grad(my.cls_head, hf.score)
 
     check_model_grad(my.model, hf.model, stage=stage)

@@ -67,3 +67,18 @@ class Qwen3MoEForCausalLMParameters(BaseModel):
     """
 
     model: Qwen3MoEParameters
+
+
+class Qwen3MoEForClassificationParameters(BaseModel):
+    """
+    Configuration parameters for Qwen3 Mixture-of-Experts model with a token/sequnce classification head.
+
+    Attributes:
+        model: The configuration for the underlying Qwen3 MoE model.
+        num_labels: The number of output labels for classification.
+        classifier_dropout: The dropout probability for the classification head.
+    """
+
+    model: Qwen3MoEParameters
+    num_labels: int
+    classifier_dropout: float

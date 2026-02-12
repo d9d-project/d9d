@@ -7,7 +7,7 @@ from torch.utils.checkpoint import checkpoint
 
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.embedding import SplitTokenEmbeddings
-from d9d.module.block.head import SplitLanguageModellingHead
+from d9d.module.block.head import ClassificationHead, SplitLanguageModellingHead
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode, create_hidden_states_aggregator
 from d9d.module.block.positional import RotaryEmbeddingProvider
 from d9d.pipelining.api import (
@@ -17,7 +17,7 @@ from d9d.pipelining.api import (
 )
 
 from .decoder_layer import Qwen3MoELayer
-from .params import Qwen3MoEForCausalLMParameters, Qwen3MoEParameters
+from .params import Qwen3MoEForCausalLMParameters, Qwen3MoEForClassificationParameters, Qwen3MoEParameters
 
 
 class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
@@ -369,5 +369,134 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
 
         if self._stage.is_current_stage_last:
             pp_outputs["logps"] = torch.empty(inputs["input_ids"].shape, dtype=torch.float32)
+
+        return pp_outputs
+
+
+class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
+    """
+    A Qwen3 MoE model wrapped with a Sequence/Token Classification head.
+
+    It is designed to be split across multiple pipeline stages.
+    """
+
+    def __init__(
+            self,
+            params: Qwen3MoEForClassificationParameters,
+            stage: PipelineStageInfo,
+            hidden_states_snapshot_mode: HiddenStatesAggregationMode,
+            enable_checkpointing: bool
+    ):
+        """
+        Constructs the Qwen3MoEForClassification object.
+
+        Args:
+            params: Full model configuration parameters.
+            stage: Pipeline stage information for this instance.
+            hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode.
+            enable_checkpointing: Whether to enable activation checkpointing.
+        """
+
+        super().__init__()
+
+        self.model = Qwen3MoEModel(
+            params.model,
+            stage,
+            hidden_states_snapshot_mode=hidden_states_snapshot_mode,
+            enable_checkpointing=enable_checkpointing
+        )
+
+        if stage.is_current_stage_last:
+            self.cls_head = ClassificationHead(
+                hidden_size=params.model.layer.hidden_size,
+                num_labels=params.num_labels,
+                dropout=params.classifier_dropout
+            )
+
+        self._stage = stage
+        self._hidden_size = params.model.layer.hidden_size
+        self._num_labels = params.num_labels
+
+    def forward(
+            self,
+            input_ids: torch.Tensor | None = None,
+            hidden_states: torch.Tensor | None = None,
+            position_ids: torch.Tensor | None = None,
+            hidden_states_snapshot: torch.Tensor | None = None,
+            hidden_states_agg_mask: torch.Tensor | None = None,
+            pooling_mask: torch.Tensor | None = None
+    ) -> dict[str, torch.Tensor]:
+        """
+        Executes the classification model forward pass.
+
+        Args:
+            input_ids: Input token IDS (for Stage 0).
+            hidden_states: Hidden states from previous stage (for Stage > 0).
+            position_ids: Positional indices for RoPE.
+            hidden_states_snapshot: Intermediate state collector.
+            hidden_states_agg_mask: Mask for state aggregation.
+            pooling_mask: Binary mask indicating which token(s) to pool for classification.
+                Note: you can use `d9d.dataset.token_pooling_mask_from_attention_mask`
+                in your Dataset to preallocate the pooling mask from attention mask.
+
+        Returns:
+            Dictionary containing 'hidden_states', optionally 'hidden_states_snapshot'.
+                If on the last stage, also contains 'scores' (logits) of shape [batch, num_labels].
+        """
+
+        model_outputs = self.model(
+            input_ids=input_ids,
+            hidden_states=hidden_states,
+            position_ids=position_ids,
+            hidden_states_snapshot=hidden_states_snapshot,
+            hidden_states_agg_mask=hidden_states_agg_mask
+        )
+        if self._stage.is_current_stage_last:
+            model_outputs["scores"] = self.cls_head(
+                hidden_states=model_outputs["hidden_states"],
+                pooling_mask=pooling_mask
+            )
+        return model_outputs
+
+    def reset_parameters(self):
+        """
+        Resets module parameters.
+        """
+
+        self.model.reset_parameters()
+
+        if self._stage.is_current_stage_last:
+            self.cls_head.reset_parameters()
+
+    def reset_moe_stats(self):
+        """
+        Resets MoE routing statistics in the backbone.
+        """
+
+        self.model.reset_moe_stats()
+
+    @property
+    def moe_tokens_per_expert(self) -> torch.Tensor:
+        """
+        Accesses MoE routing statistics from the backbone.
+        """
+
+        return self.model.moe_tokens_per_expert
+
+    def infer_stage_inputs_from_pipeline_inputs(
+            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+    ) -> dict[str, torch.Tensor]:
+        return self.model.infer_stage_inputs_from_pipeline_inputs(inputs, n_microbatches)
+
+    def infer_stage_outputs_from_pipeline_inputs(
+            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+    ) -> dict[str, torch.Tensor]:
+        pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(inputs, n_microbatches)
+
+        if self._stage.is_current_stage_last:
+            batch_size = inputs["input_ids"].shape[0] // n_microbatches
+            pp_outputs["scores"] = torch.empty(
+                (batch_size, self._num_labels), dtype=torch.float32
+            )
 
         return pp_outputs
