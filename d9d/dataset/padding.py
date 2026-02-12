@@ -29,10 +29,10 @@ def _padding_side_1d_to_config(side: PaddingSide1D, difference: int) -> tuple[in
 
 
 def pad_stack_1d(
-        items: Sequence[torch.Tensor],
-        pad_value: int,
-        padding_side: PaddingSide1D = PaddingSide1D.right,
-        pad_to_multiple_of: int | None = None
+    items: Sequence[torch.Tensor],
+    pad_value: int,
+    padding_side: PaddingSide1D = PaddingSide1D.right,
+    pad_to_multiple_of: int | None = None,
 ) -> torch.Tensor:
     """
     Stacks 1D tensors into a batch, applying padding.
@@ -72,8 +72,6 @@ def pad_stack_1d(
         if difference == 0:
             padded_items.append(x)
         else:
-            padded_items.append(
-                F.pad(x, _padding_side_1d_to_config(padding_side, difference), value=pad_value)
-            )
+            padded_items.append(F.pad(x, _padding_side_1d_to_config(padding_side, difference), value=pad_value))
 
     return torch.stack(padded_items, dim=0)

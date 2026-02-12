@@ -7,5 +7,5 @@ from .method import FullTune
 
 __all__ = [
     "FullTune",
-    "FullTuneConfig"
+    "FullTuneConfig",
 ]

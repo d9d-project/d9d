@@ -50,32 +50,18 @@ def test_model_save_load_roundtrip_simple(tmp_path, device):
     save_dir = tmp_path / "ckpt"
     mapper = identity_mapper_from_module(model)
 
-    save_model_state(
-        dest_dir=save_dir,
-        mapper=mapper,
-        model=model,
-        show_progress=False
-    )
+    save_model_state(dest_dir=save_dir, mapper=mapper, model=model, show_progress=False)
 
     # Check meta format (HF compat)
     index_content = json.loads((save_dir / MODEL_STATE_INDEX_FILE_NAME).read_text(encoding="utf-8"))
     assert index_content == {
         "metadata": {"total_size": 40},
-        "weight_map": {
-            "fc.weight": "model-00001-of-00001.safetensors",
-            "fc.bias": "model-00001-of-00001.safetensors"
-        }
+        "weight_map": {"fc.weight": "model-00001-of-00001.safetensors", "fc.bias": "model-00001-of-00001.safetensors"},
     }
 
     # Load back
     new_model = SimpleModel().to(device)
-    load_model_state(
-        src_dir=save_dir,
-        mapper=mapper,
-        device=device,
-        model=new_model,
-        show_progress=False
-    )
+    load_model_state(src_dir=save_dir, mapper=mapper, device=device, model=new_model, show_progress=False)
 
     assert torch.equal(new_model.fc.weight, model.fc.weight)
     assert torch.equal(new_model.fc.bias, model.fc.bias)
@@ -97,21 +83,13 @@ def test_model_partial_save_load_with_renaming(tmp_path, device):
     index_content = json.loads((save_dir / MODEL_STATE_INDEX_FILE_NAME).read_text(encoding="utf-8"))
     assert index_content == {
         "metadata": {"total_size": 32},
-        "weight_map": {
-            "layer.w": "model-00001-of-00001.safetensors"
-        }
+        "weight_map": {"layer.w": "model-00001-of-00001.safetensors"},
     }
 
     new_model = SimpleModel().to(device)
 
     # Read back
-    load_model_state(
-        src_dir=save_dir,
-        mapper=load_mapper,
-        device=device,
-        model=new_model,
-        show_progress=False
-    )
+    load_model_state(src_dir=save_dir, mapper=load_mapper, device=device, model=new_model, show_progress=False)
     assert torch.equal(new_model.fc.weight, model.fc.weight)
     assert not torch.equal(new_model.fc.bias, model.fc.bias)
 
@@ -148,10 +126,9 @@ def test_sharding_enforcement(tmp_path, device):
     gen = [("t1", t_heavy), ("t2", t_heavy)]
 
     dest = tmp_path / "sharded"
-    mapper = ModelStateMapperSequential([
-        ModelStateMapperRename("t1", "t1"),
-        ModelStateMapperRename("t2", "t2")
-    ])  # Identity basically, ensuring groups are processed
+    mapper = ModelStateMapperSequential(
+        [ModelStateMapperRename("t1", "t1"), ModelStateMapperRename("t2", "t2")]
+    )  # Identity basically, ensuring groups are processed
 
     write_model_state_local(dest, mapper, gen, shard_size_gb=0.0015, show_progress=False)
 
@@ -159,16 +136,9 @@ def test_sharding_enforcement(tmp_path, device):
     index_content = json.loads((dest / MODEL_STATE_INDEX_FILE_NAME).read_text(encoding="utf-8"))
     assert index_content == {
         "metadata": {"total_size": 2097152},
-        "weight_map": {
-            "t1": "model-00001-of-00002.safetensors",
-            "t2": "model-00002-of-00002.safetensors"
-        }
+        "weight_map": {"t1": "model-00001-of-00002.safetensors", "t2": "model-00002-of-00002.safetensors"},
     }
 
     files = {x.name for x in dest.iterdir()}
-    expect_files = {
-        MODEL_STATE_INDEX_FILE_NAME,
-        "model-00001-of-00002.safetensors",
-        "model-00002-of-00002.safetensors"
-    }
+    expect_files = {MODEL_STATE_INDEX_FILE_NAME, "model-00001-of-00002.safetensors", "model-00002-of-00002.safetensors"}
     assert files == expect_files

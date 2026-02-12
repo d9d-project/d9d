@@ -12,10 +12,7 @@ TLeaf = TypeVar("TLeaf")
 TSameTree = TypeVar("TSameTree", bound=PyTree)
 
 
-def _unshard_list(
-        group: Sequence[list[TLeaf] | TLeaf],
-        spec: SpecShard
-) -> list[TLeaf]:
+def _unshard_list(group: Sequence[list[TLeaf] | TLeaf], spec: SpecShard) -> list[TLeaf]:
     if spec.dim != 0:
         raise ValueError(f"Lists can only be unsharded on dim 0, got {spec.dim}")
 
@@ -28,20 +25,14 @@ def _unshard_list(
     return merged_list
 
 
-def _unshard_tensor(
-        group: list[torch.Tensor],
-        spec: SpecShard
-) -> torch.Tensor:
+def _unshard_tensor(group: list[torch.Tensor], spec: SpecShard) -> torch.Tensor:
     if spec.do_stack:
         return torch.stack(group, dim=spec.dim)
 
     return torch.cat(group, dim=spec.dim)
 
 
-def _unshard_leaf_from_group(
-        group: Sequence[TLeaf],
-        spec: ShardingSpecLeaf
-) -> TLeaf:
+def _unshard_leaf_from_group(group: Sequence[TLeaf], spec: ShardingSpecLeaf) -> TLeaf:
     """Helper to merge a group of items from different ranks into one."""
     if isinstance(spec, SpecReplicate):
         return group[0]
@@ -52,20 +43,14 @@ def _unshard_leaf_from_group(
     first_item = group[0]
 
     if isinstance(first_item, torch.Tensor):
-        return cast(TLeaf, _unshard_tensor(
-            cast(list[torch.Tensor], group),
-            spec
-        ))
+        return cast(TLeaf, _unshard_tensor(cast(list[torch.Tensor], group), spec))
     elif spec.do_stack or isinstance(first_item, list):
         return cast(TLeaf, _unshard_list(group, spec))
     else:
         raise TypeError(f"Expected Tensor or list instances, got {type(group[0])}")
 
 
-def unshard_tree(
-        sharded_trees: Sequence[TSameTree],
-        sharding_spec: ShardingSpec
-) -> TSameTree:
+def unshard_tree(sharded_trees: Sequence[TSameTree], sharding_spec: ShardingSpec) -> TSameTree:
     """
     Combines a sequence of PyTrees (one per rank) into a single global PyTree.
 
@@ -101,17 +86,14 @@ def unshard_tree(
         try:
             leaves = spec_struct.flatten_up_to(tree)
         except (ValueError, TypeError) as e:
-            raise ValueError(
-                f"Structure mismatch at shard {i}: tree does not match sharding spec structure"
-            ) from e
+            raise ValueError(f"Structure mismatch at shard {i}: tree does not match sharding spec structure") from e
 
         flat_shards_per_rank.append(leaves)
 
     grouped_leaves = list(zip(*flat_shards_per_rank, strict=True))
 
     reconstructed_leaves = [
-        _unshard_leaf_from_group(group, spec)
-        for group, spec in zip(grouped_leaves, flat_spec, strict=True)
+        _unshard_leaf_from_group(group, spec) for group, spec in zip(grouped_leaves, flat_spec, strict=True)
     ]
 
     return spec_struct.unflatten(reconstructed_leaves)

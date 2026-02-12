@@ -41,10 +41,7 @@ class PipelineStageInfo:
 
 
 def distribute_layers_for_pipeline_stage(
-        num_layers: int,
-        num_virtual_layers_pre: int,
-        num_virtual_layers_post: int,
-        stage: PipelineStageInfo
+    num_layers: int, num_virtual_layers_pre: int, num_virtual_layers_post: int, stage: PipelineStageInfo
 ) -> tuple[int, int]:
     """
     Calculates the layer index range for a specific pipeline stage.
@@ -95,12 +92,14 @@ def distribute_layers_for_pipeline_stage(
         actual_layers = layers - adjustment
 
         if actual_layers <= 0:
-            raise ValueError(f"Tried to distribute layers, but got {actual_layers} on "
-                             f"stage {proposed_stage.current_stage}. Perhaps the pipeline is too long for this model?")
+            raise ValueError(
+                f"Tried to distribute layers, but got {actual_layers} on "
+                f"stage {proposed_stage.current_stage}. Perhaps the pipeline is too long for this model?"
+            )
 
         layer_count_per_stage.append(actual_layers)
 
-    start_layer_id = sum(layer_count_per_stage[:stage.current_stage])
+    start_layer_id = sum(layer_count_per_stage[: stage.current_stage])
     num_layers_in_stage = layer_count_per_stage[stage.current_stage]
 
     return start_layer_id, start_layer_id + num_layers_in_stage
@@ -117,7 +116,7 @@ class ModuleSupportsPipelining(typing.Protocol):
     """
 
     def infer_stage_inputs_from_pipeline_inputs(
-            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+        self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
         """
         Infers the input tensors metadata for the current pipeline stage based on global batch inputs.
@@ -133,7 +132,7 @@ class ModuleSupportsPipelining(typing.Protocol):
         ...
 
     def infer_stage_outputs_from_pipeline_inputs(
-            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+        self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
         """
         Infers the output tensors metadata for the current pipeline stage based on global batch inputs.

@@ -14,7 +14,7 @@ from d9d.optim.stochastic import StochasticAdamW
         ({"betas": (-0.1, 0.999)}, "Invalid beta parameter at index 0"),
         ({"betas": (0.9, 1.0)}, "Invalid beta parameter at index 1"),
         ({"weight_decay": -0.01}, "Invalid weight_decay value"),
-    ]
+    ],
 )
 def test_init_validation(kwargs, match_msg):
     param = torch.zeros(1, dtype=torch.bfloat16)

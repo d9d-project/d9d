@@ -49,7 +49,7 @@ def clone_lm_model_weights(my: Qwen3MoEForCausalLM, hf: Qwen3MoeForCausalLM, sta
 
 
 def clone_cls_model_weights(
-        my: Qwen3MoEForClassification, hf: Qwen3MoeForSequenceClassification, stage: PipelineStageInfo
+    my: Qwen3MoEForClassification, hf: Qwen3MoeForSequenceClassification, stage: PipelineStageInfo
 ):
     clone_model_weights(my.model, hf.model, stage=stage)
     if stage.is_current_stage_last:
@@ -60,13 +60,9 @@ def check_layer_grad(my: Qwen3MoELayer, hf: Qwen3MoeDecoderLayer):
     check_grouped_query_attention_qwen3_moe_grad(my.self_attn, hf.self_attn)
     check_moe_qwen3_moe_grad(my.mlp, hf.mlp)
     check_grad_distance(
-        my.post_attention_layernorm.weight.grad[None, :],
-        hf.post_attention_layernorm.weight.grad[None, :]
+        my.post_attention_layernorm.weight.grad[None, :], hf.post_attention_layernorm.weight.grad[None, :]
     )
-    check_grad_distance(
-        my.input_layernorm.weight.grad[None, :],
-        hf.input_layernorm.weight.grad[None, :]
-    )
+    check_grad_distance(my.input_layernorm.weight.grad[None, :], hf.input_layernorm.weight.grad[None, :])
 
 
 def check_model_grad(my: Qwen3MoEModel, hf: Qwen3MoeModel, stage: PipelineStageInfo):
@@ -79,10 +75,7 @@ def check_model_grad(my: Qwen3MoEModel, hf: Qwen3MoeModel, stage: PipelineStageI
         check_layer_grad(layer_my, layer_hf)
 
     if stage.is_current_stage_last:
-        check_grad_distance(
-            my.norm.weight.grad[None, :],
-            hf.norm.weight.grad[None, :]
-        )
+        check_grad_distance(my.norm.weight.grad[None, :], hf.norm.weight.grad[None, :])
 
 
 def check_lm_model_grad(my: Qwen3MoEForCausalLM, hf: Qwen3MoeForCausalLM, stage: PipelineStageInfo):
@@ -93,7 +86,7 @@ def check_lm_model_grad(my: Qwen3MoEForCausalLM, hf: Qwen3MoeForCausalLM, stage:
 
 
 def check_cls_model_grad(
-        my: Qwen3MoEForClassification, hf: Qwen3MoeForSequenceClassification, stage: PipelineStageInfo
+    my: Qwen3MoEForClassification, hf: Qwen3MoeForSequenceClassification, stage: PipelineStageInfo
 ):
     if stage.is_current_stage_last:
         check_classification_head_grad(my.cls_head, hf.score)

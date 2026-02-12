@@ -34,5 +34,5 @@ __all__ = [
     "Stepper",
     "TimeoutManager",
     "TrackedModules",
-    "TrainTaskOperator"
+    "TrainTaskOperator",
 ]

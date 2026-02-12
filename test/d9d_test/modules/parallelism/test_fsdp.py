@@ -28,14 +28,14 @@ class SimpleLinear(nn.Module):
 
 
 @pytest.mark.distributed
-@pytest.mark.parametrize("mesh_dim", [
-    "dp_cp_shard",
-])
+@pytest.mark.parametrize(
+    "mesh_dim",
+    [
+        "dp_cp_shard",
+    ],
+)
 def test_parallelize_fsdp(dist_ctx_factory, mesh_dim):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(
-        data_parallel_shard=4,
-        context_parallel_shard=2
-    ))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_shard=4, context_parallel_shard=2))
     mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[mesh_dim]
 
     # Ensure divisibility. Mesh size 8 -> Params 16 -> 2 per Rank.

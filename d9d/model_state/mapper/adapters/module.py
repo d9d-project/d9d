@@ -17,6 +17,4 @@ def identity_mapper_from_module(module: nn.Module) -> ModelStateMapper:
         module: The instantiated PyTorch model to inspect.
     """
 
-    return ModelStateMapperParallel(
-        [ModelStateMapperIdentity(key) for key in module.state_dict()]
-    )
+    return ModelStateMapperParallel([ModelStateMapperIdentity(key) for key in module.state_dict()])

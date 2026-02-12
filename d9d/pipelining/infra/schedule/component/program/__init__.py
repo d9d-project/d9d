@@ -18,5 +18,5 @@ __all__ = [
     "ScheduleStyle",
     "add_communication_ops",
     "build_stage_to_host_rank_topology",
-    "invert_stage_to_host_rank_topology"
+    "invert_stage_to_host_rank_topology",
 ]

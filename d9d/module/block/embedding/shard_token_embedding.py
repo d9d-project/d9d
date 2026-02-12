@@ -8,7 +8,7 @@ from d9d.module.base import ModuleLateInit
 
 
 def _build_token_start_end_indices(
-        split_vocab_size: dict[str, int], split_order: Sequence[str]
+    split_vocab_size: dict[str, int], split_order: Sequence[str]
 ) -> tuple[dict[str, int], dict[str, int]]:
     offset = 0
     starts = {}
@@ -33,12 +33,7 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
     different sets of tokens require different initialization  training behaviors.
     """
 
-    def __init__(
-            self,
-            split_vocab_size: dict[str, int],
-            split_order: Sequence[str],
-            hidden_size: int
-    ):
+    def __init__(self, split_vocab_size: dict[str, int], split_order: Sequence[str], hidden_size: int):
         """
         Constructs the SplitTokenEmbeddings object.
 
@@ -52,10 +47,9 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
 
         super().__init__()
 
-        token_embedding = nn.ModuleDict({
-            split_name: nn.Embedding(vocab_size, hidden_size)
-            for split_name, vocab_size in split_vocab_size.items()
-        })
+        token_embedding = nn.ModuleDict(
+            {split_name: nn.Embedding(vocab_size, hidden_size) for split_name, vocab_size in split_vocab_size.items()}
+        )
         self.token_embedding: Mapping[str, nn.Embedding] = cast(Mapping[str, nn.Embedding], token_embedding)
 
         self._id_start, self._id_end = _build_token_start_end_indices(split_vocab_size, split_order)

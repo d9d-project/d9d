@@ -9,5 +9,5 @@ __all__ = [
     "PeftInjectionResult",
     "PeftMethod",
     "inject_peft_and_freeze",
-    "merge_peft"
+    "merge_peft",
 ]

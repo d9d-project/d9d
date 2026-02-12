@@ -92,10 +92,7 @@ class ModelProvider(abc.ABC, Generic[TModel]):
     """
 
     @abc.abstractmethod
-    def initialize_model_stage(
-            self,
-            context: InitializeModelStageContext
-    ) -> InitializeModelStageResult[TModel]:
+    def initialize_model_stage(self, context: InitializeModelStageContext) -> InitializeModelStageResult[TModel]:
         """
         Initializes the model architecture for a specific pipeline stage.
 
@@ -118,10 +115,7 @@ class ModelProvider(abc.ABC, Generic[TModel]):
         ...
 
     @abc.abstractmethod
-    def parallelize_model_stage(
-            self,
-            context: ParallelizeModelStageContext[TModel]
-    ):
+    def parallelize_model_stage(self, context: ParallelizeModelStageContext[TModel]):
         """
         Converts the model parameters into distributed tensors (DTensors).
 
@@ -135,8 +129,7 @@ class ModelProvider(abc.ABC, Generic[TModel]):
 
     @abc.abstractmethod
     def prepare_export_model_stage(
-            self,
-            context: PrepareExportModelStageContext[TModel]
+        self, context: PrepareExportModelStageContext[TModel]
     ) -> PrepareExportModelStageResult:
         """
         Prepares the state mapper required for saving the model to disk.

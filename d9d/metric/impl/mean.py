@@ -51,10 +51,7 @@ class WeightedMeanMetric(Metric[torch.Tensor]):
         return self._weight.value
 
     def state_dict(self) -> dict[str, Any]:
-        return {
-            "value": self._value.state_dict(),
-            "weight": self._weight.state_dict()
-        }
+        return {"value": self._value.state_dict(), "weight": self._weight.state_dict()}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         self._value.load_state_dict(state_dict["value"])

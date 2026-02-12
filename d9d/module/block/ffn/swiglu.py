@@ -13,11 +13,7 @@ class SwiGLU(nn.Module, ModuleLateInit):
     It corresponds to the standard MLP block used in architectures like LLaMA.
     """
 
-    def __init__(
-            self,
-            hidden_size: int,
-            intermediate_size: int
-    ):
+    def __init__(self, hidden_size: int, intermediate_size: int):
         """
         Constructs a SwiGLU object.
 
@@ -31,10 +27,7 @@ class SwiGLU(nn.Module, ModuleLateInit):
         self.up_proj = nn.Linear(hidden_size, intermediate_size)
         self.down_proj = nn.Linear(intermediate_size, hidden_size)
 
-    def forward(
-            self,
-            x: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Applies the SwiGLU FFN to the input.
 
@@ -45,12 +38,7 @@ class SwiGLU(nn.Module, ModuleLateInit):
             Output tensor. Shape: `(batch_size, seq_len, hidden_dim)`.
         """
 
-        return self.down_proj(
-            silu_mul(
-                self.gate_proj(x),
-                self.up_proj(x)
-            )
-        )
+        return self.down_proj(silu_mul(self.gate_proj(x), self.up_proj(x)))
 
     def reset_parameters(self):
         """Resets module parameters."""

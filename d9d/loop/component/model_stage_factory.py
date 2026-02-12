@@ -41,10 +41,7 @@ class TrackedModules(Stateful):
     """
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            modules: list[nn.Module],
-            stateful_predicate: StatefulPredicate
+        self, dist_context: DistributedContext, modules: list[nn.Module], stateful_predicate: StatefulPredicate
     ):
         """Constructs a TrackedModules object."""
 
@@ -71,9 +68,7 @@ class TrackedModules(Stateful):
 
     def _state_dict_stage(self, module: nn.Module) -> dict[str, Any]:
         whitelist = self._whitelisted_params(module)
-        result = {
-            k: v for k, v in module.state_dict().items() if k in whitelist
-        }
+        result = {k: v for k, v in module.state_dict().items() if k in whitelist}
         return result
 
     def state_dict(self) -> dict[str, Any]:
@@ -89,8 +84,7 @@ class TrackedModules(Stateful):
         """
 
         ret = {
-            f"pp_{self._pp_rank}_stage_{i}": self._state_dict_stage(module)
-            for i, module in enumerate(self._modules)
+            f"pp_{self._pp_rank}_stage_{i}": self._state_dict_stage(module) for i, module in enumerate(self._modules)
         }
         return ret
 
@@ -136,13 +130,13 @@ class ModelStageFactory:
     """
 
     def __init__(
-            self,
-            model_provider: ModelProvider,
-            dist_context: DistributedContext,
-            batch_maths: BatchMaths,
-            config_model: ModelStageFactoryConfig,
-            config_pipelining: PipeliningConfig,
-            pipeline_callback: PipelineOutputsProcessor
+        self,
+        model_provider: ModelProvider,
+        dist_context: DistributedContext,
+        batch_maths: BatchMaths,
+        config_model: ModelStageFactoryConfig,
+        config_pipelining: PipeliningConfig,
+        pipeline_callback: PipelineOutputsProcessor,
     ):
         """Constructs a ModelStageFactory object."""
 
@@ -171,11 +165,7 @@ class ModelStageFactory:
         # if current context is distributed - parallelize this model
         if self._dist_context.mesh_params.is_distributed:
             self._model_provider.parallelize_model_stage(
-                ParallelizeModelStageContext(
-                    model=model,
-                    stage=stage,
-                    dist_context=self._dist_context
-                )
+                ParallelizeModelStageContext(model=model, stage=stage, dist_context=self._dist_context)
             )
 
         # move state that is bound to current device to it
@@ -190,7 +180,7 @@ class ModelStageFactory:
                 src_dir=self._config_model.source_checkpoint,
                 model=model,
                 mapper=factored.state_mapper,
-                device=f"cuda:{torch.cuda.current_device()}"
+                device=f"cuda:{torch.cuda.current_device()}",
             )
 
         # set training state
@@ -198,9 +188,7 @@ class ModelStageFactory:
 
         return model
 
-    def build_pipeline_and_modules(
-            self
-    ) -> tuple[PipelineScheduleInfo, TrackedModules]:
+    def build_pipeline_and_modules(self) -> tuple[PipelineScheduleInfo, TrackedModules]:
         """
         Constructs the execution schedule and the model container.
 
@@ -219,7 +207,7 @@ class ModelStageFactory:
             n_microbatches=self._batch_maths.num_microbatches_pipelining,
             schedule_config=self._config_pipelining.schedule,
             model_provider=self._build_model_stage,
-            callback=self._pipeline_callback
+            callback=self._pipeline_callback,
         )
 
         return schedule, TrackedModules(self._dist_context, modules, stateful_predicate)

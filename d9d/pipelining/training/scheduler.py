@@ -18,10 +18,7 @@ class PipelinedLRScheduler(LRSchedulerProtocol):
         self._schedulers = schedulers
 
     def state_dict(self) -> dict[str, Any]:
-        return {
-            f"pp_{self._pp_rank}_stage_{i}": scheduler.state_dict()
-            for i, scheduler in enumerate(self._schedulers)
-        }
+        return {f"pp_{self._pp_rank}_stage_{i}": scheduler.state_dict() for i, scheduler in enumerate(self._schedulers)}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         for i, scheduler in enumerate(self._schedulers):

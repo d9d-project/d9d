@@ -29,7 +29,7 @@ class ModelStateMapperDistribute(ModelStateMapper):
                 group[self._name],
                 device_mesh=self._device_mesh,
                 placements=self._placements,
-                src_data_rank=None  # do not communicate here
+                src_data_rank=None,  # do not communicate here
             )
         }
 
@@ -51,6 +51,4 @@ class ModelStateMapperGatherFullTensor(ModelStateMapper):
         if not isinstance(tensor, DTensor):
             raise ValueError("Cannot gather anything but DTensor")
 
-        return {
-            self._name: tensor.full_tensor()
-        }
+        return {self._name: tensor.full_tensor()}

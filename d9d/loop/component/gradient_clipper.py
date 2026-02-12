@@ -15,11 +15,11 @@ class GradientClipper:
     """
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            tracked_modules: TrackedModules,
-            config: GradientClippingConfig,
-            stepper: Stepper
+        self,
+        dist_context: DistributedContext,
+        tracked_modules: TrackedModules,
+        config: GradientClippingConfig,
+        stepper: Stepper,
     ):
         """
         Constructs the gradient clipper.

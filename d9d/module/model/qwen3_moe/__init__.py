@@ -15,5 +15,5 @@ __all__ = [
     "Qwen3MoELayer",
     "Qwen3MoELayerParameters",
     "Qwen3MoEModel",
-    "Qwen3MoEParameters"
+    "Qwen3MoEParameters",
 ]

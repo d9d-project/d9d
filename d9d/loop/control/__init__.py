@@ -57,5 +57,5 @@ __all__ = [
     "TrainTask",
     "TrainTaskProvider",
     "TrainTaskProviderContext",
-    "UpdateMetricsContext"
+    "UpdateMetricsContext",
 ]

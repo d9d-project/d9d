@@ -22,10 +22,7 @@ class PipelinedOptimizer(OptimizerProtocol):
 
     def state_dict(self) -> dict[str, Any]:
         pp_rank = self._pp_rank
-        return {
-            f"pp_{pp_rank}_stage_{i}": optimizer.state_dict()
-            for i, optimizer in enumerate(self._optimizers)
-        }
+        return {f"pp_{pp_rank}_stage_{i}": optimizer.state_dict() for i, optimizer in enumerate(self._optimizers)}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         pp_rank = self._pp_rank

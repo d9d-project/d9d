@@ -3,9 +3,7 @@ import torch
 from .base import BaseHiddenStatesAggregator
 
 
-def _aggregate_hidden_states(
-        hidden_states: torch.Tensor, agg_mask: torch.Tensor
-) -> torch.Tensor:
+def _aggregate_hidden_states(hidden_states: torch.Tensor, agg_mask: torch.Tensor) -> torch.Tensor:
     orig_dtype = hidden_states.dtype
     hidden_states = hidden_states.float()
     num_tokens = agg_mask.sum(dim=1)[:, None]
@@ -33,10 +31,7 @@ class HiddenStatesAggregatorMean(BaseHiddenStatesAggregator):
         Args:
             hidden_states: The raw hidden states to be averaged and stored.
         """
-        agg = _aggregate_hidden_states(
-            hidden_states=hidden_states,
-            agg_mask=self._agg_mask
-        )
+        agg = _aggregate_hidden_states(hidden_states=hidden_states, agg_mask=self._agg_mask)
         self._collected_states.append(agg)
 
     def pack_with_snapshot(self, snapshot: torch.Tensor | None) -> torch.Tensor | None:

@@ -11,5 +11,5 @@ __all__ = [
     "LoRAConfig",
     "LoRAGroupedLinear",
     "LoRALinear",
-    "LoRAParameters"
+    "LoRAParameters",
 ]

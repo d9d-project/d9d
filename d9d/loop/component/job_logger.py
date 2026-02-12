@@ -51,13 +51,13 @@ class JobLogger(Stateful):
     """
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            config: JobLoggerConfig,
-            metrics: ComposeMetric,
-            stepper: Stepper,
-            run_config: RunConfig,
-            additional_hparams: ScalarTree
+        self,
+        dist_context: DistributedContext,
+        config: JobLoggerConfig,
+        metrics: ComposeMetric,
+        stepper: Stepper,
+        run_config: RunConfig,
+        additional_hparams: ScalarTree,
     ):
         """
         Constructs JobLogger object.
@@ -74,10 +74,9 @@ class JobLogger(Stateful):
         self._dist_context = dist_context
         self._config = config
         self._stepper = stepper
-        self._run_config = run_config.model_copy(deep=True, update={"hparams": {
-            "run": run_config.hparams,
-            "params": additional_hparams
-        }})
+        self._run_config = run_config.model_copy(
+            deep=True, update={"hparams": {"run": run_config.hparams, "params": additional_hparams}}
+        )
 
         self._tracker = self._build_tracker()
         self._metric_collector = AsyncMetricCollector(metrics)

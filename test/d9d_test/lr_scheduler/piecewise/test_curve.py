@@ -24,12 +24,12 @@ def test_curve_linear(start, end, p, expected):
 @pytest.mark.parametrize(
     ("start", "end", "p", "expected"),
     [
-        (0.0, 10.0, 0.0, 0.0),      # cos(0) = 1 -> ((1+1)/2)=1 -> end + (start-end)*1 = start
-        (0.0, 10.0, 1.0, 10.0),     # cos(pi) = -1 -> 0 -> end
-        (0.0, 10.0, 0.5, 5.0),      # cos(pi/2) = 0 -> 0.5 -> average
+        (0.0, 10.0, 0.0, 0.0),  # cos(0) = 1 -> ((1+1)/2)=1 -> end + (start-end)*1 = start
+        (0.0, 10.0, 1.0, 10.0),  # cos(pi) = -1 -> 0 -> end
+        (0.0, 10.0, 0.5, 5.0),  # cos(pi/2) = 0 -> 0.5 -> average
         (1.0, 0.0, 0.0, 1.0),
         (1.0, 0.0, 1.0, 0.0),
-    ]
+    ],
 )
 def test_curve_cosine(start, end, p, expected):
     curve = CurveCosine()
@@ -41,10 +41,10 @@ def test_curve_cosine(start, end, p, expected):
 @pytest.mark.parametrize(
     ("power", "start", "end", "p", "expected"),
     [
-        (1.0, 0.0, 100.0, 0.5, 50.0),       # Linear
-        (2.0, 0.0, 100.0, 0.5, 25.0),       # Quadratic: 0.5^2 = 0.25 -> 25
-        (0.5, 0.0, 100.0, 0.25, 50.0),      # Sqrt: 0.25^0.5 = 0.5 -> 50
-    ]
+        (1.0, 0.0, 100.0, 0.5, 50.0),  # Linear
+        (2.0, 0.0, 100.0, 0.5, 25.0),  # Quadratic: 0.5^2 = 0.25 -> 25
+        (0.5, 0.0, 100.0, 0.25, 50.0),  # Sqrt: 0.25^0.5 = 0.5 -> 50
+    ],
 )
 def test_curve_poly(power, start, end, p, expected):
     curve = CurvePoly(power=power)
@@ -58,7 +58,7 @@ def test_curve_poly(power, start, end, p, expected):
         # Exp(log(1) + 0.5 * (log(100) - log(1))) = Exp(0 + 0.5 * 4.6) approx Exp(2.3) = 10
         (1.0, 100.0, 0.5, lambda s, e: 10.0),
         (1.0, 1.0, 0.5, lambda s, e: 1.0),
-    ]
+    ],
 )
 def test_curve_exponential(start, end, p, expected_fn):
     curve = CurveExponential()

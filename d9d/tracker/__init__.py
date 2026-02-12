@@ -10,5 +10,5 @@ __all__ = [
     "BaseTracker",
     "BaseTrackerRun",
     "RunConfig",
-    "tracker_from_config"
+    "tracker_from_config",
 ]

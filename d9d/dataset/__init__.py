@@ -16,5 +16,5 @@ __all__ = [
     "TokenPoolingType",
     "pad_stack_1d",
     "shard_dataset_data_parallel",
-    "token_pooling_mask_from_attention_mask"
+    "token_pooling_mask_from_attention_mask",
 ]

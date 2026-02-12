@@ -98,12 +98,14 @@ def test_local_context_initialization():
 
 @pytest.mark.distributed
 def test_mesh_topology_complex(dist_ctx_factory):
-    ctx = dist_ctx_factory(DeviceMeshParameters(
-        data_parallel_replicate=2,
-        data_parallel_shard=2,
-        tensor_parallel=2,
-        expert_parallel=2,
-    ))
+    ctx = dist_ctx_factory(
+        DeviceMeshParameters(
+            data_parallel_replicate=2,
+            data_parallel_shard=2,
+            tensor_parallel=2,
+            expert_parallel=2,
+        )
+    )
 
     regular_mesh = ctx.mesh_for(REGULAR_DOMAIN)
     assert regular_mesh.ndim == 6

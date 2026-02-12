@@ -5,5 +5,5 @@ __all__ = [
     "AutoLRSchedulerConfig",
     "AutoLRSchedulerProvider",
     "AutoOptimizerConfig",
-    "AutoOptimizerProvider"
+    "AutoOptimizerProvider",
 ]

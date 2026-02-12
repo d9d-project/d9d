@@ -14,13 +14,13 @@ class GroupedGemm(Function):
 
     @staticmethod
     def forward(
-            ctx: Any,
-            a: torch.Tensor,
-            b: torch.Tensor,
-            batch_sizes: torch.Tensor,
-            a_grad_direction: GradDirection | None,
-            b_grad_direction: GradDirection | None,
-            trans_b: bool
+        ctx: Any,
+        a: torch.Tensor,
+        b: torch.Tensor,
+        batch_sizes: torch.Tensor,
+        a_grad_direction: GradDirection | None,
+        b_grad_direction: GradDirection | None,
+        trans_b: bool,
     ) -> torch.Tensor:
         ctx.save_for_backward(a, b, batch_sizes)
         ctx.a_grad_direction = a_grad_direction
@@ -30,7 +30,7 @@ class GroupedGemm(Function):
 
     @staticmethod
     def backward(
-            ctx: Any, grad: torch.Tensor
+        ctx: Any, grad: torch.Tensor
     ) -> tuple[torch.Tensor | None, torch.Tensor | None, None, None, None, None]:
         grad = grad.contiguous()
         a, b, batch_sizes = ctx.saved_tensors
@@ -41,24 +41,22 @@ class GroupedGemm(Function):
 
         a_grad = None
         if ctx.needs_input_grad[0] and compute_a:
-            a_grad = backend.gmm(
-                grad, b, batch_sizes, trans_a=False, trans_b=not trans_b)
+            a_grad = backend.gmm(grad, b, batch_sizes, trans_a=False, trans_b=not trans_b)
 
         b_grad = None
         if ctx.needs_input_grad[1] and compute_b:
             lhs, rhs = (grad, a) if trans_b else (a, grad)
-            b_grad = backend.gmm(
-                lhs, rhs, batch_sizes, trans_a=True, trans_b=False)
+            b_grad = backend.gmm(lhs, rhs, batch_sizes, trans_a=True, trans_b=False)
         return a_grad, b_grad, None, None, None, None
 
 
 def gmm(
-        a: torch.Tensor,
-        b: torch.Tensor,
-        batch_sizes: torch.Tensor,
-        a_grad_direction: GradDirection | None,
-        b_grad_direction: GradDirection | None,
-        trans_b: bool = False
+    a: torch.Tensor,
+    b: torch.Tensor,
+    batch_sizes: torch.Tensor,
+    a_grad_direction: GradDirection | None,
+    b_grad_direction: GradDirection | None,
+    trans_b: bool = False,
 ) -> torch.Tensor:
     """
     The Grouped GEMM (Generalized Matrix Multiplication) function with explicit gradient control.

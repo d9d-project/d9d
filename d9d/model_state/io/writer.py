@@ -23,18 +23,18 @@ class _StateWritingFlowLocal:
     """
 
     def __init__(
-            self,
-            dest_dir: Path,
-            mapper: ModelStateMapper,
-            shard_size_gb: float,
-            show_progress: bool,
-            sharding_rank: int,
-            # so we have to call writing flow from all processes, but
-            is_current_process_rank_master: bool
+        self,
+        dest_dir: Path,
+        mapper: ModelStateMapper,
+        shard_size_gb: float,
+        show_progress: bool,
+        sharding_rank: int,
+        # so we have to call writing flow from all processes, but
+        is_current_process_rank_master: bool,
     ):
         self._dest_dir = dest_dir
         self._mapper = mapper
-        self._shard_size_bytes = int(shard_size_gb * (1024 ** 3))
+        self._shard_size_bytes = int(shard_size_gb * (1024**3))
 
         self._groups_to_process = set(mapper.state_dependency_groups())
 
@@ -53,7 +53,7 @@ class _StateWritingFlowLocal:
         self._pbar = tqdm(
             desc="Saving Model States",
             total=total_num_outputs,
-            disable=not (show_progress and is_current_process_rank_master)
+            disable=not (show_progress and is_current_process_rank_master),
         )
 
     def _flush_shard(self):
@@ -83,9 +83,7 @@ class _StateWritingFlowLocal:
 
             self._groups_to_process.remove(group)
 
-            states_to_save = self._mapper.apply(
-                {k: self._available_source_states[k] for k in group.inputs}
-            )
+            states_to_save = self._mapper.apply({k: self._available_source_states[k] for k in group.inputs})
 
             for input_name in group.inputs:
                 del self._available_source_states[input_name]
@@ -118,7 +116,7 @@ class _StateWritingFlowLocal:
             warnings.warn(
                 f"State Writing: The following source tensors were provided but not consumed by any "
                 f"mapper group and will be ignored: {sorted(self._available_source_states.keys())}",
-                stacklevel=2
+                stacklevel=2,
             )
 
         weight_map_local = {
@@ -126,10 +124,7 @@ class _StateWritingFlowLocal:
             for name, shard_idx in self._weight_name_to_local_shard_idx.items()
         }
 
-        return ModelStateIndex(
-            metadata=ModelStateIndexMeta(total_size=self._total_size),
-            weight_map=weight_map_local
-        )
+        return ModelStateIndex(metadata=ModelStateIndexMeta(total_size=self._total_size), weight_map=weight_map_local)
 
     def write(self, state_generator: Iterable[tuple[str, torch.Tensor]]) -> ModelStateIndex | None:
         with self._pbar:
@@ -169,19 +164,18 @@ def _finalize_master(dest_dir: Path, indices: list[ModelStateIndex]):
     index_path = dest_dir / MODEL_STATE_INDEX_FILE_NAME
     index_path.write_text(
         ModelStateIndex(
-            metadata=ModelStateIndexMeta(total_size=total_size),
-            weight_map=total_weight_map
+            metadata=ModelStateIndexMeta(total_size=total_size), weight_map=total_weight_map
         ).model_dump_json(indent=4),
-        encoding="utf-8"
+        encoding="utf-8",
     )
 
 
 def write_model_state_local(
-        dest_dir: Path,
-        mapper: ModelStateMapper,
-        state_generator: Iterable[tuple[str, torch.Tensor]],
-        shard_size_gb: float = 4.0,
-        show_progress: bool = True
+    dest_dir: Path,
+    mapper: ModelStateMapper,
+    state_generator: Iterable[tuple[str, torch.Tensor]],
+    shard_size_gb: float = 4.0,
+    show_progress: bool = True,
 ):
     """
     Saves model states to disk in a single local process.
@@ -203,7 +197,7 @@ def write_model_state_local(
         shard_size_gb=shard_size_gb,
         show_progress=show_progress,
         sharding_rank=0,
-        is_current_process_rank_master=True
+        is_current_process_rank_master=True,
     ).write(state_generator=state_generator)
 
     idx = cast(ModelStateIndex, idx)  # we are sure is_current_process_rank_master=True
@@ -212,12 +206,12 @@ def write_model_state_local(
 
 
 def write_model_state_distributed(
-        dest_dir: Path,
-        mapper: ModelStateMapper,
-        state_generator: Iterable[tuple[str, torch.Tensor]],
-        process_group: ProcessGroup,
-        shard_size_gb: float = 4.0,
-        show_progress: bool = True
+    dest_dir: Path,
+    mapper: ModelStateMapper,
+    state_generator: Iterable[tuple[str, torch.Tensor]],
+    process_group: ProcessGroup,
+    shard_size_gb: float = 4.0,
+    show_progress: bool = True,
 ):
     """
     Saves model states in a distributed setup (multiple processes).
@@ -243,7 +237,7 @@ def write_model_state_distributed(
         shard_size_gb=shard_size_gb,
         show_progress=show_progress,
         sharding_rank=process_group.rank(),
-        is_current_process_rank_master=True
+        is_current_process_rank_master=True,
     ).write(state_generator=state_generator)
     gather_idx = all_gather_object(current_idx, process_group)
     gather_idx_filter = [x for x in gather_idx if x is not None]
@@ -252,13 +246,13 @@ def write_model_state_distributed(
 
 
 def write_model_state_pipeline_parallel(
-        dest_dir: Path,
-        mapper: ModelStateMapper,
-        state_generator: Iterable[tuple[str, torch.Tensor]],
-        device_mesh: DeviceMesh,
-        pipeline_dim_name: str,
-        shard_size_gb: float = 4.0,
-        show_progress: bool = True
+    dest_dir: Path,
+    mapper: ModelStateMapper,
+    state_generator: Iterable[tuple[str, torch.Tensor]],
+    device_mesh: DeviceMesh,
+    pipeline_dim_name: str,
+    shard_size_gb: float = 4.0,
+    show_progress: bool = True,
 ):
     """
     Saves model states in a complex ND distributed training setting.
@@ -288,10 +282,7 @@ def write_model_state_pipeline_parallel(
         raise ValueError("Cannot save state using a DeviceMesh with no dim names or coords")
 
     non_pipeline_coord_sum = sum(
-        coord
-        for name, coord
-        in zip(mesh_dim_names, coords, strict=True)
-        if name != pipeline_dim_name
+        coord for name, coord in zip(mesh_dim_names, coords, strict=True) if name != pipeline_dim_name
     )
     master_within_pipeline_rank = non_pipeline_coord_sum == 0
 
@@ -301,7 +292,7 @@ def write_model_state_pipeline_parallel(
         shard_size_gb=shard_size_gb,
         show_progress=show_progress,
         sharding_rank=pipeline_rank,
-        is_current_process_rank_master=master_within_pipeline_rank
+        is_current_process_rank_master=master_within_pipeline_rank,
     ).write(state_generator=state_generator)
     gather_idx = all_gather_object(current_idx, device_mesh.get_group(0))
     gather_idx_filter = [x for x in gather_idx if x is not None]

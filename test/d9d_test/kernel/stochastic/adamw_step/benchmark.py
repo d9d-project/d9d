@@ -28,7 +28,7 @@ def run_benchmark():
     configs = [
         triton.testing.Benchmark(
             x_names=["n_elements"],
-            x_vals=[2 ** i for i in range(20, 27)],  # 1M to ~130M elements
+            x_vals=[2**i for i in range(20, 27)],  # 1M to ~130M elements
             line_arg="provider",
             line_vals=list(_PROVIDER_TO_FN.keys()),
             line_names=list(_PROVIDER_TO_FN.keys()),
@@ -57,14 +57,7 @@ def run_benchmark():
         step = 10
 
         fn = functools.partial(
-            _PROVIDER_TO_FN[provider],
-            p, g, m, v,
-            lr=lr,
-            beta1=beta1,
-            beta2=beta2,
-            eps=eps,
-            weight_decay=wd,
-            step=step
+            _PROVIDER_TO_FN[provider], p, g, m, v, lr=lr, beta1=beta1, beta2=beta2, eps=eps, weight_decay=wd, step=step
         )
 
         ms, min_ms, max_ms = triton.testing.do_bench(fn, quantiles=[0.5, 0.2, 0.8])

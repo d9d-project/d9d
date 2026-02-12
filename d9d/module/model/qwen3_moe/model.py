@@ -28,11 +28,11 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
     """
 
     def __init__(
-            self,
-            params: Qwen3MoEParameters,
-            stage: PipelineStageInfo,
-            hidden_states_snapshot_mode: HiddenStatesAggregationMode,
-            enable_checkpointing: bool
+        self,
+        params: Qwen3MoEParameters,
+        stage: PipelineStageInfo,
+        hidden_states_snapshot_mode: HiddenStatesAggregationMode,
+        enable_checkpointing: bool,
     ):
         """
         Constructs the Qwen3MoEModel object.
@@ -50,7 +50,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             self.embed_tokens = SplitTokenEmbeddings(
                 hidden_size=params.layer.hidden_size,
                 split_vocab_size=params.split_vocab_size,
-                split_order=params.split_vocab_order
+                split_order=params.split_vocab_order,
             )
 
         # we use ModuleDict here to properly handle pipelining and loading weights after the model
@@ -59,27 +59,20 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             num_layers=params.num_hidden_layers,
             num_virtual_layers_pre=params.pipeline_num_virtual_layers_pre,  # embeddings
             num_virtual_layers_post=params.pipeline_num_virtual_layers_post,  # LM head
-            stage=stage
+            stage=stage,
         )
 
         self._num_layers_before = layer_start
         self._layers_iter = list(map(str, range(layer_start, layer_end)))
-        layers = nn.ModuleDict({
-            str(layer_idx): Qwen3MoELayer(params=params.layer) for layer_idx in self._layers_iter
-        })
+        layers = nn.ModuleDict({str(layer_idx): Qwen3MoELayer(params=params.layer) for layer_idx in self._layers_iter})
         self.layers: Mapping[str, Qwen3MoELayer] = cast(Mapping[str, Qwen3MoELayer], layers)
 
         self.rope_provider = RotaryEmbeddingProvider(
-            max_position_ids=params.max_position_ids,
-            rope_base=params.rope_base,
-            head_dim=params.layer.head_dim
+            max_position_ids=params.max_position_ids, rope_base=params.rope_base, head_dim=params.layer.head_dim
         )
 
         if stage.is_current_stage_last:
-            self.norm = nn.RMSNorm(
-                normalized_shape=params.layer.hidden_size,
-                eps=params.layer.rms_norm_eps
-            )
+            self.norm = nn.RMSNorm(normalized_shape=params.layer.hidden_size, eps=params.layer.rms_norm_eps)
 
         self._stage = stage
         self._hidden_states_snapshot_mode = hidden_states_snapshot_mode
@@ -93,12 +86,12 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         return self.layers[self._layers_iter[0]].input_layernorm.weight.dtype
 
     def forward(
-            self,
-            input_ids: torch.Tensor | None = None,
-            hidden_states: torch.Tensor | None = None,
-            position_ids: torch.Tensor | None = None,
-            hidden_states_snapshot: torch.Tensor | None = None,
-            hidden_states_agg_mask: torch.Tensor | None = None,
+        self,
+        input_ids: torch.Tensor | None = None,
+        hidden_states: torch.Tensor | None = None,
+        position_ids: torch.Tensor | None = None,
+        hidden_states_snapshot: torch.Tensor | None = None,
+        hidden_states_agg_mask: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         """
         Executes the forward pass for the current pipeline stage.
@@ -134,10 +127,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             decoder_layer = self.layers[decoder_layer_name]
 
             if self._enable_checkpointing:
-                last_hidden_states = checkpoint(
-                    decoder_layer, last_hidden_states, rope_params,
-                    use_reentrant=False
-                )
+                last_hidden_states = checkpoint(decoder_layer, last_hidden_states, rope_params, use_reentrant=False)
             else:
                 last_hidden_states = decoder_layer(last_hidden_states, rope_params)
 
@@ -148,7 +138,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
 
         return {
             "hidden_states": last_hidden_states,
-            "hidden_states_snapshot": state_aggregator.pack_with_snapshot(hidden_states_snapshot)
+            "hidden_states_snapshot": state_aggregator.pack_with_snapshot(hidden_states_snapshot),
         }
 
     def reset_moe_stats(self):
@@ -168,10 +158,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             A tensor of shape (num_local_layers, num_experts) containing counts.
         """
 
-        return torch.stack(
-            [self.layers[layer_name].moe_tokens_per_expert for layer_name in self._layers_iter],
-            dim=0
-        )
+        return torch.stack([self.layers[layer_name].moe_tokens_per_expert for layer_name in self._layers_iter], dim=0)
 
     def reset_parameters(self):
         """Resets module parameters"""
@@ -189,7 +176,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             self.norm.reset_parameters()
 
     def infer_stage_inputs_from_pipeline_inputs(
-            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+        self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
         input_ids = inputs["input_ids"]
 
@@ -198,28 +185,26 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         # for calculation - input ids or prev hidden state
         if self._stage.is_current_stage_first:
             pp_inputs["input_ids"] = torch.empty(
-                (input_ids.shape[0] // n_microbatches, input_ids.shape[1]),
-                dtype=torch.long,
-                device=input_ids.device
+                (input_ids.shape[0] // n_microbatches, input_ids.shape[1]), dtype=torch.long, device=input_ids.device
             )
         else:
             pp_inputs["hidden_states"] = torch.empty(
                 (input_ids.shape[0] // n_microbatches, input_ids.shape[1], self._hidden_size),
                 dtype=self.output_dtype(),
-                device=input_ids.device
+                device=input_ids.device,
             )
             if self._hidden_states_snapshot_mode != HiddenStatesAggregationMode.no:
                 num_layers_before = self._num_layers_before + 1  # 1 for embedding
                 pp_inputs["hidden_states_snapshot"] = torch.empty(
                     (num_layers_before, input_ids.shape[0] // n_microbatches, self._hidden_size),
                     dtype=self.output_dtype(),
-                    device=input_ids.device
+                    device=input_ids.device,
                 )
 
         return pp_inputs
 
     def infer_stage_outputs_from_pipeline_inputs(
-            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+        self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
         input_ids = inputs["input_ids"]
 
@@ -228,7 +213,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             "hidden_states": torch.empty(
                 (input_ids.shape[0] // n_microbatches, input_ids.shape[1], self._hidden_size),
                 dtype=self.output_dtype(),
-                device=input_ids.device
+                device=input_ids.device,
             )
         }
 
@@ -240,7 +225,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             pp_outputs["hidden_states_snapshot"] = torch.empty(
                 (num_layers_after, input_ids.shape[0] // n_microbatches, self._hidden_size),
                 dtype=self.output_dtype(),
-                device=input_ids.device
+                device=input_ids.device,
             )
 
         return pp_outputs
@@ -254,11 +239,11 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
     """
 
     def __init__(
-            self,
-            params: Qwen3MoEForCausalLMParameters,
-            stage: PipelineStageInfo,
-            hidden_states_snapshot_mode: HiddenStatesAggregationMode,
-            enable_checkpointing: bool
+        self,
+        params: Qwen3MoEForCausalLMParameters,
+        stage: PipelineStageInfo,
+        hidden_states_snapshot_mode: HiddenStatesAggregationMode,
+        enable_checkpointing: bool,
     ):
         """
         Constructs the Qwen3MoEForCausalLM object.
@@ -276,27 +261,27 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             params.model,
             stage,
             hidden_states_snapshot_mode=hidden_states_snapshot_mode,
-            enable_checkpointing=enable_checkpointing
+            enable_checkpointing=enable_checkpointing,
         )
 
         if stage.is_current_stage_last:
             self.lm_head = SplitLanguageModellingHead(
                 split_vocab_size=params.model.split_vocab_size,
                 split_order=params.model.split_vocab_order,
-                hidden_size=params.model.layer.hidden_size
+                hidden_size=params.model.layer.hidden_size,
             )
 
         self._stage = stage
         self._hidden_size = params.model.layer.hidden_size
 
     def forward(
-            self,
-            input_ids: torch.Tensor | None = None,
-            hidden_states: torch.Tensor | None = None,
-            position_ids: torch.Tensor | None = None,
-            hidden_states_snapshot: torch.Tensor | None = None,
-            hidden_states_agg_mask: torch.Tensor | None = None,
-            labels: torch.Tensor | None = None
+        self,
+        input_ids: torch.Tensor | None = None,
+        hidden_states: torch.Tensor | None = None,
+        position_ids: torch.Tensor | None = None,
+        hidden_states_snapshot: torch.Tensor | None = None,
+        hidden_states_agg_mask: torch.Tensor | None = None,
+        labels: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         """
         Executes the model forward pass.
@@ -322,13 +307,10 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             hidden_states=hidden_states,
             position_ids=position_ids,
             hidden_states_snapshot=hidden_states_snapshot,
-            hidden_states_agg_mask=hidden_states_agg_mask
+            hidden_states_agg_mask=hidden_states_agg_mask,
         )
         if self._stage.is_current_stage_last:
-            lm_out = self.lm_head(
-                hidden_states=model_outputs["hidden_states"],
-                labels=labels
-            )
+            lm_out = self.lm_head(hidden_states=model_outputs["hidden_states"], labels=labels)
             model_outputs["logps"] = lm_out
         return model_outputs
 
@@ -358,12 +340,12 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         return self.model.moe_tokens_per_expert
 
     def infer_stage_inputs_from_pipeline_inputs(
-            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+        self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
         return self.model.infer_stage_inputs_from_pipeline_inputs(inputs, n_microbatches)
 
     def infer_stage_outputs_from_pipeline_inputs(
-            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+        self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
         pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(inputs, n_microbatches)
 
@@ -381,11 +363,11 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
     """
 
     def __init__(
-            self,
-            params: Qwen3MoEForClassificationParameters,
-            stage: PipelineStageInfo,
-            hidden_states_snapshot_mode: HiddenStatesAggregationMode,
-            enable_checkpointing: bool
+        self,
+        params: Qwen3MoEForClassificationParameters,
+        stage: PipelineStageInfo,
+        hidden_states_snapshot_mode: HiddenStatesAggregationMode,
+        enable_checkpointing: bool,
     ):
         """
         Constructs the Qwen3MoEForClassification object.
@@ -403,14 +385,14 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
             params.model,
             stage,
             hidden_states_snapshot_mode=hidden_states_snapshot_mode,
-            enable_checkpointing=enable_checkpointing
+            enable_checkpointing=enable_checkpointing,
         )
 
         if stage.is_current_stage_last:
             self.cls_head = ClassificationHead(
                 hidden_size=params.model.layer.hidden_size,
                 num_labels=params.num_labels,
-                dropout=params.classifier_dropout
+                dropout=params.classifier_dropout,
             )
 
         self._stage = stage
@@ -418,13 +400,13 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
         self._num_labels = params.num_labels
 
     def forward(
-            self,
-            input_ids: torch.Tensor | None = None,
-            hidden_states: torch.Tensor | None = None,
-            position_ids: torch.Tensor | None = None,
-            hidden_states_snapshot: torch.Tensor | None = None,
-            hidden_states_agg_mask: torch.Tensor | None = None,
-            pooling_mask: torch.Tensor | None = None
+        self,
+        input_ids: torch.Tensor | None = None,
+        hidden_states: torch.Tensor | None = None,
+        position_ids: torch.Tensor | None = None,
+        hidden_states_snapshot: torch.Tensor | None = None,
+        hidden_states_agg_mask: torch.Tensor | None = None,
+        pooling_mask: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         """
         Executes the classification model forward pass.
@@ -449,12 +431,11 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
             hidden_states=hidden_states,
             position_ids=position_ids,
             hidden_states_snapshot=hidden_states_snapshot,
-            hidden_states_agg_mask=hidden_states_agg_mask
+            hidden_states_agg_mask=hidden_states_agg_mask,
         )
         if self._stage.is_current_stage_last:
             model_outputs["scores"] = self.cls_head(
-                hidden_states=model_outputs["hidden_states"],
-                pooling_mask=pooling_mask
+                hidden_states=model_outputs["hidden_states"], pooling_mask=pooling_mask
             )
         return model_outputs
 
@@ -484,19 +465,17 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
         return self.model.moe_tokens_per_expert
 
     def infer_stage_inputs_from_pipeline_inputs(
-            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+        self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
         return self.model.infer_stage_inputs_from_pipeline_inputs(inputs, n_microbatches)
 
     def infer_stage_outputs_from_pipeline_inputs(
-            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+        self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
         pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(inputs, n_microbatches)
 
         if self._stage.is_current_stage_last:
             batch_size = inputs["input_ids"].shape[0] // n_microbatches
-            pp_outputs["scores"] = torch.empty(
-                (batch_size, self._num_labels), dtype=torch.float32
-            )
+            pp_outputs["scores"] = torch.empty((batch_size, self._num_labels), dtype=torch.float32)
 
         return pp_outputs

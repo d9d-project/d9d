@@ -119,8 +119,7 @@ def test_config_validation():
             return 0
 
     with pytest.raises(ValueError, match="Dataset should implement __len__"):
-        ShardedDataset(UnsizedDataset(), 2, 0, ShardIndexingMode.sequential,
-                       pad_to_equal_size_across_shards=False)
+        ShardedDataset(UnsizedDataset(), 2, 0, ShardIndexingMode.sequential, pad_to_equal_size_across_shards=False)
 
 
 @pytest.mark.local
@@ -129,10 +128,7 @@ def test_shard_dataset_factory_non_distributed(dist_ctx_factory):
 
     dataset = SimpleDataset(100)
     sharded = shard_dataset_data_parallel(
-        dataset,
-        dist_ctx,
-        indexing_mode=ShardIndexingMode.chunked,
-        pad_to_equal_size_across_shards=True
+        dataset, dist_ctx, indexing_mode=ShardIndexingMode.chunked, pad_to_equal_size_across_shards=True
     )
 
     assert isinstance(sharded, ShardedDataset)
@@ -148,10 +144,7 @@ def test_shard_dataset_factory_distributed(dist_ctx_factory):
     dataset = SimpleDataset(16)  # 16 items, 8 shards -> 2 items/shard
 
     sharded = shard_dataset_data_parallel(
-        dataset,
-        dist_ctx,
-        indexing_mode=ShardIndexingMode.sequential,
-        pad_to_equal_size_across_shards=False
+        dataset, dist_ctx, indexing_mode=ShardIndexingMode.sequential, pad_to_equal_size_across_shards=False
     )
 
     sharded = cast(ShardedDataset, sharded)

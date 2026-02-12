@@ -23,15 +23,9 @@ def _do_standard_forward(stages: list[PipelineModel], x: torch.Tensor, y: torch.
     return x_in
 
 
-@pytest.mark.parametrize(
-    "n_microbatches",
-    [1, 2, 4, 8, 16, 32]
-)
+@pytest.mark.parametrize("n_microbatches", [1, 2, 4, 8, 16, 32])
 @pytest.mark.distributed
-def test_inference_e2e(
-        dist_ctx_factory,
-        n_microbatches: int
-):
+def test_inference_e2e(dist_ctx_factory, n_microbatches: int):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=8))
     pp_mesh = dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"]
     n_stages = pp_mesh.size()
@@ -60,7 +54,7 @@ def test_inference_e2e(
         n_microbatches=n_microbatches,
         schedule_config=PipelineScheduleInferenceConfig(),
         model_provider=_model_provider,
-        callback=_result_fn
+        callback=_result_fn,
     )
 
     schedule_info.schedule.configure_buffers(inputs={"x": x}, kwargs={"y": y}, sharding_spec=None)
@@ -106,7 +100,7 @@ def test_inference_e2e_local(dist_ctx_factory):
         n_microbatches=4,  # Ignored by offline executor strategies usually, but passed for API
         schedule_config=PipelineScheduleInferenceConfig(),
         model_provider=_model_provider,
-        callback=_result_fn
+        callback=_result_fn,
     )
 
     assert isinstance(schedule_info.schedule, OfflinePipelineExecutor)

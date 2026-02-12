@@ -44,6 +44,7 @@ def set_seeds(
 
     try:
         import numpy as np  # noqa: PLC0415
+
         np.random.seed(seed)
     except ImportError:
         pass
@@ -52,10 +53,7 @@ def set_seeds(
     if dist_context.mesh_params.is_distributed:
         mesh_regular = dist_context.mesh_for(REGULAR_DOMAIN)
         duplicate_seed_mesh_dim = tuple(
-            name
-            for name
-            in cast(list[str], mesh_regular.mesh_dim_names)
-            if name != distinct_seed_mesh_dim
+            name for name in cast(list[str], mesh_regular.mesh_dim_names) if name != distinct_seed_mesh_dim
         )
         duplicate_seed_mesh = mesh_regular[duplicate_seed_mesh_dim] if len(duplicate_seed_mesh_dim) != 0 else None
 

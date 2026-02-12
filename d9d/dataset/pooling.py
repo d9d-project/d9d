@@ -18,8 +18,7 @@ class TokenPoolingType(StrEnum):
 
 
 def token_pooling_mask_from_attention_mask(
-        attention_mask: torch.Tensor,
-        pooling_type: TokenPoolingType
+    attention_mask: torch.Tensor, pooling_type: TokenPoolingType
 ) -> torch.Tensor:
     """Generates a binary mask for token pooling based on the specified strategy.
 

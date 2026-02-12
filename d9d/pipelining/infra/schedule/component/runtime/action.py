@@ -216,7 +216,7 @@ class ForwardComputeAction(ActionBase):
         stage.forward_one_chunk(
             microbatch_index=self.microbatch_idx,
             pipeline_inputs=ctx.pipeline_inputs_microbatches[self.microbatch_idx],
-            pipeline_kwargs=ctx.pipeline_kwargs_microbatches[self.microbatch_idx]
+            pipeline_kwargs=ctx.pipeline_kwargs_microbatches[self.microbatch_idx],
         )
         result = stage.get_local_fwd_output(self.microbatch_idx)
 
@@ -224,10 +224,7 @@ class ForwardComputeAction(ActionBase):
             ctx.callback.trigger(result, self.microbatch_idx)
 
         if not stage.info.is_current_stage_last and self.stage_idx + 1 in ctx.stages:
-            ctx.stages[self.stage_idx + 1].set_local_fwd_input(
-                inputs=result,
-                microbatch_index=self.microbatch_idx
-            )
+            ctx.stages[self.stage_idx + 1].set_local_fwd_input(inputs=result, microbatch_index=self.microbatch_idx)
 
     @property
     def work_type(self) -> ActionWorkType:
@@ -269,16 +266,11 @@ class BackwardFullInputComputeAction(ActionBase):
         else:
             loss = None
 
-        stage.backward_one_chunk(
-            microbatch_index=self.microbatch_idx,
-            full_backward=self.full_backward,
-            loss=loss
-        )
+        stage.backward_one_chunk(microbatch_index=self.microbatch_idx, full_backward=self.full_backward, loss=loss)
 
         if not stage.info.is_current_stage_first and self.stage_idx - 1 in ctx.stages:
             ctx.stages[self.stage_idx - 1].set_local_bwd_input(
-                microbatch_index=self.microbatch_idx,
-                inputs=stage.pop_local_bwd_output(self.microbatch_idx)
+                microbatch_index=self.microbatch_idx, inputs=stage.pop_local_bwd_output(self.microbatch_idx)
             )
 
     @property
@@ -310,9 +302,7 @@ class BackwardWeightComputeAction(ActionBase):
     def apply(self, ctx: ActionContext):
         stage = ctx.stages[self.stage_idx]
 
-        stage.backward_weight_one_chunk(
-            microbatch_index=self.microbatch_idx
-        )
+        stage.backward_weight_one_chunk(microbatch_index=self.microbatch_idx)
 
     @property
     def work_type(self) -> ActionWorkType:

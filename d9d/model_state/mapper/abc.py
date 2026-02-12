@@ -23,19 +23,19 @@ class StateGroup:
 
 class ModelStateMapper(abc.ABC):
     """
-   The abstract base class for all model state transformation operations.
+    The abstract base class for all model state transformation operations.
 
-   This class serves as the interface between the definition of a transformation
-   topology and the actual execution of tensor operations.
+    This class serves as the interface between the definition of a transformation
+    topology and the actual execution of tensor operations.
 
-   It enforces a Declarative vs. Imperative separation of concerns:
+    It enforces a Declarative vs. Imperative separation of concerns:
 
-   1.  Declarative (Topology): Through `state_dependency_groups()`, the mapper
-       announces *what* it intends to do without handling any data. This allows the system to build execution graphs,
-       validate chains, detect collisions, and shard tasks *before* allocating memory.
-   2.  Imperative (Execution): Through `apply()`, the mapper performs the
-       actual logic (PyTorch operations) on model states.
-   """
+    1.  Declarative (Topology): Through `state_dependency_groups()`, the mapper
+        announces *what* it intends to do without handling any data. This allows the system to build execution graphs,
+        validate chains, detect collisions, and shard tasks *before* allocating memory.
+    2.  Imperative (Execution): Through `apply()`, the mapper performs the
+        actual logic (PyTorch operations) on model states.
+    """
 
     @abc.abstractmethod
     def state_dependency_groups(self) -> frozenset[StateGroup]:

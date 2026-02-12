@@ -28,33 +28,33 @@ class MoELayer(nn.Module, ModuleLateInit):
     """
 
     def __init__(
-            self,
-            hidden_dim: int,
-            intermediate_dim_grouped: int,
-            num_grouped_experts: int,
-            top_k: int,
-            router_renormalize_probabilities: bool
+        self,
+        hidden_dim: int,
+        intermediate_dim_grouped: int,
+        num_grouped_experts: int,
+        top_k: int,
+        router_renormalize_probabilities: bool,
     ):
         """
-        Constructs the MoELayer.
+         Constructs the MoELayer.
 
-       Args:
-           hidden_dim: Hidden size.
-           intermediate_dim_grouped: Intermediate dimension for the Expert FFNs.
-           num_grouped_experts: Total number of experts.
-           top_k: Number of experts to route each token to.
-           router_renormalize_probabilities: Configures router probability normalization behavior.
-       """
+        Args:
+            hidden_dim: Hidden size.
+            intermediate_dim_grouped: Intermediate dimension for the Expert FFNs.
+            num_grouped_experts: Total number of experts.
+            top_k: Number of experts to route each token to.
+            router_renormalize_probabilities: Configures router probability normalization behavior.
+        """
 
         super().__init__()
         self.router = TopKRouter(
-            dim=hidden_dim, num_experts=num_grouped_experts, top_k=top_k,
-            renormalize_probabilities=router_renormalize_probabilities
+            dim=hidden_dim,
+            num_experts=num_grouped_experts,
+            top_k=top_k,
+            renormalize_probabilities=router_renormalize_probabilities,
         )
         self.grouped_experts = GroupedSwiGLU(
-            hidden_dim=hidden_dim,
-            intermediate_dim=intermediate_dim_grouped,
-            num_experts=num_grouped_experts
+            hidden_dim=hidden_dim, intermediate_dim=intermediate_dim_grouped, num_experts=num_grouped_experts
         )
         self._communicator: ExpertCommunicationHandler = NoCommunicationHandler(num_grouped_experts)
 
@@ -87,10 +87,7 @@ class MoELayer(nn.Module, ModuleLateInit):
         """Resets the expert load balancing counters."""
         self.tokens_per_expert.zero_()
 
-    def forward(
-            self,
-            hidden_states: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
         """
         Routes tokens to experts, computes, and combines results.
 

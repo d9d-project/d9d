@@ -44,9 +44,7 @@ def shard_spec_on_dim(tree: PyTree[Any], dim: int) -> ShardingSpec:
     """
 
     return pytree.tree_map(
-        lambda x: _tree_item_to_shard(x, dim),
-        tree,
-        is_leaf=lambda x: isinstance(x, (torch.Tensor, list))
+        lambda x: _tree_item_to_shard(x, dim), tree, is_leaf=lambda x: isinstance(x, (torch.Tensor, list))
     )
 
 

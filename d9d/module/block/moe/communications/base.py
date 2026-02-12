@@ -8,10 +8,7 @@ class ExpertCommunicationHandler(abc.ABC):
 
     @abc.abstractmethod
     def dispatch(
-            self,
-            hidden_states: torch.Tensor,
-            topk_ids: torch.Tensor,
-            topk_weights: torch.Tensor
+        self, hidden_states: torch.Tensor, topk_ids: torch.Tensor, topk_weights: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Prepares and routes local hidden states to their target experts (possibly on other workers).
@@ -39,10 +36,7 @@ class ExpertCommunicationHandler(abc.ABC):
         ...
 
     @abc.abstractmethod
-    def combine(
-            self,
-            hidden_states: torch.Tensor
-    ) -> torch.Tensor:
+    def combine(self, hidden_states: torch.Tensor) -> torch.Tensor:
         """
         Restores hidden states to their original order and location.
 

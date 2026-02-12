@@ -25,16 +25,12 @@ def test_local_equivalence(norm_type, max_norm):
         p_d.grad = p_t.grad.clone()
 
     # Calculate using PyTorch
-    torch_total_norm = torch.nn.utils.clip_grad_norm_(
-        params_torch, max_norm=max_norm or 1e9, norm_type=norm_type
-    )
+    torch_total_norm = torch.nn.utils.clip_grad_norm_(params_torch, max_norm=max_norm or 1e9, norm_type=norm_type)
 
     # Calculate using d9d
     groups = group_parameters_for_norm(params_d9d)
 
-    d9d_total_norm = clip_grad_norm_distributed_(
-        groups, max_norm=max_norm, norm_type=norm_type, pp_mesh=None
-    )
+    d9d_total_norm = clip_grad_norm_distributed_(groups, max_norm=max_norm, norm_type=norm_type, pp_mesh=None)
 
     # Check Norm Value
     assert torch.isclose(torch_total_norm, d9d_total_norm)
@@ -47,11 +43,7 @@ def test_local_equivalence(norm_type, max_norm):
 
 @pytest.mark.distributed
 def test_pp_ep_norm_calculation(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(
-        pipeline_parallel=4,
-        expert_parallel=2,
-        data_parallel_replicate=2
-    ))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=4, expert_parallel=2, data_parallel_replicate=2))
 
     ep_mesh = dist_ctx.mesh_for(EXPERT_DOMAIN)
     sub_mesh = ep_mesh[["ep_replicate", "ep_shard"]]
@@ -59,19 +51,11 @@ def test_pp_ep_norm_calculation(dist_ctx_factory):
     pp_rank = pp_mesh.get_local_rank()
 
     param_rep = nn.Parameter(
-        distribute_tensor(
-            torch.zeros(8, 8, device="cuda"),
-            device_mesh=sub_mesh,
-            placements=[Replicate(), Replicate()]
-        )
+        distribute_tensor(torch.zeros(8, 8, device="cuda"), device_mesh=sub_mesh, placements=[Replicate(), Replicate()])
     )
 
     param_sharded = nn.Parameter(
-        distribute_tensor(
-            torch.zeros(8, 16, device="cuda"),
-            device_mesh=sub_mesh,
-            placements=[Replicate(), Shard(1)]
-        )
+        distribute_tensor(torch.zeros(8, 16, device="cuda"), device_mesh=sub_mesh, placements=[Replicate(), Shard(1)])
     )
 
     params = []
@@ -81,9 +65,7 @@ def test_pp_ep_norm_calculation(dist_ctx_factory):
         # Grad = 1.0 everywhere. 8x8 = 64 elements.
         # Since it is replicated, norm is calculated locally. SqNorm = 64.
         param_rep.grad = distribute_tensor(
-            torch.ones(8, 8, device="cuda"),
-            device_mesh=sub_mesh,
-            placements=[Replicate(), Replicate()]
+            torch.ones(8, 8, device="cuda"), device_mesh=sub_mesh, placements=[Replicate(), Replicate()]
         )
         params.append(param_rep)
 
@@ -95,11 +77,7 @@ def test_pp_ep_norm_calculation(dist_ctx_factory):
         # Local SqNorm = 64.
         # Since it is sharded, global norm sums the squares over the shard group.
         # Total Global SqNorm for this param = 64 (Rank EP0) + 64 (Rank EP1) = 128.
-        param_sharded.grad = DTensor.from_local(
-            torch.ones(8, 8, device="cuda"),
-            sub_mesh,
-            [Replicate(), Shard(1)]
-        )
+        param_sharded.grad = DTensor.from_local(torch.ones(8, 8, device="cuda"), sub_mesh, [Replicate(), Shard(1)])
         params.append(param_sharded)
 
     # --- Group and Calculate ---
@@ -111,9 +89,7 @@ def test_pp_ep_norm_calculation(dist_ctx_factory):
     # PP Reduction: Sums PP0 + PP1 = 64 + 128 = 192.
     # Final Result: Sqrt(192)
 
-    global_norm = clip_grad_norm_distributed_(
-        groups, max_norm=None, norm_type=2.0, pp_mesh=pp_mesh
-    )
+    global_norm = clip_grad_norm_distributed_(groups, max_norm=None, norm_type=2.0, pp_mesh=pp_mesh)
 
     expected_sq = 64.0 + 128.0
     expected_norm = math.sqrt(expected_sq)
@@ -123,9 +99,7 @@ def test_pp_ep_norm_calculation(dist_ctx_factory):
     # --- Verify Clipping ---
     # Apply clipping with strict max_norm=1.0
     # Expected scaling factor: 1.0 / sqrt(192)
-    clip_grad_norm_distributed_(
-        groups, max_norm=1.0, norm_type=2.0, pp_mesh=pp_mesh
-    )
+    clip_grad_norm_distributed_(groups, max_norm=1.0, norm_type=2.0, pp_mesh=pp_mesh)
 
     expected_scale = 1.0 / expected_norm
 

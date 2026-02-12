@@ -4,5 +4,5 @@ from .training import LRSchedulerProtocol, OptimizerProtocol
 
 __all__ = [
     "LRSchedulerProtocol",
-    "OptimizerProtocol"
+    "OptimizerProtocol",
 ]

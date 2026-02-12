@@ -47,11 +47,7 @@ class MetricAccumulator(Stateful):
     the sync phase via distributed reduction (all-reduce).
     """
 
-    def __init__(
-            self,
-            initial_value: torch.Tensor,
-            reduce_op: MetricReduceOp = MetricReduceOp.sum
-    ):
+    def __init__(self, initial_value: torch.Tensor, reduce_op: MetricReduceOp = MetricReduceOp.sum):
         """Constructs MetricAccumulator object.
 
         Args:
@@ -131,11 +127,7 @@ class MetricAccumulator(Stateful):
             Dictionary containing local and synchronized tensors and status flags.
         """
 
-        return {
-            "local": self._local,
-            "synchronized": self._synchronized,
-            "is_synchronized": self._is_synchronized
-        }
+        return {"local": self._local, "synchronized": self._synchronized, "is_synchronized": self._is_synchronized}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         """Restores the accumulator state from a checkpoint.

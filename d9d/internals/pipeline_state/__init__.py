@@ -10,5 +10,5 @@ from .handler import PipelineStateHandler
 
 __all__ = [
     "PipelineState",
-    "PipelineStateHandler"
+    "PipelineStateHandler",
 ]

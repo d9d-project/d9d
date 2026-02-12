@@ -100,7 +100,7 @@ class ProjectDataset(Dataset, DatasetImplementingSortKeyProtocol):
         return {
             "input_ids": input_ids,
             "labels": labels,
-            "position_ids": position_ids
+            "position_ids": position_ids,
         }
 
     @classmethod
@@ -111,7 +111,7 @@ class ProjectDataset(Dataset, DatasetImplementingSortKeyProtocol):
             # Pad labels with -100 (we ignore this value by default)
             "labels": pad_stack_1d([x["labels"] for x in batch], pad_value=LM_IGNORE_INDEX),
             # Pad position tokens
-            "position_ids": pad_stack_1d([x["position_ids"] for x in batch], pad_value=0)
+            "position_ids": pad_stack_1d([x["position_ids"] for x in batch], pad_value=0),
         }
 
     def __len__(self) -> int:
@@ -125,7 +125,7 @@ class ProjectDatasetProvider(DatasetProvider):
     @staticmethod
     def _count_tokens(item: dict, text_column: str, tokenizer: Tokenizer) -> dict:
         return {
-            "token_counts": len(tokenizer.encode(item[text_column]).tokens)
+            "token_counts": len(tokenizer.encode(item[text_column]).tokens),
         }
 
     def __call__(self, context: InitializeDatasetContext) -> InitializeDatasetResult:
@@ -135,20 +135,15 @@ class ProjectDatasetProvider(DatasetProvider):
         # the dataset and builds the cache first. Ranks 1-N wait, then load from cache.
         # Prevents race conditions and corruption on the HF cache.
         with context.dist_context.main_process_first():
-            data = datasets.load_dataset(
-                self._config.dataset,
-                split=self._config.split
-            ).take(
-                self._config.use_samples
-            ).shuffle(
-                self._config.shuffle_seed
-            ).map(
-                self._count_tokens,
-                num_proc=self._config.num_proc,
-                fn_kwargs={
-                    "tokenizer": tokenizer,
-                    "text_column": self._config.text_column
-                }
+            data = (
+                datasets.load_dataset(self._config.dataset, split=self._config.split)
+                .take(self._config.use_samples)
+                .shuffle(self._config.shuffle_seed)
+                .map(
+                    self._count_tokens,
+                    num_proc=self._config.num_proc,
+                    fn_kwargs={"tokenizer": tokenizer, "text_column": self._config.text_column},
+                )
             )
 
         dataset = ProjectDataset(data, tokenizer)
@@ -159,7 +154,7 @@ class ProjectDatasetProvider(DatasetProvider):
             dataset,
             buffer_size=self._config.presort_buffer_size,
             pack_size=context.batch_maths.global_batch_size,
-            init_seed=self._config.shuffle_seed
+            init_seed=self._config.shuffle_seed,
         )
 
         # Split dataset across data parallel ranks
@@ -167,7 +162,7 @@ class ProjectDatasetProvider(DatasetProvider):
 
         return InitializeDatasetResult(
             dataset=dataset_shard,
-            collator=ProjectDataset.collate
+            collator=ProjectDataset.collate,
         )
 
 
@@ -186,30 +181,24 @@ class ProjectModelProvider(ModelProvider[Qwen3MoEForCausalLM]):
             params=self._config.model,
             stage=context.stage,
             hidden_states_snapshot_mode=HiddenStatesAggregationMode.no,
-            enable_checkpointing=self._config.checkpointing
+            enable_checkpointing=self._config.checkpointing,
         ).bfloat16()
 
         return InitializeModelStageResult(
             model=model,
-            state_mapper=identity_mapper_from_module(model)
+            state_mapper=identity_mapper_from_module(model),
         )
 
     def parallelize_model_stage(self, context: ParallelizeModelStageContext):
         # Applies specific distributed strategies
         # suited for Qwen3 MoE architecture.
         # You can apply your own horizontal parallelism strategy here.
-        parallelize_qwen3_moe_for_causal_lm(
-            dist_context=context.dist_context,
-            stage=context.stage,
-            model=context.model
-        )
+        parallelize_qwen3_moe_for_causal_lm(dist_context=context.dist_context, stage=context.stage, model=context.model)
 
     def prepare_export_model_stage(self, context: PrepareExportModelStageContext) -> PrepareExportModelStageResult:
         # When exporting, save model weights as-is
 
-        return PrepareExportModelStageResult(
-            state_mapper=identity_mapper_from_module(context.model)
-        )
+        return PrepareExportModelStageResult(state_mapper=identity_mapper_from_module(context.model))
 
     def dump_hparams(self) -> ScalarTree:
         return self._config.model_dump(mode="json")
@@ -236,12 +225,12 @@ class PerplexityTask(InferenceTask[dict[str, torch.Tensor]]):
         # kwargs are the same for all the pipeline stages
         return BuildForwardInputsResult(
             inputs={
-                "input_ids": ctx.batch["input_ids"]
+                "input_ids": ctx.batch["input_ids"],
             },
             kwargs={
                 "labels": ctx.batch["labels"],
-                "position_ids": ctx.batch["position_ids"]
-            }
+                "position_ids": ctx.batch["position_ids"],
+            },
         )
 
     def process_outputs(self, ctx: ProcessOutputsContext):
@@ -270,9 +259,7 @@ class PerplexityTask(InferenceTask[dict[str, torch.Tensor]]):
 def main():
     # 1. Load Configuration
     # Uses Pydantic to validate the JSON structure against the class definitions above.
-    config = ProjectConfig.model_validate_json(
-        Path("calculate_perplexity.json").read_text(encoding="utf-8")
-    )
+    config = ProjectConfig.model_validate_json(Path("calculate_perplexity.json").read_text(encoding="utf-8"))
 
     # 2. Dependency Injection / Construction
     inference = InferenceConfigurator(
@@ -280,7 +267,7 @@ def main():
         parameters=config.inference,
         task_provider=lambda ctx: PerplexityTask(ctx.dist_context),
         model_provider=ProjectModelProvider(config.model_provider),
-        data_provider=ProjectDatasetProvider(config.data)
+        data_provider=ProjectDatasetProvider(config.data),
     ).configure()
 
     # 3. Execution

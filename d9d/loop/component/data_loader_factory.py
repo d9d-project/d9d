@@ -50,12 +50,7 @@ class IteratorBatchGroup(Iterator):
     It also moves the data to the specified device immediately upon access.
     """
 
-    def __init__(
-            self,
-            base: Iterator,
-            device: torch.types.Device,
-            batch_group_size: int
-    ):
+    def __init__(self, base: Iterator, device: torch.types.Device, batch_group_size: int):
         """
         Constructs an IteratorBatchGroup object.
 
@@ -124,12 +119,12 @@ class StatefulDataLoaderDataParallelAware(StatefulDataLoader):
     """
 
     def __init__(
-            self,
-            dataset: Dataset,
-            dp_rank: int,
-            device: torch.types.Device,
-            group_size: int,
-            **kwargs: Unpack[DataLoaderKwargs]
+        self,
+        dataset: Dataset,
+        dp_rank: int,
+        device: torch.types.Device,
+        group_size: int,
+        **kwargs: Unpack[DataLoaderKwargs],
     ):
         """
         Constructs a StatefulDataLoaderDataParallelAware object.
@@ -148,19 +143,13 @@ class StatefulDataLoaderDataParallelAware(StatefulDataLoader):
         self._group_size = group_size
 
     def state_dict(self) -> dict[str, Any]:
-        return {
-            f"dp_{self._dp_rank}": super().state_dict()
-        }
+        return {f"dp_{self._dp_rank}": super().state_dict()}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         super().load_state_dict(state_dict[f"dp_{self._dp_rank}"])
 
     def __iter__(self) -> Iterator:
-        return IteratorBatchGroup(
-            super().__iter__(),
-            device=self._device,
-            batch_group_size=self._group_size
-        )
+        return IteratorBatchGroup(super().__iter__(), device=self._device, batch_group_size=self._group_size)
 
 
 class DataLoaderFactory:
@@ -172,11 +161,11 @@ class DataLoaderFactory:
     """
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            provider: DatasetProvider,
-            config_data_loading: DataLoadingConfig,
-            batch_maths: BatchMaths
+        self,
+        dist_context: DistributedContext,
+        provider: DatasetProvider,
+        config_data_loading: DataLoadingConfig,
+        batch_maths: BatchMaths,
     ):
         """
         Constructs a DataLoaderFactory object.
@@ -196,16 +185,9 @@ class DataLoaderFactory:
         self._batch_maths = batch_maths
 
     def _build_dataloader(
-            self,
-            provider: DatasetProvider,
-            batch_size: int,
-            group_size: int,
-            drop_last: bool
+        self, provider: DatasetProvider, batch_size: int, group_size: int, drop_last: bool
     ) -> StatefulDataLoader:
-        result = provider(InitializeDatasetContext(
-            dist_context=self._dist_context,
-            batch_maths=self._batch_maths
-        ))
+        result = provider(InitializeDatasetContext(dist_context=self._dist_context, batch_maths=self._batch_maths))
 
         if self._dist_context.mesh_params.is_distributed:
             dp_rank = self._dist_context.mesh_for(BATCH_DOMAIN)["dp"].get_local_rank()
@@ -222,7 +204,7 @@ class DataLoaderFactory:
             batch_size=batch_size,
             dp_rank=dp_rank,
             device="cuda",
-            drop_last=drop_last
+            drop_last=drop_last,
         )
 
     def build_dataloader_for_train_job(self) -> StatefulDataLoader:
@@ -241,7 +223,7 @@ class DataLoaderFactory:
             self._provider,
             batch_size=self._batch_maths.data_loader_batch_size,
             group_size=self._batch_maths.num_microbatches_gradient_accumulation,
-            drop_last=True
+            drop_last=True,
         )
 
     def build_dataloader_for_infer_job(self) -> StatefulDataLoader:
@@ -256,8 +238,5 @@ class DataLoaderFactory:
         """
 
         return self._build_dataloader(
-            self._provider,
-            batch_size=self._batch_maths.data_loader_batch_size,
-            group_size=1,
-            drop_last=False
+            self._provider, batch_size=self._batch_maths.data_loader_batch_size, group_size=1, drop_last=False
         )

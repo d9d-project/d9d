@@ -17,7 +17,7 @@ class _TrackerImportFailed:
 
 
 _MAP: dict[type[AnyTrackerConfig], type[BaseTracker] | _TrackerImportFailed] = {
-    NullTrackerConfig: NullTracker
+    NullTrackerConfig: NullTracker,
 }
 
 try:

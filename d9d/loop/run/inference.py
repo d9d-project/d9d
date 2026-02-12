@@ -1,4 +1,3 @@
-
 import torch
 from tqdm import tqdm
 
@@ -39,12 +38,12 @@ class InferenceConfigurator:
     """
 
     def __init__(
-            self,
-            mesh: DeviceMeshParameters,
-            parameters: InferenceConfig,
-            task_provider: InferenceTaskProvider,
-            model_provider: ModelProvider,
-            data_provider: DatasetProvider
+        self,
+        mesh: DeviceMeshParameters,
+        parameters: InferenceConfig,
+        task_provider: InferenceTaskProvider,
+        model_provider: ModelProvider,
+        data_provider: DatasetProvider,
     ):
         """
         Constructs a configurator capable of building the full inference state.
@@ -66,50 +65,34 @@ class InferenceConfigurator:
     def _build_new_state(self) -> InferenceJobState:
         dist_context = self._mesh.build()
 
-        pipelining_config = PipeliningConfig(
-            schedule=PipelineScheduleInferenceConfig()
-        )
+        pipelining_config = PipeliningConfig(schedule=PipelineScheduleInferenceConfig())
 
         set_seeds(dist_context, seed=self._parameters.determinism.base_seed)
 
-        timeout_manager = TimeoutManager(
-            dist_context=dist_context,
-            config=self._parameters.timeout
-        )
+        timeout_manager = TimeoutManager(dist_context=dist_context, config=self._parameters.timeout)
         timeout_manager.set_init()
 
-        task = self._task_provider(InferenceTaskProviderContext(
-            dist_context=dist_context
-        ))
+        task = self._task_provider(InferenceTaskProviderContext(dist_context=dist_context))
 
         batch_maths = BatchMaths(
-            dist_context=dist_context,
-            config_batching=self._parameters.batching,
-            config_pipelining=pipelining_config
+            dist_context=dist_context, config_batching=self._parameters.batching, config_pipelining=pipelining_config
         )
 
         data_loader_factory = DataLoaderFactory(
             dist_context=dist_context,
             provider=self._data_provider,
             config_data_loading=self._parameters.data_loading,
-            batch_maths=batch_maths
+            batch_maths=batch_maths,
         )
         data_loader_infer = data_loader_factory.build_dataloader_for_infer_job()
 
-        stepper = Stepper(
-            initial_step=1,
-            total_steps=len(data_loader_infer)
-        )
+        stepper = Stepper(initial_step=1, total_steps=len(data_loader_infer))
 
         pipeline_state_handler = PipelineStateHandler(
-            sharding_spec={},
-            num_shards=batch_maths.num_microbatches_pipelining
+            sharding_spec={}, num_shards=batch_maths.num_microbatches_pipelining
         )
 
-        processor = InferenceProcessor(
-            state=pipeline_state_handler,
-            task=task
-        )
+        processor = InferenceProcessor(state=pipeline_state_handler, task=task)
 
         schedule, modules = ModelStageFactory(
             model_provider=self._model_provider,
@@ -117,35 +100,20 @@ class InferenceConfigurator:
             config_model=self._parameters.model_stage_factory,
             config_pipelining=pipelining_config,
             batch_maths=batch_maths,
-            pipeline_callback=processor
+            pipeline_callback=processor,
         ).build_pipeline_and_modules()
 
         task_operator = InferenceTaskOperator(
-            dist_context=dist_context,
-            task=task,
-            pipeline=schedule,
-            pipeline_state=pipeline_state_handler
+            dist_context=dist_context, task=task, pipeline=schedule, pipeline_state=pipeline_state_handler
         )
 
-        gc = ManualGarbageCollector(
-            dist_ctx=dist_context,
-            config=self._parameters.gc,
-            step=stepper
-        )
+        gc = ManualGarbageCollector(dist_ctx=dist_context, config=self._parameters.gc, step=stepper)
 
         checkpointer = StateCheckpointer(
-            dist_context=dist_context,
-            stepper=stepper,
-            config=self._parameters.checkpointing,
-            gc=gc,
-            run_name=None
+            dist_context=dist_context, stepper=stepper, config=self._parameters.checkpointing, gc=gc, run_name=None
         )
 
-        profiler = JobProfiler(
-            dist_context=dist_context,
-            stepper=stepper,
-            config=self._parameters.profiling
-        )
+        profiler = JobProfiler(dist_context=dist_context, stepper=stepper, config=self._parameters.profiling)
 
         return InferenceJobState(
             dist_context=dist_context,
@@ -158,7 +126,7 @@ class InferenceConfigurator:
             task=task,
             profiler=profiler,
             timeout_manager=timeout_manager,
-            task_operator=task_operator
+            task_operator=task_operator,
         )
 
     def configure(self) -> "Inference":
@@ -233,10 +201,10 @@ class Inference:
                     desc="Inference",
                     total=self._state.stepper.total_steps,
                     disable=not self._state.dist_context.is_local_main_process,
-                    initial=self._state.stepper.current_step
+                    initial=self._state.stepper.current_step,
                 ) as bar,
                 self._state.garbage_collector as gc,
-                self._state.profiler.open() as profiler
+                self._state.profiler.open() as profiler,
             ):
                 for batch_group in self._state.data_loader:
                     for batch in batch_group:

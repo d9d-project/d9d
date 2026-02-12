@@ -20,16 +20,16 @@ def _size_bucket(n_elements: int) -> int:
         triton.Config({"BLOCK_SIZE": 4096}, num_warps=8),
         triton.Config({"BLOCK_SIZE": 8192}, num_warps=8),
     ],
-    key=["size_bucket"]
+    key=["size_bucket"],
 )
 @triton.jit
 def _silu_mul_kernel(
-        x_ptr: torch.Tensor,
-        y_ptr: torch.Tensor,
-        out_ptr: torch.Tensor,
-        n_elements: int,
-        size_bucket: int,  # used for autotuning
-        BLOCK_SIZE: tl.constexpr,
+    x_ptr: torch.Tensor,
+    y_ptr: torch.Tensor,
+    out_ptr: torch.Tensor,
+    n_elements: int,
+    size_bucket: int,  # used for autotuning
+    BLOCK_SIZE: tl.constexpr,
 ):
     # prepare
     pid = tl.program_id(axis=0)
@@ -80,11 +80,7 @@ def silu_mul_forward(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     def _grid(meta: dict[str, int]) -> tuple[int, ...]:
         return (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
 
-    _silu_mul_kernel[_grid](
-        x, y, out,
-        n_elements,
-        size_bucket=_size_bucket(n_elements)
-    )
+    _silu_mul_kernel[_grid](x, y, out, n_elements, size_bucket=_size_bucket(n_elements))
 
     return out
 
@@ -97,18 +93,18 @@ def silu_mul_forward(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
         triton.Config({"BLOCK_SIZE": 4096}, num_warps=8),
         triton.Config({"BLOCK_SIZE": 8192}, num_warps=8),
     ],
-    key=["size_bucket"]
+    key=["size_bucket"],
 )
 @triton.jit
 def _silu_mul_backward_kernel(
-        grad_out_ptr: torch.Tensor,
-        x_ptr: torch.Tensor,
-        y_ptr: torch.Tensor,
-        grad_x_ptr: torch.Tensor,
-        grad_y_ptr: torch.Tensor,
-        n_elements: int,
-        size_bucket: int,  # used for autotuning
-        BLOCK_SIZE: tl.constexpr
+    grad_out_ptr: torch.Tensor,
+    x_ptr: torch.Tensor,
+    y_ptr: torch.Tensor,
+    grad_x_ptr: torch.Tensor,
+    grad_y_ptr: torch.Tensor,
+    n_elements: int,
+    size_bucket: int,  # used for autotuning
+    BLOCK_SIZE: tl.constexpr,
 ):
     # prepare
     pid = tl.program_id(0)
@@ -140,9 +136,7 @@ def _silu_mul_backward_kernel(
     tl.store(grad_x_ptr + offsets, dx, mask=mask)
 
 
-def silu_mul_backward(
-        grad_output: torch.Tensor, x: torch.Tensor, y: torch.Tensor
-) -> tuple[torch.Tensor, torch.Tensor]:
+def silu_mul_backward(grad_output: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Computes the backward pass of silu(x)*y using Triton.
 
@@ -171,10 +165,7 @@ def silu_mul_backward(
         return (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
 
     _silu_mul_backward_kernel[_grid](
-        grad_output, x, y,
-        grad_x, grad_y,
-        n_elements,
-        size_bucket=_size_bucket(n_elements)
+        grad_output, x, y, grad_x, grad_y, n_elements, size_bucket=_size_bucket(n_elements)
     )
 
     return grad_x, grad_y

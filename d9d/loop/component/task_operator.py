@@ -32,27 +32,14 @@ class ForwardResult:
     loss_weight: torch.Tensor
 
 
-def _run_pipeline(
-        task: BaseTask,
-        pipeline: PipelineScheduleInfo,
-        pipeline_state: PipelineStateHandler,
-        batch: PyTree
-):
+def _run_pipeline(task: BaseTask, pipeline: PipelineScheduleInfo, pipeline_state: PipelineStateHandler, batch: PyTree):
     model_inputs = task.build_forward_inputs(
-        BuildForwardInputsContext(
-            batch=batch,
-            state=pipeline_state.global_state()
-        )
+        BuildForwardInputsContext(batch=batch, state=pipeline_state.global_state())
     )
     pipeline.schedule.configure_buffers(
-        inputs=model_inputs.inputs,
-        kwargs=model_inputs.kwargs,
-        sharding_spec=model_inputs.pipeline_sharding_spec
+        inputs=model_inputs.inputs, kwargs=model_inputs.kwargs, sharding_spec=model_inputs.pipeline_sharding_spec
     )
-    pipeline.schedule.step(
-        inputs=model_inputs.inputs,
-        kwargs=model_inputs.kwargs
-    )
+    pipeline.schedule.step(inputs=model_inputs.inputs, kwargs=model_inputs.kwargs)
 
 
 class TrainTaskOperator:
@@ -64,12 +51,12 @@ class TrainTaskOperator:
     """
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            task: TrainTask,
-            pipeline: PipelineScheduleInfo,
-            pipeline_state: PipelineStateHandler,
-            metrics: ComposeMetric
+        self,
+        dist_context: DistributedContext,
+        task: TrainTask,
+        pipeline: PipelineScheduleInfo,
+        pipeline_state: PipelineStateHandler,
+        metrics: ComposeMetric,
     ):
         """
         Constructs the TrainTaskOperator.
@@ -111,12 +98,7 @@ class TrainTaskOperator:
 
         try:
             # Do forward and backward pass
-            _run_pipeline(
-                pipeline_state=self._pipeline_state,
-                task=self._task,
-                pipeline=self._pipeline,
-                batch=batch
-            )
+            _run_pipeline(pipeline_state=self._pipeline_state, task=self._task, pipeline=self._pipeline, batch=batch)
 
             # Update metrics if possible
 
@@ -124,14 +106,8 @@ class TrainTaskOperator:
             if not self._pipeline.has_last_stage:
                 return None
 
-            self._task.update_metrics(UpdateMetricsContext(
-                state=pipeline_state,
-                metrics=self._metrics.children
-            ))
-            return ForwardResult(
-                loss=pipeline_state[STATE_LOSS],
-                loss_weight=pipeline_state[STATE_LOSS_WEIGHT]
-            )
+            self._task.update_metrics(UpdateMetricsContext(state=pipeline_state, metrics=self._metrics.children))
+            return ForwardResult(loss=pipeline_state[STATE_LOSS], loss_weight=pipeline_state[STATE_LOSS_WEIGHT])
         finally:
             self._pipeline_state.reset()
 
@@ -145,11 +121,11 @@ class InferenceTaskOperator:
     """
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            task: InferenceTask,
-            pipeline: PipelineScheduleInfo,
-            pipeline_state: PipelineStateHandler
+        self,
+        dist_context: DistributedContext,
+        task: InferenceTask,
+        pipeline: PipelineScheduleInfo,
+        pipeline_state: PipelineStateHandler,
     ):
         """
         Constructs the InferenceTaskOperator.
@@ -182,11 +158,6 @@ class InferenceTaskOperator:
 
         try:
             # Do forward pass
-            _run_pipeline(
-                pipeline_state=self._pipeline_state,
-                task=self._task,
-                pipeline=self._pipeline,
-                batch=batch
-            )
+            _run_pipeline(pipeline_state=self._pipeline_state, task=self._task, pipeline=self._pipeline, batch=batch)
         finally:
             self._pipeline_state.reset()

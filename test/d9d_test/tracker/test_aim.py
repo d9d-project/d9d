@@ -40,7 +40,7 @@ def test_aim_tracker_lifecycle(mock_aim_run):
             repo="/test_aim",
             log_system_params=True,
             capture_terminal_logs=True,
-            system_tracking_interval=10
+            system_tracking_interval=10,
         )
 
         # Check metadata
@@ -69,7 +69,7 @@ def test_aim_tracker_resume(mock_aim_run):
             repo=".",
             log_system_params=True,
             capture_terminal_logs=True,
-            system_tracking_interval=10
+            system_tracking_interval=10,
         )
 
 
@@ -85,9 +85,7 @@ def test_aim_run_logging(mock_aim_run, mock_aim_dist):
         # Context Merging
         run.set_context({"phase": "train"})
         run.scalar("accuracy", 0.9)
-        mock_instance.track.assert_called_with(
-            name="accuracy", value=0.9, context={"phase": "train"}, step=100
-        )
+        mock_instance.track.assert_called_with(name="accuracy", value=0.9, context={"phase": "train"}, step=100)
         # Ephemeral context
         run.scalar("f1", 0.8, context={"type": "micro"})
         mock_instance.track.assert_called_with(

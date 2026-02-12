@@ -28,10 +28,7 @@ def _resolve_master_addr() -> str:
 
 
 def _build_mesh_domains(params: "DeviceMeshParameters") -> dict[str, DeviceMesh]:
-    return {
-        provider.name: provider.build_mesh(params)
-        for provider in ALL_DOMAIN_PROVIDERS
-    }
+    return {provider.name: provider.build_mesh(params) for provider in ALL_DOMAIN_PROVIDERS}
 
 
 class DistributedContext:
@@ -55,13 +52,13 @@ class DistributedContext:
             self._meshes = meshes
             self._num_nodes = regular_mesh.size() // torch.cuda.device_count()
             self._logger = build_dist_logger(
-                f'pp:{regular_mesh.get_local_rank("pp")}-'
-                f'dpr:{regular_mesh.get_local_rank("dp_replicate")}-'
-                f'dps:{regular_mesh.get_local_rank("dp_shard")}-'
-                f'cps:{regular_mesh.get_local_rank("cp_shard")}-'
-                f'cpr:{regular_mesh.get_local_rank("cp_replicate")}-'
-                f'tp:{regular_mesh.get_local_rank("tp")}',
-                level=log_level
+                f"pp:{regular_mesh.get_local_rank('pp')}-"
+                f"dpr:{regular_mesh.get_local_rank('dp_replicate')}-"
+                f"dps:{regular_mesh.get_local_rank('dp_shard')}-"
+                f"cps:{regular_mesh.get_local_rank('cp_shard')}-"
+                f"cpr:{regular_mesh.get_local_rank('cp_replicate')}-"
+                f"tp:{regular_mesh.get_local_rank('tp')}",
+                level=log_level,
             )
         else:
             self._meshes = {}

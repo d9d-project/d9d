@@ -8,11 +8,7 @@ from .replicate_parallel import parallelize_replicate
 
 
 def parallelize_hsdp(
-        module: nn.Module,
-        mesh: DeviceMesh,
-        shard_dim: str = "dp_cp_shard",
-        *fsdp_args: Any,
-        **fsdp_kwargs: Any
+    module: nn.Module, mesh: DeviceMesh, shard_dim: str = "dp_cp_shard", *fsdp_args: Any, **fsdp_kwargs: Any
 ):
     """
     Applies Hybrid Sharded Data Parallelism (HSDP) to a module.

@@ -27,15 +27,9 @@ class SimpleLinear(nn.Module):
 
 
 @pytest.mark.distributed
-@pytest.mark.parametrize("mesh_dims", [
-    ("dp_replicate",),
-    ("dp_replicate", "cp_replicate")
-])
+@pytest.mark.parametrize("mesh_dims", [("dp_replicate",), ("dp_replicate", "cp_replicate")])
 def test_parallelize_replicate(dist_ctx_factory, mesh_dims):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(
-        data_parallel_replicate=4,
-        context_parallel_replicate=2
-    ))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=4, context_parallel_replicate=2))
     mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[tuple(mesh_dims)]
 
     model = SimpleLinear().cuda()

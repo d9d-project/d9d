@@ -3,7 +3,6 @@ Complex state mappers are built using composition. This package provides ModelSt
 are composed of other mappers.
 """
 
-
 from .helper import filter_empty_mappers
 from .parallel import ModelStateMapperParallel
 from .sequential import ModelStateMapperSequential
@@ -13,5 +12,5 @@ __all__ = [
     "ModelStateMapperParallel",
     "ModelStateMapperSequential",
     "ModelStateMapperShard",
-    "filter_empty_mappers"
+    "filter_empty_mappers",
 ]

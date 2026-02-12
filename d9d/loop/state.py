@@ -45,6 +45,7 @@ class JobState(Stateful):
         data_loader: The input data stream.
         timeout_manager: Component for checking and refreshing distributed timeouts.
     """
+
     dist_context: DistributedContext
 
     stepper: Stepper
@@ -63,7 +64,7 @@ class JobState(Stateful):
         return {
             "stepper": self.stepper.state_dict(),
             "tracked_modules": self.tracked_modules.state_dict(),
-            "data_loader": self.data_loader.state_dict()
+            "data_loader": self.data_loader.state_dict(),
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
@@ -91,6 +92,7 @@ class TrainJobState(JobState):
         gradient_clipper: Component for clipping gradient norms.
         exporter: Component for exporting the final model artifacts.
     """
+
     task: TrainTask
     gradient_manager: GradientManager
     metrics: ComposeMetric
@@ -132,6 +134,7 @@ class InferenceJobState(JobState):
         task: The specific inference task logic definition.
         task_operator: Executor for running forward and backward passes.
     """
+
     task: InferenceTask
     task_operator: InferenceTaskOperator
 

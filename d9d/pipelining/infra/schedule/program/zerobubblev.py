@@ -30,16 +30,12 @@ class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
     def __init__(self):
         """Constructs the ZBV builder."""
 
-    def compose(
-            self, num_microbatches: int, pp_size: int
-    ) -> dict[int, list[ActionBase]]:
+    def compose(self, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:
         num_stages = self.num_stages_per_rank * pp_size
 
         # 1. Topology
         # V-style: Rank 0 gets Stage 0 & Stage N-1. Rank 1 gets Stage 1 & Stage N-2...
-        stage_to_rank = build_stage_to_host_rank_topology(
-            pp_size=pp_size, num_stages=num_stages, style=ScheduleStyle.v
-        )
+        stage_to_rank = build_stage_to_host_rank_topology(pp_size=pp_size, num_stages=num_stages, style=ScheduleStyle.v)
 
         actions: dict[int, list[ActionBase]] = {}
 
@@ -52,18 +48,14 @@ class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
             )
 
         # 2. Inject Communications
-        return add_communication_ops(
-            compute_actions=actions,
-            stage_to_rank=stage_to_rank,
-            num_stages=num_stages
-        )
+        return add_communication_ops(compute_actions=actions, stage_to_rank=stage_to_rank, num_stages=num_stages)
 
     def _generate_rank_schedule(  # noqa: C901
-            self,
-            rank: int,
-            pp_size: int,
-            num_stages: int,
-            target_microbatches: int,
+        self,
+        rank: int,
+        pp_size: int,
+        num_stages: int,
+        target_microbatches: int,
     ) -> list[ActionBase]:
         # ZBV logic assumes the pipeline is fully saturated to define the loop bounds.
         # We simulate enough steps to cover the topology startup, then filter
@@ -95,26 +87,14 @@ class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
             rank_ops.append(ForwardComputeAction(stage_idx=stage, microbatch_idx=idx))
 
         def emit_i_and_w(stage: int, idx: int):
-            rank_ops.append(
-                BackwardFullInputComputeAction(
-                    stage_idx=stage, microbatch_idx=idx, full_backward=False
-                )
-            )
-            rank_ops.append(
-                BackwardWeightComputeAction(stage_idx=stage, microbatch_idx=idx)
-            )
+            rank_ops.append(BackwardFullInputComputeAction(stage_idx=stage, microbatch_idx=idx, full_backward=False))
+            rank_ops.append(BackwardWeightComputeAction(stage_idx=stage, microbatch_idx=idx))
 
         def emit_i(stage: int, idx: int):
-            rank_ops.append(
-                BackwardFullInputComputeAction(
-                    stage_idx=stage, microbatch_idx=idx, full_backward=False
-                )
-            )
+            rank_ops.append(BackwardFullInputComputeAction(stage_idx=stage, microbatch_idx=idx, full_backward=False))
 
         def emit_w(stage: int, idx: int):
-            rank_ops.append(
-                BackwardWeightComputeAction(stage_idx=stage, microbatch_idx=idx)
-            )
+            rank_ops.append(BackwardWeightComputeAction(stage_idx=stage, microbatch_idx=idx))
 
         # -- Phase 1: Warmup 1 (Chunk 0 Forwards) --
         warmup_n1 = 2 * (pp_size - rank) - 1
@@ -196,21 +176,15 @@ class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
 
         # -- Integrity Check --
         if not (w0_cnt == b0_cnt == f0_cnt):
-            raise RuntimeError(
-                f"ZBV Schedule Failed (Chunk 0): F={f0_cnt}, I={b0_cnt}, W={w0_cnt}"
-            )
+            raise RuntimeError(f"ZBV Schedule Failed (Chunk 0): F={f0_cnt}, I={b0_cnt}, W={w0_cnt}")
         if not (w1_cnt == b1_cnt == f1_cnt):
-            raise RuntimeError(
-                f"ZBV Schedule Failed (Chunk 1): F={f1_cnt}, I={b1_cnt}, W={w1_cnt}"
-            )
+            raise RuntimeError(f"ZBV Schedule Failed (Chunk 1): F={f1_cnt}, I={b1_cnt}, W={w1_cnt}")
 
         # -- Post-Process: Filter to Target Microbatches --
         # Remove any actions involving simulated microbatches beyond the user's request.
         final_ops: list[ActionBase] = []
         for action in rank_ops:
-            if isinstance(action, (ForwardComputeAction,
-                                   BackwardFullInputComputeAction,
-                                   BackwardWeightComputeAction)):
+            if isinstance(action, (ForwardComputeAction, BackwardFullInputComputeAction, BackwardWeightComputeAction)):
                 if action.microbatch_idx < target_microbatches:
                     final_ops.append(action)
             else:

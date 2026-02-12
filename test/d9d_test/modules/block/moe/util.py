@@ -8,15 +8,15 @@ from d9d_test.modules.checkers import check_grad_distance
 
 def clone_moe_weights_qwen3_moe(my: MoELayer, hf: Qwen3MoeSparseMoeBlock):
     my.router.gate.weight.data = hf.gate.weight.data.detach().clone()
-    my.grouped_experts.gate_proj.weight.data = torch.stack(
-        [exp.gate_proj.weight.data.T for exp in hf.experts],
-        dim=0).detach().clone()
-    my.grouped_experts.up_proj.weight.data = torch.stack(
-        [exp.up_proj.weight.data.T for exp in hf.experts],
-        dim=0).detach().clone()
-    my.grouped_experts.down_proj.weight.data = torch.stack(
-        [exp.down_proj.weight.data.T for exp in hf.experts],
-        dim=0).detach().clone()
+    my.grouped_experts.gate_proj.weight.data = (
+        torch.stack([exp.gate_proj.weight.data.T for exp in hf.experts], dim=0).detach().clone()
+    )
+    my.grouped_experts.up_proj.weight.data = (
+        torch.stack([exp.up_proj.weight.data.T for exp in hf.experts], dim=0).detach().clone()
+    )
+    my.grouped_experts.down_proj.weight.data = (
+        torch.stack([exp.down_proj.weight.data.T for exp in hf.experts], dim=0).detach().clone()
+    )
 
 
 def _optional_expert(weight: nn.Parameter):
@@ -29,11 +29,17 @@ def _optional_expert(weight: nn.Parameter):
 def check_moe_qwen3_moe_grad(my: MoELayer, hf: Qwen3MoeSparseMoeBlock):
     for my_grad, hf_grad in [
         (my.router.gate.weight.grad, hf.gate.weight.grad),
-        (my.grouped_experts.gate_proj.weight.grad,
-         torch.stack([_optional_expert(x.gate_proj.weight) for x in hf.experts], dim=0)),
-        (my.grouped_experts.up_proj.weight.grad,
-         torch.stack([_optional_expert(x.up_proj.weight) for x in hf.experts], dim=0)),
-        (my.grouped_experts.down_proj.weight.grad,
-         torch.stack([_optional_expert(x.down_proj.weight) for x in hf.experts], dim=0))
+        (
+            my.grouped_experts.gate_proj.weight.grad,
+            torch.stack([_optional_expert(x.gate_proj.weight) for x in hf.experts], dim=0),
+        ),
+        (
+            my.grouped_experts.up_proj.weight.grad,
+            torch.stack([_optional_expert(x.up_proj.weight) for x in hf.experts], dim=0),
+        ),
+        (
+            my.grouped_experts.down_proj.weight.grad,
+            torch.stack([_optional_expert(x.down_proj.weight) for x in hf.experts], dim=0),
+        ),
     ]:
         check_grad_distance(my_grad.flatten(start_dim=-2), hf_grad.flatten(start_dim=-2))

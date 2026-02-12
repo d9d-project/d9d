@@ -15,12 +15,7 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
     It applies this operation across multiple discrete experts in parallel without padding or masking.
     """
 
-    def __init__(
-            self,
-            hidden_dim: int,
-            intermediate_dim: int,
-            num_experts: int
-    ):
+    def __init__(self, hidden_dim: int, intermediate_dim: int, num_experts: int):
         """
         Constructs the GroupedSwiGLU module.
 
@@ -38,10 +33,10 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
         self.down_proj = GroupedLinear(num_experts, intermediate_dim, hidden_dim)
 
     def forward(
-            self,
-            permuted_x: torch.Tensor,
-            permuted_probs: torch.Tensor,
-            tokens_per_expert: torch.Tensor,
+        self,
+        permuted_x: torch.Tensor,
+        permuted_probs: torch.Tensor,
+        tokens_per_expert: torch.Tensor,
     ) -> torch.Tensor:
         """
         Computes expert outputs for sorted input tokens.
@@ -64,11 +59,8 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
 
         probs = permuted_probs[:, None].to(permuted_x.dtype)
         values = self.down_proj(
-            silu_mul(
-                self.gate_proj(permuted_x, tokens_per_expert),
-                self.up_proj(permuted_x, tokens_per_expert)
-            ),
-            tokens_per_expert
+            silu_mul(self.gate_proj(permuted_x, tokens_per_expert), self.up_proj(permuted_x, tokens_per_expert)),
+            tokens_per_expert,
         )
 
         return probs * values

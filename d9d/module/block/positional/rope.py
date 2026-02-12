@@ -4,10 +4,7 @@ from torch import nn
 from d9d.module.base import ModuleLateInit
 
 
-def _prepare_rope_inverse_frequencies(
-        rope_base: int,
-        inside_dim: int
-) -> torch.Tensor:
+def _prepare_rope_inverse_frequencies(rope_base: int, inside_dim: int) -> torch.Tensor:
     """
     Calculates inverse frequencies for RoPE calculation.
 
@@ -20,17 +17,13 @@ def _prepare_rope_inverse_frequencies(
     """
 
     power = torch.arange(0, inside_dim, 2, dtype=torch.int64).to(dtype=torch.float) / inside_dim
-    freq = rope_base ** power
+    freq = rope_base**power
     inv_freq = 1.0 / freq
     return inv_freq
 
 
 def prepare_rotary_cos_sin_emb(
-        rope_base: int,
-        head_dim: int,
-        max_position_ids: int,
-        device: torch.device,
-        dtype: torch.dtype
+    rope_base: int, head_dim: int, max_position_ids: int, device: torch.device, dtype: torch.dtype
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Precomputes rotary cosine and sine embeddings.
@@ -90,7 +83,7 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
                 head_dim=self._head_dim,
                 max_position_ids=self._max_position_ids,
                 device=self.cos_emb.device,
-                dtype=self.cos_emb.dtype
+                dtype=self.cos_emb.dtype,
             )
             self.cos_emb.data = cos
             self.sin_emb.data = sin
@@ -98,12 +91,12 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
 
 def _rotate_half(x: torch.Tensor) -> torch.Tensor:
     x1 = x[..., : x.shape[-1] // 2]
-    x2 = x[..., x.shape[-1] // 2:]
+    x2 = x[..., x.shape[-1] // 2 :]
     return torch.cat((-x2, x1), dim=-1)
 
 
 def _apply_rotary_pos_emb(
-        q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor
+    q: torch.Tensor, k: torch.Tensor, cos: torch.Tensor, sin: torch.Tensor
 ) -> tuple[torch.Tensor, torch.Tensor]:
     cos = cos.unsqueeze(1)
     sin = sin.unsqueeze(1)
@@ -123,11 +116,11 @@ class RotaryEmbeddingApplicator(nn.Module):
         super().__init__()
 
     def forward(
-            self,
-            query_states: torch.Tensor,
-            key_states: torch.Tensor,
-            position_embedding_cos: torch.Tensor,
-            position_embedding_sin: torch.Tensor
+        self,
+        query_states: torch.Tensor,
+        key_states: torch.Tensor,
+        position_embedding_cos: torch.Tensor,
+        position_embedding_sin: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Rotates query and key states using provided cosine and sine embeddings.
@@ -144,7 +137,8 @@ class RotaryEmbeddingApplicator(nn.Module):
             A tuple containing the rotated query and key tensors.
         """
 
-        query_states, key_states = _apply_rotary_pos_emb(query_states, key_states,
-                                                         position_embedding_cos, position_embedding_sin)
+        query_states, key_states = _apply_rotary_pos_emb(
+            query_states, key_states, position_embedding_cos, position_embedding_sin
+        )
 
         return query_states, key_states

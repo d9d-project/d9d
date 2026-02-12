@@ -4,11 +4,7 @@ from d9d.module.parallelism.api import parallelize_expert_parallel, parallelize_
 from d9d.pipelining.api import PipelineStageInfo
 
 
-def parallelize_qwen3_moe_model(
-        dist_context: DistributedContext,
-        model: Qwen3MoEModel,
-        stage: PipelineStageInfo
-):
+def parallelize_qwen3_moe_model(dist_context: DistributedContext, model: Qwen3MoEModel, stage: PipelineStageInfo):
     """
     Parallelizes the base Qwen3 MoE model components.
 
@@ -39,10 +35,7 @@ def parallelize_qwen3_moe_model(
         raise ValueError("Context Parallel currently is not supported for this model.")
 
     if stage.is_current_stage_first:
-        parallelize_hsdp(
-            model.embed_tokens,
-            mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"]
-        )
+        parallelize_hsdp(model.embed_tokens, mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"])
 
     if stage.is_current_stage_last:
         parallelize_hsdp(
@@ -51,10 +44,7 @@ def parallelize_qwen3_moe_model(
         )
 
     for layer in model.layers.values():
-        parallelize_expert_parallel(
-            layer.mlp,
-            mesh_experts=expert_mesh["ep_replicate", "ep_shard"]
-        )
+        parallelize_expert_parallel(layer.mlp, mesh_experts=expert_mesh["ep_replicate", "ep_shard"])
 
         parallelize_hsdp(
             layer.self_attn,
@@ -71,9 +61,7 @@ def parallelize_qwen3_moe_model(
 
 
 def parallelize_qwen3_moe_for_causal_lm(
-        dist_context: DistributedContext,
-        model: Qwen3MoEForCausalLM,
-        stage: PipelineStageInfo
+    dist_context: DistributedContext, model: Qwen3MoEForCausalLM, stage: PipelineStageInfo
 ):
     """
     Parallelizes the Qwen3 MoE Causal LM model.
@@ -100,9 +88,7 @@ def parallelize_qwen3_moe_for_causal_lm(
 
 
 def parallelize_qwen3_moe_for_classification(
-        dist_context: DistributedContext,
-        model: Qwen3MoEForClassification,
-        stage: PipelineStageInfo
+    dist_context: DistributedContext, model: Qwen3MoEForClassification, stage: PipelineStageInfo
 ):
     """
     Parallelizes the Qwen3 MoE classification model.

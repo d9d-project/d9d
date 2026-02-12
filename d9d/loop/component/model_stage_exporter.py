@@ -9,12 +9,7 @@ from .model_stage_factory import TrackedModules
 
 
 class ModelStageExporter:
-    def __init__(
-            self,
-            model_provider: ModelProvider,
-            modules: TrackedModules,
-            dist_context: DistributedContext
-    ):
+    def __init__(self, model_provider: ModelProvider, modules: TrackedModules, dist_context: DistributedContext):
         self._model_provider = model_provider
         self._modules = modules
         self._dist_context = dist_context
@@ -22,10 +17,9 @@ class ModelStageExporter:
     def export(self, save_dir: Path):
         mappers = []
         for stage in self._modules.modules:
-            result = self._model_provider.prepare_export_model_stage(PrepareExportModelStageContext(
-                model=stage,
-                dist_context=self._dist_context
-            ))
+            result = self._model_provider.prepare_export_model_stage(
+                PrepareExportModelStageContext(model=stage, dist_context=self._dist_context)
+            )
             mappers.append(result.state_mapper)
         save_model_state_pipeline_parallel(
             dest_dir=save_dir,

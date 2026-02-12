@@ -16,10 +16,7 @@ _LORA_MODULES = (LoRALinear, LoRAGroupedLinear)
 
 
 def named_modules_without_lora(
-        module: nn.Module,
-        memo: set[nn.Module] | None = None,
-        prefix: str = "",
-        remove_duplicate: bool = True
+    module: nn.Module, memo: set[nn.Module] | None = None, prefix: str = "", remove_duplicate: bool = True
 ):
     """
     Yields named modules, skipping submodules that are already LoRA layers.
@@ -72,11 +69,11 @@ class LoRA(PeftMethod[LoRAConfig]):
 
     def __init__(self, config: LoRAConfig):
         """
-         Constructs a LoRA method.
+        Constructs a LoRA method.
 
-         Args:
-             config: LoRA configuration containing patterns and hyperparameters.
-         """
+        Args:
+            config: LoRA configuration containing patterns and hyperparameters.
+        """
 
         self._config = config
 
@@ -102,17 +99,13 @@ class LoRA(PeftMethod[LoRAConfig]):
             params_to_train.extend(lora_mod.lora_A.parameters())
             params_to_train.extend(lora_mod.lora_B.parameters())
 
-            state_mappers.append(ModelStateMapperRename(
-                name_from=f"{mod_name}.weight",
-                name_to=f"{mod_name}.base.weight"
-            ))
+            state_mappers.append(
+                ModelStateMapperRename(name_from=f"{mod_name}.weight", name_to=f"{mod_name}.base.weight")
+            )
 
             module.set_submodule(mod_name, lora_mod)
 
-        return PeftInjectionResult(
-            parameters_to_train=params_to_train,
-            load_state_mappers=state_mappers
-        )
+        return PeftInjectionResult(parameters_to_train=params_to_train, load_state_mappers=state_mappers)
 
     def merge(self, module: nn.Module):
         for mod_name, mod in module.named_modules():

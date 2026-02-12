@@ -19,12 +19,7 @@ class ManualGarbageCollector(AbstractContextManager):
     manual collection at specific intervals (periodic) or specific points (forced).
     """
 
-    def __init__(
-            self,
-            dist_ctx: DistributedContext,
-            config: GarbageCollectionConfig,
-            step: Stepper
-    ):
+    def __init__(self, dist_ctx: DistributedContext, config: GarbageCollectionConfig, step: Stepper):
         """
         Constructs the garbage collector manager.
 
@@ -51,10 +46,7 @@ class ManualGarbageCollector(AbstractContextManager):
         return self
 
     def __exit__(
-            self,
-            exc_type: type[BaseException] | None,
-            exc_value: BaseException | None,
-            traceback: TracebackType | None, /
+        self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None, /
     ) -> None:
         """
         Re-enables automatic garbage collection and performs a final full collection.

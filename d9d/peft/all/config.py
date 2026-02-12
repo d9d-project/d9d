@@ -21,9 +21,7 @@ class PeftStackConfig(BaseModel):
 
 
 AnyPeftConfig = Annotated[
-    LoRAConfig
-    | FullTuneConfig
-    | PeftStackConfig,
+    LoRAConfig | FullTuneConfig | PeftStackConfig,
     Field(discriminator="kind"),
 ]
 """

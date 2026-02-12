@@ -22,15 +22,14 @@ class Stepper(Stateful):
         return self._total_steps
 
     def state_dict(self) -> dict[str, Any]:
-        return {
-            "current_step": self._current_step,
-            "total_steps": self._total_steps
-        }
+        return {"current_step": self._current_step, "total_steps": self._total_steps}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         if state_dict["total_steps"] != self._total_steps:
-            raise ValueError(f'Step count differs: saved {state_dict["total_steps"]}, '
-                             f'current {self._total_steps}. Perhaps project configuration changed?')
+            raise ValueError(
+                f"Step count differs: saved {state_dict['total_steps']}, "
+                f"current {self._total_steps}. Perhaps project configuration changed?"
+            )
 
         self._current_step = state_dict["current_step"]
 

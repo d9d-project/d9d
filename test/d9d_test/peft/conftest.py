@@ -15,11 +15,7 @@ class SimpleBlock(nn.Module):
         self.proj = nn.Linear(dim, dim * 2, bias=False)
         self.untouched = nn.Linear(dim, dim * 2, bias=False)
         self.experts = GroupedLinear(
-            n_groups=num_experts,
-            in_features=dim * 2,
-            out_features=dim,
-            device=torch.device("cpu"),
-            dtype=torch.float32
+            n_groups=num_experts, in_features=dim * 2, out_features=dim, device=torch.device("cpu"), dtype=torch.float32
         )
 
     def forward(self, x):
@@ -54,16 +50,12 @@ def peft_config_stack():
     return PeftStackConfig(
         methods=[
             # 1. LoRA on standard projections
-            LoRAConfig(
-                module_name_pattern=re.compile(r".*proj.*"),
-                params=LoRAParameters(r=4, alpha=8, dropout=0.0)
-            ),
+            LoRAConfig(module_name_pattern=re.compile(r".*proj.*"), params=LoRAParameters(r=4, alpha=8, dropout=0.0)),
             # 2. Full Tune on Head
             FullTuneConfig(module_name_pattern=re.compile(r".*head.*")),
             # 3. LoRA on Experts (Grouped)
             LoRAConfig(
-                module_name_pattern=re.compile(r".*experts.*"),
-                params=LoRAParameters(r=4, alpha=8, dropout=0.0)
+                module_name_pattern=re.compile(r".*experts.*"), params=LoRAParameters(r=4, alpha=8, dropout=0.0)
             ),
         ]
     )

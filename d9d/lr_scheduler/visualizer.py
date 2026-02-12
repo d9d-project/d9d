@@ -47,28 +47,24 @@ def visualize_lr_scheduler(factory: SchedulerFactory, num_steps: int, init_lr: f
 
     fig = go.Figure()
 
-    fig.add_trace(go.Scatter(
-        x=steps,
-        y=lrs,
-        mode="lines",
-        name="Learning Rate",
-        line={"color": "#636EFA", "width": 3},
-        hovertemplate="<b>Step:</b> %{x}<br><b>LR:</b> %{y:.6f}<extra></extra>"
-    ))
+    fig.add_trace(
+        go.Scatter(
+            x=steps,
+            y=lrs,
+            mode="lines",
+            name="Learning Rate",
+            line={"color": "#636EFA", "width": 3},
+            hovertemplate="<b>Step:</b> %{x}<br><b>LR:</b> %{y:.6f}<extra></extra>",
+        )
+    )
 
     fig.update_layout(
-        title={
-            "text": "Scheduler",
-            "y": 0.95,
-            "x": 0.5,
-            "xanchor": "center",
-            "yanchor": "top"
-        },
+        title={"text": "Scheduler", "y": 0.95, "x": 0.5, "xanchor": "center", "yanchor": "top"},
         xaxis_title="Steps",
         yaxis_title="Learning Rate",
         template="plotly_white",
         hovermode="x unified",
-        height=500
+        height=500,
     )
 
     fig.show()

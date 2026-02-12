@@ -26,10 +26,7 @@ class ComposeMetric(Metric[dict[str, Any]]):
             metric.sync(dist_context)
 
     def compute(self) -> dict[str, Any]:
-        return {
-            metric_name: metric.compute()
-            for metric_name, metric in self._children.items()
-        }
+        return {metric_name: metric.compute() for metric_name, metric in self._children.items()}
 
     def reset(self):
         for metric in self._children.values():
@@ -40,10 +37,7 @@ class ComposeMetric(Metric[dict[str, Any]]):
             metric.to(device)
 
     def state_dict(self) -> dict[str, Any]:
-        return {
-            metric_name: metric.state_dict()
-            for metric_name, metric in self._children.items()
-        }
+        return {metric_name: metric.state_dict() for metric_name, metric in self._children.items()}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         for metric_name, metric in self._children.items():

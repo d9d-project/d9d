@@ -13,10 +13,7 @@ class PipelineSchedule(abc.ABC):
 
     @abc.abstractmethod
     def configure_buffers(
-            self,
-            inputs: dict[str, torch.Tensor],
-            kwargs: dict[str, Any],
-            sharding_spec: PipelineShardingSpec | None
+        self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any], sharding_spec: PipelineShardingSpec | None
     ):
         """
         Configures internal state and buffers based on input shapes.
@@ -45,6 +42,6 @@ class PipelineSchedule(abc.ABC):
          Args:
              inputs: A dictionary of global input tensors.
              kwargs: A dictionary of global keyword arguments.
-         """
+        """
 
         ...

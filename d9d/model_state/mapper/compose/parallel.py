@@ -52,7 +52,8 @@ class ModelStateMapperParallel(ModelStateMapper):
         group_keys = frozenset(group.keys())
 
         if group_keys not in self._inputs_to_mapper:
-            raise ValueError("Tried to run a parallel mapper with undefined group. Perhaps you sent groups that are "
-                             "not isolated?")
+            raise ValueError(
+                "Tried to run a parallel mapper with undefined group. Perhaps you sent groups that are not isolated?"
+            )
 
         return self._inputs_to_mapper[group_keys].apply(group)

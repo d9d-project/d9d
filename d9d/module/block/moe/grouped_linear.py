@@ -19,12 +19,12 @@ class GroupedLinear(nn.Module, ModuleLateInit):
     """
 
     def __init__(
-            self,
-            n_groups: int,
-            in_features: int,
-            out_features: int,
-            device: torch.device | str | None = None,
-            dtype: torch.dtype | None = None
+        self,
+        n_groups: int,
+        in_features: int,
+        out_features: int,
+        device: torch.device | str | None = None,
+        dtype: torch.dtype | None = None,
     ):
         """
         Constructs the GroupedLinear layer.
@@ -37,8 +37,7 @@ class GroupedLinear(nn.Module, ModuleLateInit):
             dtype: Target data type.
         """
         super().__init__()
-        self.weight = nn.Parameter(torch.empty(n_groups, in_features, out_features,
-                                               device=device, dtype=dtype))
+        self.weight = nn.Parameter(torch.empty(n_groups, in_features, out_features, device=device, dtype=dtype))
 
         self.n_groups = n_groups
         self.in_features = in_features
@@ -65,13 +64,7 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         if isinstance(weight, DTensor):
             weight = weight.to_local()
 
-        return gmm(
-            x,
-            weight,
-            x_groups,
-            a_grad_direction=GradDirection.inputs,
-            b_grad_direction=GradDirection.weight
-        )
+        return gmm(x, weight, x_groups, a_grad_direction=GradDirection.inputs, b_grad_direction=GradDirection.weight)
 
     def reset_parameters(self):
         """Initializes weights using a uniform distribution based on input features."""

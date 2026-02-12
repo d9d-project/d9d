@@ -51,27 +51,27 @@ class StochasticAdamW(Optimizer):
     """
 
     def __init__(
-            self,
-            params: ParamsT,
-            lr: float,
-            betas: tuple[float, float] = (0.9, 0.999),
-            eps: float = 1e-8,
-            weight_decay: float = 1e-2,
-            generator: torch.Generator | None = None,
-            state_dtype: torch.dtype = torch.float32,
+        self,
+        params: ParamsT,
+        lr: float,
+        betas: tuple[float, float] = (0.9, 0.999),
+        eps: float = 1e-8,
+        weight_decay: float = 1e-2,
+        generator: torch.Generator | None = None,
+        state_dtype: torch.dtype = torch.float32,
     ):
         """Constructs a new StochasticAdamW optimizer.
 
-         Args:
-             params: Iterable of parameters to optimize or dicts defining parameter groups.
-             lr: Learning rate.
-             betas: Coefficients used for computing running averages of gradient and its square.
-             eps: Term added to the denominator to improve numerical stability.
-             weight_decay: Weight decay coefficient.
-             generator: Pseudorandom number generator for stochastic rounding. If None,
-                 a new generator is created and seeded from the main PyTorch generator.
-             state_dtype: Data Type to use for the optimizer states.
-         """
+        Args:
+            params: Iterable of parameters to optimize or dicts defining parameter groups.
+            lr: Learning rate.
+            betas: Coefficients used for computing running averages of gradient and its square.
+            eps: Term added to the denominator to improve numerical stability.
+            weight_decay: Weight decay coefficient.
+            generator: Pseudorandom number generator for stochastic rounding. If None,
+                a new generator is created and seeded from the main PyTorch generator.
+            state_dtype: Data Type to use for the optimizer states.
+        """
 
         if lr <= 0:
             raise ValueError(f"Invalid learning rate: {lr}")
@@ -97,7 +97,7 @@ class StochasticAdamW(Optimizer):
             "betas": betas,
             "eps": eps,
             "weight_decay": weight_decay,
-            "state_dtype": state_dtype
+            "state_dtype": state_dtype,
         }
         super().__init__(params, defaults)
 
@@ -154,5 +154,5 @@ class StochasticAdamW(Optimizer):
                     eps=eps,
                     weight_decay=weight_decay,
                     step=state["step"],
-                    generator=self._generator
+                    generator=self._generator,
                 )

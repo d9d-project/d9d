@@ -18,12 +18,7 @@ class JobProfiler:
     profiler based on the current step count provided by the stepper.
     """
 
-    def __init__(
-            self,
-            dist_context: DistributedContext,
-            config: ProfilingConfig | None,
-            stepper: Stepper
-    ):
+    def __init__(self, dist_context: DistributedContext, config: ProfilingConfig | None, stepper: Stepper):
         """
         Constructs JobProfiler object.
 
@@ -42,7 +37,7 @@ class JobProfiler:
                 active_steps=config.active_steps,
                 warmup_steps=config.warmup_steps,
                 period_steps=config.period_steps,
-                dist_context=dist_context
+                dist_context=dist_context,
             )
         self._stepper = stepper
 

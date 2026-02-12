@@ -67,10 +67,6 @@ class PiecewiseScheduleEngine:
             phase_len = phase.end_step - phase.start_step
             phase_progress = steps_in_phase / phase_len
 
-            return phase.curve.compute(
-                start=phase.start_value,
-                end=phase.end_value,
-                step_p=phase_progress
-            )
+            return phase.curve.compute(start=phase.start_value, end=phase.end_value, step_p=phase_progress)
 
         return self._phases[-1].end_value

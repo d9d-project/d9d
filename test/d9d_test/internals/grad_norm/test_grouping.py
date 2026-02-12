@@ -8,18 +8,14 @@ from torch.distributed.tensor import Replicate, Shard, distribute_tensor
 
 @pytest.mark.distributed
 def test_grouping_mechanism(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(
-        pipeline_parallel=4,
-        expert_parallel=2,
-        data_parallel_replicate=2
-    ))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=4, expert_parallel=2, data_parallel_replicate=2))
     ep_mesh = dist_ctx.mesh_for(EXPERT_DOMAIN)
 
     local_param = nn.Parameter(
         distribute_tensor(
             torch.randn(16, 16, device="cuda"),
             device_mesh=ep_mesh[["ep_replicate", "ep_shard"]],
-            placements=[Replicate(), Replicate()]
+            placements=[Replicate(), Replicate()],
         )
     )
 
@@ -27,7 +23,7 @@ def test_grouping_mechanism(dist_ctx_factory):
         distribute_tensor(
             torch.randn(16, 16, device="cuda"),
             device_mesh=ep_mesh[["ep_replicate", "ep_shard"]],
-            placements=[Replicate(), Shard(0)]
+            placements=[Replicate(), Shard(0)],
         )
     )
 

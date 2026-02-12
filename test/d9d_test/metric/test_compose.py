@@ -29,14 +29,8 @@ def test_local(device: str):
         metric.update(1, 2)
 
     # update and compute propagation
-    mean_a.update(
-        torch.tensor([10.0], device=device),
-        torch.tensor([1.0], device=device)
-    )
-    mean_b.update(
-        torch.tensor([20.0], device=device),
-        torch.tensor([2.0], device=device)
-    )
+    mean_a.update(torch.tensor([10.0], device=device), torch.tensor([1.0], device=device))
+    mean_b.update(torch.tensor([20.0], device=device), torch.tensor([2.0], device=device))
 
     expect_state = {"a": torch.tensor(10.0, device=device), "b": torch.tensor(20.0, device=device)}
 
@@ -78,24 +72,15 @@ def test_distributed(dist_ctx_factory):
 
     # Update Children (Rank Dependent Data)
     # Child A: Rank i adds value i, weight 1 -> Global Mean = 3.5 (for 8 ranks)
-    mean_a.update(
-        torch.tensor([float(rank)], device=device),
-        torch.tensor([1.0], device=device)
-    )
+    mean_a.update(torch.tensor([float(rank)], device=device), torch.tensor([1.0], device=device))
     # Child B: Rank i adds value 2*i, weight 1 -> Global Mean = 7.0 (for 8 ranks)
-    mean_b.update(
-        torch.tensor([float(rank) * 2], device=device),
-        torch.tensor([1.0], device=device)
-    )
+    mean_b.update(torch.tensor([float(rank) * 2], device=device), torch.tensor([1.0], device=device))
 
     # Verify ComposeMetric delegates sync triggers to children
     metric.sync(dist_ctx)
 
     # Compute Check (Global Aggregation)
-    expect_state = {
-        "a": torch.tensor(3.5, device=device),
-        "b": torch.tensor(7.0, device=device)
-    }
+    expect_state = {"a": torch.tensor(3.5, device=device), "b": torch.tensor(7.0, device=device)}
     assert_close(metric.compute(), expect_state)
 
     # State Dict / Reset / Load

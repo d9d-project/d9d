@@ -34,12 +34,12 @@ class StateCheckpointer:
     """
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            stepper: Stepper,
-            config: CheckpointingConfig,
-            gc: ManualGarbageCollector,
-            run_name: str | None
+        self,
+        dist_context: DistributedContext,
+        stepper: Stepper,
+        config: CheckpointingConfig,
+        gc: ManualGarbageCollector,
+        run_name: str | None,
     ):
         """
         Constructs the StateCheckpoint object.
@@ -87,7 +87,7 @@ class StateCheckpointer:
         if not self._config.num_to_keep:
             return
 
-        to_delete = self._get_sorted_checkpoint_dirs()[:-self._config.num_to_keep]
+        to_delete = self._get_sorted_checkpoint_dirs()[: -self._config.num_to_keep]
 
         for delete_dir in to_delete:
             self._dist_context.logger.info(f"Purging checkpoint {delete_dir}")
@@ -103,10 +103,7 @@ class StateCheckpointer:
         self._dist_context.logger.info(f"Saving checkpoint {next_checkpoint_id}")
 
         save_from = {"state": state}
-        dcp.save(
-            state_dict=save_from,
-            checkpoint_id=next_checkpoint_id
-        )
+        dcp.save(state_dict=save_from, checkpoint_id=next_checkpoint_id)
 
         self._purge_old_checkpoints()
         self._free_memory()
@@ -146,13 +143,8 @@ class StateCheckpointer:
         self._dist_context.wait_world()
         self._dist_context.logger.info(f"Loading checkpoint {last_checkpoint}")
 
-        load_into = {
-            "state": state
-        }
-        dcp.load(
-            state_dict=load_into,
-            checkpoint_id=last_checkpoint
-        )
+        load_into = {"state": state}
+        dcp.load(state_dict=load_into, checkpoint_id=last_checkpoint)
         self._free_memory()
 
         self._dist_context.logger.info("Waiting for world after loading checkpoint")

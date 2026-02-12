@@ -12,30 +12,30 @@ from d9d.module.block.hidden_states_aggregator.noop import HiddenStatesAggregato
         # Case 1: Simple 2x2x2 batch, full mask
         # Input: (Batch=2, Seq=2, Hidden=2)
         (
-                [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
-                [[1.0, 1.0], [1.0, 1.0]],
-                # Expected Mean:
-                # B0: (1+3)/2, (2+4)/2 -> [2, 3]
-                # B1: (5+7)/2, (6+8)/2 -> [6, 7]
-                [[2.0, 3.0], [6.0, 7.0]],
+            [[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]],
+            [[1.0, 1.0], [1.0, 1.0]],
+            # Expected Mean:
+            # B0: (1+3)/2, (2+4)/2 -> [2, 3]
+            # B1: (5+7)/2, (6+8)/2 -> [6, 7]
+            [[2.0, 3.0], [6.0, 7.0]],
         ),
         # Case 2: Masking logic
         # Input: (Batch=2, Seq=2, Hidden=1)
         (
-                [[[10.0], [99.0]], [[20.0], [40.0]]],
-                [[1.0, 0.0], [1.0, 1.0]],
-                # Expected Mean:
-                # B0: Keep index 0 only -> [10]
-                # B1: Keep both -> (20+40)/2 -> [30]
-                [[10.0], [30.0]],
+            [[[10.0], [99.0]], [[20.0], [40.0]]],
+            [[1.0, 0.0], [1.0, 1.0]],
+            # Expected Mean:
+            # B0: Keep index 0 only -> [10]
+            # B1: Keep both -> (20+40)/2 -> [30]
+            [[10.0], [30.0]],
         ),
         # Case 3: Uneven masking (3 tokens, mask middle)
         # Input: (Batch=1, Seq=3, Hidden=1)
         (
-                [[[10.0], [500.0], [20.0]]],
-                [[1.0, 0.0, 1.0]],
-                # Expected: (10 + 20) / 2 -> 15
-                [[15.0]],
+            [[[10.0], [500.0], [20.0]]],
+            [[1.0, 0.0, 1.0]],
+            # Expected: (10 + 20) / 2 -> 15
+            [[15.0]],
         ),
     ],
 )
@@ -118,30 +118,10 @@ def test_noop_aggregator():
 @pytest.mark.parametrize(
     ("mode", "provide_mask", "expect_class", "expect_error"),
     [
-        (
-            HiddenStatesAggregationMode.no,
-            False,
-            HiddenStatesAggregatorNoOp,
-            None
-        ),
-        (
-            HiddenStatesAggregationMode.no,
-            True,
-            HiddenStatesAggregatorNoOp,
-            None
-        ),
-        (
-            HiddenStatesAggregationMode.mean,
-            True,
-            HiddenStatesAggregatorMean,
-            None
-        ),
-        (
-            HiddenStatesAggregationMode.mean,
-            False,
-            None,
-            ValueError
-        ),
+        (HiddenStatesAggregationMode.no, False, HiddenStatesAggregatorNoOp, None),
+        (HiddenStatesAggregationMode.no, True, HiddenStatesAggregatorNoOp, None),
+        (HiddenStatesAggregationMode.mean, True, HiddenStatesAggregatorMean, None),
+        (HiddenStatesAggregationMode.mean, False, None, ValueError),
     ],
 )
 def test_factory_creation(mode, provide_mask, expect_class, expect_error):

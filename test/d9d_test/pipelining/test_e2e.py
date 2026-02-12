@@ -57,19 +57,16 @@ def _do_standard_backward(stages: list[PipelineModel], x: torch.Tensor, y: torch
         (PipelineSchedule1F1BConfig(num_stages_per_rank=2, zero_bubble=True), 2),
         (PipelineScheduleZeroBubbleVConfig(), 2),
         (PipelineScheduleDualPipeVConfig(), 2),
-    ]
+    ],
 )
-@pytest.mark.parametrize(
-    "n_microbatches",
-    [1, 2, 4, 8, 16, 32]
-)
-@pytest.mark.parametrize(
-    "freeze_w1",
-    [True, False]
-)
+@pytest.mark.parametrize("n_microbatches", [1, 2, 4, 8, 16, 32])
+@pytest.mark.parametrize("freeze_w1", [True, False])
 def test_e2e(
-        dist_ctx_factory, schedule_config: AnyPipelineScheduleConfig, stages_per_rank: int,
-        n_microbatches: int, freeze_w1: bool
+    dist_ctx_factory,
+    schedule_config: AnyPipelineScheduleConfig,
+    stages_per_rank: int,
+    n_microbatches: int,
+    freeze_w1: bool,
 ):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=8))
     pp_mesh = dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"]
@@ -101,7 +98,7 @@ def test_e2e(
         n_microbatches=n_microbatches,
         schedule_config=schedule_config,
         model_provider=_model_provider,
-        callback=_loss_fn
+        callback=_loss_fn,
     )
 
     not_this_rank_stages = [i for i in range(len(full_stage_modules)) if i not in this_rank_stages]
@@ -169,7 +166,7 @@ def test_e2e_local(dist_ctx_factory, freeze_w1: bool):
         n_microbatches=4,  # This number is ignored by OfflinePipelineExecutor logic regarding flow
         schedule_config=schedule_config,
         model_provider=_model_provider,
-        callback=_loss_fn
+        callback=_loss_fn,
     )
 
     assert isinstance(schedule_info.schedule, OfflinePipelineExecutor)

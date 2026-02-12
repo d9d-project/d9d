@@ -44,11 +44,7 @@ class PipelineStateStorage:
     how to split or join data.
     """
 
-    def __init__(
-            self,
-            sharding_spec: dict[StateKey, ShardingSpecLeaf],
-            num_shards: int
-    ):
+    def __init__(self, sharding_spec: dict[StateKey, ShardingSpecLeaf], num_shards: int):
         """
         Constructs a PipelineStateStorage object.
 
@@ -169,15 +165,10 @@ class PipelineStateStorage:
         # here we know we are in global state
 
         sharded = shard_tree(
-            state,
-            self._state_sharding_spec[key],
-            num_shards=self._num_shards,
-            enforce_even_split=True
+            state, self._state_sharding_spec[key], num_shards=self._num_shards, enforce_even_split=True
         )
 
-        sharded_state = ShardedState({
-            shard_idx: shard for shard_idx, shard in enumerate(sharded)
-        })
+        sharded_state = ShardedState({shard_idx: shard for shard_idx, shard in enumerate(sharded)})
 
         self._state[key] = sharded_state
 

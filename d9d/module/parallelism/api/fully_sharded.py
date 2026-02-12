@@ -11,12 +11,7 @@ def _force_fsdp_grad_reduction_policy(module: FSDPModule):
     module.set_requires_all_reduce(False)
 
 
-def parallelize_fsdp(
-        module: nn.Module,
-        mesh: DeviceMesh,
-        *args: Any,
-        **kwargs: Any
-):
+def parallelize_fsdp(module: nn.Module, mesh: DeviceMesh, *args: Any, **kwargs: Any):
     """
     Applies Fully Sharded Data Parallel (FSDP) with forced gradient summation.
 
@@ -34,8 +29,9 @@ def parallelize_fsdp(
     """
 
     if mesh.ndim != 1:
-        raise ValueError("FSDP mesh should contain exactly one dimension - for HSDP, please apply "
-                         "parallelize_replicate(...) first!")
+        raise ValueError(
+            "FSDP mesh should contain exactly one dimension - for HSDP, please apply parallelize_replicate(...) first!"
+        )
 
     fully_shard(module, *args, mesh=mesh, **kwargs)
     if not isinstance(module, FSDPModule):

@@ -11,9 +11,7 @@ from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 
 
 def stage_backward_full(
-        outputs: list[torch.Tensor],
-        output_grads: list[torch.Tensor] | None,
-        inputs: list[torch.Tensor]
+    outputs: list[torch.Tensor], output_grads: list[torch.Tensor] | None, inputs: list[torch.Tensor]
 ) -> list[torch.Tensor | None]:
     """
     Performs a standard, full backward pass for a pipeline stage.
@@ -33,10 +31,7 @@ def stage_backward_full(
     """
 
     with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs, GradDirection.weight):
-        torch.autograd.backward(
-            tensors=outputs,
-            grad_tensors=output_grads
-        )
+        torch.autograd.backward(tensors=outputs, grad_tensors=output_grads)
 
     input_grads = []
     for input_item in inputs:
@@ -109,7 +104,7 @@ def _construct_reverse_graph(roots: list[Node]) -> dict[Node, list[Node]]:
 
 
 def _reverse_closure(
-        roots: list[Node], target_nodes: set[Node], reverse_edges_dict: dict[Node, list[Node]]
+    roots: list[Node], target_nodes: set[Node], reverse_edges_dict: dict[Node, list[Node]]
 ) -> tuple[set[Node], set[Node]]:
     """
     Computes a closure of nodes reachable from roots in the reverse graph.
@@ -148,7 +143,7 @@ def _reverse_closure(
 
 
 def _get_param_groups(
-        inputs: list[Node], params: list[Node], reverse_edges_dict: dict[Node, list[Node]]
+    inputs: list[Node], params: list[Node], reverse_edges_dict: dict[Node, list[Node]]
 ) -> list[ParamGroup]:
     """
     Clusters parameters based on their dependencies on inputs.
@@ -170,14 +165,9 @@ def _get_param_groups(
     node_to_group_map: dict[Node, dict[str, set[Node]]] = {}
 
     for param in params:
-        _, intersected_inputs = _reverse_closure(
-            [param], inputs_closure, reverse_edges_dict
-        )
+        _, intersected_inputs = _reverse_closure([param], inputs_closure, reverse_edges_dict)
 
-        current_dict = {
-            "params": {param},
-            "intermediates": intersected_inputs
-        }
+        current_dict = {"params": {param}, "intermediates": intersected_inputs}
 
         target_dict = None
         for intermediate_node in intersected_inputs:
@@ -199,10 +189,9 @@ def _get_param_groups(
     for group_dict in node_to_group_map.values():
         if id(group_dict) not in seen_ids:
             seen_ids.add(id(group_dict))
-            unique_groups.append(ParamGroup(
-                params=group_dict["params"],
-                intermediates=list(group_dict["intermediates"])
-            ))
+            unique_groups.append(
+                ParamGroup(params=group_dict["params"], intermediates=list(group_dict["intermediates"]))
+            )
 
     return unique_groups
 
@@ -238,10 +227,10 @@ class BackwardInputResult:
 
 
 def stage_backward_input(
-        outputs: list[torch.Tensor],
-        output_grads: list[torch.Tensor] | None,
-        inputs: list[torch.Tensor],
-        weights: Iterator[nn.Parameter],
+    outputs: list[torch.Tensor],
+    output_grads: list[torch.Tensor] | None,
+    inputs: list[torch.Tensor],
+    weights: Iterator[nn.Parameter],
 ) -> BackwardInputResult:
     """
     Performs the first phase of a split backward pass: Input Gradients.
@@ -305,14 +294,12 @@ def stage_backward_input(
         param_groups=param_groups,
         # TODO(max): we can keep only intermediate ownership tokens to both truncate the
         # TODO(max): graph and do not deallocate C++ stuff
-        grad_ownership_tokens=outputs  # Keep the tensors alive!
+        grad_ownership_tokens=outputs,  # Keep the tensors alive!
     )
 
 
 def stage_backward_weight(  # noqa: C901
-        weights: Iterator[nn.Parameter],
-        param_groups: list[ParamGroup],
-        retain_graph: bool = False
+    weights: Iterator[nn.Parameter], param_groups: list[ParamGroup], retain_graph: bool = False
 ) -> tuple[torch.Tensor | None, ...]:
     """
     Performs the second phase of a split backward pass: Weight Gradients.
@@ -368,7 +355,7 @@ def stage_backward_weight(  # noqa: C901
                         tensors=valid_edges,
                         grad_tensors=valid_grad_outputs,
                         retain_graph=retain_graph,
-                        inputs=inputs_for_backward
+                        inputs=inputs_for_backward,
                     )
 
         # Break Cycle: Grads

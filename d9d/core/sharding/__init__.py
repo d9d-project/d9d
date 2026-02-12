@@ -11,5 +11,5 @@ __all__ = [
     "shard_spec_nothing",
     "shard_spec_on_dim",
     "shard_tree",
-    "unshard_tree"
+    "unshard_tree",
 ]

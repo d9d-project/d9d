@@ -11,10 +11,10 @@ class BatchMaths:
     """
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            config_batching: BatchingConfig,
-            config_pipelining: PipeliningConfig | None
+        self,
+        dist_context: DistributedContext,
+        config_batching: BatchingConfig,
+        config_pipelining: PipeliningConfig | None,
     ):
         """
         Constructs the batch mathematics calculator.

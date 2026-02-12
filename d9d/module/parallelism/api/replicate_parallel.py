@@ -27,7 +27,11 @@ def parallelize_replicate(
      mesh: The device mesh over which to replicate the module.
     """
 
-    parallelize_module(module, mesh, ToLocalParallel(
-        param_placement=tuple(Replicate() for _ in range(mesh.ndim)),
-        grad_placement=tuple(Replicate() for _ in range(mesh.ndim))
-    ))
+    parallelize_module(
+        module,
+        mesh,
+        ToLocalParallel(
+            param_placement=tuple(Replicate() for _ in range(mesh.ndim)),
+            grad_placement=tuple(Replicate() for _ in range(mesh.ndim)),
+        ),
+    )

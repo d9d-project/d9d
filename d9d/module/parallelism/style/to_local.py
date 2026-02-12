@@ -7,9 +7,7 @@ from torch.distributed.tensor.parallel import ParallelStyle
 
 
 def _build_to_local_patched_class(
-        module: nn.Module,
-        grad_placement: tuple[Placement, ...],
-        param_names: list[str]
+    module: nn.Module, grad_placement: tuple[Placement, ...], param_names: list[str]
 ) -> type:
     param_name_to_property = {
         param_name: property(
@@ -61,8 +59,7 @@ class ToLocalParallel(ParallelStyle):
     def _distribute_params(self, name: str, module: nn.Module, device_mesh: DeviceMesh):
         for param_name, param in module.named_parameters(recurse=False):
             new_param = nn.Parameter(
-                distribute_tensor(param.data, device_mesh, self._param_placement),
-                requires_grad=param.requires_grad
+                distribute_tensor(param.data, device_mesh, self._param_placement), requires_grad=param.requires_grad
             )
 
             module.register_parameter(param_name, new_param)
@@ -76,11 +73,7 @@ class ToLocalParallel(ParallelStyle):
             patched_classes[submod_name] = _build_to_local_patched_class(submod, self._grad_placement, param_names)
             original_classes[submod_name] = submod.__class__
 
-            distribute_module(
-                submod,
-                device_mesh,
-                self._distribute_params
-            )
+            distribute_module(submod, device_mesh, self._distribute_params)
 
         master_module.register_forward_pre_hook(_ModulePatch(patched_classes))
         master_module.register_forward_hook(_ModulePatch(original_classes))

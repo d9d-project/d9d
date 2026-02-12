@@ -8,18 +8,16 @@ def check_grad(my_grad: Tensor, hf_grad: torch.Tensor, atol: float, rtol: float)
 
 
 def check_grad_distance(
-        my_grad: torch.Tensor,
-        hf_grad: torch.Tensor,
-        tol_angle: float = 0.05,
-        tol_norm_abs: float = 3e-3,
-        tol_norm_rel: float = 0.1
+    my_grad: torch.Tensor,
+    hf_grad: torch.Tensor,
+    tol_angle: float = 0.05,
+    tol_norm_abs: float = 3e-3,
+    tol_norm_rel: float = 0.1,
 ):
     my_grad_fp32 = my_grad.float()
     hf_grad_fp32 = hf_grad.float()
 
-    grad_non_zero_filter = ~(
-            (my_grad_fp32.abs().sum(dim=-1) == 0) & (hf_grad_fp32.abs().sum(dim=-1) == 0)
-    )
+    grad_non_zero_filter = ~((my_grad_fp32.abs().sum(dim=-1) == 0) & (hf_grad_fp32.abs().sum(dim=-1) == 0))
     my_grad_fp32 = my_grad_fp32[grad_non_zero_filter]
     hf_grad_fp32 = hf_grad_fp32[grad_non_zero_filter]
 
@@ -33,11 +31,11 @@ def check_grad_distance(
 
 
 def check_grad_distance_all_local_dist(
-        local: torch.nn.Module,
-        dist: torch.nn.Module,
-        tol_angle: float = 0.05,
-        tol_norm_abs: float = 3e-3,
-        tol_norm_rel: float = 0.1
+    local: torch.nn.Module,
+    dist: torch.nn.Module,
+    tol_angle: float = 0.05,
+    tol_norm_abs: float = 3e-3,
+    tol_norm_rel: float = 0.1,
 ):
     local_params = dict(local.named_parameters())
 
@@ -56,19 +54,12 @@ def check_grad_distance_all_local_dist(
         dist_grad = dist_param.grad.full_tensor()
 
         check_grad_distance(
-            local_grad,
-            dist_grad,
-            tol_angle=tol_angle,
-            tol_norm_abs=tol_norm_abs,
-            tol_norm_rel=tol_norm_rel
+            local_grad, dist_grad, tol_angle=tol_angle, tol_norm_abs=tol_norm_abs, tol_norm_rel=tol_norm_rel
         )
 
 
 @torch.no_grad()
-def copy_params_local_to_dist(
-        local: torch.nn.Module,
-        dist: torch.nn.Module
-):
+def copy_params_local_to_dist(local: torch.nn.Module, dist: torch.nn.Module):
     local_params = dict(local.named_parameters())
 
     for name, dist_param in dist.named_parameters():
@@ -81,9 +72,7 @@ def copy_params_local_to_dist(
         assert isinstance(dist_param, DTensor)
 
         sharded_local_data = distribute_tensor(
-            local_data,
-            device_mesh=dist_param.device_mesh,
-            placements=dist_param.placements
+            local_data, device_mesh=dist_param.device_mesh, placements=dist_param.placements
         )
 
         dist_param.to_local().copy_(sharded_local_data.to_local())

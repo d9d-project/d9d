@@ -14,6 +14,8 @@ test-distributed:
 test: test-local test-distributed
 
 lint:
+	@echo "Formatting"
+	@ruff format
 	@echo "Auto-Fixing Imports"
 	@ruff check --fix
 	@echo "Running linting"

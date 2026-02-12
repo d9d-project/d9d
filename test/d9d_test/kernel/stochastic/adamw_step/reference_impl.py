@@ -2,16 +2,16 @@ import torch
 
 
 def adamw_step_torch(
-        p: torch.Tensor,
-        g: torch.Tensor,
-        m: torch.Tensor,
-        v: torch.Tensor,
-        lr: float,
-        beta1: float,
-        beta2: float,
-        eps: float,
-        weight_decay: float,
-        step: int
+    p: torch.Tensor,
+    g: torch.Tensor,
+    m: torch.Tensor,
+    v: torch.Tensor,
+    lr: float,
+    beta1: float,
+    beta2: float,
+    eps: float,
+    weight_decay: float,
+    step: int,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     p_f64 = p.to(torch.float32)
     g_f64 = g.to(torch.float32)
@@ -23,8 +23,8 @@ def adamw_step_torch(
     m_next = beta1 * m_f64 + (1 - beta1) * g_f64
     v_next = beta2 * v_f64 + (1 - beta2) * (g_f64 * g_f64)
 
-    bc1 = 1 - beta1 ** step
-    bc2 = 1 - beta2 ** step
+    bc1 = 1 - beta1**step
+    bc2 = 1 - beta2**step
 
     m_hat = m_next / bc1
     v_hat = v_next / bc2

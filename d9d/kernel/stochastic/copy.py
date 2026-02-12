@@ -13,15 +13,11 @@ from .ops import fp32_to_bf16_kernel
         triton.Config({"BLOCK_SIZE": 4096}, num_warps=8),
         triton.Config({"BLOCK_SIZE": 8192}, num_warps=8),
     ],
-    key=["n_elements"]
+    key=["n_elements"],
 )
 @triton.jit
 def _copy_fp32_to_bf16_kernel(
-        source_ptr: torch.Tensor,
-        target_ptr: torch.Tensor,
-        n_elements: int,
-        seed: int,
-        BLOCK_SIZE: tl.constexpr
+    source_ptr: torch.Tensor, target_ptr: torch.Tensor, n_elements: int, seed: int, BLOCK_SIZE: tl.constexpr
 ):
     pid = tl.program_id(axis=0)
     offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
@@ -30,19 +26,13 @@ def _copy_fp32_to_bf16_kernel(
     # load source value (fp32)
     val_fp32 = tl.load(source_ptr + offsets, mask=mask)
 
-    val_bf16 = fp32_to_bf16_kernel(
-        val_fp32=val_fp32,
-        offsets=offsets,
-        seed=seed
-    )
+    val_bf16 = fp32_to_bf16_kernel(val_fp32=val_fp32, offsets=offsets, seed=seed)
 
     tl.store(target_ptr + offsets, val_bf16, mask=mask)
 
 
 def copy_fp32_to_bf16_stochastic_(
-        target: torch.Tensor,
-        source: torch.Tensor,
-        generator: torch.Generator | None = None
+    target: torch.Tensor, source: torch.Tensor, generator: torch.Generator | None = None
 ) -> torch.Tensor:
     """
     Copies elements from a Float32 tensor to a BFloat16 tensor using stochastic rounding.
@@ -86,19 +76,10 @@ def copy_fp32_to_bf16_stochastic_(
     n_elements = source.numel()
 
     # Generate a random seed for this specific kernel launch
-    seed = torch.randint(
-        0, 2 ** 31 - 1, (1,),
-        device="cpu",
-        generator=generator
-    ).item()
+    seed = torch.randint(0, 2**31 - 1, (1,), device="cpu", generator=generator).item()
 
     def _grid(meta: dict[str, int]) -> tuple[int, ...]:
         return (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
 
-    _copy_fp32_to_bf16_kernel[_grid](
-        source,
-        target,
-        n_elements,
-        seed
-    )
+    _copy_fp32_to_bf16_kernel[_grid](source, target, n_elements, seed)
     return target

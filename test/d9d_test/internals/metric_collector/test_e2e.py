@@ -87,10 +87,7 @@ def test_pytree_support(dist_ctx_factory):
     class PyTreeMetric(MockMetric):
         def compute(self):
             super().compute()
-            return {
-                "a": self.val,
-                "b": [self.val + 1, self.val + 2]
-            }
+            return {"a": self.val, "b": [self.val + 1, self.val + 2]}
 
     metric = PyTreeMetric()
     collector = AsyncMetricCollector(metric)

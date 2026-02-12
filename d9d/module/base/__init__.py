@@ -3,5 +3,5 @@
 from .late_init import ModuleLateInit
 
 __all__ = [
-    "ModuleLateInit"
+    "ModuleLateInit",
 ]

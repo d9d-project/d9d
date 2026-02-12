@@ -16,8 +16,7 @@ class ModelStateMapperShard(ModelStateMapper):
 
     def __init__(self, sub_mapper: ModelStateMapper, total_shards: int, current_shard: int):
         self._groups = self._shard_groups(
-            sub_mapper.state_dependency_groups(),
-            n_shards=total_shards, shard=current_shard
+            sub_mapper.state_dependency_groups(), n_shards=total_shards, shard=current_shard
         )
         self._sub_mapper = sub_mapper
         self._total_shards = total_shards

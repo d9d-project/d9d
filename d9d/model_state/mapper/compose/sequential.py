@@ -79,8 +79,9 @@ class ModelStateMapperSequential(ModelStateMapper):
             required_inputs = last_group_traced.inputs
 
             for mapper_i in range(0, len(mappers) - 1)[::-1]:
-                next_visit_groups = [x for x in mappers[mapper_i].state_dependency_groups()
-                                     if not x.outputs.isdisjoint(required_inputs)]
+                next_visit_groups = [
+                    x for x in mappers[mapper_i].state_dependency_groups() if not x.outputs.isdisjoint(required_inputs)
+                ]
 
                 required_inputs = frozenset.union(*(x.inputs for x in next_visit_groups))
 

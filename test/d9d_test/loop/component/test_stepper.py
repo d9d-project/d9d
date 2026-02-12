@@ -49,30 +49,25 @@ def test_stepper_load_state_dict_config_mismatch():
         # Special: Disable
         (1, 10, StepActionSpecial.disable, False, False),
         (10, 10, StepActionSpecial.disable, False, False),
-
         # Special: Last Step
         (9, 10, StepActionSpecial.last_step, False, False),
         (10, 10, StepActionSpecial.last_step, False, True),
-
         # Periodic (every 5 steps) - standard cases
         (4, 20, 5, False, False),
         (5, 20, 5, False, True),
         (6, 20, 5, False, False),
         (10, 20, 5, False, True),
-
         # Periodic - Boundary check (last step is also periodic)
         (20, 20, 5, False, True),
-
         # Periodic with enable_on_last_step_if_periodic=True
         # Case 1: Last step is NOT divisible by period (e.g., total=21, period=5)
         (21, 21, 5, True, True),
         # Case 2: Not last step, not divisible
         (20, 21, 5, True, True),  # Wait, 20 % 5 == 0, so True regardless of flag
         (19, 21, 5, True, False),
-
         # Case 3: Last step IS divisible by period
         (20, 20, 5, True, True),
-    ]
+    ],
 )
 def test_should_do_action(current_step, total_steps, action, enable_on_last, expected):
     stepper = Stepper(initial_step=0, total_steps=total_steps)

@@ -9,5 +9,5 @@ __all__ = [
     "BinaryAccuracyMetric",
     "ComposeMetric",
     "SumMetric",
-    "WeightedMeanMetric"
+    "WeightedMeanMetric",
 ]

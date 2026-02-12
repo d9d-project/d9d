@@ -22,12 +22,12 @@ class OptimizerFactory:
     """
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            tracked_modules: TrackedModules,
-            optimizer_provider: OptimizerProvider,
-            lr_scheduler_provider: LRSchedulerProvider,
-            stepper: Stepper
+        self,
+        dist_context: DistributedContext,
+        tracked_modules: TrackedModules,
+        optimizer_provider: OptimizerProvider,
+        lr_scheduler_provider: LRSchedulerProvider,
+        stepper: Stepper,
     ):
         """
         Constructs the OptimizerFactory.
@@ -62,18 +62,13 @@ class OptimizerFactory:
         lr_schedulers: list[LRSchedulerProtocol] = []
         for module in self._tracked_modules.modules:
             optimizer = self._optimizer_provider(
-                InitializeOptimizerStageContext(
-                    dist_context=self._dist_context,
-                    model=module
-                )
+                InitializeOptimizerStageContext(dist_context=self._dist_context, model=module)
             )
             optimizers.append(optimizer)
 
             scheduler = self._lr_scheduler_provider(
                 InitializeLRSchedulerContext(
-                    dist_context=self._dist_context,
-                    total_steps=self._stepper.total_steps,
-                    optimizer=optimizer
+                    dist_context=self._dist_context, total_steps=self._stepper.total_steps, optimizer=optimizer
                 )
             )
             lr_schedulers.append(scheduler)
@@ -83,12 +78,6 @@ class OptimizerFactory:
         else:
             mesh_pp = None
 
-        pipe_optimizer = PipelinedOptimizer(
-            mesh_pp=mesh_pp,
-            optimizers=optimizers
-        )
-        pipe_scheduler = PipelinedLRScheduler(
-            mesh_pp=mesh_pp,
-            schedulers=lr_schedulers
-        )
+        pipe_optimizer = PipelinedOptimizer(mesh_pp=mesh_pp, optimizers=optimizers)
+        pipe_scheduler = PipelinedLRScheduler(mesh_pp=mesh_pp, schedulers=lr_schedulers)
         return pipe_optimizer, pipe_scheduler

@@ -17,12 +17,7 @@ TOutput = TypeVar("TOutput")
 
 class PipelineOutputsProcessor(abc.ABC, Generic[TOutput]):
     @abc.abstractmethod
-    def __call__(
-            self,
-            pipeline_outputs: dict[str, torch.Tensor],
-            microbatch_idx: int
-    ) -> TOutput:
-        ...
+    def __call__(self, pipeline_outputs: dict[str, torch.Tensor], microbatch_idx: int) -> TOutput: ...
 
 
 class LossComputer(PipelineOutputsProcessor[torch.Tensor]):
@@ -35,12 +30,7 @@ class LossComputer(PipelineOutputsProcessor[torch.Tensor]):
     metrics into the state for logging, and returns the loss*weight term for backpropagation.
     """
 
-    def __init__(
-            self,
-            state: PipelineStateHandler,
-            task: TrainTask,
-            stepper: Stepper
-    ):
+    def __init__(self, state: PipelineStateHandler, task: TrainTask, stepper: Stepper):
         """
         Constructs a new LossComputer.
 
@@ -54,11 +44,7 @@ class LossComputer(PipelineOutputsProcessor[torch.Tensor]):
         self._task = task
         self._stepper = stepper
 
-    def __call__(
-            self,
-            pipeline_outputs: dict[str, torch.Tensor],
-            microbatch_idx: int
-    ) -> torch.Tensor:
+    def __call__(self, pipeline_outputs: dict[str, torch.Tensor], microbatch_idx: int) -> torch.Tensor:
         """
         Computes the weighted loss for a specific sharded microbatch or the full microbatch.
 
@@ -77,15 +63,11 @@ class LossComputer(PipelineOutputsProcessor[torch.Tensor]):
             The calculated loss multiplied by its weight.
         """
 
-        state = self._state.sharded_state(
-            shard_id=microbatch_idx
-        )
+        state = self._state.sharded_state(shard_id=microbatch_idx)
 
-        computation = self._task.compute_loss(ComputeLossContext(
-            pipeline_results=pipeline_outputs,
-            state=state,
-            stepper=self._stepper
-        ))
+        computation = self._task.compute_loss(
+            ComputeLossContext(pipeline_results=pipeline_outputs, state=state, stepper=self._stepper)
+        )
 
         loss = computation.loss
         loss_weight = computation.loss_weight
@@ -107,11 +89,7 @@ class InferenceProcessor(PipelineOutputsProcessor[None]):
     and delegates the output processing logic to the user-defined inference task.
     """
 
-    def __init__(
-            self,
-            state: PipelineStateHandler,
-            task: InferenceTask
-    ):
+    def __init__(self, state: PipelineStateHandler, task: InferenceTask):
         """
         Constructs a new ModelOutputsProcessor.
 
@@ -123,11 +101,7 @@ class InferenceProcessor(PipelineOutputsProcessor[None]):
         self._state = state
         self._task = task
 
-    def __call__(
-            self,
-            pipeline_outputs: dict[str, torch.Tensor],
-            microbatch_idx: int
-    ) -> None:
+    def __call__(self, pipeline_outputs: dict[str, torch.Tensor], microbatch_idx: int) -> None:
         """
         Processes model outputs for a specific microbatch or full batch.
 
@@ -139,11 +113,6 @@ class InferenceProcessor(PipelineOutputsProcessor[None]):
             microbatch_idx: Index of the current microbatch, or None if not using microbatching.
         """
 
-        state = self._state.sharded_state(
-            shard_id=microbatch_idx
-        )
+        state = self._state.sharded_state(shard_id=microbatch_idx)
 
-        self._task.process_outputs(ProcessOutputsContext(
-            pipeline_results=pipeline_outputs,
-            state=state
-        ))
+        self._task.process_outputs(ProcessOutputsContext(pipeline_results=pipeline_outputs, state=state))

@@ -6,5 +6,5 @@ from .abc import ModelStateMapper, StateGroup
 
 __all__ = [
     "ModelStateMapper",
-    "StateGroup"
+    "StateGroup",
 ]

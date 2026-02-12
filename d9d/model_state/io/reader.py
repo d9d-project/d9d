@@ -15,13 +15,7 @@ class _StateLoadingFlow:
     Internal orchestration logic for loading and transforming model states in a streamed manner.
     """
 
-    def __init__(
-            self,
-            src_dir: Path,
-            mapper: ModelStateMapper,
-            device: str,
-            show_progress: bool
-    ):
+    def __init__(self, src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool):
         self._src_dir = src_dir
         self._mapper = mapper
         self._device = device
@@ -37,7 +31,7 @@ class _StateLoadingFlow:
         self._pbar = tqdm(
             desc="Loading Model States",
             total=len([output_name for group in self._groups_to_process for output_name in group.outputs]),
-            disable=not show_progress
+            disable=not show_progress,
         )
 
     def _load_index(self) -> ModelStateIndex:
@@ -70,9 +64,7 @@ class _StateLoadingFlow:
 
             self._groups_to_process.remove(group)
 
-            loaded_states = self._mapper.apply(
-                {k: v for k, v in self._stored_states.items() if k in group.inputs}
-            )
+            loaded_states = self._mapper.apply({k: v for k, v in self._stored_states.items() if k in group.inputs})
             yield from loaded_states.items()
             self._pbar.update(len(loaded_states))
 
@@ -95,10 +87,7 @@ class _StateLoadingFlow:
 
 
 def read_model_state(
-        src_dir: Path,
-        mapper: ModelStateMapper,
-        device: str,
-        show_progress: bool = True
+    src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool = True
 ) -> Iterable[tuple[str, torch.Tensor]]:
     """
     Reads a model checkpoint from disk, transforming it on-the-fly according to the state mapper.
@@ -117,9 +106,4 @@ def read_model_state(
         A tuple containing the transformed parameter name and its tensor value.
     """
 
-    yield from _StateLoadingFlow(
-        src_dir=src_dir,
-        device=device,
-        mapper=mapper,
-        show_progress=show_progress
-    ).load()
+    yield from _StateLoadingFlow(src_dir=src_dir, device=device, mapper=mapper, show_progress=show_progress).load()

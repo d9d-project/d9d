@@ -40,22 +40,18 @@ def init_deepep_buffer(group: torch.distributed.ProcessGroup, hidden_bytes: int)
     global _buffer  # noqa: PLW0603
     num_nvl_bytes, num_rdma_bytes = 0, 0
     for config in (
-            Buffer.get_dispatch_config(group.size()),
-            Buffer.get_combine_config(group.size()),
+        Buffer.get_dispatch_config(group.size()),
+        Buffer.get_combine_config(group.size()),
     ):
-        num_nvl_bytes = max(
-            config.get_nvl_buffer_size_hint(hidden_bytes, group.size()), num_nvl_bytes
-        )
-        num_rdma_bytes = max(
-            config.get_rdma_buffer_size_hint(hidden_bytes, group.size()), num_rdma_bytes
-        )
+        num_nvl_bytes = max(config.get_nvl_buffer_size_hint(hidden_bytes, group.size()), num_nvl_bytes)
+        num_rdma_bytes = max(config.get_rdma_buffer_size_hint(hidden_bytes, group.size()), num_rdma_bytes)
 
     # Allocate buffer if not existed or not enough buffer
     if (
-            _buffer is None
-            or _buffer.group != group
-            or _buffer.num_nvl_bytes < num_nvl_bytes
-            or _buffer.num_rdma_bytes < num_rdma_bytes
+        _buffer is None
+        or _buffer.group != group
+        or _buffer.num_nvl_bytes < num_nvl_bytes
+        or _buffer.num_rdma_bytes < num_rdma_bytes
     ):
         _buffer = Buffer(group, num_nvl_bytes, num_rdma_bytes)
 
@@ -65,41 +61,16 @@ class DeepEpDispatch(torch.autograd.Function):
 
     @staticmethod
     def forward(
-            ctx: FunctionCtx,
-            x: torch.Tensor,
-            topk_idx: torch.Tensor,
-            topk_weights: torch.Tensor,
-            num_experts: int
-    ) -> tuple[
-        torch.Tensor,
-        torch.Tensor,
-        torch.Tensor,
-        list,
-        tuple,
-        EventOverlap
-    ]:
+        ctx: FunctionCtx, x: torch.Tensor, topk_idx: torch.Tensor, topk_weights: torch.Tensor, num_experts: int
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, list, tuple, EventOverlap]:
         previous_event = Buffer.capture()
-        (
-            num_tokens_per_rank,
-            num_tokens_per_rdma_rank,
-            num_tokens_per_expert,
-            is_token_in_rank,
-            previous_event
-        ) = _buffer.get_dispatch_layout(
-            topk_idx, num_experts,
-            previous_event=previous_event,
-            async_finish=True,
-            allocate_on_comm_stream=True
+        (num_tokens_per_rank, num_tokens_per_rdma_rank, num_tokens_per_expert, is_token_in_rank, previous_event) = (
+            _buffer.get_dispatch_layout(
+                topk_idx, num_experts, previous_event=previous_event, async_finish=True, allocate_on_comm_stream=True
+            )
         )
 
-        (
-            recv_x,
-            recv_topk_idx,
-            recv_topk_weights,
-            num_recv_tokens_per_expert_list,
-            handle,
-            event
-        ) = _buffer.dispatch(
+        (recv_x, recv_topk_idx, recv_topk_weights, num_recv_tokens_per_expert_list, handle, event) = _buffer.dispatch(
             x,
             topk_idx=topk_idx,
             topk_weights=topk_weights,
@@ -109,7 +80,7 @@ class DeepEpDispatch(torch.autograd.Function):
             num_tokens_per_expert=num_tokens_per_expert,
             previous_event=previous_event,
             async_finish=True,
-            allocate_on_comm_stream=True
+            allocate_on_comm_stream=True,
         )
 
         event.current_stream_wait()
@@ -118,43 +89,28 @@ class DeepEpDispatch(torch.autograd.Function):
 
         ctx.handle = handle
 
-        return (
-            recv_x,
-            recv_topk_idx,
-            recv_topk_weights,
-            num_recv_tokens_per_expert_list,
-            handle
-        )
+        return (recv_x, recv_topk_idx, recv_topk_weights, num_recv_tokens_per_expert_list, handle)
 
     @staticmethod
     def backward(
-            ctx: FunctionCtx,
-            grad_recv_x: torch.Tensor,
-            grad_recv_topk_idx: torch.Tensor,
-            grad_recv_topk_weights: torch.Tensor,
-            grad_num_recv_tokens_per_expert_list: list,
-            grad_handle: Any
-    ) -> tuple[
-        torch.Tensor,
-        None,
-        torch.Tensor,
-        None
-    ]:
+        ctx: FunctionCtx,
+        grad_recv_x: torch.Tensor,
+        grad_recv_topk_idx: torch.Tensor,
+        grad_recv_topk_weights: torch.Tensor,
+        grad_num_recv_tokens_per_expert_list: list,
+        grad_handle: Any,
+    ) -> tuple[torch.Tensor, None, torch.Tensor, None]:
         handle = ctx.handle
 
         prev_event = Buffer.capture()
 
-        (
-            combined_grad_x,
-            combined_grad_recv_topk_weights,
-            event
-        ) = _buffer.combine(
+        (combined_grad_x, combined_grad_recv_topk_weights, event) = _buffer.combine(
             grad_recv_x.contiguous(),
             handle,
             topk_weights=grad_recv_topk_weights,
             async_finish=True,
             previous_event=prev_event,
-            allocate_on_comm_stream=True
+            allocate_on_comm_stream=True,
         )
 
         event.current_stream_wait()
@@ -166,19 +122,11 @@ class DeepEpCombine(torch.autograd.Function):
     """Autograd function for the DeepEP Combine operation."""
 
     @staticmethod
-    def forward(
-            ctx: FunctionCtx,
-            x: torch.Tensor,
-            handle: Any
-    ) -> torch.Tensor:
+    def forward(ctx: FunctionCtx, x: torch.Tensor, handle: Any) -> torch.Tensor:
         previous_event = Buffer.capture()
 
         combined_x, _, event = _buffer.combine(
-            x,
-            handle,
-            async_finish=True,
-            previous_event=previous_event,
-            allocate_on_comm_stream=True
+            x, handle, async_finish=True, previous_event=previous_event, allocate_on_comm_stream=True
         )
 
         event.current_stream_wait()
@@ -198,7 +146,7 @@ class DeepEpCombine(torch.autograd.Function):
             handle=handle,
             async_finish=True,
             previous_event=previous_event,
-            allocate_on_comm_stream=True
+            allocate_on_comm_stream=True,
         )
 
         event.current_stream_wait()
@@ -239,35 +187,18 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
         self._num_experts_per_shard = self._num_experts // group.size()
 
     def dispatch(
-            self,
-            hidden_states: torch.Tensor,
-            topk_ids: torch.Tensor,
-            topk_weights: torch.Tensor
+        self, hidden_states: torch.Tensor, topk_ids: torch.Tensor, topk_weights: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        (
-            hidden_states,
-            topk_ids,
-            topk_weights,
-            tokens_per_expert,
-            handle
-        ) = DeepEpDispatch.apply(
-            hidden_states,
-            topk_ids,
-            topk_weights,
-            self._num_experts
+        (hidden_states, topk_ids, topk_weights, tokens_per_expert, handle) = DeepEpDispatch.apply(
+            hidden_states, topk_ids, topk_weights, self._num_experts
         )
 
-        routing_map, routing_probs = fused_indices_to_multihot(
-            topk_ids, topk_weights, self._num_experts_per_shard
-        )
+        routing_map, routing_probs = fused_indices_to_multihot(topk_ids, topk_weights, self._num_experts_per_shard)
 
         self._hidden_shape_before_permute = hidden_states.shape
 
         hidden_states, routing_probs, reverse_permute_map = moe_permute_with_probs(
-            hidden_states,
-            routing_probs,
-            routing_map,
-            num_out_tokens=tokens_per_expert.sum().item()
+            hidden_states, routing_probs, routing_map, num_out_tokens=tokens_per_expert.sum().item()
         )
 
         self._handle = handle
@@ -275,10 +206,7 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
 
         return hidden_states, routing_probs, tokens_per_expert
 
-    def combine(
-            self,
-            hidden_states: torch.Tensor
-    ) -> torch.Tensor:
+    def combine(self, hidden_states: torch.Tensor) -> torch.Tensor:
         if self._handle is None:
             raise ValueError("you fucked up moe communication order: you should dispatch first and after that combine")
 
@@ -288,10 +216,7 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
             restore_shape=self._hidden_shape_before_permute,
         )
 
-        hidden_states = DeepEpCombine.apply(
-            hidden_states,
-            self._handle
-        )
+        hidden_states = DeepEpCombine.apply(hidden_states, self._handle)
 
         self._handle = None
         self._unpermute_mapping = None

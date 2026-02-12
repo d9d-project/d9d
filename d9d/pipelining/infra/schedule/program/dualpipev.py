@@ -36,7 +36,7 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
 
     @staticmethod
     def _build_for_rank(  # noqa: C901
-            rank: int, stage_to_rank: dict[int, int], num_microbatches: int, pp_size: int
+        rank: int, stage_to_rank: dict[int, int], num_microbatches: int, pp_size: int
     ) -> list[ActionBase]:
         compute_actions: list[ActionBase] = []
 
@@ -56,9 +56,7 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
         # --- Helper Functions for Action Emission ---
 
         def _add_f(stage: int):
-            compute_actions.append(
-                ForwardComputeAction(stage_idx=stage, microbatch_idx=f_idx[stage])
-            )
+            compute_actions.append(ForwardComputeAction(stage_idx=stage, microbatch_idx=f_idx[stage]))
             f_idx[stage] += 1
 
         def _add_b_full(stage: int):
@@ -87,9 +85,7 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
             if not weight_queue:
                 return
             s, mb = weight_queue.popleft()
-            compute_actions.append(
-                BackwardWeightComputeAction(stage_idx=s, microbatch_idx=mb)
-            )
+            compute_actions.append(BackwardWeightComputeAction(stage_idx=s, microbatch_idx=mb))
 
         def _add_overlap_f_b(stage_f: int, stage_b: int, b_is_full: bool):
             """Emit overlapped Forward and Backward actions."""
@@ -98,9 +94,7 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
 
             act_f = ForwardComputeAction(stage_idx=stage_f, microbatch_idx=mb_f)
 
-            act_b = BackwardFullInputComputeAction(
-                stage_idx=stage_b, microbatch_idx=mb_b, full_backward=b_is_full
-            )
+            act_b = BackwardFullInputComputeAction(stage_idx=stage_b, microbatch_idx=mb_b, full_backward=b_is_full)
             if not b_is_full:
                 weight_queue.append((stage_b, mb_b))
 
@@ -189,40 +183,28 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
 
         return compute_actions
 
-    def compose(
-            self, num_microbatches: int, pp_size: int
-    ) -> dict[int, list[ActionBase]]:
+    def compose(self, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:
         num_stages = self.num_stages_per_rank * pp_size
 
         if num_microbatches < num_stages:
-            raise ValueError(
-                f"DualPipeV requires num_microbatches ({num_microbatches}) >= "
-                f"num_stages ({num_stages})."
-            )
+            raise ValueError(f"DualPipeV requires num_microbatches ({num_microbatches}) >= num_stages ({num_stages}).")
 
         # Ranks hold stages in a V pattern (e.g., Rank 0 holds Stage 0 and Stage N-1).
         # We rely on the sorted order of local steps to determine Phase 0 (Forward-going)
         # and Phase 1 (Backward-coming).
-        stage_to_rank = build_stage_to_host_rank_topology(
-            pp_size=pp_size, num_stages=num_stages, style=ScheduleStyle.v
-        )
+        stage_to_rank = build_stage_to_host_rank_topology(pp_size=pp_size, num_stages=num_stages, style=ScheduleStyle.v)
 
         compute_actions: dict[int, list[ActionBase]] = {r: [] for r in range(pp_size)}
 
         for rank in range(pp_size):
             compute_actions[rank] = self._build_for_rank(
-                rank=rank,
-                pp_size=pp_size,
-                num_microbatches=num_microbatches,
-                stage_to_rank=stage_to_rank
+                rank=rank, pp_size=pp_size, num_microbatches=num_microbatches, stage_to_rank=stage_to_rank
             )
 
         # 4. Inject Communication Operations
         # This wrapper handles dependency analysis and inserts Send/Recv/Wait ops.
         return add_communication_ops(
-            compute_actions=compute_actions,
-            stage_to_rank=stage_to_rank,
-            num_stages=num_stages
+            compute_actions=compute_actions, stage_to_rank=stage_to_rank, num_stages=num_stages
         )
 
     @property

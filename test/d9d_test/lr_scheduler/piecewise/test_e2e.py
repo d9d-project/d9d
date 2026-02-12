@@ -33,8 +33,7 @@ def test_success(optimizer):
     # Base LR = 0.1
 
     torch.testing.assert_close(
-        torch.tensor(lrs),
-        torch.tensor([0.0, 0.05, 0.1, 0.07, 0.04, 0.01, 0.0082, 0.0064, 0.0046, 0.0028, 0.001])
+        torch.tensor(lrs), torch.tensor([0.0, 0.05, 0.1, 0.07, 0.04, 0.01, 0.0082, 0.0064, 0.0046, 0.0028, 0.001])
     )
 
 

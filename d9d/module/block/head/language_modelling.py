@@ -24,12 +24,7 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
     consistency with the global vocabulary indices.
     """
 
-    def __init__(
-            self,
-            split_vocab_size: dict[str, int],
-            split_order: Sequence[str],
-            hidden_size: int
-    ):
+    def __init__(self, split_vocab_size: dict[str, int], split_order: Sequence[str], hidden_size: int):
         """
         Constructs the SplitLanguageModellingHead object.
 
@@ -42,20 +37,18 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
 
         super().__init__()
 
-        lm_head = nn.ModuleDict({
-            split_name: nn.Linear(hidden_size, vocab_size, bias=False)
-            for split_name, vocab_size in split_vocab_size.items()
-        })
+        lm_head = nn.ModuleDict(
+            {
+                split_name: nn.Linear(hidden_size, vocab_size, bias=False)
+                for split_name, vocab_size in split_vocab_size.items()
+            }
+        )
 
         self.lm_head: Mapping[str, nn.Linear] = cast(Mapping[str, nn.Linear], lm_head)
         self._split_order = split_order
         self._hidden_size = hidden_size
 
-    def forward(
-            self,
-            hidden_states: torch.Tensor,
-            labels: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
         """
         Computes the cross-entropy loss for the given hidden states and labels.
 
@@ -72,11 +65,7 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
         lm_head_weight = torch.cat([self.lm_head[split_name].weight for split_name in self._split_order], dim=0)
 
         losses = linear_cross_entropy(
-            hidden_states,
-            lm_head_weight,
-            labels,
-            ignore_index=LM_IGNORE_INDEX,
-            reduction="none"
+            hidden_states, lm_head_weight, labels, ignore_index=LM_IGNORE_INDEX, reduction="none"
         )
         return losses
 

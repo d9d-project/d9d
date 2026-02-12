@@ -27,19 +27,23 @@ def _build_injection_mapper(name: str, state: torch.Tensor) -> ModelStateMapper:
 def _augment_mapper_for_injection(model: nn.Module, mapper: ModelStateMapper) -> ModelStateMapper:
     states_to_load = {output for group in mapper.state_dependency_groups() for output in group.outputs}
     current_state_dict = model.state_dict()
-    mapper = ModelStateMapperSequential([
-        mapper,
-        ModelStateMapperParallel([_build_injection_mapper(name, current_state_dict[name]) for name in states_to_load])
-    ])
+    mapper = ModelStateMapperSequential(
+        [
+            mapper,
+            ModelStateMapperParallel(
+                [_build_injection_mapper(name, current_state_dict[name]) for name in states_to_load]
+            ),
+        ]
+    )
     return mapper
 
 
 def load_model_state(
-        src_dir: Path,
-        mapper: ModelStateMapper,
-        device: str,
-        model: nn.Module,
-        show_progress: bool = True,
+    src_dir: Path,
+    mapper: ModelStateMapper,
+    device: str,
+    model: nn.Module,
+    show_progress: bool = True,
 ):
     """
     High-level utility to stream a checkpoint directly into a PyTorch module.
@@ -67,9 +71,6 @@ def load_model_state(
     """
 
     for state_name, state_value in read_model_state(
-            src_dir=src_dir,
-            mapper=_augment_mapper_for_injection(model, mapper),
-            device=device,
-            show_progress=show_progress
+        src_dir=src_dir, mapper=_augment_mapper_for_injection(model, mapper), device=device, show_progress=show_progress
     ):
         model.load_state_dict({state_name: state_value}, strict=False)

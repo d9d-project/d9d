@@ -5,5 +5,5 @@ __all__ = [
     "Inference",
     "InferenceConfigurator",
     "Trainer",
-    "TrainingConfigurator"
+    "TrainingConfigurator",
 ]

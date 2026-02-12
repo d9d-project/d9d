@@ -29,11 +29,7 @@ def test_custom_backward_correctness():
 
     loss = model(x, y)["x"].mean()
 
-    results = stage_backward_full(
-        outputs=[loss],
-        output_grads=[torch.ones_like(loss)],
-        inputs=[x, y]
-    )
+    results = stage_backward_full(outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x, y])
 
     # check that we do not set input .grad variables - these are not needed to be stored at regular .grad container
     assert x.grad is None
@@ -63,10 +59,7 @@ def test_split_backward_correctness():
     hook_state = register_pp_hooks(model)
 
     results = stage_backward_input(
-        outputs=[loss],
-        output_grads=[torch.ones_like(loss)],
-        inputs=[x, y],
-        weights=model.parameters()
+        outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x, y], weights=model.parameters()
     )
 
     check_pp_hooks_ran(hook_state, 0)
@@ -89,10 +82,7 @@ def test_split_backward_correctness():
     gc.collect()
 
     # B. Backward Weight Phase
-    stage_backward_weight(
-        weights=model.parameters(),
-        param_groups=results.param_groups
-    )
+    stage_backward_weight(weights=model.parameters(), param_groups=results.param_groups)
 
     check_pp_hooks_ran(hook_state, 1)
 

@@ -15,5 +15,5 @@ __all__ = [
     "REGULAR_DOMAIN",
     "DeviceMeshParameters",
     "DistributedContext",
-    "build_dist_logger"
+    "build_dist_logger",
 ]

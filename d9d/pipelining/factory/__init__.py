@@ -17,5 +17,5 @@ __all__ = [
     "PipelineScheduleInferenceConfig",
     "PipelineScheduleLoopedBFSConfig",
     "PipelineScheduleZeroBubbleVConfig",
-    "build_schedule"
+    "build_schedule",
 ]

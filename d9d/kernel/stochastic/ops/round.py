@@ -4,9 +4,9 @@ import triton.language as tl
 
 @triton.jit
 def fp32_to_bf16_kernel(
-        val_fp32: tl.tensor,
-        offsets: tl.tensor,
-        seed: int,
+    val_fp32: tl.tensor,
+    offsets: tl.tensor,
+    seed: int,
 ) -> tl.tensor:
     val_ui32 = val_fp32.to(tl.uint32, bitcast=True)
 

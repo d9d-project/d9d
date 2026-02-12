@@ -27,25 +27,17 @@ class NoCommunicationHandler(ExpertCommunicationHandler):
         self._unpermute_mapping: torch.Tensor | None = None
 
     def dispatch(
-            self,
-            hidden_states: torch.Tensor,
-            topk_ids: torch.Tensor,
-            topk_weights: torch.Tensor
+        self, hidden_states: torch.Tensor, topk_ids: torch.Tensor, topk_weights: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         with torch.no_grad():
             tokens_per_expert = torch.bincount(topk_ids.flatten(), minlength=self._num_experts).cpu()
 
-        routing_map, routing_probs = fused_indices_to_multihot(
-            topk_ids, topk_weights, self._num_experts
-        )
+        routing_map, routing_probs = fused_indices_to_multihot(topk_ids, topk_weights, self._num_experts)
 
         self._hidden_shape_before_permute = hidden_states.shape
 
         hidden_states, routing_probs, reverse_permute_map = moe_permute_with_probs(
-            hidden_states,
-            routing_probs,
-            routing_map,
-            num_out_tokens=cast(int, tokens_per_expert.sum().item())
+            hidden_states, routing_probs, routing_map, num_out_tokens=cast(int, tokens_per_expert.sum().item())
         )
 
         self._unpermute_mapping = reverse_permute_map

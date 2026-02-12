@@ -22,14 +22,7 @@ def test_bad_target_contiguity():
 
 
 @pytest.mark.local
-@pytest.mark.parametrize("shape", [
-    (10,),
-    (100,),
-    (128,),
-    (1024,),
-    (32, 32),
-    (2048, 4096)
-])
+@pytest.mark.parametrize("shape", [(10,), (100,), (128,), (1024,), (32, 32), (2048, 4096)])
 def test_reproducibility_with_generator(shape):
     src = torch.randn(shape, dtype=torch.float32, device="cuda")
 
@@ -53,10 +46,13 @@ def test_reproducibility_with_generator(shape):
 
 
 @pytest.mark.local
-@pytest.mark.parametrize("shape", [
-    (2048, 4096),
-    (2_000_000,),
-])
+@pytest.mark.parametrize(
+    "shape",
+    [
+        (2048, 4096),
+        (2_000_000,),
+    ],
+)
 def test_mean_preservation_bias(shape):
     """
     STATISTICAL TEST:

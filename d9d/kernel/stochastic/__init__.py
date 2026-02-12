@@ -7,5 +7,5 @@ from .copy import copy_fp32_to_bf16_stochastic_
 
 __all__ = [
     "adamw_stochastic_bf16_",
-    "copy_fp32_to_bf16_stochastic_"
+    "copy_fp32_to_bf16_stochastic_",
 ]

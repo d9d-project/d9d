@@ -32,16 +32,16 @@ class MockSortableDataset(DatasetImplementingSortKeyProtocol[int], Stateful):
 @pytest.mark.parametrize(
     ("dataset_len", "buffer_size", "pack_size"),
     [
-        (100, 10, 1),   # Even division, full shuffle
-        (100, 10, 5),   # Even division, packs of 5
+        (100, 10, 1),  # Even division, full shuffle
+        (100, 10, 5),  # Even division, packs of 5
         (100, 10, 10),  # Pack size == buffer size (no local shuffle, just sorted chunks)
-        (100, 30, 1),   # Remainder buffer at end (100 % 30 != 0)
+        (100, 30, 1),  # Remainder buffer at end (100 % 30 != 0)
         (100, 30, 5),
         (100, 30, 10),
-        (105, 10, 1),   # Odd dataset length
+        (105, 10, 1),  # Odd dataset length
         (105, 10, 5),
         (105, 10, 10),
-        (105, 30, 1),   # 105 % 30 = 15 remainder
+        (105, 30, 1),  # 105 % 30 = 15 remainder
         (105, 30, 5),
         (105, 30, 10),
     ],

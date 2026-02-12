@@ -78,9 +78,7 @@ def group_parameters_for_norm(parameters: Iterable[nn.Parameter]) -> ParametersF
             continue
 
         group = GradNormGroup(
-            shard_meshes=_extract_shard_meshes(param),
-            grad_dtype=param.grad_dtype,
-            device=param.device
+            shard_meshes=_extract_shard_meshes(param), grad_dtype=param.grad_dtype, device=param.device
         )
         grouped_params[group].append(param)
     # we are sure dict is ordered in python 3.11 so we can sort it...

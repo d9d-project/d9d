@@ -20,9 +20,7 @@ def _get_sub_actions(action: ActionBase) -> tuple[ActionBase, ...]:
 
 
 def _check_action_communication_dependencies_fulfilled(
-        action: ActionBase,
-        rank_events: set[ActionBase],
-        num_stages: int
+    action: ActionBase, rank_events: set[ActionBase], num_stages: int
 ) -> bool:
     match action:
         case ForwardComputeAction():
@@ -39,16 +37,8 @@ def _check_action_communication_dependencies_fulfilled(
             if BackwardReceiveAction(action.stage_idx, action.microbatch_idx) in rank_events:
                 return True
 
-            next_full = BackwardFullInputComputeAction(
-                action.stage_idx + 1,
-                action.microbatch_idx,
-                full_backward=True
-            )
-            next_inp = BackwardFullInputComputeAction(
-                action.stage_idx + 1,
-                action.microbatch_idx,
-                full_backward=False
-            )
+            next_full = BackwardFullInputComputeAction(action.stage_idx + 1, action.microbatch_idx, full_backward=True)
+            next_inp = BackwardFullInputComputeAction(action.stage_idx + 1, action.microbatch_idx, full_backward=False)
 
             if next_full in rank_events or next_inp in rank_events:
                 return True
@@ -58,9 +48,7 @@ def _check_action_communication_dependencies_fulfilled(
 
 
 def check_action_communication_dependencies_fulfilled(
-        action: ActionBase,
-        rank_events: set[ActionBase],
-        num_stages: int
+    action: ActionBase, rank_events: set[ActionBase], num_stages: int
 ) -> bool:
     """
     Checks if data dependencies (Receive or Local Compute) are met for an action.
@@ -93,9 +81,9 @@ class _CommunicationPackage:
 
 
 def _create_communications_for_action(
-        action: ActionBase,
-        num_stages: int,
-        stage_to_rank: dict[int, int],
+    action: ActionBase,
+    num_stages: int,
+    stage_to_rank: dict[int, int],
 ) -> _CommunicationPackage | None:
     match action:
         case ForwardComputeAction():
@@ -109,7 +97,7 @@ def _create_communications_for_action(
             return _CommunicationPackage(
                 send=ForwardSendAction(action.stage_idx, action.microbatch_idx),
                 recv=ForwardReceiveAction(action.stage_idx + 1, action.microbatch_idx),
-                sends_to_rank=next_rank
+                sends_to_rank=next_rank,
             )
         case BackwardFullInputComputeAction():
             if action.stage_idx == 0:
@@ -122,16 +110,16 @@ def _create_communications_for_action(
             return _CommunicationPackage(
                 send=BackwardSendAction(action.stage_idx, action.microbatch_idx),
                 recv=BackwardReceiveAction(action.stage_idx - 1, action.microbatch_idx),
-                sends_to_rank=prev_rank
+                sends_to_rank=prev_rank,
             )
         case _:
             return None
 
 
 def add_communication_ops(
-        compute_actions: dict[int, list[ActionBase]],
-        stage_to_rank: dict[int, int],
-        num_stages: int,
+    compute_actions: dict[int, list[ActionBase]],
+    stage_to_rank: dict[int, int],
+    num_stages: int,
 ) -> dict[int, list[ActionBase]]:
     """
     Injects communication actions into a computation-only schedule.
@@ -171,7 +159,7 @@ def add_communication_ops(
 
             # Check readiness
             if not check_action_communication_dependencies_fulfilled(
-                    current_action, completed_events[rank], num_stages
+                current_action, completed_events[rank], num_stages
             ):
                 continue
 
@@ -184,9 +172,7 @@ def add_communication_ops(
                 completed_events[rank].add(sub_action)
 
                 comm_pkg = _create_communications_for_action(
-                    sub_action,
-                    num_stages=num_stages,
-                    stage_to_rank=stage_to_rank
+                    sub_action, num_stages=num_stages, stage_to_rank=stage_to_rank
                 )
                 if comm_pkg:
                     # Add Send locally

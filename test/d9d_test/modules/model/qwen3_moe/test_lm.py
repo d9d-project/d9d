@@ -43,7 +43,7 @@ def build_hf_model() -> Qwen3MoeForCausalLM:
             attention_dropout=0.0,
             norm_topk_prob=True,
             router_aux_loss_coef=0.0,
-            _attn_implementation="sdpa"
+            _attn_implementation="sdpa",
         )
     ).cuda()
     # no rope conversion here
@@ -86,11 +86,11 @@ def test_consistent_to_hf(checkpointing):
 
 
 def _build_distributed_model(
-        stage: PipelineStageInfo,
-        dist_ctx: DistributedContext,
-        local_model: nn.Module,
-        stage_memo: list[tuple[PipelineStageInfo, Qwen3MoeForCausalLM]],
-        checkpointing: bool
+    stage: PipelineStageInfo,
+    dist_ctx: DistributedContext,
+    local_model: nn.Module,
+    stage_memo: list[tuple[PipelineStageInfo, Qwen3MoeForCausalLM]],
+    checkpointing: bool,
 ):
     model = build_decoder(stage=stage, checkpointing=checkpointing)
     parallelize_qwen3_moe_for_causal_lm(dist_ctx, model, stage)
@@ -100,57 +100,60 @@ def _build_distributed_model(
 
 
 def _shard_virtual_dp(tensor: torch.Tensor, dist_ctx: DistributedContext) -> torch.Tensor:
-    return DTensor.from_local(
-        tensor,
-        device_mesh=dist_ctx.mesh_for(BATCH_DOMAIN)["dp"],
-        placements=[Replicate()]
-    ).redistribute(placements=(Shard(0),)).to_local()
+    return (
+        DTensor.from_local(tensor, device_mesh=dist_ctx.mesh_for(BATCH_DOMAIN)["dp"], placements=[Replicate()])
+        .redistribute(placements=(Shard(0),))
+        .to_local()
+    )
 
 
 @pytest.mark.distributed
 @pytest.mark.parametrize("checkpointing", [True, False])
-@pytest.mark.parametrize("mesh", [
-    # PP + DPR / EP
-    DeviceMeshParameters(
-        pipeline_parallel=2,
-        expert_parallel=4,
-        tensor_parallel=1,
-        context_parallel_shard=1,
-        data_parallel_shard=1,
-        data_parallel_replicate=4,
-        context_parallel_replicate=1
-    ),
-    # PP + DPS / EP
-    DeviceMeshParameters(
-        pipeline_parallel=2,
-        expert_parallel=4,
-        tensor_parallel=1,
-        context_parallel_shard=1,
-        data_parallel_shard=4,
-        data_parallel_replicate=1,
-        context_parallel_replicate=1
-    ),
-    # PP + DPR + DPS / EP
-    DeviceMeshParameters(
-        pipeline_parallel=2,
-        expert_parallel=4,
-        tensor_parallel=1,
-        context_parallel_shard=1,
-        data_parallel_shard=2,
-        data_parallel_replicate=2,
-        context_parallel_replicate=1
-    ),
-    # PP + DPR + DPS / EP + R
-    DeviceMeshParameters(
-        pipeline_parallel=2,
-        expert_parallel=2,
-        tensor_parallel=1,
-        context_parallel_shard=1,
-        data_parallel_shard=2,
-        data_parallel_replicate=2,
-        context_parallel_replicate=1
-    ),
-])
+@pytest.mark.parametrize(
+    "mesh",
+    [
+        # PP + DPR / EP
+        DeviceMeshParameters(
+            pipeline_parallel=2,
+            expert_parallel=4,
+            tensor_parallel=1,
+            context_parallel_shard=1,
+            data_parallel_shard=1,
+            data_parallel_replicate=4,
+            context_parallel_replicate=1,
+        ),
+        # PP + DPS / EP
+        DeviceMeshParameters(
+            pipeline_parallel=2,
+            expert_parallel=4,
+            tensor_parallel=1,
+            context_parallel_shard=1,
+            data_parallel_shard=4,
+            data_parallel_replicate=1,
+            context_parallel_replicate=1,
+        ),
+        # PP + DPR + DPS / EP
+        DeviceMeshParameters(
+            pipeline_parallel=2,
+            expert_parallel=4,
+            tensor_parallel=1,
+            context_parallel_shard=1,
+            data_parallel_shard=2,
+            data_parallel_replicate=2,
+            context_parallel_replicate=1,
+        ),
+        # PP + DPR + DPS / EP + R
+        DeviceMeshParameters(
+            pipeline_parallel=2,
+            expert_parallel=2,
+            tensor_parallel=1,
+            context_parallel_shard=1,
+            data_parallel_shard=2,
+            data_parallel_replicate=2,
+            context_parallel_replicate=1,
+        ),
+    ],
+)
 def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
     dist_ctx = dist_ctx_factory(mesh)
 
@@ -179,29 +182,17 @@ def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
         n_microbatches=2,
         schedule_config=PipelineScheduleGPipeConfig(),
         model_provider=lambda stg: _build_distributed_model(
-            stage=stg,
-            dist_ctx=dist_ctx,
-            stage_memo=stage_memo,
-            local_model=local,
-            checkpointing=checkpointing
+            stage=stg, dist_ctx=dist_ctx, stage_memo=stage_memo, local_model=local, checkpointing=checkpointing
         ),
-        callback=_loss_fn
+        callback=_loss_fn,
     )
 
-    inputs_dist = {
-        "input_ids": input_ids_dist
-    }
-    kwargs_dist = {
-        "position_ids": position_ids_dist,
-        "labels": labels_dist
-    }
+    inputs_dist = {"input_ids": input_ids_dist}
+    kwargs_dist = {"position_ids": position_ids_dist, "labels": labels_dist}
 
     schedule.schedule.configure_buffers(inputs_dist, kwargs_dist, sharding_spec=PipelineShardingSpec())
 
-    schedule.schedule.step(
-        inputs_dist,
-        kwargs_dist
-    )
+    schedule.schedule.step(inputs_dist, kwargs_dist)
 
     pp_mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["pp"]
 
@@ -215,7 +206,4 @@ def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
 
     for stage_model in stage_memo:
         sync_grads_manually(stage_model)
-        check_grad_distance_all_local_dist(
-            local=local,
-            dist=stage_model
-        )
+        check_grad_distance_all_local_dist(local=local, dist=stage_model)

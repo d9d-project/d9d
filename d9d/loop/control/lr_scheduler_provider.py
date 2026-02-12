@@ -32,10 +32,7 @@ class LRSchedulerProvider(Protocol):
     """
 
     @abc.abstractmethod
-    def __call__(
-            self,
-            context: InitializeLRSchedulerContext
-    ) -> LRSchedulerProtocol:
+    def __call__(self, context: InitializeLRSchedulerContext) -> LRSchedulerProtocol:
         """
         Initializes the LR scheduler for a specific model pipeline stage.
 

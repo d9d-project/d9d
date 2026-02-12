@@ -9,7 +9,7 @@ from d9d_test.kernel.stochastic.copy.reference_impl import copy_fp32_to_bf16_sto
 _PROVIDER_TO_FN = {
     "d9d": copy_fp32_to_bf16_stochastic_,
     "torch-eager": copy_fp32_to_bf16_stochastic_torch_,
-    "torch-compile": torch.compile(copy_fp32_to_bf16_stochastic_torch_)
+    "torch-compile": torch.compile(copy_fp32_to_bf16_stochastic_torch_),
 }
 
 
@@ -17,7 +17,7 @@ def run_benchmark():
     configs = [
         triton.testing.Benchmark(
             x_names=["n_elements"],
-            x_vals=[2 ** i for i in range(20, 27)],
+            x_vals=[2**i for i in range(20, 27)],
             line_arg="provider",
             line_vals=list(_PROVIDER_TO_FN.keys()),
             line_names=list(_PROVIDER_TO_FN.keys()),

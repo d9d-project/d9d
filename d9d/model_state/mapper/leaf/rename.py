@@ -13,14 +13,7 @@ class ModelStateMapperRename(ModelStateMapper):
         self._name_to = name_to
 
     def state_dependency_groups(self) -> frozenset[StateGroup]:
-        return frozenset([
-            StateGroup(
-                inputs=frozenset([self._name_from]),
-                outputs=frozenset([self._name_to])
-            )
-        ])
+        return frozenset([StateGroup(inputs=frozenset([self._name_from]), outputs=frozenset([self._name_to]))])
 
     def apply(self, group: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        return {
-            self._name_to: group[self._name_from]
-        }
+        return {self._name_to: group[self._name_from]}

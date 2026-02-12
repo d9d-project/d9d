@@ -13,17 +13,25 @@ from d9d.internals.profiling import Profiler
         (4, 1, 1, 0, 4, (4,)),
         (4, 1, 1, 0, 3, ()),
         (4, 1, 1, 0, 8, (4, 8)),
-    ]
+    ],
 )
-def test_e2e(dist_ctx_factory, shared_tmp_dir, period_steps, warmup_steps, active_steps, start_step, simulate_steps,
-             will_write_at):
+def test_e2e(
+    dist_ctx_factory,
+    shared_tmp_dir,
+    period_steps,
+    warmup_steps,
+    active_steps,
+    start_step,
+    simulate_steps,
+    will_write_at,
+):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
     profiler_wrapper = Profiler(
         save_dir=shared_tmp_dir,
         period_steps=period_steps,
         warmup_steps=warmup_steps,
         active_steps=active_steps,
-        dist_context=dist_ctx
+        dist_context=dist_ctx,
     )
 
     # We must run exactly 'period_steps' to complete one cycle and trigger the dump
@@ -69,17 +77,18 @@ def test_e2e(dist_ctx_factory, shared_tmp_dir, period_steps, warmup_steps, activ
         (4, 1, 1, 0, 4, (4,)),
         (4, 1, 1, 0, 3, ()),
         (4, 1, 1, 0, 8, (4, 8)),
-    ]
+    ],
 )
-def test_local_e2e(dist_ctx_factory, tmp_path, period_steps, warmup_steps, active_steps, start_step, simulate_steps,
-                   will_write_at):
+def test_local_e2e(
+    dist_ctx_factory, tmp_path, period_steps, warmup_steps, active_steps, start_step, simulate_steps, will_write_at
+):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())
     profiler_wrapper = Profiler(
         save_dir=tmp_path,
         period_steps=period_steps,
         warmup_steps=warmup_steps,
         active_steps=active_steps,
-        dist_context=dist_ctx
+        dist_context=dist_ctx,
     )
 
     with profiler_wrapper.open(start_step=start_step) as prof:

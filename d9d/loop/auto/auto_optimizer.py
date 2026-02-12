@@ -43,6 +43,7 @@ class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
         weight_decay: Weight decay coefficient.
         state_dtype: Data Type to use for the optimizer states.
     """
+
     name: Literal["stochastic_adamw"] = "stochastic_adamw"
 
     lr: float
@@ -59,7 +60,7 @@ class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
             betas=self.betas,
             eps=self.eps,
             weight_decay=self.weight_decay,
-            state_dtype=getattr(torch, self.state_dtype)
+            state_dtype=getattr(torch, self.state_dtype),
         )
 
 
@@ -76,6 +77,7 @@ class AdamWOptimizerConfig(BaseAutoOptimizerConfig):
         amsgrad: Whether to use the AMSGrad variant.
         maximize: Whether to maximize the params based on the objective (as opposed to minimizing).
     """
+
     name: Literal["adamw"] = "adamw"
 
     lr: float
@@ -95,7 +97,7 @@ class AdamWOptimizerConfig(BaseAutoOptimizerConfig):
             weight_decay=self.weight_decay,
             amsgrad=self.amsgrad,
             maximize=self.maximize,
-            fused=True
+            fused=True,
         )
 
 
@@ -113,6 +115,7 @@ class AdamOptimizerConfig(BaseAutoOptimizerConfig):
         amsgrad: Whether to use the AMSGrad variant.
         maximize: Whether to maximize the params based on the objective.
     """
+
     name: Literal["adam"] = "adam"
 
     lr: float
@@ -134,7 +137,7 @@ class AdamOptimizerConfig(BaseAutoOptimizerConfig):
             decoupled_weight_decay=self.decoupled_weight_decay,
             amsgrad=self.amsgrad,
             maximize=self.maximize,
-            fused=True
+            fused=True,
         )
 
 
@@ -151,6 +154,7 @@ class SGDOptimizerConfig(BaseAutoOptimizerConfig):
         nesterov: Enables Nesterov momentum.
         maximize: Whether to maximize the params based on the objective.
     """
+
     name: Literal["sgd"] = "sgd"
 
     lr: float
@@ -170,16 +174,13 @@ class SGDOptimizerConfig(BaseAutoOptimizerConfig):
             weight_decay=self.weight_decay,
             nesterov=self.nesterov,
             maximize=self.maximize,
-            fused=True
+            fused=True,
         )
 
 
 AutoOptimizerConfig = Annotated[
-    StochasticAdamWOptimizerConfig |
-    AdamWOptimizerConfig |
-    AdamOptimizerConfig |
-    SGDOptimizerConfig,
-    Field(discriminator="name")
+    StochasticAdamWOptimizerConfig | AdamWOptimizerConfig | AdamOptimizerConfig | SGDOptimizerConfig,
+    Field(discriminator="name"),
 ]
 
 

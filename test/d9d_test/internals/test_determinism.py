@@ -24,7 +24,7 @@ def _get_random_states() -> RandomState:
         torch=torch.rand(1).item(),
         numpy=np.random.rand(),
         random=random.random(),
-        hash_seed=os.environ["PYTHONHASHSEED"]
+        hash_seed=os.environ["PYTHONHASHSEED"],
     )
 
 
@@ -68,11 +68,7 @@ def test_set_seeds_local_determinism(dist_ctx_factory):
 
 @pytest.mark.distributed
 def test_seed_variation_over_pp(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(
-        pipeline_parallel=4,
-        expert_parallel=2,
-        data_parallel_replicate=2
-    ))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=4, expert_parallel=2, data_parallel_replicate=2))
     world_size = dist_ctx.mesh_for(FLAT_DOMAIN).size()
     pp_size = dist_ctx.mesh_params.pipeline_parallel
     non_pp_size = world_size // dist_ctx.mesh_params.pipeline_parallel
@@ -83,7 +79,7 @@ def test_seed_variation_over_pp(dist_ctx_factory):
     local_state = _get_random_states()
 
     all_states = all_gather_object(local_state, group=dist_ctx.mesh_for(FLAT_DOMAIN).get_group())
-    all_states_by_pp = [all_states[pp_rank * non_pp_size: (pp_rank + 1) * non_pp_size] for pp_rank in range(pp_size)]
+    all_states_by_pp = [all_states[pp_rank * non_pp_size : (pp_rank + 1) * non_pp_size] for pp_rank in range(pp_size)]
 
     for pp_batch in all_states_by_pp:
         #  all states within PP are the same

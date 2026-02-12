@@ -28,9 +28,9 @@ class PipelineScheduleInfo:
 
 
 def _build_schedule_local(
-        schedule_config: AnyPipelineScheduleConfig,
-        model_provider: Callable[[PipelineStageInfo], nn.Module],
-        callback: PipelineLossFn | PipelineResultFn
+    schedule_config: AnyPipelineScheduleConfig,
+    model_provider: Callable[[PipelineStageInfo], nn.Module],
+    callback: PipelineLossFn | PipelineResultFn,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     stage_info = PipelineStageInfo(num_stages=1, current_stage=0)
 
@@ -38,19 +38,15 @@ def _build_schedule_local(
     has_backward = not isinstance(schedule_config, PipelineScheduleInferenceConfig)
     scheduler = OfflinePipelineExecutor(model=model, callback=callback, do_backward=has_backward)
 
-    return PipelineScheduleInfo(
-        schedule=scheduler,
-        has_first_stage=True,
-        has_last_stage=True
-    ), [model]
+    return PipelineScheduleInfo(schedule=scheduler, has_first_stage=True, has_last_stage=True), [model]
 
 
 def _build_schedule_distributed(
-        dist_context: DistributedContext,
-        n_microbatches: int,
-        schedule_config: AnyPipelineScheduleConfig,
-        model_provider: Callable[[PipelineStageInfo], nn.Module],
-        callback: PipelineLossFn | PipelineResultFn,
+    dist_context: DistributedContext,
+    n_microbatches: int,
+    schedule_config: AnyPipelineScheduleConfig,
+    model_provider: Callable[[PipelineStageInfo], nn.Module],
+    callback: PipelineLossFn | PipelineResultFn,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     program_builder = PIPELINE_PROGRAM_REGISTRY.program_for(schedule_config)
     mesh = dist_context.mesh_for(REGULAR_DOMAIN)["pp"]
@@ -58,9 +54,7 @@ def _build_schedule_distributed(
     num_stages = program_builder.num_stages_per_rank * mesh.size()
 
     stage_to_host = build_stage_to_host_rank_topology(
-        num_stages=num_stages,
-        pp_size=mesh.size(),
-        style=program_builder.topology_style
+        num_stages=num_stages, pp_size=mesh.size(), style=program_builder.topology_style
     )
     host_to_stage = invert_stage_to_host_rank_topology(stage_to_host)
     this_rank_stages = host_to_stage[mesh.get_local_rank()]
@@ -71,10 +65,7 @@ def _build_schedule_distributed(
     has_last_stage = False
 
     for stage_idx in this_rank_stages:
-        stage_info = PipelineStageInfo(
-            num_stages=num_stages,
-            current_stage=stage_idx
-        )
+        stage_info = PipelineStageInfo(num_stages=num_stages, current_stage=stage_idx)
 
         if stage_info.is_current_stage_first:
             has_first_stage = True
@@ -84,35 +75,26 @@ def _build_schedule_distributed(
         model = model_provider(stage_info)
         modules.append(model)
         stage = PipelineStage(
-            info=stage_info,
-            module=model,
-            group=mesh.get_group(),
-            stage_to_host_topology=stage_to_host
+            info=stage_info, module=model, group=mesh.get_group(), stage_to_host_topology=stage_to_host
         )
         stages.append(stage)
 
     program = program_builder.compose(num_microbatches=n_microbatches, pp_size=mesh.size())
     schedule = PipelineScheduleExecutor(
-        dist_context=dist_context,
-        stages=stages,
-        num_microbatches=n_microbatches,
-        callback=callback,
-        program=program
+        dist_context=dist_context, stages=stages, num_microbatches=n_microbatches, callback=callback, program=program
     )
 
     return PipelineScheduleInfo(
-        schedule=schedule,
-        has_first_stage=has_first_stage,
-        has_last_stage=has_last_stage
+        schedule=schedule, has_first_stage=has_first_stage, has_last_stage=has_last_stage
     ), modules
 
 
 def build_schedule(
-        dist_context: DistributedContext,
-        n_microbatches: int,
-        schedule_config: AnyPipelineScheduleConfig,
-        model_provider: Callable[[PipelineStageInfo], nn.Module],
-        callback: PipelineLossFn | PipelineResultFn,
+    dist_context: DistributedContext,
+    n_microbatches: int,
+    schedule_config: AnyPipelineScheduleConfig,
+    model_provider: Callable[[PipelineStageInfo], nn.Module],
+    callback: PipelineLossFn | PipelineResultFn,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     """
     Constructs the pipeline schedule and instantiates model stages.
@@ -143,11 +125,7 @@ def build_schedule(
             n_microbatches=n_microbatches,
             schedule_config=schedule_config,
             model_provider=model_provider,
-            callback=callback
+            callback=callback,
         )
     else:
-        return _build_schedule_local(
-            schedule_config=schedule_config,
-            model_provider=model_provider,
-            callback=callback
-        )
+        return _build_schedule_local(schedule_config=schedule_config, model_provider=model_provider, callback=callback)

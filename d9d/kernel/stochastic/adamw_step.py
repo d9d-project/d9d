@@ -14,25 +14,25 @@ from .ops import fp32_to_bf16_kernel
         triton.Config({"BLOCK_SIZE": 8192}, num_warps=8),
     ],
     key=["n_elements"],
-    restore_value=["p_ptr", "m_ptr", "v_ptr"]
+    restore_value=["p_ptr", "m_ptr", "v_ptr"],
 )
 @triton.jit
 def _adamw_stochastic_bf16_kernel(
-        p_ptr: tl.tensor,  # Pointer to parameters (Always BF16 -> read/write)
-        g_ptr: tl.tensor,  # Pointer to gradients  (BF16 or FP32 -> read only)
-        m_ptr: tl.tensor,  # Pointer to exp_avg    (BF16 or FP32 -> read/write)
-        v_ptr: tl.tensor,  # Pointer to exp_avg_sq (BF16 or FP32 -> read/write)
-        n_elements: int,  # Total number of elements
-        lr: float,  # Learning rate
-        beta1: float,
-        beta2: float,
-        eps: float,
-        weight_decay: float,
-        step: int,  # Current step (for bias correction)
-        seed: int,  # Random seed for stochastic rounding
-        BLOCK_SIZE: tl.constexpr,
-        GRAD_IS_BF16: tl.constexpr,  # noqa: N803
-        STATE_IS_BF16: tl.constexpr  # noqa: N803
+    p_ptr: tl.tensor,  # Pointer to parameters (Always BF16 -> read/write)
+    g_ptr: tl.tensor,  # Pointer to gradients  (BF16 or FP32 -> read only)
+    m_ptr: tl.tensor,  # Pointer to exp_avg    (BF16 or FP32 -> read/write)
+    v_ptr: tl.tensor,  # Pointer to exp_avg_sq (BF16 or FP32 -> read/write)
+    n_elements: int,  # Total number of elements
+    lr: float,  # Learning rate
+    beta1: float,
+    beta2: float,
+    eps: float,
+    weight_decay: float,
+    step: int,  # Current step (for bias correction)
+    seed: int,  # Random seed for stochastic rounding
+    BLOCK_SIZE: tl.constexpr,
+    GRAD_IS_BF16: tl.constexpr,  # noqa: N803
+    STATE_IS_BF16: tl.constexpr,  # noqa: N803
 ):
     pid = tl.program_id(axis=0)
     offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
@@ -95,17 +95,17 @@ def _adamw_stochastic_bf16_kernel(
 
 
 def adamw_stochastic_bf16_(  # noqa: C901
-        params: torch.Tensor,
-        grads: torch.Tensor,
-        exp_avg: torch.Tensor,
-        exp_avg_sq: torch.Tensor,
-        lr: float,
-        beta1: float,
-        beta2: float,
-        eps: float,
-        weight_decay: float,
-        step: int,
-        generator: torch.Generator | None = None
+    params: torch.Tensor,
+    grads: torch.Tensor,
+    exp_avg: torch.Tensor,
+    exp_avg_sq: torch.Tensor,
+    lr: float,
+    beta1: float,
+    beta2: float,
+    eps: float,
+    weight_decay: float,
+    step: int,
+    generator: torch.Generator | None = None,
 ) -> None:
     """
     Performs a single in-place AdamW optimization step.
@@ -170,15 +170,11 @@ def adamw_stochastic_bf16_(  # noqa: C901
 
     n_elements = params.numel()
 
-    grad_is_bf16 = (grads.dtype == torch.bfloat16)
-    state_is_bf16 = (exp_avg.dtype == torch.bfloat16)
+    grad_is_bf16 = grads.dtype == torch.bfloat16
+    state_is_bf16 = exp_avg.dtype == torch.bfloat16
 
     # Generate random seed
-    seed = torch.randint(
-        0, 2 ** 31 - 1, (1,),
-        device="cpu",
-        generator=generator
-    ).item()
+    seed = torch.randint(0, 2**31 - 1, (1,), device="cpu", generator=generator).item()
 
     def _grid(meta: dict[str, int]) -> tuple[int, ...]:
         return (triton.cdiv(n_elements, meta["BLOCK_SIZE"]),)
@@ -188,9 +184,7 @@ def adamw_stochastic_bf16_(  # noqa: C901
         grads,
         exp_avg,
         exp_avg_sq,
-
         n_elements,
-
         lr,
         beta1,
         beta2,
@@ -198,7 +192,6 @@ def adamw_stochastic_bf16_(  # noqa: C901
         weight_decay,
         step,
         seed,
-
         GRAD_IS_BF16=grad_is_bf16,
-        STATE_IS_BF16=state_is_bf16
+        STATE_IS_BF16=state_is_bf16,
     )

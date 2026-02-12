@@ -33,11 +33,13 @@ def test_structural(model_for_peft, peft_config_stack):
     assert mapper.state_dependency_groups() == frozenset(
         {
             StateGroup(inputs=frozenset({"layers.1.proj.weight"}), outputs=frozenset({"layers.1.proj.base.weight"})),
-            StateGroup(inputs=frozenset({"layers.1.experts.weight"}),
-                       outputs=frozenset({"layers.1.experts.base.weight"})),
-            StateGroup(inputs=frozenset({"layers.0.experts.weight"}),
-                       outputs=frozenset({"layers.0.experts.base.weight"})),
-            StateGroup(inputs=frozenset({"layers.0.proj.weight"}), outputs=frozenset({"layers.0.proj.base.weight"}))
+            StateGroup(
+                inputs=frozenset({"layers.1.experts.weight"}), outputs=frozenset({"layers.1.experts.base.weight"})
+            ),
+            StateGroup(
+                inputs=frozenset({"layers.0.experts.weight"}), outputs=frozenset({"layers.0.experts.base.weight"})
+            ),
+            StateGroup(inputs=frozenset({"layers.0.proj.weight"}), outputs=frozenset({"layers.0.proj.base.weight"})),
         }
     )
 
@@ -63,8 +65,7 @@ def test_e2e(peft_config_stack, model_for_peft):
     inject_peft_and_freeze(peft, model)
 
     peft_trainable_parameter_names_and_shape = {
-        (name, tuple(val.shape)) for name, val in model.named_parameters()
-        if val.requires_grad
+        (name, tuple(val.shape)) for name, val in model.named_parameters() if val.requires_grad
     }
     peft_trainable_parameter_names_and_shape_should_be = {
         ("head.weight", (10, 32)),
@@ -75,7 +76,7 @@ def test_e2e(peft_config_stack, model_for_peft):
         ("layers.1.experts.lora_A.weight", (4, 64, 4)),
         ("layers.1.experts.lora_B.weight", (4, 4, 32)),
         ("layers.1.proj.lora_A.weight", (4, 32)),
-        ("layers.1.proj.lora_B.weight", (64, 4))
+        ("layers.1.proj.lora_B.weight", (64, 4)),
     }
     assert peft_trainable_parameter_names_and_shape == peft_trainable_parameter_names_and_shape_should_be
 

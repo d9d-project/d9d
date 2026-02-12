@@ -20,10 +20,7 @@ from d9d.pipelining.infra.schedule.program import (
 
 TConfig = TypeVar("TConfig", bound=AnyPipelineScheduleConfig)
 
-TRegistryDict = dict[
-    type[AnyPipelineScheduleConfig],
-    Callable[[AnyPipelineScheduleConfig], PipelineProgramBuilder]
-]
+TRegistryDict = dict[type[AnyPipelineScheduleConfig], Callable[[AnyPipelineScheduleConfig], PipelineProgramBuilder]]
 
 TBoundRegistryFn = Callable[[TConfig], PipelineProgramBuilder]
 
@@ -32,9 +29,7 @@ class PipelineProgramRegistry:
     def __init__(self) -> None:
         self._registry: TRegistryDict = {}
 
-    def register_program(
-            self, config_cls: type[TConfig]
-    ) -> Callable[[TBoundRegistryFn], TBoundRegistryFn]:
+    def register_program(self, config_cls: type[TConfig]) -> Callable[[TBoundRegistryFn], TBoundRegistryFn]:
         def decorator(func: TBoundRegistryFn) -> TBoundRegistryFn:
             config_cls_any = cast(type[AnyPipelineScheduleConfig], config_cls)
             self._registry[config_cls_any] = func
@@ -68,8 +63,9 @@ def _build_looped_bfs(cfg: PipelineScheduleLoopedBFSConfig) -> PipelineProgramBu
 
 @PIPELINE_PROGRAM_REGISTRY.register_program(PipelineSchedule1F1BConfig)
 def _build_1f1b(cfg: PipelineSchedule1F1BConfig) -> PipelineProgramBuilder:
-    return Interleaved1F1BPipelineProgramBuilder(num_stages_per_rank=cfg.num_stages_per_rank,
-                                                 enable_zero_bubble=cfg.zero_bubble)
+    return Interleaved1F1BPipelineProgramBuilder(
+        num_stages_per_rank=cfg.num_stages_per_rank, enable_zero_bubble=cfg.zero_bubble
+    )
 
 
 @PIPELINE_PROGRAM_REGISTRY.register_program(PipelineScheduleDualPipeVConfig)

@@ -27,13 +27,17 @@ def build_moe_inputs(dtype: torch.dtype):
 def build_my_moe(dtype: torch.dtype):
     torch.manual_seed(42)
 
-    moe = MoELayer(
-        hidden_dim=512,
-        num_grouped_experts=32,
-        intermediate_dim_grouped=256,
-        top_k=4,
-        router_renormalize_probabilities=True
-    ).cuda().to(dtype)
+    moe = (
+        MoELayer(
+            hidden_dim=512,
+            num_grouped_experts=32,
+            intermediate_dim_grouped=256,
+            top_k=4,
+            router_renormalize_probabilities=True,
+        )
+        .cuda()
+        .to(dtype)
+    )
     moe.reset_parameters()
     return moe
 
@@ -41,16 +45,20 @@ def build_my_moe(dtype: torch.dtype):
 def build_hf_my_moe(dtype: torch.dtype):
     torch.manual_seed(42)
 
-    moe_hf = Qwen3MoeSparseMoeBlock(
-        Qwen3MoeConfig(
-            num_experts=32,
-            num_experts_per_tok=4,
-            norm_topk_prob=True,
-            hidden_size=512,
-            moe_intermediate_size=256,
-            hidden_act="silu"
+    moe_hf = (
+        Qwen3MoeSparseMoeBlock(
+            Qwen3MoeConfig(
+                num_experts=32,
+                num_experts_per_tok=4,
+                norm_topk_prob=True,
+                hidden_size=512,
+                moe_intermediate_size=256,
+                hidden_act="silu",
+            )
         )
-    ).cuda().to(dtype)
+        .cuda()
+        .to(dtype)
+    )
 
     moe_my = build_my_moe(dtype)
 
@@ -80,10 +88,7 @@ def test_consistent_to_hf(dtype):
 @pytest.mark.distributed
 @pytest.mark.parametrize("dtype", [torch.bfloat16])
 def test_consistent_to_itself_expert_parallel(dtype, dist_ctx_factory):
-    ctx = dist_ctx_factory(DeviceMeshParameters(
-        expert_parallel=8,
-        data_parallel_replicate=8
-    ))
+    ctx = dist_ctx_factory(DeviceMeshParameters(expert_parallel=8, data_parallel_replicate=8))
     expert_mesh = ctx.mesh_for(EXPERT_DOMAIN)
     batch_mesh = ctx.mesh_for(BATCH_DOMAIN)
     dp_size = batch_mesh["dp"].size()
@@ -97,10 +102,7 @@ def test_consistent_to_itself_expert_parallel(dtype, dist_ctx_factory):
     (hidden_states_local.sum() / loss_div_factor).backward()
 
     moe_dist = build_my_moe(dtype)
-    parallelize_expert_parallel(
-        moe_dist,
-        mesh_experts=expert_mesh[["ep_replicate", "ep_shard"]]
-    )
+    parallelize_expert_parallel(moe_dist, mesh_experts=expert_mesh[["ep_replicate", "ep_shard"]])
     hidden_states_dist = moe_dist(hidden_states_in + pre_dist)
     (hidden_states_dist.sum() / loss_div_factor / dp_size).backward()
 

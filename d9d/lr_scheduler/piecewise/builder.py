@@ -14,11 +14,7 @@ class PiecewiseScheduleBuilder:
     Builder for constructing multiphase learning rate schedules.
     """
 
-    def __init__(
-            self,
-            initial_multiplier: float,
-            total_steps: int | None
-    ):
+    def __init__(self, initial_multiplier: float, total_steps: int | None):
         """
         Constructs a new PiecewiseScheduleBuilder.
 
@@ -45,13 +41,15 @@ class PiecewiseScheduleBuilder:
             The builder instance for chaining.
         """
 
-        self._phases.append(SchedulePhase(
-            start_step=self._last_end_step,
-            end_step=self._last_end_step + steps,
-            curve=curve,
-            start_value=self._last_multiplier,
-            end_value=target_multiplier
-        ))
+        self._phases.append(
+            SchedulePhase(
+                start_step=self._last_end_step,
+                end_step=self._last_end_step + steps,
+                curve=curve,
+                start_value=self._last_multiplier,
+                end_value=target_multiplier,
+            )
+        )
 
         self._last_end_step += steps
         self._last_multiplier = target_multiplier
@@ -76,9 +74,7 @@ class PiecewiseScheduleBuilder:
         """
 
         if self._total_steps is None:
-            raise ValueError(
-                "You must define 'total_steps' in the constructor to use percentage-based methods."
-            )
+            raise ValueError("You must define 'total_steps' in the constructor to use percentage-based methods.")
 
         if not 0.0 <= p <= 1.0:
             raise ValueError("Percentage should be in range of [0.0, 1.0]")
@@ -88,8 +84,7 @@ class PiecewiseScheduleBuilder:
 
         if duration < 0:
             raise ValueError(
-                f"Target percentage {p} (step {target_step_abs}) is behind "
-                f"current cursor (step {self._last_end_step})."
+                f"Target percentage {p} (step {target_step_abs}) is behind current cursor (step {self._last_end_step})."
             )
 
         return self.for_steps(duration, target_multiplier, curve)
@@ -131,10 +126,7 @@ class PiecewiseScheduleBuilder:
         return LambdaLR(optimizer, engine.get_factor)
 
 
-def piecewise_schedule(
-        initial_multiplier: float,
-        total_steps: int | None = None
-) -> PiecewiseScheduleBuilder:
+def piecewise_schedule(initial_multiplier: float, total_steps: int | None = None) -> PiecewiseScheduleBuilder:
     """
     Entry point for creating a piecewise learning rate schedule.
 
@@ -146,7 +138,4 @@ def piecewise_schedule(
         A builder instance to configure phases.
     """
 
-    return PiecewiseScheduleBuilder(
-        initial_multiplier=initial_multiplier,
-        total_steps=total_steps
-    )
+    return PiecewiseScheduleBuilder(initial_multiplier=initial_multiplier, total_steps=total_steps)

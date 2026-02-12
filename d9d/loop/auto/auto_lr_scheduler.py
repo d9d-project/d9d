@@ -15,15 +15,13 @@ class PiecewiseConfig(BaseModel):
         name: Discriminator tag, must be "piecewise".
         scheduler: Detailed configuration for the piecewise schedule.
     """
+
     name: Literal["piecewise"] = "piecewise"
 
     scheduler: PiecewiseSchedulerConfig
 
 
-AutoLRSchedulerConfig = Annotated[
-    PiecewiseConfig,
-    Field(discriminator="name")
-]
+AutoLRSchedulerConfig = Annotated[PiecewiseConfig, Field(discriminator="name")]
 
 
 class AutoLRSchedulerProvider(LRSchedulerProvider):
@@ -40,7 +38,5 @@ class AutoLRSchedulerProvider(LRSchedulerProvider):
         match self._config:
             case PiecewiseConfig():
                 return piecewise_scheduler_from_config(
-                    self._config.scheduler,
-                    optimizer=context.optimizer,
-                    total_steps=context.total_steps
+                    self._config.scheduler, optimizer=context.optimizer, total_steps=context.total_steps
                 )

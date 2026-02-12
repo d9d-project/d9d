@@ -61,11 +61,7 @@ def assert_metric_local(case: MetricCase, device: str, atol: float | None = None
         metric.reset()
 
 
-def assert_metric_distributed(
-        dist_ctx_factory, case: MetricCase,
-        atol: float | None = None,
-        rtol: float | None = None
-):
+def assert_metric_distributed(dist_ctx_factory, case: MetricCase, atol: float | None = None, rtol: float | None = None):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
     this_rank = dist_ctx.mesh_for(FLAT_DOMAIN).get_rank()
     # do 2 roundabouts to test reset works

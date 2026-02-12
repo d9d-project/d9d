@@ -30,7 +30,7 @@ def test_shard_spec_on_dim():
         "too_small_rank": torch.randn(5),
         "scalar": torch.tensor(1.0),
         "not_tensor": "string_val",
-        "valid_list": [1, 2, 3, 4]
+        "valid_list": [1, 2, 3, 4],
     }
 
     spec = shard_spec_on_dim(tree, 0)
@@ -39,7 +39,7 @@ def test_shard_spec_on_dim():
         "too_small_rank": SpecShard(0),
         "scalar": SpecReplicate(),
         "not_tensor": SpecReplicate(),
-        "valid_list": SpecShard(0)
+        "valid_list": SpecShard(0),
     }
 
     with pytest.raises(ValueError, match="Cannot shard"):
@@ -64,11 +64,11 @@ _ROUNDTRIP_CASES = [
         num_shards=4,
         enforce_even_split=True,
         expected_shards=(
-            torch.tensor([[0.], [1.]]),
-            torch.tensor([[2.], [3.]]),
-            torch.tensor([[4.], [5.]]),
-            torch.tensor([[6.], [7.]]),
-        )
+            torch.tensor([[0.0], [1.0]]),
+            torch.tensor([[2.0], [3.0]]),
+            torch.tensor([[4.0], [5.0]]),
+            torch.tensor([[6.0], [7.0]]),
+        ),
     ),
     RoundtripCase(
         input_tree=torch.arange(10).float(),
@@ -76,140 +76,98 @@ _ROUNDTRIP_CASES = [
         num_shards=3,
         enforce_even_split=False,
         expected_shards=(
-            torch.tensor([0., 1., 2., 3.]),  # 4
-            torch.tensor([4., 5., 6.]),  # 3
-            torch.tensor([7., 8., 9.]),  # 3
-        )
+            torch.tensor([0.0, 1.0, 2.0, 3.0]),  # 4
+            torch.tensor([4.0, 5.0, 6.0]),  # 3
+            torch.tensor([7.0, 8.0, 9.0]),  # 3
+        ),
     ),
     RoundtripCase(
         input_tree=[1, 2, 3, 4, 5, 6],
         spec=SpecShard(0),
         num_shards=3,
         enforce_even_split=True,
-        expected_shards=(
-            [1, 2],
-            [3, 4],
-            [5, 6]
-        )
+        expected_shards=([1, 2], [3, 4], [5, 6]),
     ),
     RoundtripCase(
         input_tree=[10, 20, 30, 40, 50],
         spec=SpecShard(0),
         num_shards=2,
         enforce_even_split=False,
-        expected_shards=(
-            [10, 20, 30],
-            [40, 50]
-        )
+        expected_shards=([10, 20, 30], [40, 50]),
     ),
     RoundtripCase(
         input_tree=[_OBJ_1, _OBJ_2, _OBJ_3],
         spec=SpecShard(0),
         num_shards=3,
         enforce_even_split=True,
-        expected_shards=(
-            [_OBJ_1],
-            [_OBJ_2],
-            [_OBJ_3]
-        )
+        expected_shards=([_OBJ_1], [_OBJ_2], [_OBJ_3]),
     ),
     RoundtripCase(
-        input_tree=torch.tensor([1., 2., 3.]),
+        input_tree=torch.tensor([1.0, 2.0, 3.0]),
         spec=SpecReplicate(),
         num_shards=2,
-        expected_shards=(
-            torch.tensor([1., 2., 3.]),
-            torch.tensor([1., 2., 3.])
-        ),
-        enforce_even_split=False
+        expected_shards=(torch.tensor([1.0, 2.0, 3.0]), torch.tensor([1.0, 2.0, 3.0])),
+        enforce_even_split=False,
     ),
     RoundtripCase(
         input_tree={
             "model": {
-                "weights": torch.tensor([[1., 2.], [3., 4.], [5., 6.], [7., 8.]]),  # 4x2
+                "weights": torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]),  # 4x2
                 "vocab": [5, 6, 7, 8],
-                "cfg": {"dim": 1}
+                "cfg": {"dim": 1},
             },
-            "opt": torch.tensor([0., 0.])
+            "opt": torch.tensor([0.0, 0.0]),
         },
         spec={
-            "model": {
-                "weights": SpecShard(0),
-                "vocab": SpecShard(0),
-                "cfg": SpecReplicate()
-            },
-            "opt": SpecReplicate()
+            "model": {"weights": SpecShard(0), "vocab": SpecShard(0), "cfg": SpecReplicate()},
+            "opt": SpecReplicate(),
         },
         num_shards=2,
         enforce_even_split=True,
         expected_shards=(
             # Rank 0
             {
-                "model": {
-                    "weights": torch.tensor([[1., 2.], [3., 4.]]),
-                    "vocab": [5, 6],
-                    "cfg": {"dim": 1}
-                },
-                "opt": torch.tensor([0., 0.])
+                "model": {"weights": torch.tensor([[1.0, 2.0], [3.0, 4.0]]), "vocab": [5, 6], "cfg": {"dim": 1}},
+                "opt": torch.tensor([0.0, 0.0]),
             },
             # Rank 1
             {
-                "model": {
-                    "weights": torch.tensor([[5., 6.], [7., 8.]]),
-                    "vocab": [7, 8],
-                    "cfg": {"dim": 1}
-                },
-                "opt": torch.tensor([0., 0.])
-            }
-        )
+                "model": {"weights": torch.tensor([[5.0, 6.0], [7.0, 8.0]]), "vocab": [7, 8], "cfg": {"dim": 1}},
+                "opt": torch.tensor([0.0, 0.0]),
+            },
+        ),
     ),
     RoundtripCase(
-        input_tree=torch.tensor([[1., 2.], [3., 4.], [5., 6.]]),  # 3x2
+        input_tree=torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]),  # 3x2
         spec=SpecShard(0, do_stack=True),
         num_shards=3,
         enforce_even_split=True,
         expected_shards=(
-            torch.tensor([1., 2.]),  # Rank reduces: (2,)
-            torch.tensor([3., 4.]),
-            torch.tensor([5., 6.])
-        )
+            torch.tensor([1.0, 2.0]),  # Rank reduces: (2,)
+            torch.tensor([3.0, 4.0]),
+            torch.tensor([5.0, 6.0]),
+        ),
     ),
     RoundtripCase(
         input_tree=[123, 456, 789],
         spec=SpecShard(0, do_stack=True),
         num_shards=3,
         enforce_even_split=True,
-        expected_shards=(
-            123, 456, 789
-        )
+        expected_shards=(123, 456, 789),
     ),
     RoundtripCase(
-        input_tree=torch.tensor([
-            [1., 2., 3., 4.],
-            [5., 6., 7., 8.]
-        ]),  # 2x4
+        input_tree=torch.tensor([[1.0, 2.0, 3.0, 4.0], [5.0, 6.0, 7.0, 8.0]]),  # 2x4
         spec=SpecShard(1),  # Split Columns
         num_shards=2,
         enforce_even_split=True,
-        expected_shards=(
-            torch.tensor([[1., 2.], [5., 6.]]),
-            torch.tensor([[3., 4.], [7., 8.]])
-        )
+        expected_shards=(torch.tensor([[1.0, 2.0], [5.0, 6.0]]), torch.tensor([[3.0, 4.0], [7.0, 8.0]])),
     ),
     RoundtripCase(
-        input_tree=torch.tensor([
-            [1., 2.],
-            [3., 4.],
-            [5., 6.],
-            [7., 8.]
-        ]),  # 4x2
+        input_tree=torch.tensor([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]]),  # 4x2
         spec=SpecShard(1, do_stack=True),
         num_shards=2,
         enforce_even_split=True,
-        expected_shards=(
-            torch.tensor([1., 3., 5., 7.]),
-            torch.tensor([2., 4., 6., 8.])
-        )
+        expected_shards=(torch.tensor([1.0, 3.0, 5.0, 7.0]), torch.tensor([2.0, 4.0, 6.0, 8.0])),
     ),
 ]
 
@@ -217,12 +175,7 @@ _ROUNDTRIP_CASES = [
 @pytest.mark.local
 @pytest.mark.parametrize("case", _ROUNDTRIP_CASES)
 def test_sharding_roundtrip(case: RoundtripCase):
-    shards = shard_tree(
-        case.input_tree,
-        case.spec,
-        case.num_shards,
-        enforce_even_split=case.enforce_even_split
-    )
+    shards = shard_tree(case.input_tree, case.spec, case.num_shards, enforce_even_split=case.enforce_even_split)
 
     assert len(shards) == case.num_shards
 

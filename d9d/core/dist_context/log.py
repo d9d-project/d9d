@@ -22,9 +22,7 @@ def build_dist_logger(qualifier: str, level: int) -> logging.Logger:
     dist_logger.handlers.clear()
     ch = logging.StreamHandler(sys.stdout)
     ch.setLevel(level)
-    formatter = logging.Formatter(
-        f"[d9d] [{qualifier}] %(asctime)s - %(levelname)s - %(message)s"
-    )
+    formatter = logging.Formatter(f"[d9d] [{qualifier}] %(asctime)s - %(levelname)s - %(message)s")
     ch.setFormatter(formatter)
     dist_logger.addHandler(ch)
     return dist_logger

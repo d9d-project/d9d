@@ -9,5 +9,5 @@ __all__ = [
     "GroupedLinear",
     "GroupedSwiGLU",
     "MoELayer",
-    "TopKRouter"
+    "TopKRouter",
 ]

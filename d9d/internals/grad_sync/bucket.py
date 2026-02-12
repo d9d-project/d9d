@@ -149,13 +149,13 @@ class SyncGradientBucket(AbstractGradientBucket):
     """
 
     def __init__(
-            self,
-            parameters: list[nn.Parameter],
-            require_accumulations: int,
-            device: torch.device,
-            grad_dtype: torch.dtype,
-            reduce_mesh: DeviceMesh,
-            communicate_stream: torch.cuda.Stream
+        self,
+        parameters: list[nn.Parameter],
+        require_accumulations: int,
+        device: torch.device,
+        grad_dtype: torch.dtype,
+        reduce_mesh: DeviceMesh,
+        communicate_stream: torch.cuda.Stream,
     ):
         """
         Constructs a SyncGradientBucket.
@@ -192,11 +192,7 @@ class SyncGradientBucket(AbstractGradientBucket):
 
         buffer_size = sum(cast(DTensor, param.data).to_local().numel() for param in self._params)
 
-        self._buffer = torch.zeros(
-            (buffer_size,),
-            dtype=self._grad_dtype,
-            device=self._device
-        )
+        self._buffer = torch.zeros((buffer_size,), dtype=self._grad_dtype, device=self._device)
 
         offset = 0
 
@@ -204,7 +200,7 @@ class SyncGradientBucket(AbstractGradientBucket):
             data = cast(DTensor, param.data)
             local_param = data.to_local()
 
-            local_grad = self._buffer[offset:offset + local_param.numel()].view(local_param.shape)
+            local_grad = self._buffer[offset : offset + local_param.numel()].view(local_param.shape)
 
             param.grad = dist_grad_from_local(data, local_grad)
 
@@ -237,11 +233,7 @@ class SyncGradientBucket(AbstractGradientBucket):
             # data safety), but in a DIFFERENT stream
             with torch.cuda.stream(self._communicate_stream):
                 for group in self._reduce_groups:
-                    dist.all_reduce(
-                        self._buffer,
-                        op=dist.ReduceOp.SUM,
-                        group=group
-                    )
+                    dist.all_reduce(self._buffer, op=dist.ReduceOp.SUM, group=group)
             self._ready_to_sync = True
 
     def _bind_hooks(self):

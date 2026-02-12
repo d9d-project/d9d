@@ -8,5 +8,5 @@ from .factory import HiddenStatesAggregationMode, create_hidden_states_aggregato
 __all__ = [
     "BaseHiddenStatesAggregator",
     "HiddenStatesAggregationMode",
-    "create_hidden_states_aggregator"
+    "create_hidden_states_aggregator",
 ]

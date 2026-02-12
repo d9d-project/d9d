@@ -17,12 +17,12 @@ class PipelineScheduleExecutor(PipelineSchedule):
     """Executes a defined pipeline schedule by interpreting a sequence of actions."""
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            stages: list[PipelineStage],
-            num_microbatches: int,
-            callback: PipelineLossFn | PipelineResultFn,
-            program: dict[int, list[ActionBase]]
+        self,
+        dist_context: DistributedContext,
+        stages: list[PipelineStage],
+        num_microbatches: int,
+        callback: PipelineLossFn | PipelineResultFn,
+        program: dict[int, list[ActionBase]],
     ):
         """
         Constructs the schedule executor.
@@ -40,9 +40,9 @@ class PipelineScheduleExecutor(PipelineSchedule):
         self._num_microbatches = num_microbatches
         self._program = program
 
-        self._has_backward = any(any(
-            action.has_backward_work for action in sub_program
-        ) for sub_program in program.values())
+        self._has_backward = any(
+            any(action.has_backward_work for action in sub_program) for sub_program in program.values()
+        )
 
         self._comm_handler = PipelineCommunicationHandler(self._stages)
 
@@ -56,10 +56,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
         self._input_kwargs_sharding_spec: ShardingSpec | None = None
 
     def configure_buffers(
-            self,
-            inputs: dict[str, torch.Tensor],
-            kwargs: dict[str, Any],
-            sharding_spec: PipelineShardingSpec | None
+        self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any], sharding_spec: PipelineShardingSpec | None
     ):
         if sharding_spec is None or sharding_spec.input_data is None:
             self._input_data_sharding_spec = shard_spec_on_dim(inputs, dim=0)
@@ -68,9 +65,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
 
         for stage in self._stages.values():
             stage.configure_buffers(
-                num_microbatches=self._num_microbatches,
-                pipeline_inputs=inputs,
-                has_backward=self._has_backward
+                num_microbatches=self._num_microbatches, pipeline_inputs=inputs, has_backward=self._has_backward
             )
 
     def step(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
@@ -88,13 +83,13 @@ class PipelineScheduleExecutor(PipelineSchedule):
             inputs,
             num_shards=self._num_microbatches,
             sharding_spec=self._input_data_sharding_spec,
-            enforce_even_split=True
+            enforce_even_split=True,
         )
         kwargs_shard = shard_tree(
             kwargs,
             num_shards=self._num_microbatches,
             sharding_spec=self._input_kwargs_sharding_spec,
-            enforce_even_split=True
+            enforce_even_split=True,
         )
 
         my_program = self._program[pp_group.rank()]
@@ -102,13 +97,15 @@ class PipelineScheduleExecutor(PipelineSchedule):
         for action in my_program:
             with record_function(str(action)):
                 self._dist_ctx.logger.debug(f"Running pipeline action {action}")
-                action.apply(ActionContext(
-                    callback=self._callback,
-                    stages=self._stages,
-                    communications=self._comm_handler,
-                    pipeline_inputs_microbatches=inputs_shard,
-                    pipeline_kwargs_microbatches=kwargs_shard
-                ))
+                action.apply(
+                    ActionContext(
+                        callback=self._callback,
+                        stages=self._stages,
+                        communications=self._comm_handler,
+                        pipeline_inputs_microbatches=inputs_shard,
+                        pipeline_kwargs_microbatches=kwargs_shard,
+                    )
+                )
 
         self._dist_ctx.logger.debug("Waiting for potentially hanging PP send comms")
         self._comm_handler.wait_send_all()  # finalize just in case

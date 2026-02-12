@@ -23,11 +23,11 @@ class GradientManager:
     """
 
     def __init__(
-            self,
-            dist_context: DistributedContext,
-            tracked_modules: TrackedModules,
-            batch_maths: BatchMaths,
-            config: GradientManagerConfig
+        self,
+        dist_context: DistributedContext,
+        tracked_modules: TrackedModules,
+        batch_maths: BatchMaths,
+        config: GradientManagerConfig,
     ):
         """
         Constructs the GradientManager and initializes the internal synchronizer.
@@ -49,7 +49,7 @@ class GradientManager:
         self._grad_sync = GradientSynchronizer(
             [list(module.parameters()) for module in self._tracked_modules.modules],
             bucket_size_mb=self._config.bucket_size_mb,
-            require_accumulations=self._batch_maths.num_backward_calls
+            require_accumulations=self._batch_maths.num_backward_calls,
         )
         self._grads_to_scale: list[torch.Tensor] | None = None
 

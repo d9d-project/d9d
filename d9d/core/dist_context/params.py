@@ -74,24 +74,24 @@ class DeviceMeshParameters(BaseModel):
         """Checks if any form of parallelism is enabled."""
 
         return (
-                self.has_pipeline_parallel or
-                self.has_data_parallel_replicate or
-                self.has_data_parallel_shard or
-                self.has_context_parallel_shard or
-                self.has_context_parallel_replicate or
-                self.has_expert_parallel or
-                self.has_tensor_parallel
+            self.has_pipeline_parallel
+            or self.has_data_parallel_replicate
+            or self.has_data_parallel_shard
+            or self.has_context_parallel_shard
+            or self.has_context_parallel_replicate
+            or self.has_expert_parallel
+            or self.has_tensor_parallel
         )
 
     @model_validator(mode="after")
     def _check_ep_divisibility(self) -> Self:
         """Validates that DP/CP/TP dimensions can support the requested EP/ETP degrees."""
         dp_cp_tp_degree = (
-            self.data_parallel_shard *
-            self.data_parallel_replicate *
-            self.context_parallel_shard *
-            self.context_parallel_replicate *
-            self.tensor_parallel
+            self.data_parallel_shard
+            * self.data_parallel_replicate
+            * self.context_parallel_shard
+            * self.context_parallel_replicate
+            * self.tensor_parallel
         )
         ep_degree = self.expert_parallel
 

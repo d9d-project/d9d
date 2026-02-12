@@ -20,181 +20,108 @@ _TEST_CASES = [
     # 1D simple
     TestCase(
         num_shards=2,
-        global_state={
-            "loss": torch.tensor([0.5, 1.5])
-        },
-        sharded_state={
-            0: {"loss": torch.tensor([0.5])},
-            1: {"loss": torch.tensor([1.5])}
-        },
-        sharding_spec={"loss": SpecShard(0)}
+        global_state={"loss": torch.tensor([0.5, 1.5])},
+        sharded_state={0: {"loss": torch.tensor([0.5])}, 1: {"loss": torch.tensor([1.5])}},
+        sharding_spec={"loss": SpecShard(0)},
     ),
     TestCase(
         num_shards=2,
-        global_state={
-            "loss": torch.tensor([0.5, 1.5])
-        },
-        sharded_state={
-            0: {"loss": torch.tensor([0.5])},
-            1: {"loss": torch.tensor([1.5])}
-        },
-        sharding_spec={}
+        global_state={"loss": torch.tensor([0.5, 1.5])},
+        sharded_state={0: {"loss": torch.tensor([0.5])}, 1: {"loss": torch.tensor([1.5])}},
+        sharding_spec={},
     ),
     # 1D multiple elements
     TestCase(
         num_shards=2,
-        global_state={
-            "data": torch.tensor([0., 1., 2., 3.])
-        },
-        sharded_state={
-            0: {"data": torch.tensor([0., 1.])},
-            1: {"data": torch.tensor([2., 3.])}
-        },
-        sharding_spec={"data": SpecShard(0)}
+        global_state={"data": torch.tensor([0.0, 1.0, 2.0, 3.0])},
+        sharded_state={0: {"data": torch.tensor([0.0, 1.0])}, 1: {"data": torch.tensor([2.0, 3.0])}},
+        sharding_spec={"data": SpecShard(0)},
     ),
     TestCase(
         num_shards=2,
-        global_state={
-            "data": torch.tensor([0., 1., 2., 3.])
-        },
-        sharded_state={
-            0: {"data": torch.tensor([0., 1.])},
-            1: {"data": torch.tensor([2., 3.])}
-        },
-        sharding_spec={}
+        global_state={"data": torch.tensor([0.0, 1.0, 2.0, 3.0])},
+        sharded_state={0: {"data": torch.tensor([0.0, 1.0])}, 1: {"data": torch.tensor([2.0, 3.0])}},
+        sharding_spec={},
     ),
     # 2D default
     TestCase(
         num_shards=2,
-        global_state={
-            "matrix": torch.tensor([[1., 2.], [3., 4.]])
-        },
-        sharded_state={
-            0: {"matrix": torch.tensor([[1., 2.]])},
-            1: {"matrix": torch.tensor([[3., 4.]])}
-        },
-        sharding_spec={"matrix": SpecShard(0)}
+        global_state={"matrix": torch.tensor([[1.0, 2.0], [3.0, 4.0]])},
+        sharded_state={0: {"matrix": torch.tensor([[1.0, 2.0]])}, 1: {"matrix": torch.tensor([[3.0, 4.0]])}},
+        sharding_spec={"matrix": SpecShard(0)},
     ),
     # 2D col
     TestCase(
         num_shards=2,
-        global_state={
-            "matrix": torch.tensor([[1., 2.], [3., 4.]])
-        },
-        sharded_state={
-            0: {"matrix": torch.tensor([[1.], [3.]])},
-            1: {"matrix": torch.tensor([[2.], [4.]])}
-        },
-        sharding_spec={"matrix": SpecShard(1)}
+        global_state={"matrix": torch.tensor([[1.0, 2.0], [3.0, 4.0]])},
+        sharded_state={0: {"matrix": torch.tensor([[1.0], [3.0]])}, 1: {"matrix": torch.tensor([[2.0], [4.0]])}},
+        sharding_spec={"matrix": SpecShard(1)},
     ),
     # List Split
     TestCase(
         num_shards=2,
-        global_state={
-            "ids": [10, 20, 30, 40]
-        },
-        sharded_state={
-            0: {"ids": [10, 20]},
-            1: {"ids": [30, 40]}
-        },
-        sharding_spec={}
+        global_state={"ids": [10, 20, 30, 40]},
+        sharded_state={0: {"ids": [10, 20]}, 1: {"ids": [30, 40]}},
+        sharding_spec={},
+    ),
+    TestCase(
+        num_shards=2,
+        global_state={"ids": [10, 20, 30, 40]},
+        sharded_state={0: {"ids": [10, 20]}, 1: {"ids": [30, 40]}},
+        sharding_spec={"ids": SpecShard(0)},
+    ),
+    TestCase(
+        num_shards=2,
+        global_state={"metrics": torch.tensor([10.0, 20.0])},
+        sharded_state={0: {"metrics": torch.tensor(10.0)}, 1: {"metrics": torch.tensor(20.0)}},
+        sharding_spec={"metrics": SpecShard(dim=0, do_stack=True)},
     ),
     TestCase(
         num_shards=2,
         global_state={
-            "ids": [10, 20, 30, 40]
-        },
-        sharded_state={
-            0: {"ids": [10, 20]},
-            1: {"ids": [30, 40]}
-        },
-        sharding_spec={"ids": SpecShard(0)}
-    ),
-    TestCase(
-        num_shards=2,
-        global_state={
-            "metrics": torch.tensor([10., 20.])
-        },
-        sharded_state={
-            0: {"metrics": torch.tensor(10.)},
-            1: {"metrics": torch.tensor(20.)}
-        },
-        sharding_spec={"metrics": SpecShard(dim=0, do_stack=True)}
-    ),
-    TestCase(
-        num_shards=2,
-        global_state={
-            "batch_embeddings": torch.tensor([
-                [1.0, 1.1, 1.2],
-                [2.0, 2.1, 2.2]
-            ])  # Shape (2, 3)
+            "batch_embeddings": torch.tensor([[1.0, 1.1, 1.2], [2.0, 2.1, 2.2]])  # Shape (2, 3)
         },
         sharded_state={
             0: {"batch_embeddings": torch.tensor([1.0, 1.1, 1.2])},
-            1: {"batch_embeddings": torch.tensor([2.0, 2.1, 2.2])}
+            1: {"batch_embeddings": torch.tensor([2.0, 2.1, 2.2])},
         },
-        sharding_spec={"batch_embeddings": SpecShard(dim=0, do_stack=True)}
+        sharding_spec={"batch_embeddings": SpecShard(dim=0, do_stack=True)},
     ),
     TestCase(
         num_shards=2,
-        global_state={
-            "items": [15, 12]
-        },
-        sharded_state={
-            0: {"items": 15},
-            1: {"items": 12}
-        },
-        sharding_spec={"items": SpecShard(dim=0, do_stack=True)}
+        global_state={"items": [15, 12]},
+        sharded_state={0: {"items": 15}, 1: {"items": 12}},
+        sharding_spec={"items": SpecShard(dim=0, do_stack=True)},
     ),
 ]
 
 _TEST_CASES_WRITE_SHARD_READ_GLOBAL = [
     TestCase(
         num_shards=2,
-        global_state={
-            "batch_embeddings": torch.tensor([0.5, 1.0])
-        },
-        sharded_state={
-            0: {"batch_embeddings": torch.tensor(0.5)},
-            1: {"batch_embeddings": torch.tensor(1.0)}
-        },
-        sharding_spec={}
+        global_state={"batch_embeddings": torch.tensor([0.5, 1.0])},
+        sharded_state={0: {"batch_embeddings": torch.tensor(0.5)}, 1: {"batch_embeddings": torch.tensor(1.0)}},
+        sharding_spec={},
     ),
     TestCase(
         num_shards=2,
-        global_state={
-            "items": [15, 12]
-        },
-        sharded_state={
-            0: {"items": 15},
-            1: {"items": 12}
-        },
-        sharding_spec={}
+        global_state={"items": [15, 12]},
+        sharded_state={0: {"items": 15}, 1: {"items": 12}},
+        sharding_spec={},
     ),
 ]
 
 _TEST_CASES_WRITE_GLOBAL_READ_SHARD = [
     TestCase(
         num_shards=2,
-        global_state={
-            "batch_embeddings": torch.tensor([0.5, 1.0])
-        },
-        sharded_state={
-            0: {"batch_embeddings": torch.tensor([0.5])},
-            1: {"batch_embeddings": torch.tensor([1.0])}
-        },
-        sharding_spec={}
+        global_state={"batch_embeddings": torch.tensor([0.5, 1.0])},
+        sharded_state={0: {"batch_embeddings": torch.tensor([0.5])}, 1: {"batch_embeddings": torch.tensor([1.0])}},
+        sharding_spec={},
     ),
     TestCase(
         num_shards=2,
-        global_state={
-            "items": [15, 12]
-        },
-        sharded_state={
-            0: {"items": [15]},
-            1: {"items": [12]}
-        },
-        sharding_spec={}
+        global_state={"items": [15, 12]},
+        sharded_state={0: {"items": [15]}, 1: {"items": [12]}},
+        sharding_spec={},
     ),
 ]
 
@@ -271,7 +198,7 @@ def test_detach_mechanics():
     handler = PipelineStateHandler(sharding_spec={}, num_shards=2)
 
     # Global Write Detach
-    t_grad = torch.tensor([1., 2., 3., 4.], requires_grad=True)
+    t_grad = torch.tensor([1.0, 2.0, 3.0, 4.0], requires_grad=True)
     handler.global_state()["grad_tensor"] = t_grad
 
     stored = handler.global_state()["grad_tensor"]
@@ -280,7 +207,7 @@ def test_detach_mechanics():
     assert_close(stored, t_grad.detach())
 
     # Sharded Write Detach
-    t_grad_shard = torch.tensor([5.], requires_grad=True)
+    t_grad_shard = torch.tensor([5.0], requires_grad=True)
     handler.sharded_state(0)["grad_shard"] = t_grad_shard
 
     stored_shard = handler.sharded_state(0)["grad_shard"]

@@ -15,19 +15,14 @@ def test_validation_logic():
 
     with pytest.raises(ValueError, match="Shape mismatch"):
         adamw_stochastic_bf16_(
-            p, torch.zeros((64,), dtype=torch.bfloat16, device="cuda"),
-            m, v, 1e-3, 0.9, 0.999, 1e-8, 0.0, 1
+            p, torch.zeros((64,), dtype=torch.bfloat16, device="cuda"), m, v, 1e-3, 0.9, 0.999, 1e-8, 0.0, 1
         )
 
     with pytest.raises(ValueError, match="Params must be BFloat16"):
-        adamw_stochastic_bf16_(
-            p.float(), g.float(), m, v, 1e-3, 0.9, 0.999, 1e-8, 0.0, 1
-        )
+        adamw_stochastic_bf16_(p.float(), g.float(), m, v, 1e-3, 0.9, 0.999, 1e-8, 0.0, 1)
 
     with pytest.raises(ValueError, match="States have different dtypes"):
-        adamw_stochastic_bf16_(
-            p, g, m.bfloat16(), v.float(), 1e-3, 0.9, 0.999, 1e-8, 0.0, 1
-        )
+        adamw_stochastic_bf16_(p, g, m.bfloat16(), v.float(), 1e-3, 0.9, 0.999, 1e-8, 0.0, 1)
 
 
 @pytest.mark.local
@@ -49,14 +44,7 @@ def test_reproducibility(state_dtype, grad_dtype):
         v = v_orig.clone()
 
         adamw_stochastic_bf16_(
-            p, g, m, v,
-            lr=1e-3,
-            beta1=0.9,
-            beta2=0.999,
-            eps=1e-8,
-            weight_decay=0.01,
-            step=1,
-            generator=gen
+            p, g, m, v, lr=1e-3, beta1=0.9, beta2=0.999, eps=1e-8, weight_decay=0.01, step=1, generator=gen
         )
         return p, m, v
 
@@ -92,16 +80,7 @@ def test_correctness_against_reference(state_dtype, grad_dtype, shape):
     lr, beta1, beta2, eps, wd, step = 1e-3, 0.9, 0.999, 1e-8, 0.1, 5
 
     p_ref, m_ref, v_ref = adamw_step_torch(
-        p,
-        g,
-        m,
-        v,
-        lr=lr,
-        beta1=beta1,
-        beta2=beta2,
-        eps=eps,
-        weight_decay=wd,
-        step=step
+        p, g, m, v, lr=lr, beta1=beta1, beta2=beta2, eps=eps, weight_decay=wd, step=step
     )
 
     p_ker = p.to(torch.bfloat16)
@@ -110,14 +89,17 @@ def test_correctness_against_reference(state_dtype, grad_dtype, shape):
     v_ker = v.to(state_dtype)
 
     adamw_stochastic_bf16_(
-        p_ker, g_ker, m_ker, v_ker,
+        p_ker,
+        g_ker,
+        m_ker,
+        v_ker,
         lr=lr,
         beta1=beta1,
         beta2=beta2,
         eps=eps,
         weight_decay=wd,
         step=step,
-        generator=torch.Generator().manual_seed(123)
+        generator=torch.Generator().manual_seed(123),
     )
 
     if state_dtype == torch.float32:
@@ -146,10 +128,17 @@ def test_statistical_mean_preservation(shape):
     v = torch.zeros_like(p, dtype=torch.float32)  # v=0
 
     adamw_stochastic_bf16_(
-        p, g, m, v,
-        lr=lr, beta1=0.0, beta2=0.0, eps=1e-10, weight_decay=0.0,
+        p,
+        g,
+        m,
+        v,
+        lr=lr,
+        beta1=0.0,
+        beta2=0.0,
+        eps=1e-10,
+        weight_decay=0.0,
         step=1,
-        generator=torch.Generator().manual_seed(777)
+        generator=torch.Generator().manual_seed(777),
     )
 
     p_float = p.float()

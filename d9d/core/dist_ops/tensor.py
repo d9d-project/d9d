@@ -6,10 +6,7 @@ import torch.distributed as dist
 
 
 def gather(
-        tensor: torch.Tensor,
-        group: dist.ProcessGroup,
-        group_dst: int,
-        async_op: bool = False
+    tensor: torch.Tensor, group: dist.ProcessGroup, group_dst: int, async_op: bool = False
 ) -> list[torch.Tensor] | tuple[list[torch.Tensor] | None, dist.Work] | None:
     """
     Gathers tensors from the process group to a specific destination rank.
@@ -34,13 +31,7 @@ def gather(
     else:
         save_list = None
 
-    work = dist.gather(
-        tensor,
-        save_list,
-        group=group,
-        group_dst=group_dst,
-        async_op=async_op
-    )
+    work = dist.gather(tensor, save_list, group=group, group_dst=group_dst, async_op=async_op)
 
     if async_op:
         return save_list, work
@@ -49,9 +40,7 @@ def gather(
 
 
 def all_gather(
-        tensor: torch.Tensor,
-        group: dist.ProcessGroup,
-        async_op: bool = False
+    tensor: torch.Tensor, group: dist.ProcessGroup, async_op: bool = False
 ) -> list[torch.Tensor] | tuple[list[torch.Tensor], dist.Work]:
     """
     Gathers tensors from the whole process group to all ranks.
@@ -71,12 +60,7 @@ def all_gather(
     """
 
     save_list = [torch.empty_like(tensor) for _ in range(group.size())]
-    work = dist.all_gather(
-        save_list,
-        tensor,
-        group=group,
-        async_op=async_op
-    )
+    work = dist.all_gather(save_list, tensor, group=group, async_op=async_op)
     if async_op:
         return save_list, work
     else:
@@ -84,24 +68,18 @@ def all_gather(
 
 
 def _all_gather_shapes(
-        tensor: torch.Tensor,
-        group: dist.ProcessGroup,
+    tensor: torch.Tensor,
+    group: dist.ProcessGroup,
 ) -> Sequence[torch.Tensor]:
     all_ndim = [torch.empty((), dtype=torch.long, device=tensor.device) for _ in range(group.size())]
     all_ndim_wait = dist.all_gather(
-        all_ndim,
-        torch.tensor(tensor.ndim, dtype=torch.long, device=tensor.device),
-        group=group,
-        async_op=True
+        all_ndim, torch.tensor(tensor.ndim, dtype=torch.long, device=tensor.device), group=group, async_op=True
     )
     all_ndim_wait.wait()
 
     all_shape = [torch.empty(cast(int, ndim.item()), dtype=torch.long, device=tensor.device) for ndim in all_ndim]
     all_shape_wait = dist.all_gather(
-        all_shape,
-        torch.tensor(tensor.shape, dtype=torch.long, device=tensor.device),
-        group=group,
-        async_op=True
+        all_shape, torch.tensor(tensor.shape, dtype=torch.long, device=tensor.device), group=group, async_op=True
     )
     all_shape_wait.wait()
 
@@ -109,9 +87,7 @@ def _all_gather_shapes(
 
 
 def all_gather_variadic_shape(
-        tensor: torch.Tensor,
-        group: dist.ProcessGroup,
-        async_op: bool = False
+    tensor: torch.Tensor, group: dist.ProcessGroup, async_op: bool = False
 ) -> list[torch.Tensor] | tuple[list[torch.Tensor], dist.Work]:
     """
     Gathers tensors of different shapes from the whole process group to all ranks.
@@ -133,23 +109,14 @@ def all_gather_variadic_shape(
     all_shape = _all_gather_shapes(tensor, group)
 
     all_result = [torch.empty(tuple(shape), dtype=tensor.dtype, device=tensor.device) for shape in all_shape]
-    all_result_wait = dist.all_gather(
-        all_result,
-        tensor,
-        group=group,
-        async_op=async_op
-    )
+    all_result_wait = dist.all_gather(all_result, tensor, group=group, async_op=async_op)
     if async_op:
         return all_result, all_result_wait
     else:
         return all_result
 
 
-def gather_variadic_shape(
-        tensor: torch.Tensor,
-        group: dist.ProcessGroup,
-        group_dst: int
-) -> list[torch.Tensor] | None:
+def gather_variadic_shape(tensor: torch.Tensor, group: dist.ProcessGroup, group_dst: int) -> list[torch.Tensor] | None:
     """
     Gathers tensors of different shapes from the process group to a specific rank.
 

@@ -17,21 +17,16 @@ class ModelStateMapperSelectChildModules(ModelStateMapper):
         self._parent_prefix = f"{parent_name}."
 
     def state_dependency_groups(self) -> frozenset[StateGroup]:
-        return frozenset([
-            StateGroup(
-                inputs=frozenset([self._parent_prefix + name]),
-                outputs=frozenset([name])
-            )
-            for name in self._base_names
-        ])
+        return frozenset(
+            [
+                StateGroup(inputs=frozenset([self._parent_prefix + name]), outputs=frozenset([name]))
+                for name in self._base_names
+            ]
+        )
 
     def apply(self, group: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
         name, value = next(iter(group.items()))
         if name.startswith(self._parent_prefix):
-            return {
-                name[len(self._parent_prefix):]: value
-            }
+            return {name[len(self._parent_prefix) :]: value}
         else:
-            return {
-
-            }
+            return {}

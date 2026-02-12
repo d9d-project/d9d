@@ -30,10 +30,7 @@ class OptimizerProvider(Protocol):
     """
 
     @abc.abstractmethod
-    def __call__(
-            self,
-            context: InitializeOptimizerStageContext
-    ) -> Optimizer:
+    def __call__(self, context: InitializeOptimizerStageContext) -> Optimizer:
         """
         Initializes the optimizer for a specific training stage.
 

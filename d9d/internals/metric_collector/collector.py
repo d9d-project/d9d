@@ -54,10 +54,7 @@ class AsyncMetricCollector:
         # depend on main stream
         self._stream.wait_stream(torch.cuda.current_stream())
 
-        with (
-            torch.cuda.stream(self._stream),
-            record_function("Async Metric Sync & Compute")
-        ):
+        with torch.cuda.stream(self._stream), record_function("Async Metric Sync & Compute"):
             if dist_context.mesh_params.is_distributed:
                 self._metric.sync(dist_context)
             self._compute_buffer = self._metric.compute()

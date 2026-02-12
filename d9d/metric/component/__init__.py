@@ -4,5 +4,5 @@ from .accumulator import MetricAccumulator, MetricReduceOp
 
 __all__ = [
     "MetricAccumulator",
-    "MetricReduceOp"
+    "MetricReduceOp",
 ]

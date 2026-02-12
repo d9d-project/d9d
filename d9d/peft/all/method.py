@@ -35,10 +35,7 @@ class PeftStack(PeftMethod[PeftStackConfig]):
             params_to_train.extend(result.parameters_to_train)
             state_mappers.extend(result.load_state_mappers)
 
-        return PeftInjectionResult(
-            parameters_to_train=params_to_train,
-            load_state_mappers=state_mappers
-        )
+        return PeftInjectionResult(parameters_to_train=params_to_train, load_state_mappers=state_mappers)
 
     def merge(self, module: nn.Module):
         for method in self._methods[::-1]:
@@ -57,7 +54,7 @@ class PeftStack(PeftMethod[PeftStackConfig]):
 _PEFT_CONFIG_MAP: dict[type[BaseModel], type[PeftMethod]] = {
     LoRAConfig: LoRA,
     FullTuneConfig: FullTune,
-    PeftStackConfig: PeftStack
+    PeftStackConfig: PeftStack,
 }
 
 

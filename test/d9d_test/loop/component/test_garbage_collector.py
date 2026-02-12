@@ -62,7 +62,7 @@ def test_manual_gc_collect_forced(mock_gc, dist_ctx_factory, gc_config_periodic)
         (10, 10, True),  # 10 % 10 == 0
         (11, 10, False),
         (20, 10, True),
-    ]
+    ],
 )
 def test_manual_gc_collect_periodic(mock_gc, dist_ctx_factory, current_step, period, should_collect):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())

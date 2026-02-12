@@ -5,11 +5,7 @@ import torch.distributed as dist
 T = TypeVar("T")
 
 
-def gather_object(
-        obj: T,
-        group: dist.ProcessGroup,
-        group_dst: int
-) -> list[T] | None:
+def gather_object(obj: T, group: dist.ProcessGroup, group_dst: int) -> list[T] | None:
     """
     Gathers picklable objects from the whole process group to a specific destination rank.
 
@@ -31,19 +27,11 @@ def gather_object(
         save_list = cast(list[T], [None for _ in range(group.size())])
     else:
         save_list = None
-    dist.gather_object(
-        obj,
-        save_list,
-        group=group,
-        group_dst=group_dst
-    )
+    dist.gather_object(obj, save_list, group=group, group_dst=group_dst)
     return save_list
 
 
-def all_gather_object(
-        obj: T,
-        group: dist.ProcessGroup
-) -> list[T]:
+def all_gather_object(obj: T, group: dist.ProcessGroup) -> list[T]:
     """
     Gathers picklable objects from the whole process group to all ranks.
 
@@ -60,9 +48,5 @@ def all_gather_object(
     # We initialize with None, but we cast to list[T] because we know
     # dist.gather_object will populate these slots with actual objects.
     save_list = cast(list[T], [None for _ in range(group.size())])
-    dist.all_gather_object(
-        save_list,
-        obj,
-        group=group
-    )
+    dist.all_gather_object(save_list, obj, group=group)
     return save_list

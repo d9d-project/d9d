@@ -15,9 +15,5 @@ def dist_grad_from_local(data: DTensor, local_grad: Tensor) -> DTensor:
     """
 
     return DTensor.from_local(
-        local_grad,
-        shape=data.shape,
-        stride=data.stride(),
-        device_mesh=data.device_mesh,
-        placements=data.placements
+        local_grad, shape=data.shape, stride=data.stride(), device_mesh=data.device_mesh, placements=data.placements
     )

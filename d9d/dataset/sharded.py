@@ -46,12 +46,12 @@ class ShardedDataset(Dataset[_T_co], Stateful):
     """
 
     def __init__(
-            self,
-            dataset: Dataset[_T_co],
-            total_shards: int,
-            current_shard: int,
-            indexing_mode: ShardIndexingMode,
-            pad_to_equal_size_across_shards: bool
+        self,
+        dataset: Dataset[_T_co],
+        total_shards: int,
+        current_shard: int,
+        indexing_mode: ShardIndexingMode,
+        pad_to_equal_size_across_shards: bool,
     ):
         """
         Constructs a ShardedDataset object.
@@ -154,20 +154,17 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         self._current_shard = state_dict["current_shard"]
 
     def state_dict(self) -> dict[str, Any]:
-        dct: dict[str, Any] = {
-            "total_shards": self._total_shards,
-            "current_shard": self._current_shard
-        }
+        dct: dict[str, Any] = {"total_shards": self._total_shards, "current_shard": self._current_shard}
         if isinstance(self._dataset, Stateful):
             dct["dataset"] = self._dataset.state_dict()
         return dct
 
 
 def shard_dataset_data_parallel(
-        dataset: Dataset[_T_co],
-        dist_context: DistributedContext,
-        indexing_mode: ShardIndexingMode = ShardIndexingMode.sequential,
-        pad_to_equal_size_across_shards: bool = True
+    dataset: Dataset[_T_co],
+    dist_context: DistributedContext,
+    indexing_mode: ShardIndexingMode = ShardIndexingMode.sequential,
+    pad_to_equal_size_across_shards: bool = True,
 ) -> Dataset[_T_co]:
     """
     Wraps a dataset into a ShardedDataset based on the Data Parallel dimension of the distributed context.
@@ -198,5 +195,5 @@ def shard_dataset_data_parallel(
         total_shards=n_shards,
         current_shard=current_shard,
         indexing_mode=indexing_mode,
-        pad_to_equal_size_across_shards=pad_to_equal_size_across_shards
+        pad_to_equal_size_across_shards=pad_to_equal_size_across_shards,
     )

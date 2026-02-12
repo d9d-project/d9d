@@ -58,6 +58,7 @@ class PipelineScheduleZeroBubbleVConfig(BaseModel):
     A specialized V-shape topology schedule that splits backward passes into
     Input and Weight gradients to maximize overlap. Requires exactly 2 stages per rank.
     """
+
     schedule: Literal["zero_bubble_v"] = "zero_bubble_v"
 
 
@@ -73,13 +74,13 @@ class PipelineScheduleDualPipeVConfig(BaseModel):
 
 
 AnyPipelineScheduleConfig = Annotated[
-    PipelineScheduleInferenceConfig |
-    PipelineScheduleGPipeConfig |
-    PipelineScheduleLoopedBFSConfig |
-    PipelineSchedule1F1BConfig |
-    PipelineScheduleZeroBubbleVConfig |
-    PipelineScheduleDualPipeVConfig,
-    Field(discriminator="schedule")
+    PipelineScheduleInferenceConfig
+    | PipelineScheduleGPipeConfig
+    | PipelineScheduleLoopedBFSConfig
+    | PipelineSchedule1F1BConfig
+    | PipelineScheduleZeroBubbleVConfig
+    | PipelineScheduleDualPipeVConfig,
+    Field(discriminator="schedule"),
 ]
 """Union of all supported pipeline schedule configuration types.
 

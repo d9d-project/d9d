@@ -18,7 +18,7 @@ def check_grouped_query_attention_qwen3_moe_grad(my: GroupedQueryAttention, hf: 
         (my.q_proj.weight.grad, hf.q_proj.weight.grad),
         (my.k_proj.weight.grad, hf.k_proj.weight.grad),
         (my.v_proj.weight.grad, hf.v_proj.weight.grad),
-        (my.o_proj.weight.grad, hf.o_proj.weight.grad)
+        (my.o_proj.weight.grad, hf.o_proj.weight.grad),
     ]:
         check_grad_distance(my_grad, hf_grad)
 

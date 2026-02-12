@@ -47,14 +47,14 @@ class TrainingConfigurator:
     """
 
     def __init__(
-            self,
-            mesh: DeviceMeshParameters,
-            parameters: TrainerConfig,
-            task_provider: TrainTaskProvider,
-            model_provider: ModelProvider,
-            data_provider: DatasetProvider,
-            optimizer_provider: OptimizerProvider,
-            lr_scheduler_provider: LRSchedulerProvider
+        self,
+        mesh: DeviceMeshParameters,
+        parameters: TrainerConfig,
+        task_provider: TrainTaskProvider,
+        model_provider: ModelProvider,
+        data_provider: DatasetProvider,
+        optimizer_provider: OptimizerProvider,
+        lr_scheduler_provider: LRSchedulerProvider,
     ):
         """
         Constructs a configurator capable of building the full training state.
@@ -81,45 +81,32 @@ class TrainingConfigurator:
 
         set_seeds(dist_context, seed=self._parameters.determinism.base_seed)
 
-        timeout_manager = TimeoutManager(
-            dist_context=dist_context,
-            config=self._parameters.timeout
-        )
+        timeout_manager = TimeoutManager(dist_context=dist_context, config=self._parameters.timeout)
         timeout_manager.set_init()
 
-        task = self._task_provider(TrainTaskProviderContext(
-            dist_context=dist_context
-        ))
+        task = self._task_provider(TrainTaskProviderContext(dist_context=dist_context))
 
         batch_maths = BatchMaths(
             dist_context=dist_context,
             config_batching=self._parameters.batching,
-            config_pipelining=self._parameters.pipelining
+            config_pipelining=self._parameters.pipelining,
         )
 
         data_loader_factory = DataLoaderFactory(
             dist_context=dist_context,
             provider=self._data_provider,
             config_data_loading=self._parameters.data_loading,
-            batch_maths=batch_maths
+            batch_maths=batch_maths,
         )
         data_loader_train = data_loader_factory.build_dataloader_for_train_job()
 
-        stepper = Stepper(
-            initial_step=1,
-            total_steps=len(data_loader_train)
-        )
+        stepper = Stepper(initial_step=1, total_steps=len(data_loader_train))
 
         pipeline_state_handler = PipelineStateHandler(
-            sharding_spec={},
-            num_shards=batch_maths.num_microbatches_pipelining
+            sharding_spec={}, num_shards=batch_maths.num_microbatches_pipelining
         )
 
-        loss_computer = LossComputer(
-            state=pipeline_state_handler,
-            task=task,
-            stepper=stepper
-        )
+        loss_computer = LossComputer(state=pipeline_state_handler, task=task, stepper=stepper)
 
         schedule, modules = ModelStageFactory(
             model_provider=self._model_provider,
@@ -127,7 +114,7 @@ class TrainingConfigurator:
             config_model=self._parameters.model_stage_factory,
             config_pipelining=self._parameters.pipelining,
             batch_maths=batch_maths,
-            pipeline_callback=loss_computer
+            pipeline_callback=loss_computer,
         ).build_pipeline_and_modules()
 
         metrics = ComposeMetric(task.create_metrics(CreateMetricsContext()).metrics)
@@ -137,14 +124,14 @@ class TrainingConfigurator:
             task=task,
             pipeline=schedule,
             pipeline_state=pipeline_state_handler,
-            metrics=metrics
+            metrics=metrics,
         )
 
         grad_clipper = GradientClipper(
             dist_context=dist_context,
             tracked_modules=modules,
             config=self._parameters.gradient_clipping,
-            stepper=stepper
+            stepper=stepper,
         )
 
         optimizer, scheduler = OptimizerFactory(
@@ -152,40 +139,28 @@ class TrainingConfigurator:
             tracked_modules=modules,
             optimizer_provider=self._optimizer_provider,
             stepper=stepper,
-            lr_scheduler_provider=self._lr_scheduler_provider
+            lr_scheduler_provider=self._lr_scheduler_provider,
         ).build_optimizer_and_scheduler()
 
-        gc = ManualGarbageCollector(
-            dist_ctx=dist_context,
-            config=self._parameters.gc,
-            step=stepper
-        )
+        gc = ManualGarbageCollector(dist_ctx=dist_context, config=self._parameters.gc, step=stepper)
 
         checkpointer = StateCheckpointer(
             dist_context=dist_context,
             stepper=stepper,
             config=self._parameters.checkpointing,
             gc=gc,
-            run_name=self._parameters.run.name
+            run_name=self._parameters.run.name,
         )
 
-        profiler = JobProfiler(
-            dist_context=dist_context,
-            stepper=stepper,
-            config=self._parameters.profiling
-        )
+        profiler = JobProfiler(dist_context=dist_context, stepper=stepper, config=self._parameters.profiling)
 
-        exporter = ModelStageExporter(
-            model_provider=self._model_provider,
-            dist_context=dist_context,
-            modules=modules
-        )
+        exporter = ModelStageExporter(model_provider=self._model_provider, dist_context=dist_context, modules=modules)
 
         gradient_manager = GradientManager(
             dist_context=dist_context,
             tracked_modules=modules,
             batch_maths=batch_maths,
-            config=self._parameters.gradient_manager
+            config=self._parameters.gradient_manager,
         )
 
         job_logger = JobLogger(
@@ -194,10 +169,7 @@ class TrainingConfigurator:
             metrics=metrics,
             stepper=stepper,
             run_config=self._parameters.run,
-            additional_hparams={
-                "task": task.dump_hparams(),
-                "model": self._model_provider.dump_hparams()
-            }
+            additional_hparams={"task": task.dump_hparams(), "model": self._model_provider.dump_hparams()},
         )
 
         return TrainJobState(
@@ -218,7 +190,7 @@ class TrainingConfigurator:
             logger=job_logger,
             gradient_manager=gradient_manager,
             timeout_manager=timeout_manager,
-            task_operator=task_operator
+            task_operator=task_operator,
         )
 
     def configure(self) -> "Trainer":
@@ -275,14 +247,14 @@ class Trainer:
                 desc="Training",
                 total=self._state.stepper.total_steps,
                 disable=not self._state.dist_context.is_local_main_process,
-                initial=self._state.stepper.current_step
+                initial=self._state.stepper.current_step,
             ) as bar,
             self._state.logger.new_run() as run,
             self._state.garbage_collector as gc,
             self._state.profiler.open() as profiler,
             self._state.gradient_manager.install(),
             self._state.gradient_clipper.install(),
-            self._state.logger.install()
+            self._state.logger.install(),
         ):
             run.set_context({"stage": "train"})
 
@@ -315,10 +287,7 @@ class Trainer:
                 self._state.lr_scheduler.step()
 
                 # log everything
-                self._state.logger.log(
-                    run,
-                    loss_value=self._state.gradient_manager.compute_global_loss()
-                )
+                self._state.logger.log(run, loss_value=self._state.gradient_manager.compute_global_loss())
 
                 # reset grads
                 self._state.gradient_manager.zero_grad()

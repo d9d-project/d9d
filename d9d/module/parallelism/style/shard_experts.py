@@ -36,14 +36,9 @@ class ShardMoESparseExpertsParallel(ParallelStyle):
         if mesh_dim_names is None:
             raise ValueError("This plan should be applied only on named DeviceMeshes")
 
-        placements = [
-            Shard(0) if dim_name == self._shard_dim_name else Replicate()
-            for dim_name
-            in mesh_dim_names
-        ]
+        placements = [Shard(0) if dim_name == self._shard_dim_name else Replicate() for dim_name in mesh_dim_names]
         weight = nn.Parameter(
-            distribute_tensor(mod.weight, device_mesh, placements),
-            requires_grad=mod.weight.requires_grad
+            distribute_tensor(mod.weight, device_mesh, placements), requires_grad=mod.weight.requires_grad
         )
         mod.weight = weight
 

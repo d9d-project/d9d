@@ -8,12 +8,12 @@ from torch.distributed.tensor import DTensor, Placement, Replicate, Shard
 
 
 def _make_dtensor_param(
-        shape: tuple[int, ...],
-        value: float,
-        mesh: DeviceMesh,
-        placements: tuple[Placement, ...],
-        dtype: torch.dtype,
-        grad_dtype: torch.dtype,
+    shape: tuple[int, ...],
+    value: float,
+    mesh: DeviceMesh,
+    placements: tuple[Placement, ...],
+    dtype: torch.dtype,
+    grad_dtype: torch.dtype,
 ):
     local_t = torch.full(shape, value, device="cuda", dtype=dtype)
     dt = DTensor.from_local(local_t, device_mesh=mesh, placements=placements)
@@ -37,25 +37,24 @@ def _make_dtensor_param(
             {"shape": (151, 55), "placements": (Replicate(),), "will_sync": True},
             {"shape": (2, 3, 4, 5), "placements": (Replicate(),), "will_sync": True},
             {"shape": (8, 16), "placements": (Replicate(),), "will_sync": True},
-        ]
-    ]
+        ],
+    ],
 )
 @pytest.mark.parametrize(
     ("param_dtype", "grad_dtype"),
-    [
-        (torch.float32, torch.float32),
-        (torch.bfloat16, torch.float32),
-        (torch.bfloat16, torch.bfloat16)
-    ]
+    [(torch.float32, torch.float32), (torch.bfloat16, torch.float32), (torch.bfloat16, torch.bfloat16)],
 )
 def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
     sync_mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
     params = [
         _make_dtensor_param(
-            shape=spec["shape"], value=1.0,
-            grad_dtype=grad_dtype, dtype=param_dtype,
-            mesh=sync_mesh, placements=spec["placements"]
+            shape=spec["shape"],
+            value=1.0,
+            grad_dtype=grad_dtype,
+            dtype=param_dtype,
+            mesh=sync_mesh,
+            placements=spec["placements"],
         )
         for spec in tensor_specs
     ]
@@ -97,10 +96,7 @@ def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype):
         for param, spec in zip(params, tensor_specs, strict=True):
             if spec["will_sync"]:
                 expect_grad = torch.full(
-                    param.to_local().shape,
-                    fill_value=world_size * (world_size - 1),
-                    dtype=grad_dtype,
-                    device="cuda"
+                    param.to_local().shape, fill_value=world_size * (world_size - 1), dtype=grad_dtype, device="cuda"
                 )
                 assert torch.allclose(param.grad.to_local(), expect_grad)
             else:
@@ -124,11 +120,7 @@ def test_e2e_local():
     for p in params:
         p.grad_dtype = torch.float32
 
-    sync = GradientSynchronizer(
-        param_groups=[params],
-        bucket_size_mb=1,
-        require_accumulations=2
-    )
+    sync = GradientSynchronizer(param_groups=[params], bucket_size_mb=1, require_accumulations=2)
 
     sync.bind()
 

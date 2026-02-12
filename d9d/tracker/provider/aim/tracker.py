@@ -42,12 +42,7 @@ class AimRun(BaseTrackerRun):
         else:
             track_context = {**self._context, **context}
 
-        self._run.track(
-            name=name,
-            value=value,
-            context=track_context,
-            step=self._step
-        )
+        self._run.track(name=name, value=value, context=track_context, step=self._step)
 
     def bins(self, name: str, values: torch.Tensor, context: dict[str, str] | None = None):
         if context is None:
@@ -57,12 +52,9 @@ class AimRun(BaseTrackerRun):
 
         self._run.track(
             name=name,
-            value=Distribution(
-                hist=values.numpy(),
-                bin_range=(0, values.shape[0])
-            ),
+            value=Distribution(hist=values.numpy(), bin_range=(0, values.shape[0])),
             context=track_context,
-            step=self._step
+            step=self._step,
         )
 
 
@@ -84,9 +76,7 @@ class AimTracker(BaseTracker[AimConfig]):
         self._restart_hash = state["restart_hash"]
 
     def state_dict(self) -> dict[str, Any]:
-        return {
-            "restart_hash": self._restart_hash
-        }
+        return {"restart_hash": self._restart_hash}
 
     @contextmanager
     def open(self, properties: RunConfig) -> Generator[BaseTrackerRun, None, None]:
@@ -95,7 +85,7 @@ class AimTracker(BaseTracker[AimConfig]):
             repo=self._config.repo,
             log_system_params=self._config.log_system_params,
             capture_terminal_logs=self._config.capture_terminal_logs,
-            system_tracking_interval=self._config.system_tracking_interval
+            system_tracking_interval=self._config.system_tracking_interval,
         )
         run.name = properties.name
         run.description = properties.description

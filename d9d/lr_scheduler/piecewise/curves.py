@@ -57,7 +57,7 @@ class CurvePoly(CurveBase):
         self._power = power
 
     def compute(self, start: float, end: float, step_p: float) -> float:
-        p_transformed = step_p ** self._power
+        p_transformed = step_p**self._power
         return start + (end - start) * p_transformed
 
 

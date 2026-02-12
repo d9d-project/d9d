@@ -23,11 +23,7 @@ def test_grouped_linear_grad_directions(direction, expect_input_grad, expect_wei
     model = GroupedLinear(n_groups, in_features, out_features, device="cuda", dtype=torch.bfloat16)
 
     x = torch.randn(
-        n_groups * batch_size_per_group,
-        in_features,
-        device="cuda",
-        dtype=torch.bfloat16,
-        requires_grad=True
+        n_groups * batch_size_per_group, in_features, device="cuda", dtype=torch.bfloat16, requires_grad=True
     )
 
     x_groups = torch.tensor([batch_size_per_group] * n_groups, device="cpu", dtype=torch.long)

@@ -14,5 +14,5 @@ __all__ = [
     "parallelize_expert_parallel",
     "parallelize_fsdp",
     "parallelize_hsdp",
-    "parallelize_replicate"
+    "parallelize_replicate",
 ]

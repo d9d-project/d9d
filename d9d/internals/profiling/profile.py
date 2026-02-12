@@ -19,12 +19,7 @@ class Profiler:
     """
 
     def __init__(
-            self,
-            save_dir: Path,
-            period_steps: int,
-            warmup_steps: int,
-            active_steps: int,
-            dist_context: DistributedContext
+        self, save_dir: Path, period_steps: int, warmup_steps: int, active_steps: int, dist_context: DistributedContext
     ):
         """
         Constructs a Profiler object.
@@ -69,9 +64,7 @@ class Profiler:
 
         end = time.monotonic()
 
-        self._dist_context.logger.info(
-            f"Finished dumping profiler traces in {end - begin:.2f} seconds"
-        )
+        self._dist_context.logger.info(f"Finished dumping profiler traces in {end - begin:.2f} seconds")
 
     @contextmanager
     def open(self, start_step: int):
@@ -99,14 +92,11 @@ class Profiler:
         active = self._active
 
         with tprof.profile(
-                activities=[
-                    tprof.ProfilerActivity.CPU,
-                    tprof.ProfilerActivity.CUDA
-                ],
-                schedule=tprof.schedule(wait=wait, warmup=warmup, active=active),
-                on_trace_ready=self._dump_trace,
-                record_shapes=True,
-                with_stack=True
+            activities=[tprof.ProfilerActivity.CPU, tprof.ProfilerActivity.CUDA],
+            schedule=tprof.schedule(wait=wait, warmup=warmup, active=active),
+            on_trace_ready=self._dump_trace,
+            record_shapes=True,
+            with_stack=True,
         ) as profiler:
             profiler.step_num = start_step
             yield profiler

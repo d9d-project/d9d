@@ -7,5 +7,5 @@ from .naive import NoCommunicationHandler
 __all__ = [
     "DeepEpCommunicationHandler",
     "ExpertCommunicationHandler",
-    "NoCommunicationHandler"
+    "NoCommunicationHandler",
 ]

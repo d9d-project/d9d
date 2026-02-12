@@ -15,12 +15,7 @@ class OfflinePipelineExecutor(PipelineSchedule):
     used for single-device execution within the pipeline abstraction.
     """
 
-    def __init__(
-            self,
-            model: nn.Module,
-            callback: PipelineLossFn | PipelineResultFn,
-            do_backward: bool
-    ):
+    def __init__(self, model: nn.Module, callback: PipelineLossFn | PipelineResultFn, do_backward: bool):
         """
         Constructs the offline pipeline executor.
 
@@ -35,26 +30,15 @@ class OfflinePipelineExecutor(PipelineSchedule):
         self._do_backward = do_backward
 
     def configure_buffers(
-            self,
-            inputs: dict[str, torch.Tensor],
-            kwargs: dict[str, Any],
-            sharding_spec: PipelineShardingSpec | None
+        self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any], sharding_spec: PipelineShardingSpec | None
     ):
         pass
 
-    def _forward_only(
-            self,
-            inputs: dict[str, torch.Tensor],
-            kwargs: dict[str, Any]
-    ):
+    def _forward_only(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
         result = self._model(**inputs, **kwargs)
         self._callback(result, 0)  # microbatch=0
 
-    def _forward_backward(
-            self,
-            inputs: dict[str, torch.Tensor],
-            kwargs: dict[str, Any]
-    ):
+    def _forward_backward(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
         result = self._model(**inputs, **kwargs)
         loss = self._callback(result, 0)  # microbatch=0
         del result  # do not peak memory

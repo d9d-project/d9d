@@ -43,14 +43,11 @@ def simple_collate(batch):
         (1, 1, [1]),  # Single item
         (2, 3, [2]),  # Less than group size
         (0, 3, []),  # Empty
-    ]
+    ],
 )
 @pytest.mark.local
 def test_iterator_batch_group(num_items, batch_group_size, expected_groups):
-    data = [
-        {"val": torch.tensor(i, device="cpu"), "meta": f"id_{i}"}
-        for i in range(num_items)
-    ]
+    data = [{"val": torch.tensor(i, device="cpu"), "meta": f"id_{i}"} for i in range(num_items)]
     base_iter = iter(data)
     device = torch.tensor(0).to("cuda").device
 
@@ -94,7 +91,7 @@ def test_stateful_loader_checkpointing(tmp_path):
         group_size=group_size,
         batch_size=batch_size,
         collate_fn=simple_collate,
-        shuffle=False
+        shuffle=False,
     )
 
     loader_iter = iter(loader)
@@ -117,7 +114,7 @@ def test_stateful_loader_checkpointing(tmp_path):
         group_size=group_size,
         batch_size=batch_size,
         collate_fn=simple_collate,
-        shuffle=False
+        shuffle=False,
     )
 
     loader_new.load_state_dict(state)
@@ -137,27 +134,16 @@ def test_stateful_loader_checkpointing(tmp_path):
 @pytest.mark.distributed
 def test_dataloader_e2e_integration(dist_ctx_factory, num_workers, pin_memory, persistent_workers):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    batch_maths = MockBatchMaths(
-        data_loader_batch_size=2,
-        num_microbatches_gradient_accumulation=2
-    )
+    batch_maths = MockBatchMaths(data_loader_batch_size=2, num_microbatches_gradient_accumulation=2)
     loading_config = DataLoadingConfig(
-        num_workers=num_workers,
-        pin_memory=pin_memory,
-        persistent_workers=persistent_workers
+        num_workers=num_workers, pin_memory=pin_memory, persistent_workers=persistent_workers
     )
 
     def provider(ctx: InitializeDatasetContext) -> InitializeDatasetResult:
-        return InitializeDatasetResult(
-            dataset=SimpleDataset(64),
-            collator=simple_collate
-        )
+        return InitializeDatasetResult(dataset=SimpleDataset(64), collator=simple_collate)
 
     factory = DataLoaderFactory(
-        dist_context=dist_ctx,
-        provider=provider,
-        config_data_loading=loading_config,
-        batch_maths=batch_maths
+        dist_context=dist_ctx, provider=provider, config_data_loading=loading_config, batch_maths=batch_maths
     )
 
     loader = factory.build_dataloader_for_train_job()
@@ -171,4 +157,4 @@ def test_dataloader_e2e_integration(dist_ctx_factory, num_workers, pin_memory, p
 
     assert len(batches) == 2  # group_size
     assert batches[0].is_cuda
-    assert_close(batches[0], torch.tensor([0., 1.], device="cuda"))
+    assert_close(batches[0], torch.tensor([0.0, 1.0], device="cuda"))

@@ -8,10 +8,7 @@ from d9d.metric.component import MetricAccumulator
 
 
 class BinaryAccuracyMetric(Metric[torch.Tensor]):
-    def __init__(
-        self,
-        threshold: float = 0.5
-    ):
+    def __init__(self, threshold: float = 0.5):
         self._threshold = threshold
 
         self._correct = MetricAccumulator(torch.scalar_tensor(0, dtype=torch.long))
@@ -45,10 +42,7 @@ class BinaryAccuracyMetric(Metric[torch.Tensor]):
         self._total.to(device)
 
     def state_dict(self) -> dict[str, Any]:
-        return {
-            "correct": self._correct.state_dict(),
-            "total": self._total.state_dict()
-        }
+        return {"correct": self._correct.state_dict(), "total": self._total.state_dict()}
 
     def load_state_dict(self, state_dict: dict[str, Any]):
         self._correct.load_state_dict(state_dict["correct"])

@@ -33,11 +33,7 @@ def test_distributed_write_sharding(dist_ctx_factory, shared_tmp_dir):
     dest = shared_tmp_dir / "dist_save"
 
     write_model_state_distributed(
-        dest_dir=dest,
-        mapper=mapper,
-        state_generator=gen,
-        process_group=group,
-        show_progress=False
+        dest_dir=dest, mapper=mapper, state_generator=gen, process_group=group, show_progress=False
     )
 
     dist_ctx.wait_world()
@@ -54,29 +50,22 @@ def test_distributed_write_sharding(dist_ctx_factory, shared_tmp_dir):
                 "tensor_4": "model-00005-of-00008.safetensors",
                 "tensor_5": "model-00006-of-00008.safetensors",
                 "tensor_6": "model-00007-of-00008.safetensors",
-                "tensor_7": "model-00008-of-00008.safetensors"
-            }
+                "tensor_7": "model-00008-of-00008.safetensors",
+            },
         }
 
         loaded_state = read_model_state(
             dest,
             mapper=ModelStateMapperParallel([ModelStateMapperIdentity(f"tensor_{i}") for i in range(8)]),
             device="cpu",
-            show_progress=False
+            show_progress=False,
         )
-        assert dict(loaded_state) == {
-            f"tensor_{i}": torch.scalar_tensor(i, dtype=torch.float32)
-            for i in range(8)
-        }
+        assert dict(loaded_state) == {f"tensor_{i}": torch.scalar_tensor(i, dtype=torch.float32) for i in range(8)}
 
 
 @pytest.mark.distributed
 def test_pipeline_parallel_save(dist_ctx_factory, shared_tmp_dir):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(
-        pipeline_parallel=4,
-        expert_parallel=2,
-        data_parallel_replicate=2
-    ))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=4, expert_parallel=2, data_parallel_replicate=2))
     mesh = dist_ctx.mesh_for(REGULAR_DOMAIN)
     pp_mesh = mesh["pp"]
     global_rank = pp_mesh.get_rank()
@@ -90,12 +79,7 @@ def test_pipeline_parallel_save(dist_ctx_factory, shared_tmp_dir):
     dest = shared_tmp_dir / "pp_save"
 
     save_model_state_pipeline_parallel(
-        dest_dir=dest,
-        mapper=mapper,
-        device_mesh=mesh,
-        pipeline_dim_name="pp",
-        models=[model],
-        show_progress=False
+        dest_dir=dest, mapper=mapper, device_mesh=mesh, pipeline_dim_name="pp", models=[model], show_progress=False
     )
 
     dist_ctx.wait_world()
@@ -108,16 +92,13 @@ def test_pipeline_parallel_save(dist_ctx_factory, shared_tmp_dir):
                 "layer_0.w": "model-00001-of-00004.safetensors",
                 "layer_2.w": "model-00002-of-00004.safetensors",
                 "layer_4.w": "model-00003-of-00004.safetensors",
-                "layer_6.w": "model-00004-of-00004.safetensors"
-            }
+                "layer_6.w": "model-00004-of-00004.safetensors",
+            },
         }
         loaded_state = read_model_state(
             dest,
             mapper=ModelStateMapperParallel([ModelStateMapperIdentity(f"layer_{i}.w") for i in range(0, 8, 2)]),
             device="cpu",
-            show_progress=False
+            show_progress=False,
         )
-        assert dict(loaded_state) == {
-            f"layer_{i}.w": torch.tensor([[i]], dtype=torch.float32)
-            for i in range(0, 8, 2)
-        }
+        assert dict(loaded_state) == {f"layer_{i}.w": torch.tensor([[i]], dtype=torch.float32) for i in range(0, 8, 2)}

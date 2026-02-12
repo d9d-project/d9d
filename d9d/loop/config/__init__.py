@@ -32,5 +32,5 @@ __all__ = [
     "StepActionPeriod",
     "StepActionSpecial",
     "TimeoutConfig",
-    "TrainerConfig"
+    "TrainerConfig",
 ]

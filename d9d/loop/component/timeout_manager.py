@@ -8,6 +8,7 @@ class TimeoutState(StrEnum):
     """
     Represents the lifecycle states of the timeout manager configuration.
     """
+
     none = "none"
     set_initial = "set_initial"
     set_regular = "set_regular"
@@ -22,11 +23,7 @@ class TimeoutManager:
     step execution timeouts.
     """
 
-    def __init__(
-            self,
-            dist_context: DistributedContext,
-            config: TimeoutConfig
-    ):
+    def __init__(self, dist_context: DistributedContext, config: TimeoutConfig):
         """
         Constructs the TimeoutManager object.
 

@@ -76,8 +76,7 @@ class PipelineStateHandler:
         """
 
         self._storage = PipelineStateStorage(
-            sharding_spec={(k,): v for k, v in sharding_spec.items()},
-            num_shards=num_shards
+            sharding_spec={(k,): v for k, v in sharding_spec.items()}, num_shards=num_shards
         )
 
     def global_state(self) -> PipelineState:

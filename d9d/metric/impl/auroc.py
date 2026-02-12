@@ -63,10 +63,7 @@ class BinaryAUROCMetric(Metric[torch.Tensor]):
             https://www.researchgate.net/publication/353020448_Fast_and_memory_efficient_AUC-ROC_approximation_for_Stream_Learning
     """
 
-    def __init__(
-            self,
-            num_bins: int = 10000
-    ):
+    def __init__(self, num_bins: int = 10000):
         """Constructs the BinaryAUROCMetric object.
 
         Args:
@@ -126,10 +123,7 @@ class BinaryAUROCMetric(Metric[torch.Tensor]):
         self._neg_hist.to(device)
 
     def state_dict(self) -> dict[str, Any]:
-        return {
-            "pos_hist": self._pos_hist.state_dict(),
-            "neg_hist": self._neg_hist.state_dict()
-        }
+        return {"pos_hist": self._pos_hist.state_dict(), "neg_hist": self._neg_hist.state_dict()}
 
     def load_state_dict(self, state_dict: dict[str, Any]):
         self._pos_hist.load_state_dict(state_dict["pos_hist"])

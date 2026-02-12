@@ -63,20 +63,16 @@ class StageCommunicationHandler:
     """
 
     def __init__(
-            self,
-
-            name: str,
-            stage_index: int,
-            num_microbatches: int,
-
-            input_stage_index: int | None,
-            input_args: dict[str, torch.Tensor],
-
-            output_stage_index: int | None,
-            output_args: dict[str, torch.Tensor],
-
-            stage_idx_to_host_rank: dict[int, int],
-            group: dist.ProcessGroup
+        self,
+        name: str,
+        stage_index: int,
+        num_microbatches: int,
+        input_stage_index: int | None,
+        input_args: dict[str, torch.Tensor],
+        output_stage_index: int | None,
+        output_args: dict[str, torch.Tensor],
+        stage_idx_to_host_rank: dict[int, int],
+        group: dist.ProcessGroup,
     ):
         """
         Constructs a StageCommunicationHandler object.
@@ -98,23 +94,20 @@ class StageCommunicationHandler:
             stage_index=stage_index,
             num_microbatches=num_microbatches,
             input_stage_index=input_stage_index,
-            input_args=input_args
+            input_args=input_args,
         )
-        self._output_handlers = self._build_outputs(
-            output_stage_index=output_stage_index,
-            output_args=output_args
-        )
+        self._output_handlers = self._build_outputs(output_stage_index=output_stage_index, output_args=output_args)
 
         self._stage_idx_to_host_rank = stage_idx_to_host_rank
         self._group = group
 
     @staticmethod
     def _build_inputs(
-            name: str,
-            stage_index: int,
-            num_microbatches: int,
-            input_stage_index: int | None,
-            input_args: dict[str, torch.Tensor]
+        name: str,
+        stage_index: int,
+        num_microbatches: int,
+        input_stage_index: int | None,
+        input_args: dict[str, torch.Tensor],
     ) -> dict[int, dict[str, StageInput]]:
         handlers: dict[int, dict[str, StageInput]] = {}
 
@@ -131,25 +124,20 @@ class StageCommunicationHandler:
                             input_tensor_meta.size(),
                             dtype=input_tensor_meta.dtype,
                             layout=input_tensor_meta.layout,
-                            device="cuda"  # force device
-                        )
+                            device="cuda",  # force device
+                        ),
                     )
         return handlers
 
     @staticmethod
-    def _build_outputs(
-            output_stage_index: int | None,
-            output_args: dict[str, torch.Tensor]
-    ) -> dict[str, StageOutput]:
+    def _build_outputs(output_stage_index: int | None, output_args: dict[str, torch.Tensor]) -> dict[str, StageOutput]:
         handlers: dict[str, StageOutput] = {}
 
         for output_name in output_args:
             if output_stage_index is None:
                 handlers[output_name] = EndStageOutput()
             else:
-                handlers[output_name] = SendStageOutput(
-                    to_stage=output_stage_index
-                )
+                handlers[output_name] = SendStageOutput(to_stage=output_stage_index)
         return handlers
 
     def set_input_requires_grad_(self, requires_grad: bool):
@@ -184,8 +172,7 @@ class StageCommunicationHandler:
             if not isinstance(handler, ReceiveStageInput):
                 raise RuntimeError("Tried to set a buffer of no-receive stage input")
             prev_requires_grad = handler.buffer.requires_grad
-            handler.buffer = input_value.detach().requires_grad_(
-                prev_requires_grad)
+            handler.buffer = input_value.detach().requires_grad_(prev_requires_grad)
 
     def get_inputs(self, microbatch_index: int) -> dict[str, torch.Tensor]:
         """

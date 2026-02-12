@@ -29,32 +29,23 @@ def _parameter_to_local_grad(parameter: nn.Parameter) -> torch.Tensor:
         return grad
 
 
-def _get_local_norm_pow(
-        parameters: list[nn.Parameter],
-        norm_type: float
-) -> torch.Tensor:
+def _get_local_norm_pow(parameters: list[nn.Parameter], norm_type: float) -> torch.Tensor:
     # calculates for local
 
     if len(parameters) == 0:
         return torch.tensor(0.0, device="cuda")
 
     norm_val = torch.nn.utils.get_total_norm(
-        [_parameter_to_local_grad(x) for x in parameters],
-        norm_type=norm_type,
-        foreach=True,
-        error_if_nonfinite=False
+        [_parameter_to_local_grad(x) for x in parameters], norm_type=norm_type, foreach=True, error_if_nonfinite=False
     )
 
     if math.isinf(norm_type):
         return norm_val
     else:
-        return norm_val ** norm_type
+        return norm_val**norm_type
 
 
-def _get_global_norm_pow_horizontal(
-        parameter_groups: ParametersForNorm,
-        norm_type: float
-) -> torch.Tensor:
+def _get_global_norm_pow_horizontal(parameter_groups: ParametersForNorm, norm_type: float) -> torch.Tensor:
     # calculates for horizontal parallelism
     if len(parameter_groups) == 0:
         return torch.tensor(0.0, device="cuda")
@@ -71,10 +62,7 @@ def _get_global_norm_pow_horizontal(
                 )
             process_group = group.shard_meshes[0].get_group()
             work = dist.all_reduce(
-                local_norm_pow,
-                op=_reduce_op_from_norm_type(norm_type),
-                group=process_group,
-                async_op=True
+                local_norm_pow, op=_reduce_op_from_norm_type(norm_type), group=process_group, async_op=True
             )
             works.append(work)
         norms.append(local_norm_pow)
@@ -91,24 +79,15 @@ def _get_global_norm_pow_horizontal(
 
 
 def _get_global_norm_pow_pp(
-        parameter_groups: ParametersForNorm,
-        norm_type: float,
-        pp_mesh: DeviceMesh | None
+    parameter_groups: ParametersForNorm, norm_type: float, pp_mesh: DeviceMesh | None
 ) -> torch.Tensor:
-    norm = _get_global_norm_pow_horizontal(
-        parameter_groups=parameter_groups,
-        norm_type=norm_type
-    )
+    norm = _get_global_norm_pow_horizontal(parameter_groups=parameter_groups, norm_type=norm_type)
     if pp_mesh is not None:
         dist.all_reduce(norm, op=_reduce_op_from_norm_type(norm_type), group=pp_mesh.get_group())
     return norm
 
 
-def _clip_grad_with_norm_(
-        parameter_groups: ParametersForNorm,
-        max_norm: float,
-        total_norm: torch.Tensor
-):
+def _clip_grad_with_norm_(parameter_groups: ParametersForNorm, max_norm: float, total_norm: torch.Tensor):
     clip_coef = max_norm / (total_norm + 1e-6)
     clip_coef_clamped = torch.clamp(clip_coef, max=1.0)
 
@@ -118,10 +97,7 @@ def _clip_grad_with_norm_(
 
 
 def clip_grad_norm_distributed_(
-        parameter_groups: ParametersForNorm,
-        max_norm: float | None,
-        norm_type: float,
-        pp_mesh: DeviceMesh | None
+    parameter_groups: ParametersForNorm, max_norm: float | None, norm_type: float, pp_mesh: DeviceMesh | None
 ) -> torch.Tensor:
     """
     Clips gradient norms in a fully distributed environment.
@@ -150,9 +126,7 @@ def clip_grad_norm_distributed_(
 
     with record_function("Gradient Clipping"):
         global_norm_pow = _get_global_norm_pow_pp(
-            parameter_groups=parameter_groups,
-            norm_type=norm_type,
-            pp_mesh=pp_mesh
+            parameter_groups=parameter_groups, norm_type=norm_type, pp_mesh=pp_mesh
         )
         if math.isinf(norm_type):
             global_norm = global_norm_pow
@@ -160,10 +134,6 @@ def clip_grad_norm_distributed_(
             global_norm = global_norm_pow ** (1.0 / norm_type)
 
         if max_norm:
-            _clip_grad_with_norm_(
-                parameter_groups,
-                max_norm=max_norm,
-                total_norm=global_norm
-            )
+            _clip_grad_with_norm_(parameter_groups, max_norm=max_norm, total_norm=global_norm)
 
         return global_norm

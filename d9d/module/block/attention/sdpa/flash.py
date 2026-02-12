@@ -14,13 +14,13 @@ class FlashSdpa(nn.Module):
         super().__init__()
 
     def forward(
-            self,
-            query_states: torch.Tensor,
-            key_states: torch.Tensor,
-            value_states: torch.Tensor,
-            attention_mask: torch.Tensor | None,
-            is_causal: bool,
-            scale: float
+        self,
+        query_states: torch.Tensor,
+        key_states: torch.Tensor,
+        value_states: torch.Tensor,
+        attention_mask: torch.Tensor | None,
+        is_causal: bool,
+        scale: float,
     ) -> torch.Tensor:
         """
         Computes Scaled Dot-Product Attention using FlashAttention.
@@ -47,6 +47,6 @@ class FlashSdpa(nn.Module):
                 dropout_p=0.0,
                 is_causal=is_causal,
                 scale=scale,
-                enable_gqa=query_states.shape[1] != key_states.shape[1]
+                enable_gqa=query_states.shape[1] != key_states.shape[1],
             )
             return results.transpose(1, 2).contiguous()

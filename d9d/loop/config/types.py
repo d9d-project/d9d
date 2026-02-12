@@ -10,6 +10,7 @@ class StepActionSpecial(StrEnum):
             very end of the training run.
         disable: Indicates the action should never occur.
     """
+
     last_step = "last_step"
     disable = "disable"
 

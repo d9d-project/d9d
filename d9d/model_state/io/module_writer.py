@@ -35,10 +35,14 @@ def _augment_mapper_for_extraction(models: list[nn.Module], mapper: ModelStateMa
     current_state_dict = {}
     for model in models:
         current_state_dict.update(model.state_dict())
-    mapper = ModelStateMapperSequential([
-        ModelStateMapperParallel([_build_extraction_mapper(name, current_state_dict[name]) for name in states_to_save]),
-        mapper
-    ])
+    mapper = ModelStateMapperSequential(
+        [
+            ModelStateMapperParallel(
+                [_build_extraction_mapper(name, current_state_dict[name]) for name in states_to_save]
+            ),
+            mapper,
+        ]
+    )
     return mapper
 
 
@@ -48,11 +52,7 @@ def _state_generator(models: list[nn.Module]) -> Iterable[tuple[str, torch.Tenso
 
 
 def save_model_state(
-        dest_dir: Path,
-        mapper: ModelStateMapper,
-        model: nn.Module,
-        shard_size_gb: float = 4.0,
-        show_progress: bool = True
+    dest_dir: Path, mapper: ModelStateMapper, model: nn.Module, shard_size_gb: float = 4.0, show_progress: bool = True
 ):
     """
     High-level utility to save a PyTorch model to disk on a **single** process.
@@ -74,18 +74,18 @@ def save_model_state(
         mapper=_augment_mapper_for_extraction([model], mapper),
         state_generator=_state_generator([model]),
         shard_size_gb=shard_size_gb,
-        show_progress=show_progress
+        show_progress=show_progress,
     )
 
 
 def save_model_state_pipeline_parallel(
-        dest_dir: Path,
-        mapper: ModelStateMapper,
-        device_mesh: DeviceMesh,
-        pipeline_dim_name: str,
-        models: list[nn.Module],
-        shard_size_gb: float = 4.0,
-        show_progress: bool = True
+    dest_dir: Path,
+    mapper: ModelStateMapper,
+    device_mesh: DeviceMesh,
+    pipeline_dim_name: str,
+    models: list[nn.Module],
+    shard_size_gb: float = 4.0,
+    show_progress: bool = True,
 ):
     """
     High-level utility to save a model in a Distributed Pipeline Parallel environment to disk.
@@ -119,5 +119,5 @@ def save_model_state_pipeline_parallel(
         device_mesh=device_mesh,
         pipeline_dim_name=pipeline_dim_name,
         shard_size_gb=shard_size_gb,
-        show_progress=show_progress
+        show_progress=show_progress,
     )

@@ -14,5 +14,5 @@ __all__ = [
     "CurvePoly",
     "PiecewiseSchedulerConfig",
     "piecewise_schedule",
-    "piecewise_scheduler_from_config"
+    "piecewise_scheduler_from_config",
 ]

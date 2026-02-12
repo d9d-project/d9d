@@ -30,12 +30,7 @@ def _new_random_case(seed: int, size: int, num_bins: int = 10000):
     return MetricCase(
         factory_fn=lambda: BinaryAUROCMetric(num_bins=num_bins),
         initial_expect=torch.tensor(0.5),
-        steps=[
-            MetricStep(
-                [MetricParams(preds, labels)],
-                expect=expect_rnd
-            )
-        ]
+        steps=[MetricStep([MetricParams(preds, labels)], expect=expect_rnd)],
     )
 
 
@@ -62,12 +57,7 @@ def _new_random_distributed_case(seed: int, size: int, num_bins: int = 10000, nu
     return MetricCase(
         factory_fn=lambda: BinaryAUROCMetric(num_bins=num_bins),
         initial_expect=torch.tensor(0.5),
-        steps=[
-            MetricStep(
-                params_per_rank=params_per_rank,
-                expect=expect_global
-            )
-        ]
+        steps=[MetricStep(params_per_rank=params_per_rank, expect=expect_global)],
     )
 
 
@@ -81,17 +71,11 @@ def _new_random_distributed_case(seed: int, size: int, num_bins: int = 10000, nu
             initial_expect=torch.tensor(0.5),
             steps=[
                 # Step 1: Only Negatives
-                MetricStep(
-                    [MetricParams(torch.tensor([0.1, 0.2]), torch.tensor([0, 0]))],
-                    expect=torch.tensor(0.5)
-                ),
+                MetricStep([MetricParams(torch.tensor([0.1, 0.2]), torch.tensor([0, 0]))], expect=torch.tensor(0.5)),
                 # Step 2: Add Positives (Now we have valid AUROC)
                 # Preds: [0.1, 0.2, 0.8, 0.9], Labels: [0, 0, 1, 1] -> Perfect AUC
-                MetricStep(
-                    [MetricParams(torch.tensor([0.8, 0.9]), torch.tensor([1, 1]))],
-                    expect=torch.tensor(1.0)
-                )
-            ]
+                MetricStep([MetricParams(torch.tensor([0.8, 0.9]), torch.tensor([1, 1]))], expect=torch.tensor(1.0)),
+            ],
         ),
         # Edge Case - Start with 1, then 0
         MetricCase(
@@ -99,49 +83,31 @@ def _new_random_distributed_case(seed: int, size: int, num_bins: int = 10000, nu
             initial_expect=torch.tensor(0.5),
             steps=[
                 # Step 1: Only Positives
-                MetricStep(
-                    [MetricParams(torch.tensor([0.1, 0.2]), torch.tensor([1, 1]))],
-                    expect=torch.tensor(0.5)
-                ),
+                MetricStep([MetricParams(torch.tensor([0.1, 0.2]), torch.tensor([1, 1]))], expect=torch.tensor(0.5)),
                 # Step 2: Add Negatives (Now we have valid AUROC)
                 # Preds: [0.1, 0.2, 0.8, 0.9], Labels: [0, 0, 1, 1] -> Perfect AUC
-                MetricStep(
-                    [MetricParams(torch.tensor([0.8, 0.9]), torch.tensor([0, 0]))],
-                    expect=torch.tensor(0.0)
-                )
-            ]
+                MetricStep([MetricParams(torch.tensor([0.8, 0.9]), torch.tensor([0, 0]))], expect=torch.tensor(0.0)),
+            ],
         ),
         # Edge Case - All 0
         MetricCase(
             factory_fn=BinaryAUROCMetric,
             initial_expect=torch.tensor(0.5),
             steps=[
-                MetricStep(
-                    [MetricParams(torch.tensor([0.1, 0.2]), torch.tensor([0, 0]))],
-                    expect=torch.tensor(0.5)
-                ),
-                MetricStep(
-                    [MetricParams(torch.tensor([0.8, 0.9]), torch.tensor([0, 0]))],
-                    expect=torch.tensor(0.5)
-                )
-            ]
+                MetricStep([MetricParams(torch.tensor([0.1, 0.2]), torch.tensor([0, 0]))], expect=torch.tensor(0.5)),
+                MetricStep([MetricParams(torch.tensor([0.8, 0.9]), torch.tensor([0, 0]))], expect=torch.tensor(0.5)),
+            ],
         ),
         # Edge Case - All 1
         MetricCase(
             factory_fn=BinaryAUROCMetric,
             initial_expect=torch.tensor(0.5),
             steps=[
-                MetricStep(
-                    [MetricParams(torch.tensor([0.1, 0.2]), torch.tensor([1, 1]))],
-                    expect=torch.tensor(0.5)
-                ),
-                MetricStep(
-                    [MetricParams(torch.tensor([0.8, 0.9]), torch.tensor([1, 1]))],
-                    expect=torch.tensor(0.5)
-                )
-            ]
+                MetricStep([MetricParams(torch.tensor([0.1, 0.2]), torch.tensor([1, 1]))], expect=torch.tensor(0.5)),
+                MetricStep([MetricParams(torch.tensor([0.8, 0.9]), torch.tensor([1, 1]))], expect=torch.tensor(0.5)),
+            ],
         ),
-    ]
+    ],
 )
 @pytest.mark.local
 def test_local(case: MetricCase, device: str):
@@ -149,26 +115,14 @@ def test_local(case: MetricCase, device: str):
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
-@pytest.mark.parametrize(
-    "case",
-    [
-        _new_random_case(seed=42, size=10 ** i)
-        for i in range(5)
-    ]
-)
+@pytest.mark.parametrize("case", [_new_random_case(seed=42, size=10**i) for i in range(5)])
 @pytest.mark.local
 def test_local_random(case: MetricCase, device: str):
     assert_metric_local(case, device, atol=1e-4, rtol=1.3e-6)
 
 
 @pytest.mark.parametrize("device", ["cpu", "cuda"])
-@pytest.mark.parametrize(
-    "case",
-    [
-        _new_random_case(seed=42, size=10 ** i, num_bins=100000)
-        for i in range(5)
-    ]
-)
+@pytest.mark.parametrize("case", [_new_random_case(seed=42, size=10**i, num_bins=100000) for i in range(5)])
 @pytest.mark.local
 def test_local_random_precise(case: MetricCase, device: str):
     assert_metric_local(case, device, atol=1e-5, rtol=1.3e-6)
@@ -179,7 +133,7 @@ def test_local_random_precise(case: MetricCase, device: str):
     [
         _new_random_distributed_case(seed=42, size=100),
         _new_random_distributed_case(seed=43, size=1000),
-    ]
+    ],
 )
 @pytest.mark.distributed
 def test_distributed_random(dist_ctx_factory, case: MetricCase):
@@ -190,7 +144,7 @@ def test_distributed_random(dist_ctx_factory, case: MetricCase):
     "case",
     [
         _new_random_distributed_case(seed=42, size=2000, num_bins=100000),
-    ]
+    ],
 )
 @pytest.mark.distributed
 def test_distributed_random_precise(dist_ctx_factory, case: MetricCase):

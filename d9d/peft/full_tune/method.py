@@ -33,10 +33,7 @@ class FullTune(PeftMethod[FullTuneConfig]):
             if is_applicable:
                 params_to_train.extend(mod.parameters())
 
-        return PeftInjectionResult(
-            parameters_to_train=params_to_train,
-            load_state_mappers=[]
-        )
+        return PeftInjectionResult(parameters_to_train=params_to_train, load_state_mappers=[])
 
     def merge(self, module: nn.Module):
         pass  # do nothing here

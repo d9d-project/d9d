@@ -11,5 +11,5 @@ __all__ = [
     "DualPipeVPipelineProgramBuilder",
     "Interleaved1F1BPipelineProgramBuilder",
     "LoopedBFSPipelineProgramBuilder",
-    "ZeroBubbleVPipelineProgramBuilder"
+    "ZeroBubbleVPipelineProgramBuilder",
 ]

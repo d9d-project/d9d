@@ -46,8 +46,7 @@ class CurvePolyConfig(BaseModel):
 
 
 AnyCurveConfig = Annotated[
-    CurveLinearConfig | CurveCosineConfig | CurveExponentialConfig | CurvePolyConfig,
-    Field(discriminator="type")
+    CurveLinearConfig | CurveCosineConfig | CurveExponentialConfig | CurvePolyConfig, Field(discriminator="type")
 ]
 
 
@@ -125,10 +124,7 @@ class RestPhaseConfig(BaseModel):
     curve: AnyCurveConfig
 
 
-PhaseConfig = Annotated[
-    StepPhaseConfig | PercentagePhaseConfig | RestPhaseConfig,
-    Field(discriminator="mode")
-]
+PhaseConfig = Annotated[StepPhaseConfig | PercentagePhaseConfig | RestPhaseConfig, Field(discriminator="mode")]
 
 
 class PiecewiseSchedulerConfig(BaseModel):
@@ -145,9 +141,7 @@ class PiecewiseSchedulerConfig(BaseModel):
 
 
 def piecewise_scheduler_from_config(
-        config: PiecewiseSchedulerConfig,
-        optimizer: Optimizer,
-        total_steps: int | None
+    config: PiecewiseSchedulerConfig, optimizer: Optimizer, total_steps: int | None
 ) -> LRSchedulerProtocol:
     """
     Constructs a PyTorch scheduler from the provided configuration.

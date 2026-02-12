@@ -40,12 +40,12 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         self._enable_zero_bubble = enable_zero_bubble
 
     def _get_warmup_ops(
-            self,
-            rank: int,
-            microbatches_per_round: int,
-            pp_size: int,
-            n_microbatches: int,
-            multiply_factor: int,
+        self,
+        rank: int,
+        microbatches_per_round: int,
+        pp_size: int,
+        n_microbatches: int,
+        multiply_factor: int,
     ) -> int:
         """
         Calculates the number of warmup steps required before entering steady state.
@@ -54,9 +54,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         warmup_ops = warmups_ops_last_stage + multiply_factor * ((pp_size - 1) - rank)
         return min(warmup_ops, n_microbatches * self._num_stages_per_rank)
 
-    def compose(
-            self, num_microbatches: int, pp_size: int
-    ) -> dict[int, list[ActionBase]]:
+    def compose(self, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:
         """
         Generates the execution program for all ranks.
 
@@ -72,8 +70,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
 
         if num_stages % pp_size != 0:
             raise ValueError(
-                f"num_stages ({num_stages}) must be divisible by pp_size ({pp_size}) "
-                "for interleaved schedules."
+                f"num_stages ({num_stages}) must be divisible by pp_size ({pp_size}) for interleaved schedules."
             )
 
         # 1. Topology Setup
@@ -85,9 +82,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         num_rounds = max(1, num_microbatches // pp_size)
 
         if num_microbatches % num_rounds != 0:
-            raise ValueError(
-                f"microbatches ({num_microbatches}) must be divisible by rounds ({num_rounds})."
-            )
+            raise ValueError(f"microbatches ({num_microbatches}) must be divisible by rounds ({num_rounds}).")
 
         microbatches_per_round = num_microbatches // num_rounds
 
@@ -114,12 +109,12 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         )
 
     def _generate_rank_schedule(  # noqa: C901
-            self,
-            rank: int,
-            pp_size: int,
-            n_microbatches: int,
-            microbatches_per_round: int,
-            multiply_factor: int,
+        self,
+        rank: int,
+        pp_size: int,
+        n_microbatches: int,
+        microbatches_per_round: int,
+        multiply_factor: int,
     ) -> list[ActionBase]:
         """
         Generates the sequential list of compute actions for a specific rank.
@@ -145,9 +140,11 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
             return (op_idx // microbatches_per_round) % self._num_stages_per_rank
 
         def get_bwd_local_idx(op_idx: int, warmup_offset: int) -> int:
-            return (self._num_stages_per_rank
-                    - 1
-                    - ((op_idx - warmup_offset) // microbatches_per_round) % self._num_stages_per_rank)
+            return (
+                self._num_stages_per_rank
+                - 1
+                - ((op_idx - warmup_offset) // microbatches_per_round) % self._num_stages_per_rank
+            )
 
         def emit_forward(op_idx: int):
             local_idx = get_fwd_local_idx(op_idx)
@@ -167,11 +164,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
             is_full = not self._enable_zero_bubble
 
             rank_actions.append(
-                BackwardFullInputComputeAction(
-                    stage_idx=stage,
-                    microbatch_idx=mb,
-                    full_backward=is_full
-                )
+                BackwardFullInputComputeAction(stage_idx=stage, microbatch_idx=mb, full_backward=is_full)
             )
 
             if self._enable_zero_bubble:
@@ -187,15 +180,11 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
             # The earliest reasonable time to start weaving in weights is proportional to rank depth
             if steps_into_1f1b >= rank:
                 w_stage, w_mb = pending_weights.popleft()
-                rank_actions.append(
-                    BackwardWeightComputeAction(stage_idx=w_stage, microbatch_idx=w_mb)
-                )
+                rank_actions.append(BackwardWeightComputeAction(stage_idx=w_stage, microbatch_idx=w_mb))
 
         # -- Execution Phase Math --
 
-        warmup_ops = self._get_warmup_ops(
-            rank, microbatches_per_round, pp_size, n_microbatches, multiply_factor
-        )
+        warmup_ops = self._get_warmup_ops(rank, microbatches_per_round, pp_size, n_microbatches, multiply_factor)
         total_microbatch_ops = self._num_stages_per_rank * n_microbatches
         fwd_bwd_ops = total_microbatch_ops - warmup_ops
         cooldown_ops = total_microbatch_ops - fwd_bwd_ops
@@ -206,7 +195,6 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         # -- Main Schedule Loop --
 
         for op in range(total_ops):
-
             # Phase 1: Warmup (Forward Only)
             if op < warmup_ops:
                 emit_forward(op)
@@ -225,9 +213,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         # -- Post-Loop: Flush Remaining Weights (ZB only) --
         while pending_weights:
             w_stage, w_mb = pending_weights.popleft()
-            rank_actions.append(
-                BackwardWeightComputeAction(stage_idx=w_stage, microbatch_idx=w_mb)
-            )
+            rank_actions.append(BackwardWeightComputeAction(stage_idx=w_stage, microbatch_idx=w_mb))
 
         return rank_actions
 

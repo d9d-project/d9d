@@ -19,11 +19,7 @@ class LoRALinear(nn.Module):
         dropout: Scaling dropout layer.
     """
 
-    def __init__(
-            self,
-            base_layer: nn.Linear,
-            params: LoRAParameters
-    ):
+    def __init__(self, base_layer: nn.Linear, params: LoRAParameters):
         """
         Constructs a LoRALinear layer.
 
@@ -37,14 +33,14 @@ class LoRALinear(nn.Module):
 
         super().__init__()
         self.lora_A = nn.Linear(
-            base_layer.in_features, params.r, bias=False,
-            device=base_layer.weight.device,
-            dtype=base_layer.weight.dtype
+            base_layer.in_features, params.r, bias=False, device=base_layer.weight.device, dtype=base_layer.weight.dtype
         )
         self.lora_B = nn.Linear(
-            params.r, base_layer.out_features, bias=False,
+            params.r,
+            base_layer.out_features,
+            bias=False,
             device=base_layer.weight.device,
-            dtype=base_layer.weight.dtype
+            dtype=base_layer.weight.dtype,
         )
         self.base = base_layer
 
@@ -105,11 +101,7 @@ class LoRAGroupedLinear(nn.Module):
         dropout: Scaling dropout layer.
     """
 
-    def __init__(
-            self,
-            base_layer: GroupedLinear,
-            params: LoRAParameters
-    ):
+    def __init__(self, base_layer: GroupedLinear, params: LoRAParameters):
         """
         Constructs a LoRAGroupedLinear layer.
 
@@ -120,16 +112,18 @@ class LoRAGroupedLinear(nn.Module):
 
         super().__init__()
         self.lora_A = GroupedLinear(
-            base_layer.n_groups, base_layer.in_features, params.r,
+            base_layer.n_groups,
+            base_layer.in_features,
+            params.r,
             device=base_layer.weight.device,
-            dtype=base_layer.weight.dtype
+            dtype=base_layer.weight.dtype,
         )
         self.lora_B = GroupedLinear(
             base_layer.n_groups,
             params.r,
             base_layer.out_features,
             device=base_layer.weight.device,
-            dtype=base_layer.weight.dtype
+            dtype=base_layer.weight.dtype,
         )
         self.base = base_layer
 

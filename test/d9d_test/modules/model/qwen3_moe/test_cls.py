@@ -53,7 +53,7 @@ def build_hf_cls_model(num_labels=3) -> Qwen3MoeForSequenceClassification:
             router_aux_loss_coef=0.0,
             _attn_implementation="sdpa",
             num_labels=num_labels,
-            pad_token_id=_PAD_TOKEN_ID
+            pad_token_id=_PAD_TOKEN_ID,
         )
     ).cuda()
 
@@ -79,24 +79,28 @@ def build_my_cls_model(stage: PipelineStageInfo, checkpointing: bool, num_labels
                 num_attention_heads=4,
                 num_key_value_heads=4,
                 rms_norm_eps=1e-5,
-                head_dim=32
+                head_dim=32,
             ),
             rope_base=10_000,
             max_position_ids=15000,
             num_hidden_layers=2,
             split_vocab_size={"a": 100},
-            split_vocab_order=["a"]
+            split_vocab_order=["a"],
         ),
         num_labels=num_labels,
-        classifier_dropout=0.0
+        classifier_dropout=0.0,
     )
 
-    model = Qwen3MoEForClassification(
-        params=params,
-        stage=stage,
-        hidden_states_snapshot_mode=HiddenStatesAggregationMode.no,
-        enable_checkpointing=checkpointing
-    ).cuda().bfloat16()
+    model = (
+        Qwen3MoEForClassification(
+            params=params,
+            stage=stage,
+            hidden_states_snapshot_mode=HiddenStatesAggregationMode.no,
+            enable_checkpointing=checkpointing,
+        )
+        .cuda()
+        .bfloat16()
+    )
     model.reset_parameters()
     return model
 
@@ -136,20 +140,11 @@ def test_consistent_to_hf(checkpointing):
     input_ids, attention_mask, position_ids, labels = build_inputs_cls()
 
     with sdpa_kernel(SDPBackend.CUDNN_ATTENTION):
-        outs_hf = hf(
-            input_ids=input_ids,
-            attention_mask=attention_mask,
-            position_ids=position_ids,
-            labels=labels
-        )
+        outs_hf = hf(input_ids=input_ids, attention_mask=attention_mask, position_ids=position_ids, labels=labels)
 
     pooling_mask = token_pooling_mask_from_attention_mask(attention_mask, TokenPoolingType.last)
 
-    outs_my = my(
-        input_ids=input_ids,
-        position_ids=position_ids,
-        pooling_mask=pooling_mask
-    )
+    outs_my = my(input_ids=input_ids, position_ids=position_ids, pooling_mask=pooling_mask)
 
     loss_fct = nn.CrossEntropyLoss()
     my_scores = outs_my["scores"]
@@ -167,11 +162,11 @@ def test_consistent_to_hf(checkpointing):
 
 
 def _build_distributed_cls_model(
-        stage: PipelineStageInfo,
-        dist_ctx: DistributedContext,
-        local_model: nn.Module,
-        stage_memo: list,
-        checkpointing: bool
+    stage: PipelineStageInfo,
+    dist_ctx: DistributedContext,
+    local_model: nn.Module,
+    stage_memo: list,
+    checkpointing: bool,
 ):
     model = build_my_cls_model(stage=stage, checkpointing=checkpointing, num_labels=3)
 
@@ -183,27 +178,30 @@ def _build_distributed_cls_model(
 
 
 def _shard_virtual_dp(tensor: torch.Tensor, dist_ctx: DistributedContext) -> torch.Tensor:
-    return DTensor.from_local(
-        tensor,
-        device_mesh=dist_ctx.mesh_for(BATCH_DOMAIN)["dp"],
-        placements=[Replicate()]
-    ).redistribute(placements=(Shard(0),)).to_local()
+    return (
+        DTensor.from_local(tensor, device_mesh=dist_ctx.mesh_for(BATCH_DOMAIN)["dp"], placements=[Replicate()])
+        .redistribute(placements=(Shard(0),))
+        .to_local()
+    )
 
 
 @pytest.mark.distributed
 @pytest.mark.parametrize("checkpointing", [True, False])
-@pytest.mark.parametrize("mesh", [
-    # PP + DPR / EP
-    DeviceMeshParameters(
-        pipeline_parallel=2,
-        expert_parallel=4,
-        tensor_parallel=1,
-        context_parallel_shard=1,
-        data_parallel_shard=1,
-        data_parallel_replicate=4,
-        context_parallel_replicate=1
-    ),
-])
+@pytest.mark.parametrize(
+    "mesh",
+    [
+        # PP + DPR / EP
+        DeviceMeshParameters(
+            pipeline_parallel=2,
+            expert_parallel=4,
+            tensor_parallel=1,
+            context_parallel_shard=1,
+            data_parallel_shard=1,
+            data_parallel_replicate=4,
+            context_parallel_replicate=1,
+        ),
+    ],
+)
 def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
     dist_ctx = dist_ctx_factory(mesh)
     stage_memo = []
@@ -216,11 +214,7 @@ def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
 
     pooling_mask = token_pooling_mask_from_attention_mask(attention_mask, TokenPoolingType.last)
 
-    outs_local = local(
-        input_ids=input_ids,
-        position_ids=position_ids,
-        pooling_mask=pooling_mask
-    )
+    outs_local = local(input_ids=input_ids, position_ids=position_ids, pooling_mask=pooling_mask)
 
     loss_fct = nn.CrossEntropyLoss()
 
@@ -245,20 +239,13 @@ def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
         n_microbatches=2,
         schedule_config=PipelineScheduleGPipeConfig(),
         model_provider=lambda stg: _build_distributed_cls_model(
-            stage=stg,
-            dist_ctx=dist_ctx,
-            stage_memo=stage_memo,
-            local_model=local,
-            checkpointing=checkpointing
+            stage=stg, dist_ctx=dist_ctx, stage_memo=stage_memo, local_model=local, checkpointing=checkpointing
         ),
-        callback=_loss_fn
+        callback=_loss_fn,
     )
 
     inputs_dist = {"input_ids": input_ids_dist}
-    kwargs_dist = {
-        "position_ids": position_ids_dist,
-        "pooling_mask": pooling_mask_dist
-    }
+    kwargs_dist = {"position_ids": position_ids_dist, "pooling_mask": pooling_mask_dist}
 
     schedule.schedule.configure_buffers(inputs_dist, kwargs_dist, sharding_spec=PipelineShardingSpec())
 
@@ -277,7 +264,4 @@ def test_consistent_to_itself_dist(mesh, checkpointing, dist_ctx_factory):
 
     for stage_model in stage_memo:
         sync_grads_manually(stage_model)
-        check_grad_distance_all_local_dist(
-            local=local,
-            dist=stage_model
-        )
+        check_grad_distance_all_local_dist(local=local, dist=stage_model)

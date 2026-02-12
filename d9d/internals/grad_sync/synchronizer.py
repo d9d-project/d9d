@@ -39,9 +39,7 @@ def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
 
     # we are sure that device mesh contain dim names so we cast(...)
     mesh_dim_names = cast(tuple[str, ...], device_mesh.mesh_dim_names)
-    reduce_mesh = device_mesh[tuple(
-        mesh_dim_names[dim_i] for dim_i in reduce_dims
-    )]
+    reduce_mesh = device_mesh[tuple(mesh_dim_names[dim_i] for dim_i in reduce_dims)]
 
     return reduce_mesh
 
@@ -59,7 +57,7 @@ class _ParameterGroupMarker:
 
 
 def _group_params_for_buckets(
-        param_groups: list[list[nn.Parameter]]
+    param_groups: list[list[nn.Parameter]],
 ) -> dict[_ParameterGroupMarker, list[nn.Parameter]]:
     """
     Sorts parameters into groups based on their synchronization requirements.
@@ -84,10 +82,7 @@ def _group_params_for_buckets(
                 reduce_mesh = None
 
             group = _ParameterGroupMarker(
-                group_i=param_group_i,
-                reduce_mesh=reduce_mesh,
-                device=param.data.device,
-                grad_dtype=param.grad_dtype
+                group_i=param_group_i, reduce_mesh=reduce_mesh, device=param.data.device, grad_dtype=param.grad_dtype
             )
 
             regrouped_params[group].append(param)
@@ -96,10 +91,10 @@ def _group_params_for_buckets(
 
 
 def _make_bucket(
-        require_accumulations: int,
-        group_marker: _ParameterGroupMarker,
-        parameters: list[nn.Parameter],
-        communicate_stream: torch.cuda.Stream
+    require_accumulations: int,
+    group_marker: _ParameterGroupMarker,
+    parameters: list[nn.Parameter],
+    communicate_stream: torch.cuda.Stream,
 ) -> AbstractGradientBucket:
     """
     Factory function to create the appropriate bucket type.
@@ -117,15 +112,15 @@ def _make_bucket(
             device=group_marker.device,
             grad_dtype=group_marker.grad_dtype,
             reduce_mesh=group_marker.reduce_mesh,
-            communicate_stream=communicate_stream
+            communicate_stream=communicate_stream,
         )
 
 
 def _fill_buckets(
-        param_groups: dict[_ParameterGroupMarker, list[nn.Parameter]],
-        bucket_size_mb: int,
-        require_accumulations: int,
-        communicate_stream: torch.cuda.Stream
+    param_groups: dict[_ParameterGroupMarker, list[nn.Parameter]],
+    bucket_size_mb: int,
+    require_accumulations: int,
+    communicate_stream: torch.cuda.Stream,
 ) -> list[AbstractGradientBucket]:
     """
     Splits grouped parameters into buckets based on size constraints.
@@ -151,12 +146,14 @@ def _fill_buckets(
         for param in param_group:
             param_bytes = param.numel() * param.element_size()
             if current_bucket_size + param_bytes >= bucket_size and unfinished_bucket:
-                buckets.append(_make_bucket(
-                    require_accumulations=require_accumulations,
-                    group_marker=param_group_marker,
-                    parameters=unfinished_bucket,
-                    communicate_stream=communicate_stream
-                ))
+                buckets.append(
+                    _make_bucket(
+                        require_accumulations=require_accumulations,
+                        group_marker=param_group_marker,
+                        parameters=unfinished_bucket,
+                        communicate_stream=communicate_stream,
+                    )
+                )
                 unfinished_bucket = []
                 current_bucket_size = 0
 
@@ -164,12 +161,14 @@ def _fill_buckets(
             current_bucket_size += param_bytes
 
         if unfinished_bucket:
-            buckets.append(_make_bucket(
-                require_accumulations=require_accumulations,
-                group_marker=param_group_marker,
-                parameters=unfinished_bucket,
-                communicate_stream=communicate_stream
-            ))
+            buckets.append(
+                _make_bucket(
+                    require_accumulations=require_accumulations,
+                    group_marker=param_group_marker,
+                    parameters=unfinished_bucket,
+                    communicate_stream=communicate_stream,
+                )
+            )
     return buckets
 
 
@@ -182,12 +181,7 @@ class GradientSynchronizer:
     during the backward pass.
     """
 
-    def __init__(
-            self,
-            param_groups: list[list[nn.Parameter]],
-            bucket_size_mb: int,
-            require_accumulations: int
-    ):
+    def __init__(self, param_groups: list[list[nn.Parameter]], bucket_size_mb: int, require_accumulations: int):
         """
         Constructs a GradientSynchronizer.
 
@@ -219,7 +213,7 @@ class GradientSynchronizer:
             _group_params_for_buckets(self._param_groups),
             bucket_size_mb=self._bucket_size_mb,
             require_accumulations=self._require_accumulations,
-            communicate_stream=stream
+            communicate_stream=stream,
         )
 
         for bucket in self._buckets:

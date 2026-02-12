@@ -56,11 +56,11 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
     """
 
     def __init__(
-            self,
-            base_dataset: DatasetImplementingSortKeyProtocol[_T_co],
-            buffer_size: int,
-            pack_size: int,
-            init_seed: int | None = None
+        self,
+        base_dataset: DatasetImplementingSortKeyProtocol[_T_co],
+        buffer_size: int,
+        pack_size: int,
+        init_seed: int | None = None,
     ):
         """
         Args:
@@ -92,10 +92,7 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
         local_idx = list(range(len(base_idx)))
         local_idx.sort(key=lambda i: sort_keys[i])
 
-        local_idx_packs = [
-            local_idx[i: i + self._pack_size]
-            for i in range(0, len(local_idx), self._pack_size)
-        ]
+        local_idx_packs = [local_idx[i : i + self._pack_size] for i in range(0, len(local_idx), self._pack_size)]
 
         self._rng.shuffle(local_idx_packs)
 

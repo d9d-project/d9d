@@ -43,23 +43,17 @@ class PipelineModel(nn.Module, ModuleSupportsPipelining):
         r = r @ self.w2
         r = self.act(r) + y
         r = CustomMatmul.apply(r, self.w3, GradDirection.inputs, GradDirection.weight)
-        return {
-            "x": r
-        }
+        return {"x": r}
 
     def infer_stage_inputs_from_pipeline_inputs(
-            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+        self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
-        return {
-            "x": torch.empty((inputs["x"].shape[0] // n_microbatches, 8))
-        }
+        return {"x": torch.empty((inputs["x"].shape[0] // n_microbatches, 8))}
 
     def infer_stage_outputs_from_pipeline_inputs(
-            self, inputs: dict[str, torch.Tensor], n_microbatches: int
+        self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
-        return {
-            "x": torch.empty((inputs["x"].shape[0] // n_microbatches, 8))
-        }
+        return {"x": torch.empty((inputs["x"].shape[0] // n_microbatches, 8))}
 
 
 def register_pp_hooks(model: PipelineModel) -> dict[str, int]:
@@ -102,7 +96,7 @@ def _snapshot_grad(model: PipelineModel, x: torch.Tensor, y: torch.Tensor) -> di
         "y": extract_grad(y),
         "w1": extract_grad(model.w1),
         "w2": extract_grad(model.w2),
-        "w3": extract_grad(model.w3)
+        "w3": extract_grad(model.w3),
     }
 
 

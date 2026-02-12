@@ -6,9 +6,8 @@ asynchronous reduction, similar to DistributedDataParallel but exposed
 for internal framework usage with DTensors.
 """
 
-
 from .synchronizer import GradientSynchronizer
 
 __all__ = [
-    "GradientSynchronizer"
+    "GradientSynchronizer",
 ]

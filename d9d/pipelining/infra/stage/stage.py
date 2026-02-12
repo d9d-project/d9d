@@ -20,11 +20,11 @@ class PipelineStage:
     """
 
     def __init__(
-            self,
-            info: PipelineStageInfo,
-            module: nn.Module,
-            group: dist.ProcessGroup,
-            stage_to_host_topology: dict[int, int]
+        self,
+        info: PipelineStageInfo,
+        module: nn.Module,
+        group: dist.ProcessGroup,
+        stage_to_host_topology: dict[int, int],
     ):
         """
         Constructs a PipelineStage object.
@@ -46,25 +46,14 @@ class PipelineStage:
         self._forward_comm: StageCommunicationHandler | None = None
         self._backward_comm: StageCommunicationHandler | None = None
 
-        self._forward_comp = ForwardComputeHandler(
-            stage_index=info.current_stage,
-            module=module
-        )
-        self._backward_comp = BackwardComputeHandler(
-            stage_index=info.current_stage,
-            module=module
-        )
+        self._forward_comp = ForwardComputeHandler(stage_index=info.current_stage, module=module)
+        self._backward_comp = BackwardComputeHandler(stage_index=info.current_stage, module=module)
 
     @property
     def info(self) -> PipelineStageInfo:
         return self._info
 
-    def configure_buffers(
-            self,
-            num_microbatches: int,
-            has_backward: bool,
-            pipeline_inputs: dict[str, torch.Tensor]
-    ):
+    def configure_buffers(self, num_microbatches: int, has_backward: bool, pipeline_inputs: dict[str, torch.Tensor]):
         """
         Initializes the communication handlers and buffers for the stage.
 
@@ -85,12 +74,10 @@ class PipelineStage:
             if not isinstance(self._module, ModuleSupportsPipelining):
                 raise TypeError("Module does not implement ModuleSupportsPipelining protocol")
             inputs_meta = self._module.infer_stage_inputs_from_pipeline_inputs(
-                inputs=pipeline_inputs,
-                n_microbatches=num_microbatches
+                inputs=pipeline_inputs, n_microbatches=num_microbatches
             )
             outputs_meta = self._module.infer_stage_outputs_from_pipeline_inputs(
-                inputs=pipeline_inputs,
-                n_microbatches=num_microbatches
+                inputs=pipeline_inputs, n_microbatches=num_microbatches
             )
 
         self._forward_comm = StageCommunicationHandler(
@@ -102,7 +89,7 @@ class PipelineStage:
             output_stage_index=next_stage_idx,
             output_args=outputs_meta,
             group=self._group,
-            stage_idx_to_host_rank=self._stage_to_host_topology
+            stage_idx_to_host_rank=self._stage_to_host_topology,
         )
         self._forward_comm.set_input_requires_grad_(requires_grad=has_backward)
 
@@ -118,7 +105,7 @@ class PipelineStage:
                 output_stage_index=prev_stage_idx,
                 output_args=inputs_meta,
                 group=self._group,
-                stage_idx_to_host_rank=self._stage_to_host_topology
+                stage_idx_to_host_rank=self._stage_to_host_topology,
             )
         else:
             self._backward_comm = None
@@ -202,10 +189,10 @@ class PipelineStage:
         return self._backward_comm.create_send_ops(bwd_result)
 
     def forward_one_chunk(
-            self,
-            microbatch_index: int,
-            pipeline_inputs: dict[str, torch.Tensor],
-            pipeline_kwargs: dict[str, Any] | None = None,
+        self,
+        microbatch_index: int,
+        pipeline_inputs: dict[str, torch.Tensor],
+        pipeline_kwargs: dict[str, Any] | None = None,
     ):
         """
         Executes a forward pass for a single microbatch chunk.
@@ -232,18 +219,9 @@ class PipelineStage:
 
         kwargs = pipeline_kwargs or {}
 
-        self._forward_comp.run(
-            microbatch_index=microbatch_index,
-            inputs=inputs,
-            kwargs=kwargs
-        )
+        self._forward_comp.run(microbatch_index=microbatch_index, inputs=inputs, kwargs=kwargs)
 
-    def backward_one_chunk(
-            self,
-            microbatch_index: int,
-            loss: torch.Tensor | None = None,
-            full_backward: bool = True
-    ):
+    def backward_one_chunk(self, microbatch_index: int, loss: torch.Tensor | None = None, full_backward: bool = True):
         """
         Executes a backward pass for a single microbatch chunk.
 
@@ -278,17 +256,11 @@ class PipelineStage:
 
         if full_backward:
             self._backward_comp.backward_full(
-                microbatch_index=microbatch_index,
-                inputs=inputs,
-                outputs=outputs,
-                outputs_grad=outputs_grad
+                microbatch_index=microbatch_index, inputs=inputs, outputs=outputs, outputs_grad=outputs_grad
             )
         else:
             self._backward_comp.backward_input(
-                microbatch_index=microbatch_index,
-                inputs=inputs,
-                outputs=outputs,
-                outputs_grad=outputs_grad
+                microbatch_index=microbatch_index, inputs=inputs, outputs=outputs, outputs_grad=outputs_grad
             )
 
         if self._info.is_current_stage_last and not self._info.is_current_stage_first:

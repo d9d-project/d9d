@@ -20,7 +20,7 @@ class HiddenStatesAggregationMode(StrEnum):
 
 
 def create_hidden_states_aggregator(
-        mode: HiddenStatesAggregationMode, agg_mask: torch.Tensor | None
+    mode: HiddenStatesAggregationMode, agg_mask: torch.Tensor | None
 ) -> BaseHiddenStatesAggregator:
     """Factory function to create a hidden states aggregator.
 

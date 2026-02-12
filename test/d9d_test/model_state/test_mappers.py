@@ -40,9 +40,7 @@ class MergeAddMapper(ModelStateMapper):
 def test_leaf_identity():
     mapper = ModelStateMapperIdentity("foo")
 
-    expected_groups = frozenset([
-        StateGroup(inputs=frozenset(["foo"]), outputs=frozenset(["foo"]))
-    ])
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["foo"]), outputs=frozenset(["foo"]))])
     assert mapper.state_dependency_groups() == expected_groups
 
     data = {"foo": torch.tensor(1.0)}
@@ -55,9 +53,7 @@ def test_leaf_identity():
 def test_leaf_rename():
     mapper = ModelStateMapperRename("old", "new")
 
-    expected_groups = frozenset([
-        StateGroup(inputs=frozenset(["old"]), outputs=frozenset(["new"]))
-    ])
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["old"]), outputs=frozenset(["new"]))])
     assert mapper.state_dependency_groups() == expected_groups
 
     res = mapper.apply({"old": torch.tensor(123)})
@@ -69,10 +65,12 @@ def test_leaf_rename():
 def test_leaf_select_child():
     mapper = ModelStateMapperSelectChildModules(["w", "b"], "layer1")
 
-    expected_groups = frozenset([
-        StateGroup(inputs=frozenset(["layer1.w"]), outputs=frozenset(["w"])),
-        StateGroup(inputs=frozenset(["layer1.b"]), outputs=frozenset(["b"]))
-    ])
+    expected_groups = frozenset(
+        [
+            StateGroup(inputs=frozenset(["layer1.w"]), outputs=frozenset(["w"])),
+            StateGroup(inputs=frozenset(["layer1.b"]), outputs=frozenset(["b"])),
+        ]
+    )
     assert mapper.state_dependency_groups() == expected_groups
 
     res = mapper.apply({"layer1.w": torch.tensor(5)})
@@ -88,10 +86,12 @@ def test_parallel_composition():
     # Valid composition
     par = ModelStateMapperParallel([m1, m2])
 
-    expected_groups = frozenset([
-        StateGroup(inputs=frozenset(["a"]), outputs=frozenset(["x"])),
-        StateGroup(inputs=frozenset(["b"]), outputs=frozenset(["y"]))
-    ])
+    expected_groups = frozenset(
+        [
+            StateGroup(inputs=frozenset(["a"]), outputs=frozenset(["x"])),
+            StateGroup(inputs=frozenset(["b"]), outputs=frozenset(["y"])),
+        ]
+    )
     assert par.state_dependency_groups() == expected_groups
 
     with pytest.raises(ValueError, match="undefined group"):
@@ -128,9 +128,7 @@ def test_sequential_composition_gap_filling():
     seq = ModelStateMapperSequential([m1, m2])
 
     # Check merged group: Inputs of first stage, Outputs of last stage.
-    expected_groups = frozenset([
-        StateGroup(inputs=frozenset(["a", "b"]), outputs=frozenset(["result"]))
-    ])
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["a", "b"]), outputs=frozenset(["result"]))])
     assert seq.state_dependency_groups() == expected_groups
 
     # Execution: 'b' should pass through m1 via auto-added Identity
@@ -145,9 +143,7 @@ def test_sequential_composition_chaining():
     m2 = ModelStateMapperRename("b", "c")
     seq = ModelStateMapperSequential([m1, m2])
 
-    expected_groups = frozenset([
-        StateGroup(inputs=frozenset(["a"]), outputs=frozenset(["c"]))
-    ])
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["a"]), outputs=frozenset(["c"]))])
     assert seq.state_dependency_groups() == expected_groups
 
     assert seq.apply({"a": torch.tensor(1)})["c"].item() == 1
@@ -162,19 +158,23 @@ def test_shard_mapper():
     # Shard 1 of 2 (Should get index 0 and 2)
     s0 = ModelStateMapperShard(par, total_shards=2, current_shard=0)
 
-    expect_s0_groups = frozenset([
-        StateGroup(inputs=frozenset(["in_0"]), outputs=frozenset(["out_0"])),
-        StateGroup(inputs=frozenset(["in_2"]), outputs=frozenset(["out_2"]))
-    ])
+    expect_s0_groups = frozenset(
+        [
+            StateGroup(inputs=frozenset(["in_0"]), outputs=frozenset(["out_0"])),
+            StateGroup(inputs=frozenset(["in_2"]), outputs=frozenset(["out_2"])),
+        ]
+    )
     assert s0.state_dependency_groups() == expect_s0_groups
 
     # Shard 2 of 2 (Should get index 1 and 3)
     s1 = ModelStateMapperShard(par, total_shards=2, current_shard=1)
 
-    expect_s1_groups = frozenset([
-        StateGroup(inputs=frozenset(["in_1"]), outputs=frozenset(["out_1"])),
-        StateGroup(inputs=frozenset(["in_3"]), outputs=frozenset(["out_3"]))
-    ])
+    expect_s1_groups = frozenset(
+        [
+            StateGroup(inputs=frozenset(["in_1"]), outputs=frozenset(["out_1"])),
+            StateGroup(inputs=frozenset(["in_3"]), outputs=frozenset(["out_3"])),
+        ]
+    )
     assert s1.state_dependency_groups() == expect_s1_groups
 
 
@@ -182,9 +182,7 @@ def test_shard_mapper():
 def test_stack_tensors_mapper():
     mapper = ModelStateMapperStackTensors(["a", "b", "c"], "stacked", stack_dim=0)
 
-    expected_groups = frozenset([
-        StateGroup(inputs=frozenset(["a", "b", "c"]), outputs=frozenset(["stacked"]))
-    ])
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["a", "b", "c"]), outputs=frozenset(["stacked"]))])
     assert mapper.state_dependency_groups() == expected_groups
 
     t1 = torch.tensor([1, 1])
@@ -200,11 +198,7 @@ def test_stack_tensors_mapper():
 
 @pytest.mark.distributed
 def test_dtensor_mapper_logic(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(
-        pipeline_parallel=4,
-        expert_parallel=2,
-        data_parallel_replicate=2
-    ))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=4, expert_parallel=2, data_parallel_replicate=2))
     mesh = dist_ctx.mesh_for(REGULAR_DOMAIN)
     dp_mesh = mesh["dp_replicate"]
 

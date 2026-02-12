@@ -18,12 +18,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
     """
 
     def __init__(
-            self,
-            dim: int,
-            num_experts: int,
-            top_k: int,
-            renormalize_probabilities: bool,
-            enable_expert_bias: bool = False
+        self, dim: int, num_experts: int, top_k: int, renormalize_probabilities: bool, enable_expert_bias: bool = False
     ):
         """
         Constructs the TopKRouter.
@@ -53,10 +48,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
         self._top_k = top_k
         self._renormalize_probabilities = renormalize_probabilities
 
-    def forward(
-            self,
-            hidden_states: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, hidden_states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """
         Calculates routing decisions for the input tokens.
 
@@ -80,13 +72,9 @@ class TopKRouter(nn.Module, ModuleLateInit):
 
         # select top-k
         if self.expert_bias is None:
-            scores, selected_experts_indices = torch.topk(
-                scores, k=self._top_k, dim=-1
-            )
+            scores, selected_experts_indices = torch.topk(scores, k=self._top_k, dim=-1)
         else:
-            _, selected_experts_indices = torch.topk(
-                scores + self.expert_bias, k=self._top_k, dim=-1
-            )
+            _, selected_experts_indices = torch.topk(scores + self.expert_bias, k=self._top_k, dim=-1)
             scores = scores.gather(dim=-1, index=selected_experts_indices)
 
         # re-normalize scores

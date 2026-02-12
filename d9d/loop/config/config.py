@@ -18,6 +18,7 @@ class BatchingConfig(BaseModel):
         microbatch_size: The distinct batch size fed into the model during a single
             forward pass on a single device.
     """
+
     global_batch_size: int
     microbatch_size: int
 
@@ -30,6 +31,7 @@ class DeterminismConfig(BaseModel):
         base_seed: The base integer seed used to initialize random number
             generators (Python, NumPy, PyTorch) across all ranks.
     """
+
     base_seed: int
 
 
@@ -40,6 +42,7 @@ class PipeliningConfig(BaseModel):
     Attributes:
         schedule: The specific scheduling strategy configuration used to manage pipeline execution.
     """
+
     schedule: AnyPipelineScheduleConfig
 
 
@@ -50,6 +53,7 @@ class GarbageCollectionConfig(BaseModel):
     Attributes:
         period_steps: How frequently to manually trigger the Python garbage collector.
     """
+
     period_steps: StepActionPeriod
 
 
@@ -63,6 +67,7 @@ class DataLoadingConfig(BaseModel):
         persistent_workers: If True, the data loader will not shutdown the worker processes
             after a dataset has been consumed once.
     """
+
     num_workers: int
     pin_memory: bool
     persistent_workers: bool
@@ -78,6 +83,7 @@ class CheckpointingConfig(BaseModel):
         num_to_keep: The maximum number of recent checkpoints to retain. If None,
             all checkpoints are kept.
     """
+
     save_dir: Path
     period_steps: StepActionPeriod
     num_to_keep: int | None
@@ -93,6 +99,7 @@ class ModelStageFactoryConfig(BaseModel):
         checkpoint_only_trainable_parameters: If True, only parameters with
             requires_grad=True will be saved in checkpoints. Useful for PEFT/LoRA.
     """
+
     source_checkpoint: Path | None
     checkpoint_only_trainable_parameters: bool
 
@@ -106,6 +113,7 @@ class GradientClippingConfig(BaseModel):
             no clipping is performed.
         log_total_steps: Frequency at which to log the total gradient norm.
     """
+
     max_norm: float | None
     log_total_steps: StepActionPeriod
 
@@ -121,6 +129,7 @@ class ProfilingConfig(BaseModel):
         warmup_steps: Number of steps to ignore before recording to allow for warming-up.
         active_steps: Number of steps to actively record traces.
     """
+
     enabled: bool
 
     traces_dir: Path
@@ -138,6 +147,7 @@ class JobLoggerConfig(BaseModel):
         period_steps: How frequently metrics are flushed to the logger.
         tracker: Logic for the specific tracking backend (e.g., WandB, MLflow, stdout).
     """
+
     period_steps: StepActionPeriod
     tracker: AnyTrackerConfig
 
@@ -150,6 +160,7 @@ class GradientManagerConfig(BaseModel):
         grad_dtype: The data type to use for storing the gradient. If None, follows the model's dtype.
         bucket_size_mb: The size of gradient buckets in Megabytes for communication.
     """
+
     grad_dtype: str | None
     bucket_size_mb: int
 
@@ -162,6 +173,7 @@ class TimeoutConfig(BaseModel):
         init_timeout: Timeout in seconds for initializing the process group.
         step_timeout: Timeout in seconds for individual step communications.
     """
+
     init_timeout: int = 10000
     step_timeout: int = 100
 
@@ -186,6 +198,7 @@ class TrainerConfig(BaseModel):
         gradient_manager: Gradient Synchronization Settings.
         timeout: Distributed timeout settings.
     """
+
     run: RunConfig
     batching: BatchingConfig
     data_loading: DataLoadingConfig
@@ -215,6 +228,7 @@ class InferenceConfig(BaseModel):
         profiling: Profiler settings.
         timeout: Distributed timeout settings.
     """
+
     batching: BatchingConfig
     data_loading: DataLoadingConfig
     model_stage_factory: ModelStageFactoryConfig

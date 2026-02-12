@@ -4,5 +4,5 @@ from .rope import RotaryEmbeddingApplicator, RotaryEmbeddingProvider
 
 __all__ = [
     "RotaryEmbeddingApplicator",
-    "RotaryEmbeddingProvider"
+    "RotaryEmbeddingProvider",
 ]

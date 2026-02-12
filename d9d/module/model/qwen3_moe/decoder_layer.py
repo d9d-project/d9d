@@ -16,10 +16,7 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
     MLP block, with pre-RMSNorm applied before each sub-layer.
     """
 
-    def __init__(
-            self,
-            params: Qwen3MoELayerParameters
-    ):
+    def __init__(self, params: Qwen3MoELayerParameters):
         """
         Constructs a Qwen3MoELayer object.
 
@@ -35,7 +32,7 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
             num_key_value_heads=params.num_key_value_heads,
             is_causal=True,
             qk_norm_eps=params.rms_norm_eps,
-            head_dim=params.head_dim
+            head_dim=params.head_dim,
         )
 
         self.mlp = MoELayer(
@@ -43,16 +40,14 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
             num_grouped_experts=params.num_experts,
             intermediate_dim_grouped=params.intermediate_size,
             top_k=params.experts_top_k,
-            router_renormalize_probabilities=True
+            router_renormalize_probabilities=True,
         )
 
         self.input_layernorm = nn.RMSNorm(params.hidden_size, eps=params.rms_norm_eps)
         self.post_attention_layernorm = nn.RMSNorm(params.hidden_size, eps=params.rms_norm_eps)
 
     def forward(
-        self,
-        hidden_states: torch.Tensor,
-        position_embeddings: tuple[torch.Tensor, torch.Tensor]
+        self, hidden_states: torch.Tensor, position_embeddings: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
         """
         Performs the forward pass of the MoE layer.
@@ -72,7 +67,7 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         hidden_states = self.self_attn(
             hidden_states=hidden_states,
             position_embeddings=position_embeddings,
-            attention_mask=None  # no mask for moe decoder
+            attention_mask=None,  # no mask for moe decoder
         )
         hidden_states = residual + hidden_states
 

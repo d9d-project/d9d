@@ -15,9 +15,7 @@ class ScheduleStyle(StrEnum):
     v = "v"
 
 
-def build_stage_to_host_rank_topology(
-    pp_size: int, num_stages: int, style: ScheduleStyle
-) -> dict[int, int]:
+def build_stage_to_host_rank_topology(pp_size: int, num_stages: int, style: ScheduleStyle) -> dict[int, int]:
     """
     Constructs the mapping from stage index to rank index.
 
@@ -58,9 +56,7 @@ def build_stage_to_host_rank_topology(
             raise ValueError()
 
 
-def invert_stage_to_host_rank_topology(
-        stage_to_host: dict[int, int]
-) -> dict[int, list[int]]:
+def invert_stage_to_host_rank_topology(stage_to_host: dict[int, int]) -> dict[int, list[int]]:
     """
     Inverts the topology mapping to list execution stages per rank.
 

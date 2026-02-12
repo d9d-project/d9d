@@ -19,13 +19,13 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
     """
 
     def __init__(
-            self,
-            hidden_size: int,
-            num_attention_heads: int,
-            num_key_value_heads: int,
-            head_dim: int,
-            qk_norm_eps: float | None,
-            is_causal: bool
+        self,
+        hidden_size: int,
+        num_attention_heads: int,
+        num_key_value_heads: int,
+        head_dim: int,
+        qk_norm_eps: float | None,
+        is_causal: bool,
     ):
         """
         Constructs the GroupedQueryAttention layer.
@@ -43,32 +43,22 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
 
         self._head_dim = head_dim
         self._num_key_value_groups = num_attention_heads // num_key_value_heads
-        self._scaling = head_dim ** -0.5
+        self._scaling = head_dim**-0.5
 
-        self.q_proj = nn.Linear(
-            hidden_size, num_attention_heads * head_dim, bias=False
-        )
+        self.q_proj = nn.Linear(hidden_size, num_attention_heads * head_dim, bias=False)
 
-        self.k_proj = nn.Linear(
-            hidden_size, num_key_value_heads * head_dim, bias=False
-        )
+        self.k_proj = nn.Linear(hidden_size, num_key_value_heads * head_dim, bias=False)
 
-        self.v_proj = nn.Linear(
-            hidden_size, num_key_value_heads * head_dim, bias=False
-        )
+        self.v_proj = nn.Linear(hidden_size, num_key_value_heads * head_dim, bias=False)
 
-        self.o_proj = nn.Linear(
-            num_attention_heads * head_dim, hidden_size, bias=False
-        )
+        self.o_proj = nn.Linear(num_attention_heads * head_dim, hidden_size, bias=False)
 
         self.q_norm: nn.RMSNorm | None
         self.k_norm: nn.RMSNorm | None
 
         if qk_norm_eps is not None:
-            self.q_norm = nn.RMSNorm(normalized_shape=head_dim,
-                                     eps=qk_norm_eps)
-            self.k_norm = nn.RMSNorm(normalized_shape=head_dim,
-                                     eps=qk_norm_eps)
+            self.q_norm = nn.RMSNorm(normalized_shape=head_dim, eps=qk_norm_eps)
+            self.k_norm = nn.RMSNorm(normalized_shape=head_dim, eps=qk_norm_eps)
         else:
             self.q_norm = None
             self.k_norm = None
@@ -78,10 +68,10 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         self._is_causal = is_causal
 
     def forward(
-            self,
-            hidden_states: torch.Tensor,
-            attention_mask: torch.Tensor | None,
-            position_embeddings: tuple[torch.Tensor, torch.Tensor]
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: torch.Tensor | None,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
         """
         Computes the attention operation.
@@ -119,7 +109,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             value_states,
             attention_mask=attention_mask,
             is_causal=self._is_causal,
-            scale=self._scaling
+            scale=self._scaling,
         )
 
         outputs = outputs.reshape(*input_shape, -1).contiguous()

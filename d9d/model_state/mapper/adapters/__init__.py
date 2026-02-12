@@ -8,5 +8,5 @@ from .module import identity_mapper_from_module
 
 __all__ = [
     "identity_mapper_from_mapper_outputs",
-    "identity_mapper_from_module"
+    "identity_mapper_from_module",
 ]

@@ -23,9 +23,7 @@ def state_dict_main_process(dist_context: DistributedContext, obj: Stateful) -> 
     """
 
     if dist_context.is_main_process:
-        return {
-            "main_process": obj.state_dict()
-        }
+        return {"main_process": obj.state_dict()}
     else:
         return {}
 

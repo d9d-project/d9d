@@ -14,7 +14,7 @@ from d9d_test.kernel.silu_mul.reference_impl import silu_mul_torch
         (torch.float32, 1.3e-6, 1e-5),
         (torch.float16, 1.6e-2, 1e-5),
         (torch.bfloat16, 1.6e-2, 1e-5),
-    ]
+    ],
 )
 def test_silu_mul(shape, dtype, rtol, atol):
     torch.manual_seed(42)
