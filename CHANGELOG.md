@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v0.5.1 (2026-02-12)
+
+### Bug Fixes
+
+- Invalid d9d.core.protocol.training definitions
+  ([`7a0ab9a`](https://github.com/d9d-project/d9d/commit/7a0ab9af72dcda5a872c58f28614a8834f2ee6c4))
+
+- Migrate to `ty` type checker and fix newly found minor issues found by it
+  ([`37c9642`](https://github.com/d9d-project/d9d/commit/37c96429ec51bd3593329c163eec5211d0144864))
+
+
 ## v0.5.0 (2026-02-12)
 
 ### Features
