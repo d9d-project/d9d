@@ -44,7 +44,7 @@ class Profiler:
             coord = mesh_regular.get_coordinate()
             if coord is None:
                 raise RuntimeError("Invalid mesh")
-            coord_str = "-".join(map(str, coord))
+            coord_str = "-".join(str(x) for x in coord)
             rank = mesh_regular.get_rank()
             return f"rank-{rank}-coord-{coord_str}-trace.json"
         else:

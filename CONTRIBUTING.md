@@ -41,8 +41,7 @@ We provide a `Makefile` to automate common development tasks.
 | Command       | Description                                                                                                                   |
 |:--------------|:------------------------------------------------------------------------------------------------------------------------------|
 | `make test`   | Runs **both** local unit tests and distributed `torchrun` tests. **NOTE:** currently distributed tests require a 8-GPU setup. |
-| `make lint`   | Runs `ruff` linting checks.                                                                                                   |
-| `make mypy`   | Runs static type checking via `mypy`.                                                                                         |
+| `make lint`   | Runs `ruff` formatting, `ruff` linter checks and type checking using `ty`.                                                    |
 | `make mkdocs` | Starts a local documentation server at `localhost:8081`.                                                                      |
 
 ## The DEP Process (Design First)
@@ -69,8 +68,12 @@ We use [Ruff](https://docs.astral.sh/ruff/) for both linting and formatting.
 Configuration is strict (see `pyproject.toml` for enabled rules).
 
 ### Type Checking
-*   **Strict Typing:** While `disallow_untyped_defs` is currently relaxed, we strongly encourage full type hints for all function signatures.
-*   **Pydantic:** We use Pydantic V2. Ensure your code is compatible with pydantic-mypy plugins.
+We use **[ty](https://github.com/astral-sh/ty)** to ensure type safety.
+
+*   **Coverage:**
+    *   **Core Code:** strict type checking is enabled.
+    *   **Tests:** Excluded from strict type analysis (`test/**`) - at least for now.
+    *   **External Kernels:** External low-level kernels and wrappers (e.g., `d9d/kernel/cce`, `deep_ep`) are explicitly ignored.
 
 ### Testing
 We have two tiers of tests:
@@ -119,10 +122,9 @@ Before submitting a PR, ensure you have:
 
 1.  [ ] Created a DEP (if the change is major).
 2.  [ ] Added tests for your change.
-3.  [ ] Ran `make lint` to fix formatting and imports.
-4.  [ ] Ran `make mypy` to ensure type safety.
-5.  [ ] Ran `make test` to ensure no regressions.
-6.  [ ] Used a Conventional Commit title for your PR.
+3.  [ ] Ran `make lint` to fix formatting, imports and check for typing issues.
+4.  [ ] Ran `make test` to ensure no regressions.
+5.  [ ] Used a Conventional Commit title for your PR.
 
 ---
 

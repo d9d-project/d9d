@@ -141,6 +141,8 @@ class ShardedDataset(Dataset[_T_co], Stateful):
                     return ceil_len
                 else:
                     return ceil_len - (self._total_shards - shards_remainder)
+            case _:
+                raise ValueError(f"Unknown ShardIndexingMode: {self._indexing_mode}")
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         if isinstance(self._dataset, Stateful):

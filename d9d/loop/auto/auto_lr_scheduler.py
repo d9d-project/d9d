@@ -40,3 +40,5 @@ class AutoLRSchedulerProvider(LRSchedulerProvider):
                 return piecewise_scheduler_from_config(
                     self._config.scheduler, optimizer=context.optimizer, total_steps=context.total_steps
                 )
+            case _:
+                raise ValueError(f"Unsupported LR scheduler type: {self._config}")

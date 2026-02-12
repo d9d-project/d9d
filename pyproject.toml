@@ -64,9 +64,9 @@ cce = ["cut-cross-entropy"]
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.14.13"
-mypy = "^1.19.1"
 pre-commit = "^4.5.1"
 python-semantic-release = "^10.5.3"
+ty = "^0.0.16"
 
 
 [tool.poetry.group.test.dependencies]
@@ -246,24 +246,22 @@ extend-ignore-names = [
 quote-style = "double"
 indent-style = "space"
 
-[tool.mypy]
-plugins = "pydantic.mypy"
-files = [
-    "d9d",
-    "example"
+[tool.ty.src]
+exclude = [
+    "test/**",
 ]
-disable_error_code = ["import-untyped"]
 
-disallow_untyped_defs = false  # checked by ruff
-check_untyped_defs = true
+[tool.ty.rules]
+# currently does not work properly with torch.distributed package (please see https://github.com/astral-sh/ty/issues/2244)
+possibly-missing-attribute = "ignore"
 
-[[tool.mypy.overrides]]
-module = [
-    "d9d.kernel.cce.*",
-    "d9d.kernel.moe.*",
-    "d9d.module.block.moe.communications.deepep.*"
+[[tool.ty.overrides]]
+include = [
+    "d9d/kernel/cce/*",
+    "d9d/kernel/moe/*",
+    "d9d/module/block/moe/communications/deepep.py"
 ]
-ignore_errors = true
+rules = { all = "ignore" }
 
 [tool.semantic_release]
 allow_zero_version = true

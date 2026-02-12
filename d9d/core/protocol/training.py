@@ -4,7 +4,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 
 
 @runtime_checkable
-class OptimizerProtocol(Protocol, Stateful):
+class OptimizerProtocol(Stateful, Protocol):
     """
     Protocol defining an interface for standard PyTorch Optimizer object.
 
@@ -24,7 +24,7 @@ class OptimizerProtocol(Protocol, Stateful):
 
 
 @runtime_checkable
-class LRSchedulerProtocol(Protocol, Stateful):
+class LRSchedulerProtocol(Stateful, Protocol):
     """
     Protocol defining an interface for a Learning Rate Scheduler.
 

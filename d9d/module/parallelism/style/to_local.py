@@ -10,9 +10,7 @@ def _build_to_local_patched_class(
     module: nn.Module, grad_placement: tuple[Placement, ...], param_names: list[str]
 ) -> type:
     param_name_to_property = {
-        param_name: property(
-            lambda self, pn=param_name: self._parameters[pn].to_local(grad_placements=grad_placement)  # type: ignore
-        )
+        param_name: property(lambda self, pn=param_name: self._parameters[pn].to_local(grad_placements=grad_placement))
         for param_name in param_names
     }
     return type(
@@ -64,16 +62,16 @@ class ToLocalParallel(ParallelStyle):
 
             module.register_parameter(param_name, new_param)
 
-    def _apply(self, master_module: nn.Module, device_mesh: DeviceMesh):
+    def _apply(self, module: nn.Module, device_mesh: DeviceMesh):
         patched_classes = {}
         original_classes = {}
 
-        for submod_name, submod in master_module.named_modules():
+        for submod_name, submod in module.named_modules():
             param_names = [name for name, p in submod.named_parameters(recurse=False)]
             patched_classes[submod_name] = _build_to_local_patched_class(submod, self._grad_placement, param_names)
             original_classes[submod_name] = submod.__class__
 
             distribute_module(submod, device_mesh, self._distribute_params)
 
-        master_module.register_forward_pre_hook(_ModulePatch(patched_classes))
-        master_module.register_forward_hook(_ModulePatch(original_classes))
+        module.register_forward_pre_hook(_ModulePatch(patched_classes))
+        module.register_forward_hook(_ModulePatch(original_classes))

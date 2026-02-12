@@ -29,7 +29,7 @@ class GroupedGemm(Function):
         return backend.gmm(a, b, batch_sizes, trans_a=False, trans_b=trans_b)
 
     @staticmethod
-    def backward(
+    def backward(  # type: ignore[invalid-method-override]
         ctx: Any, grad: torch.Tensor
     ) -> tuple[torch.Tensor | None, torch.Tensor | None, None, None, None, None]:
         grad = grad.contiguous()

@@ -20,10 +20,8 @@ lint:
 	@ruff check --fix
 	@echo "Running linting"
 	@ruff check
-
-mypy:
-	@echo "Running mypy"
-	@mypy
+	@echo "Running type checking"
+	@ty check
 
 mkdocs:
 	@echo "Starting docs server"

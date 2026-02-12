@@ -92,7 +92,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         position_ids: torch.Tensor | None = None,
         hidden_states_snapshot: torch.Tensor | None = None,
         hidden_states_agg_mask: torch.Tensor | None = None,
-    ) -> dict[str, torch.Tensor]:
+    ) -> dict[str, torch.Tensor | None]:
         """
         Executes the forward pass for the current pipeline stage.
 

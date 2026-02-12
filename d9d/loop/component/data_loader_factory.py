@@ -148,7 +148,7 @@ class StatefulDataLoaderDataParallelAware(StatefulDataLoader):
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         super().load_state_dict(state_dict[f"dp_{self._dp_rank}"])
 
-    def __iter__(self) -> Iterator:
+    def __iter__(self) -> Iterator:  # type: ignore[invalid-method-override]
         return IteratorBatchGroup(super().__iter__(), device=self._device, batch_group_size=self._group_size)
 
 

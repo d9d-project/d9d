@@ -7,9 +7,3 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
-      - id: mypy
-        name: Run Type Checker
-        entry: make mypy
-        language: system
-        types: [ python ]
-        pass_filenames: false
