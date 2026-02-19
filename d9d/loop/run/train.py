@@ -236,7 +236,7 @@ class Trainer:
         self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
         self._state.checkpointer.load_last_checkpoint(self._state)
 
-        if self._state.stepper.current_step >= self._state.stepper.total_steps:
+        if self._state.stepper.current_step > self._state.stepper.total_steps:
             self._state.dist_context.logger.info("Already trained fully, will do nothing")
             return
 
