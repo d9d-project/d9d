@@ -38,13 +38,13 @@ class Stepper(Stateful):
             case StepActionSpecial.disable:
                 return False
             case StepActionSpecial.last_step:
-                return self._current_step == self._total_steps
+                return self._current_step == self._total_steps - 1
             case int():
                 if action <= 0:
                     raise ValueError()
 
-                will_do_periodic = self._current_step % action == 0
-                will_do_last = enable_on_last_step_if_periodic and self._current_step == self._total_steps
+                will_do_periodic = (self._current_step + 1) % action == 0
+                will_do_last = enable_on_last_step_if_periodic and self._current_step == self._total_steps - 1
 
                 return will_do_periodic or will_do_last
             case _:

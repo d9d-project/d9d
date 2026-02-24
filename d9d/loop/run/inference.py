@@ -86,7 +86,7 @@ class InferenceConfigurator:
         )
         data_loader_infer = data_loader_factory.build_dataloader_for_infer_job()
 
-        stepper = Stepper(initial_step=1, total_steps=len(data_loader_infer))
+        stepper = Stepper(initial_step=0, total_steps=len(data_loader_infer))
 
         pipeline_state_handler = PipelineStateHandler(
             sharding_spec={}, num_shards=batch_maths.num_microbatches_pipelining
@@ -211,8 +211,6 @@ class Inference:
                         self._state.task_operator.forward(batch)
 
                     gc.collect_periodic()
-                    self._state.stepper.step()
-                    bar.update()
 
                     # checkpoint at the end of the step
                     self._state.checkpointer.checkpoint_if_needed(self._state)
@@ -221,5 +219,8 @@ class Inference:
                         profiler.step()
 
                     self._state.timeout_manager.set_periodic()
+
+                    self._state.stepper.step()
+                    bar.update()
 
                 self._state.task.finalize(FinalizeContext())
