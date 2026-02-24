@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.5.2 (2026-02-24)
+
+### Bug Fixes
+
+- Fix and simplify stepper semantics (closes GitHub issue #3)
+  ([`b01366c`](https://github.com/d9d-project/d9d/commit/b01366c2572ee6d4188ced879841de72fb9ab20e))
+
+
 ## v0.5.1 (2026-02-12)
 
 ### Bug Fixes
