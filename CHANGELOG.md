@@ -2,6 +2,15 @@
 
 <!-- version list -->
 
+## v0.5.3 (2026-03-01)
+
+### Bug Fixes
+
+- Treat checkpoint saving as a post-step action so the progress bars are not shifted by 1 when
+  resume training
+  ([`f03715f`](https://github.com/d9d-project/d9d/commit/f03715fb53a903fe23d6f71660ae3a3c3bc36ee0))
+
+
 ## v0.5.2 (2026-02-24)
 
 ### Bug Fixes
