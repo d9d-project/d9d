@@ -294,15 +294,16 @@ class Trainer:
 
                 gc.collect_periodic()
 
-                # checkpoint at the end of the step
-                self._state.checkpointer.checkpoint_if_needed(self._state)
-
                 if profiler:
                     profiler.step()
 
                 self._state.timeout_manager.set_periodic()
 
                 self._state.stepper.step()
+
+                # checkpoint at the end of the step
+                self._state.checkpointer.checkpoint_if_needed(self._state)
+
                 bar.update()
 
             self._state.task.finalize(FinalizeContext())

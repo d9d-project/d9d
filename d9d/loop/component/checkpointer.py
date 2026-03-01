@@ -123,7 +123,9 @@ class StateCheckpointer:
             state: The Stateful object to save.
         """
 
-        if self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
+        if self._stepper.should_do_action(
+            self._config.period_steps, enable_on_last_step_if_periodic=True, is_post_step_action=True
+        ):
             self._checkpoint(state)
 
     def _last_checkpoint_id(self) -> Path | None:
