@@ -1,27 +1,12 @@
----
-title: Configuration
----
-
 # Configuration Schemas
 
 The `d9d.loop.config` package defines the structure for configuring the training job using Pydantic models. This ensures strict validation of configurations (e.g., ensuring global batch size is divisible by microbatch size and DP size).
 
-
-
 ## Main Config
-
-### TrainerConfig
-
-The top-level configuration object passed to `TrainingConfigurator`.
 
 ::: d9d.loop.config.TrainerConfig
     options:
       heading_level: 3
-
-
-### InferenceConfig
-
-The top-level configuration object passed to `InferenceConfigurator`.
 
 ::: d9d.loop.config.InferenceConfig
     options:

@@ -1,7 +1,3 @@
----
-title: Custom Metrics
----
-
 # Creating Custom Metrics
 
 The `d9d` framework allows you to implement custom metrics by adhering to the `Metric` interface.
@@ -69,6 +65,3 @@ class MaxMetric(Metric[torch.Tensor]):
 ```
 
 ::: d9d.metric.component
-    options:
-        show_root_heading: true
-        show_root_full_path: true

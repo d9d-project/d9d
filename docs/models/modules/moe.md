@@ -1,7 +1,3 @@
----
-title: Mixture of Experts (MoE)
----
-
 # Mixture of Experts (MoE)
 
 ## About
@@ -10,7 +6,7 @@ The `d9d.module.block.moe` package provides a complete, high-performance impleme
 
 ## Expert Parallelism
 
-For information on setting up Expert Parallelism, see [this page](../models/2_horizontal_parallelism.md).
+For information on setting up Expert Parallelism, see [this page](../models/horizontal_parallelism.md).
 
 ## Features
 
@@ -45,11 +41,5 @@ Uses efficient fused SiLU-Mul kernel.
 Currently not supported, feel free to contribute :)
 
 ::: d9d.module.block.moe
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.module.block.moe.communications
-    options:
-        show_root_heading: true
-        show_root_full_path: true

@@ -1,7 +1,3 @@
----
-title: Piecewise Scheduler
----
-
 # Piecewise Scheduler
 
 ## About
@@ -89,6 +85,3 @@ The following curve classes are available to interpolate values between phases:
 ## API Reference
 
 ::: d9d.lr_scheduler.piecewise
-    options:
-        show_root_heading: true
-        show_root_full_path: true

@@ -1,7 +1,3 @@
----
-title: Stochastic Optimizers
----
-
 # Stochastic Optimizers
 
 ## What is Stochastic Rounding and Why is It Useful For Optimization
@@ -34,12 +30,5 @@ All the benchmarks were performed on a single NVDIA H100 80GB GPU.
 ![](./benchmark/adamw_stochastic_bf16_.png)
 
 ::: d9d.optim.stochastic
-    options:
-        show_root_heading: true
-        show_root_full_path: true
-
 
 ::: d9d.kernel.stochastic
-    options:
-        show_root_heading: true
-        show_root_full_path: true

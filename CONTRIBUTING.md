@@ -84,7 +84,7 @@ We have two tiers of tests:
 
 ## Documentation
 
-Documentation is built with **MkDocs**.
+Documentation is built with **Zensical**.
 *   **Docstrings:** Public APIs must have clear docstrings.
 *   **Building:** Run `make mkdocs` to preview changes.
 *   **Location:** Source files are in `docs/` and documented code in `d9d/`.

@@ -23,7 +23,7 @@ def gather(
 
     Returns:
         If async_op is False: A list of tensors on the destination rank, None elsewhere.
-        If async_op is True: A tuple containing (buffer_list, work_handle).
+            If async_op is True: A tuple containing (buffer_list, work_handle).
     """
 
     if group.rank() == group_dst:
@@ -56,7 +56,7 @@ def all_gather(
 
     Returns:
         If async_op is False: A list of gathered tensors.
-        If async_op is True: A tuple containing (buffer_list, work_handle).
+            If async_op is True: A tuple containing (buffer_list, work_handle).
     """
 
     save_list = [torch.empty_like(tensor) for _ in range(group.size())]
@@ -103,7 +103,7 @@ def all_gather_variadic_shape(
 
     Returns:
         If async_op is False: A list of gathered tensors of varying shapes.
-        If async_op is True: A tuple containing (buffer_list, work_handle).
+            If async_op is True: A tuple containing (buffer_list, work_handle).
     """
 
     all_shape = _all_gather_shapes(tensor, group)

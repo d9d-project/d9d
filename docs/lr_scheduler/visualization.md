@@ -1,7 +1,3 @@
----
-title: Visualization
----
-
 # Schedule Visualization
 
 ## About
@@ -41,6 +37,3 @@ visualize_lr_scheduler(
 ## API Reference
 
 ::: d9d.lr_scheduler.visualizer
-    options:
-        show_root_heading: true
-        show_root_full_path: true

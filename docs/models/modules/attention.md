@@ -1,7 +1,3 @@
----
-title: Attention Layers
----
-
 # Attention Layers
 
 ## About
@@ -27,11 +23,5 @@ Uses [Rotary Positional Encoding](positional.md)
 Supports optional [QK Normalization](https://arxiv.org/pdf/2302.05442).
 
 ::: d9d.module.block.attention
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.module.block.attention.sdpa
-    options:
-        show_root_heading: true
-        show_root_full_path: true

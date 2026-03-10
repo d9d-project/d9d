@@ -1,7 +1,3 @@
----
-title: Model State Mapper
----
-
 # Model State Mapper
 
 ## About
@@ -107,21 +103,9 @@ mapper = ModelStateMapperSequential([
 ```
 
 ::: d9d.model_state.mapper
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.model_state.mapper.adapters
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.model_state.mapper.compose
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.model_state.mapper.leaf
-    options:
-        show_root_heading: true
-        show_root_full_path: true

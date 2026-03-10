@@ -1,7 +1,3 @@
----
-title: Hidden States Aggregation
----
-
 # Hidden States Aggregation
 
 ## About
@@ -32,6 +28,3 @@ This significantly reduces memory footprint when accumulating states over many i
 
 
 ::: d9d.module.block.hidden_states_aggregator
-    options:
-        show_root_heading: true
-        show_root_full_path: true

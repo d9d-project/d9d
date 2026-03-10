@@ -1,8 +1,9 @@
----
-title: Pipelining Internals
----
-
 # Pipelining Internals
+
+!!! warning "Internal API Warning"
+    If you are utilizing the standard `d9d` training infrastructure, you **do not** need to call these functions manually. The framework automatically handles pipelining based on configuration.
+
+## About
 
 This section details the internals of the `d9d.pipelining` module. It is intended for those who wish to implement new layouts, schedules, or modify the execution engine.
 
@@ -85,8 +86,16 @@ You must implement the pipeline program builder.
 ```python
 from collections import defaultdict
 
-from d9d.pipelining.infra.schedule.component.program import PipelineProgramBuilder, build_stage_to_host_rank_topology, ScheduleStyle, add_communication_ops
-from d9d.pipelining.infra.schedule.component.runtime import ActionBase, ForwardComputeAction
+from d9d.pipelining.infra.schedule.component.program import (
+    PipelineProgramBuilder, 
+    build_stage_to_host_rank_topology,
+    ScheduleStyle, 
+    add_communication_ops
+)
+from d9d.pipelining.infra.schedule.component.runtime import (
+    ActionBase, 
+    ForwardComputeAction
+)
 
 
 class MyFancyScheduleBuilder(PipelineProgramBuilder):
@@ -101,22 +110,34 @@ class MyFancyScheduleBuilder(PipelineProgramBuilder):
     def topology_style(self) -> ScheduleStyle:
         return ScheduleStyle.loop
 
-    def compose(self, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:
+    def compose(
+            self, 
+            num_microbatches: int, 
+            pp_size: int
+    ) -> dict[int, list[ActionBase]]:
         # Map logical stages to ranks
-        stage_to_rank = build_stage_to_host_rank_topology(num_stages=self._stages_per_rank * pp_size,
-                                                          style=ScheduleStyle.loop,
-                                                          pp_size=pp_size)
+        stage_to_rank = build_stage_to_host_rank_topology(
+            num_stages=self._stages_per_rank * pp_size,
+            style=ScheduleStyle.loop,
+            pp_size=pp_size
+        )
 
         actions = defaultdict(list)
 
         # 1. Generate Compute Schedule
         for rank in range(pp_size):
             # ... custom logic to decide order of Fwd/Bwd ...
-            actions[rank].append(ForwardComputeAction(stage_idx=..., microbatch_idx=...))
+            actions[rank].append(
+                ForwardComputeAction(stage_idx=..., microbatch_idx=...)
+            )
 
         # 2. Inject Communications (Magic Pass)
         # This analyzes data dependencies between stages and inserts Send/Recvs
-        return add_communication_ops(actions, stage_to_rank, num_stages=self._stages_per_rank * pp_size)
+        return add_communication_ops(
+            actions, 
+            stage_to_rank, 
+            num_stages=self._stages_per_rank * pp_size
+        )
 ```
 
 ### Registering
@@ -124,26 +145,11 @@ class MyFancyScheduleBuilder(PipelineProgramBuilder):
 Add your configuration to `factory/config.py` and register the builder in `factory/factory.py`.
 
 ::: d9d.pipelining.infra.stage
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.pipelining.infra.schedule.component.runtime
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.pipelining.infra.schedule.component.program
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.pipelining.infra.schedule.program
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.pipelining.training
-    options:
-        show_root_heading: true
-        show_root_full_path: true

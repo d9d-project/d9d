@@ -1,7 +1,3 @@
----
-title: Pipeline Parallelism
----
-
 # Pipeline Parallelism
 
 ## The d9d Approach
@@ -163,7 +159,7 @@ my_spec = PipelineShardingSpec(
 
 ### Usage within the Trainer
 
-Pipelining is available in the [Trainer](../0_loop/0_index.md) framework. When configuring the Trainer, simply provide an `AnyPipelineScheduleConfig` in your training arguments. The Trainer handles the construction of the schedule and the distribution of layers automatically.
+Pipelining is available in the [Trainer](../loop/train.md) framework. When configuring the Trainer, simply provide an `AnyPipelineScheduleConfig` in your training arguments. The Trainer handles the construction of the schedule and the distribution of layers automatically.
 
 ### Advanced - Manual Usage
 
@@ -237,11 +233,5 @@ schedule_info.schedule.step(inputs, kwargs={})
 ```
 
 ::: d9d.pipelining.api
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.pipelining.factory
-    options:
-        show_root_heading: true
-        show_root_full_path: true

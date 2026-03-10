@@ -1,13 +1,9 @@
----
-title: Gradient Norm & Clipping
----
-
 # Gradient Norm & Clipping
 
-## About
-
-!!! warning "Warning:" 
+!!! warning "Internal API Warning"
     If you are utilizing the standard `d9d` training infrastructure, you **do not** need to call these functions manually. The framework automatically handles gradient clipping. This package is primarily intended for users extending the internals of `d9d`.
+
+## About
 
 The `d9d.internals.grad_norm` package handles the calculation and clipping of gradient norms in complex distributed environments.
 
@@ -40,6 +36,7 @@ The system attempts to overlap communication with computation. Groups containing
 The goal of distributed gradient clipping is to calculate the **Global Norm** ($\|\mathbf{g}\|$) of a **single model instance**, regardless of how that model is physically fragmented across GPUs.
 
 Let the total set of model parameters $\mathcal{P}$ be divided into disjoint subsets based on parallelism strategy:
+
 1.  $\mathcal{P}_{pp}$: Sets of parameters residing on different Pipeline stages.
 2.  $\mathcal{P}_{sharded}$: Parameters split across a TP/EP/FSDP group.
 3.  $\mathcal{P}_{repl}$: Parameters replicated across other groups.
@@ -53,33 +50,40 @@ We prove that our strategy of separating aggregation logic based on placement pr
 ### Proof for Sharded Parameters (TP/EP/FSDP)
 For a parameter $w \in \mathcal{P}_{sharded}$, the logical gradient tensor $G$ is split into physical shards $G_1, G_2, \dots, G_k$ across $k$ devices. By the definition of the Frobenius norm:
 
-$$ \|G\|^2 = \sum_{rank=1}^{k} \|G_{rank}\|^2 $$
+$$
+\|G\|^2 = \sum_{rank=1}^{k} \|G_{rank}\|^2
+$$
 
 **Strategy:** We calculate local norms and apply `all_reduce(op=SUM)`.
 
 ### Proof for Replicated Parameters (DP)
 For a parameter $w \in \mathcal{P}_{repl}$, the logical gradient tensor $G$ is identical on all $k$ devices (assuming DP synchronization has occurred).
-$$ G_{rank_1} = G_{rank_2} = \dots = G $$
+$$
+G_{rank_1} = G_{rank_2} = \dots = G
+$$
 
 If we were to sum these (as we did for TP), we would obtain:
-$$ \sum_{rank=1}^{k} \|G_{rank}\|^2 = k \cdot \|G\|^2 \quad (\text{Incorrect: Double Counting}) $$
+$$
+\sum_{rank=1}^{k} \|G_{rank}\|^2 = k \cdot \|G\|^2 \quad (\text{Incorrect: Double Counting})
+$$
 
 **Strategy:** We group these parameters separately and do not communicate.
 
 ### Proof for Pipeline Parallelism (PP)
 Pipeline stages hold disjoint sets of parameters. The total norm is simply the sum of the norms of the stages.
 
-$$ \|\mathbf{g}\|^2 = \|\mathbf{g}_{stage_1}\|^2 + \|\mathbf{g}_{stage_2}\|^2 + \dots $$
+$$
+\|\mathbf{g}\|^2 = \|\mathbf{g}_{stage_1}\|^2 + \|\mathbf{g}_{stage_2}\|^2 + \dots
+$$
 
 **Strategy:** We apply `all_reduce(op=SUM)` across the PP mesh.
 
 ### Result
 The final formula utilized by `d9d` ensures $1:1$ correspondence with a single-device baseline:
 
-$$ \|\mathbf{g}\|_{global} = \sqrt{ \underbrace{\sum_{pp} \left( \underbrace{\sum_{tp} \|g_{sharded}\|^2}_{\text{Sum Unique Shards}} + \underbrace{\|g_{replicated}\|^2}_{\text{Do Not Duplicate}} \right)}_{\text{Sum Disjoint Layers}} } $$
+$$
+\|\mathbf{g}\|_{global} = \sqrt{ \underbrace{\sum_{pp} \left( \underbrace{\sum_{tp} \|g_{sharded}\|^2}_{\text{Sum Unique Shards}} + \underbrace{\|g_{replicated}\|^2}_{\text{Do Not Duplicate}} \right)}_{\text{Sum Disjoint Layers}} }
+$$
 
 
 ::: d9d.internals.grad_norm
-    options:
-        show_root_heading: true
-        show_root_full_path: true

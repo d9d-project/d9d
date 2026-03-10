@@ -1,7 +1,3 @@
----
-title: Inference Loop
----
-
 # Inference Loop
 
 ## Overview
@@ -10,17 +6,12 @@ The `d9d.loop` package provides the execution engine not only for training but a
 
 The inference engine shares the same core philosophy as the Trainer: separating the *definition* of the job from the *execution*.
 
-## Configuration & Construction
-
-The inference environment is assembled using the `InferenceConfigurator`.
-
-### InferenceConfigurator
-
-This class binds the infrastructure and user logic into a ready-to-execute `Inference` object.
+## Example
 
 ```python
 from d9d.loop.run import InferenceConfigurator
 
+# Configure
 inference = InferenceConfigurator(
     mesh=mesh_params,                  # Physical cluster layout
     parameters=config,                 # Logic configuration (batch size, etc)
@@ -29,9 +20,22 @@ inference = InferenceConfigurator(
     task_provider=...,                 # Inference-specific logic (e.g., generation)
     data_provider=...,                 # Validation/Test dataset
 ).configure()
+
+# Execute
+inference.infer()
 ```
 
-## The Configuration Lifecycle
+## Configuration & Construction
+
+The inference environment is assembled using the `InferenceConfigurator`.
+
+This class binds the infrastructure and user logic into a ready-to-execute `Inference` object.
+
+::: d9d.loop.run.InferenceConfigurator
+    options:
+        heading_level: 3
+
+### The Configuration Lifecycle
 
 The `InferenceConfigurator.configure()` method performs a setup sequence similar to training, but optimized for forward-only execution:
 
@@ -55,15 +59,19 @@ The `InferenceConfigurator.configure()` method performs a setup sequence similar
     *   Components are packed into `InferenceJobState`.
     *   The `Inference` engine is instantiated.
 
-## Inference Execution
+## Execution
 
 To run the job, call the `.infer()` method on the configured object.
 
-## The Inference Lifecycle
+::: d9d.loop.run.Inference
+    options:
+        heading_level: 3
+
+### The Inference Lifecycle
 
 The `Inference.infer()` method orchestrates the execution flow. It is designed to be lean and memory-efficient.
 
-### 1. Initialization & Recovery
+#### 1. Initialization & Recovery
 
 Before the loop starts:
 
@@ -76,7 +84,7 @@ Before the loop starts:
 3.  **Context Entry**:
     *   Enters UI, Garbage Collector, and Profiler contexts.
 
-### 2. The Step Loop
+#### 2. The Step Loop
 
 For every step:
 
@@ -93,14 +101,8 @@ For every step:
 3.  **Checkpointing**:
     *   If configured, the system saves the *progress* of the inference job. This allows restarting a long-running generation job on a massive dataset without re-processing the first half.
 
-### 3. Finalization
+#### 3. Finalization
 
 1.  **Task-specific**: 
     *   Calls `InferenceTask.finalize()`. 
     *   This is typically used to close file handles (e.g., flushing the final lines of a generated dataset to disk).
-
-## API Reference
-
-::: d9d.loop.run.InferenceConfigurator
-
-::: d9d.loop.run.Inference

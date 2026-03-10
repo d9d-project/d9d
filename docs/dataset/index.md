@@ -166,6 +166,3 @@ batch_aligned = pad_stack_1d(
 ```
 
 ::: d9d.dataset
-    options:
-        show_root_heading: true
-        show_root_full_path: true

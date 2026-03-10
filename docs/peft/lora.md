@@ -1,7 +1,3 @@
----
-title: LoRA
----
-
 # Low-Rank Adaptation (LoRA)
 
 ## About
@@ -46,6 +42,3 @@ merge_peft(method, model)
 
 
 ::: d9d.peft.lora
-    options:
-        show_root_heading: true
-        show_root_full_path: true

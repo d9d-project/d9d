@@ -1,7 +1,3 @@
----
-title: Method Stacking
----
-
 # Method Stacking
 
 ## About
@@ -52,6 +48,3 @@ merge_peft(method, model)
 ```
 
 ::: d9d.peft.all
-    options:
-        show_root_heading: true
-        show_root_full_path: true

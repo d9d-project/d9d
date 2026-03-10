@@ -1,7 +1,3 @@
----
-title: Feed Forward Networks (FFN)
----
-
 # Feed Forward Networks (FFN)
 
 ## About
@@ -21,6 +17,3 @@ Uses efficient SiLU-Mul kernel.
 ![](./benchmark/silu_mul_bf16.png)
 
 ::: d9d.module.block.ffn
-    options:
-        show_root_heading: true
-        show_root_full_path: true

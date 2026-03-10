@@ -1,7 +1,3 @@
----
-title: Distributed Operations
----
-
 # Distributed Operations
 
 ## About
@@ -92,6 +88,3 @@ for data in results:
 ```
 
 ::: d9d.core.dist_ops
-    options:
-        show_root_heading: true
-        show_root_full_path: true

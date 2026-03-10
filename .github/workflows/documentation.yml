@@ -4,11 +4,17 @@ on:
     branches:
       - main
 permissions:
-  contents: write
+  contents: read
+  pages: write
+  id-token: write
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/configure-pages@v5
       - uses: actions/checkout@v6
       - name: Configure Git Credentials
         run: |
@@ -20,4 +26,9 @@ jobs:
       - name: Install poetry
         run: pipx install poetry
       - run: poetry install --only docs
-      - run: poetry run mkdocs gh-deploy --force
+      - run: poetry run zensical build --clean
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - uses: actions/deploy-pages@v4
+        id: deployment

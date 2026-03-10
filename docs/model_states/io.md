@@ -1,7 +1,3 @@
----
-title: Model State I/O
----
-
 # Model State IO
 
 ## About
@@ -234,6 +230,3 @@ save_model_state_pipeline_parallel(
 ```
 
 ::: d9d.model_state.io
-    options:
-        show_root_heading: true
-        show_root_full_path: true

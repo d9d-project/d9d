@@ -1,0 +1,163 @@
+[project]
+site_name = "d9d"
+site_description = "d9d is a distributed training framework built on top of PyTorch 2.0. It aims to be hackable, modular, and efficient, designed to scale from single-GPU debugging to massive clusters running 6D-Parallelism."
+repo_url = "https://github.com/d9d-project/d9d"
+copyright = """
+Copyright &copy; 2026 The d9d Project
+"""
+docs_dir = "docs"
+extra_javascript = [
+    "docs/.infra/js/mathjax.js",
+    "https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"
+]
+
+nav = [
+    { "Home" = "index.md" },
+    { "Table of Contents" = "toc.md" },
+    { "Core" = [
+        "core/dist_context.md",
+        "core/dist_ops.md",
+        "core/sharding.md",
+        "core/types.md",
+        "core/autograd_extensions.md"
+    ] },
+    { "Training and Inference" = [
+        "loop/train.md",
+        "loop/inference.md",
+        "loop/config.md",
+        { "Interfaces & Logic" = [
+            "loop/interfaces/index.md",
+            "loop/interfaces/task.md",
+            "loop/interfaces/model.md",
+            "loop/interfaces/data.md",
+            "loop/interfaces/optimizer.md",
+            "loop/interfaces/lr_scheduler.md",
+        ] }
+    ] },
+    { "Model States" = [
+        "model_states/io.md",
+        "model_states/mapper.md",
+    ] },
+    { "Models" = [
+        { "Model Catalogue" = [
+            "models/model_catalogue/index.md",
+            "models/model_catalogue/qwen3_moe.md"
+        ] },
+        { "Modules" = [
+            "models/modules/index.md",
+            "models/modules/embedding.md",
+            "models/modules/head.md",
+            "models/modules/attention.md",
+            "models/modules/ffn.md",
+            "models/modules/moe.md",
+            "models/modules/positional.md",
+            "models/modules/hidden_states_aggregator.md",
+        ] },
+        "models/model_design.md",
+        "models/horizontal_parallelism.md",
+        "models/pipeline_parallelism.md",
+    ] },
+    { "Datasets" = [
+        "dataset/index.md"
+    ] },
+    { "Parameter-Efficient Fine-Tuning (PEFT)" = [
+        "peft/overview.md",
+        "peft/lora.md",
+        "peft/full_tune.md",
+        "peft/stack.md",
+    ] },
+    { "Metrics" = [
+        "metric/overview.md",
+        { "Metric Catalogue" = [
+            "metric/metric_catalogue/index.md",
+        ] },
+        "metric/custom.md",
+    ] },
+    { "Optimizers" = [
+        "optimizer/stochastic.md",
+    ] },
+    { "Learning Rate Schedulers" = [
+        "lr_scheduler/piecewise.md",
+        "lr_scheduler/visualization.md",
+    ] },
+    { "Internal APIs" = [
+        "internals/determinism.md",
+        "internals/grad_norm.md",
+        "internals/grad_sync.md",
+        "internals/metric_collector.md",
+        "internals/pipeline_state.md",
+        "internals/pipelining.md",
+        "internals/profiling.md",
+        "internals/tracker_integration.md",
+    ] },
+]
+
+
+[project.theme]
+favicon = "https://avatars.githubusercontent.com/u/248787421"
+logo = "https://avatars.githubusercontent.com/u/248787421"
+language = "en"
+features = [
+    "content.code.annotate",
+    "content.code.copy",
+    "content.code.select",
+    "content.footnote.tooltips",
+    "content.tabs.link",
+    "content.tooltips",
+    "navigation.footer",
+    "navigation.indexes",
+    "navigation.instant",
+    "navigation.instant.prefetch",
+    "navigation.instant.progress",
+    "navigation.path",
+    "navigation.top",
+    "navigation.tracking",
+    "search.highlight",
+    "toc.follow",
+]
+
+[[project.theme.palette]]
+scheme = "slate"
+primary = "indigo"
+accent = "deep purple"
+toggle.icon = "lucide/moon"
+toggle.name = "Switch to light mode"
+
+[[project.theme.palette]]
+scheme = "default"
+primary = "indigo"
+accent = "deep purple"
+toggle.icon = "lucide/sun"
+toggle.name = "Switch to dark mode"
+
+[project.plugins.mkdocstrings.handlers.python]
+inventories = [
+    "https://docs.python.org/3/objects.inv",
+    "https://docs.pydantic.dev/latest/objects.inv",
+    "https://docs.pytorch.org/docs/stable/objects.inv",
+]
+# paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+inherited_members = true
+show_root_heading = true
+show_root_full_path = true
+show_symbol_type_heading = true
+show_symbol_type_toc = true
+show_source = false
+heading_level = 2
+
+[project.markdown_extensions.pymdownx.highlight]
+linenums = true
+anchor_linenums = true
+
+[project.markdown_extensions.pymdownx.superfences]
+
+[project.markdown_extensions.pymdownx.tabbed]
+alternate_style = true
+
+[project.markdown_extensions.admonition]
+
+[project.markdown_extensions.pymdownx.arithmatex]
+generic = true

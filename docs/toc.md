@@ -1,20 +1,25 @@
 ---
-title: Table of Contents
+icon: lucide/table-of-contents
 ---
+
+# Table of Contents
 
 ## 🌐 Distributed Core
 The foundational primitives managing the cluster.
 
 *   **[Distributed Context](./core/dist_context.md)**: The Source of Truth for topology. Understanding `DeviceMesh` domains (`dense`, `expert`, `batch`).
+*   **[Distributed Operations](./core/dist_ops.md)**: Utilities for gathering var-length tensors and objects.
+*   **[PyTree Sharding](./core/sharding.md)**: Utilities for splitting complex nested structures across ranks.
+*   **[Typing Extensions](./core/types.md)**: Python type annotations for common objects and structures.
 
 
 ## 🚀 Execution Engine
 How to configure and run jobs.
 
-*   **[Training Loop](./0_loop/0_index.md)**: The lifecycle of the `Trainer`, dependency injection, and execution flow.
-*   **[Inference Loop](./0_loop/1_inference_loop.md)**: The lifecycle of distributed `Inference` and forward-only execution.
-*   **[Configuration](./0_loop/config.md)**: Pydantic schemas for configuring jobs, batching, and logging.
-*   **[Interfaces (Providers & Tasks)](./0_loop/interfaces.md)**: How to inject your custom Model, Dataset, and Step logic (Train & Infer).
+*   **[Training Loop](./loop/train.md)**: The lifecycle of the `Trainer`, dependency injection, and execution flow.
+*   **[Inference Loop](./loop/inference.md)**: The lifecycle of distributed `Inference` and forward-only execution.
+*   **[Configuration](./loop/config.md)**: Pydantic schemas for configuring jobs, batching, and logging.
+*   **[Interfaces (Providers & Tasks)](./loop/interfaces/index.md)**: How to inject your custom Model, Dataset, and Step logic (Train & Infer).
 
 
 ## 💾 Data & State
@@ -28,33 +33,26 @@ Managing data loading and model checkpoints.
 ## 🧠 Modeling & Architecture
 Building blocks for modern LLMs.
 
-*   **[Model Design](./models/1_model_design.md)**: Principles for creating compatible models.
-*   **[Model Catalogue](./models/4_model_catalogue.md)**: Models available directly in d9d.
-*   **Building Blocks**:
-    *   [Attention](./modules/attention.md) (FlashSDPA, GQA)
-    *   [Mixture of Experts](./modules/moe.md) (Sparse Experts, Routers, DeepEP integration)
-    *   [Heads](./modules/head.md) & [Embeddings](./modules/embedding.md) (Split Vocab support)
-    *   [Positional Embeddings](./modules/positional.md) (RoPE)
-    *   [FFN](./modules/ffn.md) (SwiGLU)
+*   **[Model Catalogue](./models/model_catalogue/index.md)**: Models available directly in d9d.
+*   **[Model Design](./models/model_design.md)**: Principles for creating compatible models.
+*   **[Modules](./models/modules/index.md)**: Building blocks for implementing compatible models.
 
 ## ⚡ Parallelism
 Strategies for distributing computations.
 
-*   **[Horizontal Parallelism](./models/2_horizontal_parallelism.md)**: Data Parallelism, Fully-Sharded Data Parallelism, Expert Parallelism, Tensor Parallelism.
-*   **[Pipeline Parallelism](./models/3_pipeline_parallelism.md)**: Vertical scaling, schedules (1F1B, ZeroBubble), and cross-stage communication.
-    **[Distributed Operations](./core/dist_ops.md)**: Utilities for gathering var-length tensors and objects.
-*   **[PyTree Sharding](./core/sharding.md)**: Splitting complex nested structures across ranks.
+*   **[Horizontal Parallelism](./models/horizontal_parallelism.md)**: Data Parallelism, Fully-Sharded Data Parallelism, Expert Parallelism, Tensor Parallelism.
+*   **[Pipeline Parallelism](./models/pipeline_parallelism.md)**: Vertical scaling, schedules (1F1B, ZeroBubble), and cross-stage communication.
 
 ## 🔧 Fine-Tuning (PEFT)
 Parameter-Efficient Fine-Tuning framework.
 
-*   **[Overview](./peft/0_index.md)**: Injection lifecycle and state mapping.
+*   **[Overview](./peft/overview.md)**: Injection lifecycle and state mapping.
 *   **Methods**: [LoRA](./peft/lora.md), [Full Tune](./peft/full_tune.md), and [Method Stacking](./peft/stack.md).
 
 ## 📈 Optimization & Metrics
 
-*   **[Metrics](./metric/0_index.md)**: Distributed-aware statistic accumulation.
-*   **[Implemented Metrics](./metric/implemented.md)**: Ready-to-use metric implementations.
+*   **[Metrics](./metric/overview.md)**: Distributed-aware statistic accumulation.
+*   **[Metric Catalogue](./metric/metric_catalogue/index.md)**: Ready-to-use metric implementations.
 *   **[Custom Metrics](./metric/custom.md)**: Implementing custom metrics.
 *   **[Experiment Tracking](./internals/tracker_integration.md)**: Integration with logging backends (WandB, Aim).
 *   **[Piecewise Scheduler](./lr_scheduler/piecewise.md)**: Composable LR schedules and [Visualization](./lr_scheduler/visualization.md).

@@ -1,13 +1,9 @@
----
-title: Distributed Profiling
----
-
 # Distributed Profiling
 
-## About
-
-!!! warning "Warning:" 
+!!! warning "Internal API Warning"
     If you are utilizing the standard `d9d` training infrastructure, you **do not** need to call these functions manually. The framework automatically handles profiling based on configuration. This package is primarily intended for users extending `d9d`.
+
+## About
 
 The `d9d.internals.profiling` package provides a distributed-aware wrapper around the standard PyTorch Profiler. 
 
@@ -20,6 +16,3 @@ In large-scale distributed training, profiling often becomes difficult due to:
 The `Profiler` class solves these issues by automatically handling file naming based on the `DeviceMesh` coordinates, compressing traces into `.tar.gz` archives on the fly, and managing the profiling schedule (wait/warmup/active).
 
 ::: d9d.internals.profiling
-    options:
-        show_root_heading: true
-        show_root_full_path: true

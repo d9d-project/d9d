@@ -25,4 +25,4 @@ lint:
 
 mkdocs:
 	@echo "Starting docs server"
-	@poetry run mkdocs serve -a 0.0.0.0:8081 -w docs
+	@poetry run zensical serve -a 0.0.0.0:8081

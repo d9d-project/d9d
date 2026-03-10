@@ -1,7 +1,3 @@
----
-title: Distributed Context
----
-
 # Distributed Context
 
 ## About
@@ -168,6 +164,3 @@ with dist_ctx.local_main_process_first():
 
 
 ::: d9d.core.dist_context
-    options:
-        show_root_heading: true
-        show_root_full_path: true

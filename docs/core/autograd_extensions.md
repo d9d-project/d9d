@@ -1,7 +1,3 @@
----
-title: Autograd Extensions
----
-
 # Autograd Extensions
 
 ## About
@@ -38,9 +34,9 @@ allows the training loop to explicitly signal its intent to the custom operators
 1.  **Orchestrator**: The training loop sets the context (e.g., "I only want Input gradients now").
 2.  **Operator**: The custom `backward` checks this context. Even if PyTorch says `needs_input_grad=True`, the operator will verify with `GlobalGradContext` before computation.
 
-## Usage
+### Usage
 
-### In Custom Autograd Functions
+#### In Custom Autograd Functions
 
 When writing a custom operation, you must tag your gradients with a semantic `GradDirection` and check the context before computation.
 
@@ -75,18 +71,15 @@ class MyCustomOp(torch.autograd.Function):
         return grad_input, grad_weight
 ```
 
-### In Training Loops
+#### In Training Loops
 
 By default, the `GLOBAL_GRAD_CONTEXT` is set to compute both input and weight gradients. 
 
 The d9d pipelining API configures it for split-backward automatically.
-So, if you use the [Trainer](), **everything will work out of the box**.
+So, if you use the [Trainer](../loop/train.md), **everything will work out of the box**.
 
 If you use your own training loop implementation - you have to configure the context manually.
 
 ## API Reference
 
 ::: d9d.core.autograd
-    options:
-        show_root_heading: true
-        show_root_full_path: true

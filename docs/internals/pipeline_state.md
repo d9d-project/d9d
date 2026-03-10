@@ -1,10 +1,6 @@
----
-title: Pipeline State Management
----
-
 # Pipeline State Management
 
-!!! warning "Warning:" 
+!!! warning "Internal API Warning"
     If you are utilizing the standard `d9d` training infrastructure, you **do not** need to manage pipeline states manually. The framework automatically handles this. This package is primarily intended for users extending `d9d`.
 
 ## About
@@ -21,6 +17,3 @@ For instance, a typical data flow in a pipelined step is:
 
 
 ::: d9d.internals.pipeline_state
-    options:
-        show_root_heading: true
-        show_root_full_path: true

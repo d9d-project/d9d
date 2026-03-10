@@ -1,7 +1,3 @@
----
-title: Model Heads
----
-
 # Model Heads
 
 ## About
@@ -19,6 +15,3 @@ It uses efficient fused Linear-Cross-Entropy kernel from the [Cut-Cross-Entropy]
 Supports vocab split to multiple independent splits following the [`SplitTokenEmbeddings`](embedding.md) embedding implementation.
 
 ::: d9d.module.block.head
-    options:
-        show_root_heading: true
-        show_root_full_path: true

@@ -1,7 +1,3 @@
----
-title: Model Design
----
-
 # Model Design
 
 ## Bring Your own Model
@@ -19,7 +15,7 @@ d9d opts for a "white-box" approach to modelling. We avoid heavy abstraction lay
 
 Some distributed frameworks force users to define models via metadata specification objects to inject wrapping logic (like FSDP or Checkpointing) automatically. This makes debugging difficult.
 
-In d9d, you write standard `nn.Module` classes. Use `nn.linear`, `nn.RMSNorm`, or d9d's optimized blocks directly. Distributed wrapping logic is handled transparently, maintaining the standard PyTorch look and feel.
+In d9d, you write standard `nn.Module` classes. Use `nn.Linear`, `nn.RMSNorm`, or d9d's optimized blocks directly. Distributed wrapping logic is handled transparently, maintaining the standard PyTorch look and feel.
 
 ### Explicit Composition
 
@@ -29,13 +25,13 @@ Instead, d9d promotes explicit composition like **HuggingFace Transformers** doe
 
 ### Pipelining-Aware Models
 
-Please see [Pipelining API](./3_pipeline_parallelism.md).
+Please see [Pipelining API](./pipeline_parallelism.md).
 
 ### Late Initialization
 
 Constructing a large model on a single GPU (or even CPU RAM) often leads to immediate Out-Of-Memory (OOM) errors. `d9d` solves this via the `ModuleLateInit` protocol.
 
-It is safe to use modules implementing this protocol with d9d's native [Trainer](../0_loop/0_index.md) framework. 
+It is safe to use modules implementing this protocol with d9d's native [Trainer](../loop/train.md) framework. 
 
 The Trainer will instantiate modules on the `meta` device (consuming no memory), lay out the distributed topology and sharding strategy. 
 
@@ -43,7 +39,7 @@ Only then `reset_parameters()` is called to materialize model weights without al
 
 ## Reference Implementations
 
-For reference implementations, please see [Qwen3-MoE](qwen3_moe.md).
+For reference implementations, please see [Qwen3-MoE](./model_catalogue/qwen3_moe.md).
 
 ::: d9d.module.base
     options:

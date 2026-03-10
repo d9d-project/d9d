@@ -1,8 +1,4 @@
----
-title: PyTree Sharding
----
-
-# PyTree Sharding
+# PyTree Sharding Utilities
 
 ## About
 The `d9d.core.sharding` package provides utilities for splitting and reconstructing complex nested structures (PyTrees) of PyTorch Tensors and Python Lists.
@@ -22,6 +18,3 @@ A **Sharding Spec** is a PyTree that mirrors the structure of your data (e.g., a
 Helper functions like `shard_spec_on_dim` allow generating these specs automatically.
 
 ::: d9d.core.sharding
-    options:
-        show_root_heading: true
-        show_root_full_path: true

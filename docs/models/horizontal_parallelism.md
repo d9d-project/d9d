@@ -1,7 +1,3 @@
----
-title: Horizontal Parallelism
----
-
 # Horizontal Parallelism
 
 ## About
@@ -164,11 +160,5 @@ parallelize_hsdp(
 ```
 
 ::: d9d.module.parallelism.api
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.module.parallelism.style
-    options:
-        show_root_heading: true
-        show_root_full_path: true

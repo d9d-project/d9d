@@ -1,13 +1,9 @@
----
-title: Gradient Synchronization
----
-
 # Gradient Synchronization
 
-## About
-
-!!! warning "Warning:" 
+!!! warning "Internal API Warning"
     If you are utilizing the standard `d9d` training infrastructure, you **do not** need to call these functions manually. The framework automatically handles gradient synchronization. This package is primarily intended for users extending `d9d`.
+
+## About
 
 The `d9d.internals.grad_sync` package provides low-level primitives for synchronizing gradients in distributed training setups utilizing `DTensor`.
 
@@ -41,6 +37,3 @@ In large-scale training, effective batch size is often increased by accumulating
     Once the asynchronous reduction completes, the flat buffer contains the globally summed gradient. Metadata of the contained parameter gradients is marked as `Replicate`, making them safe for the Optimizer to consume without involving synchronization later.
 
 ::: d9d.internals.grad_sync
-    options:
-        show_root_heading: true
-        show_root_full_path: true

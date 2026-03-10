@@ -1,7 +1,3 @@
----
-title: Positional Embeddings
----
-
 # Positional Embeddings
 
 ## About
@@ -21,6 +17,3 @@ First one is typically bound to a model class and is used for providing (cos, si
 Second one is typically bound to attention module implementation and is used for modifying query and key states in runtime.
 
 ::: d9d.module.block.positional
-    options:
-        show_root_heading: true
-        show_root_full_path: true

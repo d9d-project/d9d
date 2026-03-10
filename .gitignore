@@ -6,3 +6,4 @@
 .mypy_cache/
 /example_data/
 /packages/
+/.cache/

@@ -1,7 +1,3 @@
----
-title: Training Loop
----
-
 # Training Loop
 
 ## Overview
@@ -12,23 +8,12 @@ The `d9d` Trainer separates the *definition* of the job (Models, Tasks, Data) fr
 
 This allows the same code to run on a single GPU or a 1000-GPU Pipeline Parallel cluster without modifications.
 
-## Configuration & Construction
-
-To ensure reproducibility, the Trainer is not instantiated directly with loose objects. It is built using the `TrainingConfigurator` and the **dependency injection** pattern.
-
-### TrainingConfigurator
-
-This class binds the 
-
-* **[Infrastructure Configuration](../core/dist_context.md)**, 
-* **[Job Configuration](./config.md)**, 
-* and **[User Logic](./interfaces.md)** (Providers) 
-
-into a `Trainer` object with prepared `TrainJobState`.
+## Example
 
 ```python
 from d9d.loop.run import TrainingConfigurator
 
+# Configure
 trainer = TrainingConfigurator(
     mesh=mesh_params,                  # Physical cluster layout
     parameters=config,                 # Logic configuration (batch size, etc)
@@ -40,9 +25,28 @@ trainer = TrainingConfigurator(
     optimizer_provider=...,            # How to optimize
     lr_scheduler_provider=...          # LR scheduler
 ).configure()
+
+# Execute
+trainer.train()
 ```
 
-## The Configuration Lifecycle
+## Configuration & Construction
+
+To ensure reproducibility, the Trainer is not instantiated directly with loose objects. It is built using the `TrainingConfigurator` and the **dependency injection** pattern.
+
+This class binds the 
+
+* **[Infrastructure Configuration](../core/dist_context.md)**, 
+* **[Job Configuration](./config.md)**, 
+* and **[User Logic](./interfaces.md)** (Providers) 
+
+into a `Trainer` object with prepared `TrainJobState`.
+
+::: d9d.loop.run.TrainingConfigurator
+    options:
+        heading_level: 3
+
+### The Configuration Lifecycle
 
 The `TrainingConfigurator.configure()` method does:
 
@@ -76,15 +80,19 @@ The `TrainingConfigurator.configure()` method does:
     *   All components (including internal ones) are packed into the `TrainJobState`.
     *   The `Trainer` is instantiated with this state and returned.
 
-## Training
+## Execution
 
 To run a train job, just call the `.train()` method on a `Trainer` object that is returned by configuration process.
 
-## The Training Lifecycle
+::: d9d.loop.run.Trainer
+    options:
+        heading_level: 3
+
+### The Training Lifecycle
 
 The `Trainer.train()` method orchestrates the following lifecycle. It is critical to understand this flow when debugging distributed issues or checking for side effects.
 
-### 1. Initialization & Recovery
+#### 1. Initialization & Recovery
 
 Before the loop starts:
 
@@ -100,7 +108,7 @@ Before the loop starts:
     *   **Gradient Manager**: Sets up backward hooks for synchronizing gradient states by all-reduce.
     *   **Gradient Clipper**: Looks for model parameters which gradients will be registered for clipping.
 
-### 2. The Step Loop
+#### 2. The Step Loop
 
 For every global step (`step`), the trainer performs the following actions in strict order:
 
@@ -112,7 +120,7 @@ For every global step (`step`), the trainer performs the following actions in st
     * We delegate to `TrainTask` to accumulate local metrics (e.g., token counts, accuracy) into the `Metric` state.
 
 2.  **Metric Synchronization**
-    *   **Metric Sync Trigger**: `JobLogger` triggers an async reduction of all metrics across the world. [More info](../metric/0_index.md).
+    *   **Metric Sync Trigger**: `JobLogger` triggers an async reduction of all metrics across the world. [More info](../metric/overview.md).
 
 3.  **Gradient Synchronization**
     *   **Wait & Scale**: The `GradientManager` waits for all backward hooks to finish. It synchronizes the *total weighted loss* across the world to determine the scaling factor, then divides all gradients by this factor (essential for correct averaging when batch sizes vary due to masking/packing). [More info](../internals/grad_sync.md).
@@ -136,12 +144,6 @@ For every global step (`step`), the trainer performs the following actions in st
 7.  **Checkpointing**
     *   If the current step matches `checkpointing.period_steps`, checkpointing is triggered. This acts as a global barrier.
 
-### 3. Finalization
+#### 3. Finalization
 
 1.  **Task-specific**: We delegate to the `TrainTask` to do its specific finalization work.
-
-## API Reference
-
-::: d9d.loop.run.TrainingConfigurator
-
-::: d9d.loop.run.Trainer

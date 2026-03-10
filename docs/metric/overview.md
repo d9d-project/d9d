@@ -1,8 +1,4 @@
----
-title: Metrics
----
-
-# Metrics
+# Overview
 
 ## About
 
@@ -55,7 +51,7 @@ A Metric in `d9d` follows a specific lifecycle:
 
 Typically, you want to just instantiate and update metrics within your `TrainTask` object.
 
-See related examples in [Trainer](../0_loop/interfaces.md) documentation.
+See related examples in [Trainer](../loop/interfaces/index.md) documentation.
 
 ### Manual Usage
 
@@ -95,6 +91,3 @@ metric.reset()
 ```
 
 ::: d9d.metric
-    options:
-        show_root_heading: true
-        show_root_full_path: true

@@ -1,7 +1,3 @@
----
-title: Qwen3 MoE
----
-
 # Qwen3 MoE
 
 ## About
@@ -12,11 +8,5 @@ The `d9d.module.parallelism.model.qwen3_moe` package implements default horizont
 
 
 ::: d9d.module.model.qwen3_moe
-    options:
-        show_root_heading: true
-        show_root_full_path: true
 
 ::: d9d.module.parallelism.model.qwen3_moe
-    options:
-        show_root_heading: true
-        show_root_full_path: true
