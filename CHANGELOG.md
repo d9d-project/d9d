@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.5.4 (2026-03-10)
+
+### Bug Fixes
+
+- Reorder contents in README
+  ([`973c7cb`](https://github.com/d9d-project/d9d/commit/973c7cb3010ec4e863da3729b236f05a80b5911a))
+
+### Documentation
+
+- Migrate from mkdocs-shadcn to zensical
+  ([`7c131c4`](https://github.com/d9d-project/d9d/commit/7c131c4fb9ba8085494ca0fdbe4ddbbec446b1ae))
+
+
 ## v0.5.3 (2026-03-01)
 
 ### Bug Fixes
