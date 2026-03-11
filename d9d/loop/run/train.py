@@ -34,7 +34,7 @@ from d9d.loop.control import (
     TrainTaskProviderContext,
 )
 from d9d.loop.state import TrainJobState
-from d9d.metric.impl import ComposeMetric
+from d9d.metric.impl.container import ComposeMetric
 
 
 class TrainingConfigurator:

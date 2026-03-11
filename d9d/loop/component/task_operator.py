@@ -12,7 +12,7 @@ from d9d.loop.control import (
     TrainTask,
     UpdateMetricsContext,
 )
-from d9d.metric.impl import ComposeMetric
+from d9d.metric.impl.container import ComposeMetric
 from d9d.pipelining.factory.factory import PipelineScheduleInfo
 
 from .pipeline_result_processing import STATE_LOSS, STATE_LOSS_WEIGHT

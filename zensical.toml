@@ -69,7 +69,9 @@ nav = [
     { "Metrics" = [
         "metric/overview.md",
         { "Metric Catalogue" = [
-            "metric/metric_catalogue/index.md",
+            "metric/metric_catalogue/aggregation.md",
+            "metric/metric_catalogue/classification.md",
+            "metric/metric_catalogue/container.md",
         ] },
         "metric/custom.md",
     ] },

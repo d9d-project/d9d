@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.metric.impl import SumMetric
+from d9d.metric.impl.aggregation import SumMetric
 
 from d9d_test.metric.infra import MetricCase, MetricParams, MetricStep, assert_metric_distributed, assert_metric_local
 

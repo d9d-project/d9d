@@ -34,7 +34,7 @@ from d9d.loop.control import (
     UpdateMetricsContext,
 )
 from d9d.loop.run import TrainingConfigurator
-from d9d.metric.impl import SumMetric
+from d9d.metric.impl.aggregation import SumMetric
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
 from d9d.module.block.head import LM_IGNORE_INDEX
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
