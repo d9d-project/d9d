@@ -15,7 +15,9 @@ class _StateLoadingFlow:
     Internal orchestration logic for loading and transforming model states in a streamed manner.
     """
 
-    def __init__(self, src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool):
+    def __init__(
+        self, src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool, position: int | None = None
+    ):
         self._src_dir = src_dir
         self._mapper = mapper
         self._device = device
@@ -28,10 +30,13 @@ class _StateLoadingFlow:
 
         self._check_index()
 
+        desc = f"Loading Model States [{position}]" if position is not None else "Loading Model States"
         self._pbar = tqdm(
-            desc="Loading Model States",
+            desc=desc,
             total=len([output_name for group in self._groups_to_process for output_name in group.outputs]),
             disable=not show_progress,
+            position=position,
+            leave=True,
         )
 
     def _load_index(self) -> ModelStateIndex:
@@ -87,7 +92,7 @@ class _StateLoadingFlow:
 
 
 def read_model_state(
-    src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool = True
+    src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool = True, position: int | None = None
 ) -> Iterable[tuple[str, torch.Tensor]]:
     """
     Reads a model checkpoint from disk, transforming it on-the-fly according to the state mapper.
@@ -101,9 +106,13 @@ def read_model_state(
         mapper: The transformation graph defining how to map on-disk keys to output keys.
         device: The device to load tensors onto (e.g., "cpu", "cuda:0").
         show_progress: Whether to display a progress bar.
+        position: Row index for the tqdm bar. Pass the process local rank to stack one bar
+            per rank without interleaving. ``None`` lets tqdm use its default (single bar).
 
     Yields:
         A tuple containing the transformed parameter name and its tensor value.
     """
 
-    yield from _StateLoadingFlow(src_dir=src_dir, device=device, mapper=mapper, show_progress=show_progress).load()
+    yield from _StateLoadingFlow(
+        src_dir=src_dir, device=device, mapper=mapper, show_progress=show_progress, position=position
+    ).load()

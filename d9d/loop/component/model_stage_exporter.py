@@ -28,4 +28,5 @@ class ModelStageExporter:
             pipeline_dim_name="pp",
             models=self._modules.modules,
             show_progress=True,
+            position=self._dist_context.local_rank,
         )

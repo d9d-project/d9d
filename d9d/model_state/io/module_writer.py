@@ -86,6 +86,7 @@ def save_model_state_pipeline_parallel(
     models: list[nn.Module],
     shard_size_gb: float = 4.0,
     show_progress: bool = True,
+    position: int | None = None,
 ):
     """
     High-level utility to save a model in a Distributed Pipeline Parallel environment to disk.
@@ -111,6 +112,8 @@ def save_model_state_pipeline_parallel(
         models: A list of modules (pipeline stages) processed by this PP rank.
         shard_size_gb: Max size per shard file in Gigabytes.
         show_progress: Whether to display a progress bar.
+        position: Row index for the tqdm bar. Pass the process local rank to stack one bar
+            per rank without interleaving. ``None`` lets tqdm use its default (single bar).
     """
     write_model_state_pipeline_parallel(
         dest_dir=dest_dir,
@@ -120,4 +123,5 @@ def save_model_state_pipeline_parallel(
         pipeline_dim_name=pipeline_dim_name,
         shard_size_gb=shard_size_gb,
         show_progress=show_progress,
+        position=position,
     )

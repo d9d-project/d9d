@@ -31,6 +31,7 @@ class _StateWritingFlowLocal:
         sharding_rank: int,
         # so we have to call writing flow from all processes, but
         is_current_process_rank_master: bool,
+        position: int | None = None,
     ):
         self._dest_dir = dest_dir
         self._mapper = mapper
@@ -50,10 +51,13 @@ class _StateWritingFlowLocal:
 
         self._is_current_process_rank_master = is_current_process_rank_master
         total_num_outputs = len([out_name for group in self._groups_to_process for out_name in group.outputs])
+        desc = f"Saving Model States [{position}]" if position is not None else "Saving Model States"
         self._pbar = tqdm(
-            desc="Saving Model States",
+            desc=desc,
             total=total_num_outputs,
             disable=not (show_progress and is_current_process_rank_master),
+            position=position,
+            leave=True,
         )
 
     def _flush_shard(self):
@@ -198,6 +202,7 @@ def write_model_state_local(
         show_progress=show_progress,
         sharding_rank=0,
         is_current_process_rank_master=True,
+        position=None,
     ).write(state_generator=state_generator)
 
     idx = cast(ModelStateIndex, idx)  # we are sure is_current_process_rank_master=True
@@ -212,6 +217,7 @@ def write_model_state_distributed(
     process_group: ProcessGroup,
     shard_size_gb: float = 4.0,
     show_progress: bool = True,
+    position: int | None = None,
 ):
     """
     Saves model states in a distributed setup (multiple processes).
@@ -229,6 +235,8 @@ def write_model_state_distributed(
         process_group: The distributed process group.
         shard_size_gb: Maximum shard size in GB.
         show_progress: Whether to show the progress bar.
+        position: Row index for the tqdm bar. Pass the process local rank to stack one bar
+            per rank without interleaving. ``None`` lets tqdm use its default (single bar).
     """
 
     current_idx = _StateWritingFlowLocal(
@@ -238,6 +246,7 @@ def write_model_state_distributed(
         show_progress=show_progress,
         sharding_rank=process_group.rank(),
         is_current_process_rank_master=True,
+        position=position,
     ).write(state_generator=state_generator)
     gather_idx = all_gather_object(current_idx, process_group)
     gather_idx_filter = [x for x in gather_idx if x is not None]
@@ -253,6 +262,7 @@ def write_model_state_pipeline_parallel(
     pipeline_dim_name: str,
     shard_size_gb: float = 4.0,
     show_progress: bool = True,
+    position: int | None = None,
 ):
     """
     Saves model states in a complex ND distributed training setting.
@@ -272,6 +282,8 @@ def write_model_state_pipeline_parallel(
         pipeline_dim_name: The name of the mesh dimension responsible for pipeline parallelism.
         shard_size_gb: Maximum shard size in GB.
         show_progress: Whether to show the progress bar.
+        position: Row index for the tqdm bar. Pass the process local rank to stack one bar
+            per rank without interleaving. ``None`` lets tqdm use its default (single bar).
     """
 
     pipeline_rank = device_mesh[pipeline_dim_name].get_rank()
@@ -293,6 +305,7 @@ def write_model_state_pipeline_parallel(
         show_progress=show_progress,
         sharding_rank=pipeline_rank,
         is_current_process_rank_master=master_within_pipeline_rank,
+        position=position,
     ).write(state_generator=state_generator)
     gather_idx = all_gather_object(current_idx, device_mesh.get_group(0))
     gather_idx_filter = [x for x in gather_idx if x is not None]

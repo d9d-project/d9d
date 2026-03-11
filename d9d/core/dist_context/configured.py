@@ -210,6 +210,12 @@ class DistributedContext:
         return self._node_rank
 
     @property
+    def local_rank(self) -> int:
+        """Returns the rank of the current process within its node."""
+
+        return self._local_rank
+
+    @property
     def num_nodes(self) -> int:
         """Returns the total number of nodes in the cluster."""
 

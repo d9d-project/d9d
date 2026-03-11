@@ -181,6 +181,7 @@ class ModelStageFactory:
                 model=model,
                 mapper=factored.state_mapper,
                 device=f"cuda:{torch.cuda.current_device()}",
+                position=self._dist_context.local_rank,  # progress bar is displayed once per rank inside this node
             )
 
         # set training state

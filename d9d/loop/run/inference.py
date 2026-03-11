@@ -185,7 +185,6 @@ class Inference:
         with torch.inference_mode():
             self._enable_eval_mode()
 
-            self._state.dist_context.logger.info("Waiting for the world to start job")
             self._state.dist_context.wait_world()
             self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
             self._state.checkpointer.load_last_checkpoint(self._state)

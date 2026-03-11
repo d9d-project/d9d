@@ -44,6 +44,7 @@ def load_model_state(
     device: str,
     model: nn.Module,
     show_progress: bool = True,
+    position: int | None = None,
 ):
     """
     High-level utility to stream a checkpoint directly into a PyTorch module.
@@ -68,9 +69,15 @@ def load_model_state(
         device: The device to load tensors onto (usually "cpu" or "cuda").
         model: The model instance to load weights into.
         show_progress: Whether to display the loading progress bar.
+        position: Row index for the tqdm bar. Pass the process local rank to stack one bar
+            per rank without interleaving. ``None`` lets tqdm use its default (single bar).
     """
 
     for state_name, state_value in read_model_state(
-        src_dir=src_dir, mapper=_augment_mapper_for_injection(model, mapper), device=device, show_progress=show_progress
+        src_dir=src_dir,
+        mapper=_augment_mapper_for_injection(model, mapper),
+        device=device,
+        show_progress=show_progress,
+        position=position,
     ):
         model.load_state_dict({state_name: state_value}, strict=False)

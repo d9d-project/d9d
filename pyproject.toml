@@ -226,7 +226,8 @@ suppress-none-returning = true
     "S101", # asserts allowed in tests...
     "D",  # no docs for tests sorry
     "ANN",  # no type annotations for tests
-    "SLF001"  # private access is ok for tests
+    "SLF001",  # private access is ok for tests
+    "PLC0415"  # imports outside top level are OK for tests
 ]
 "example/*.py" = [
     "INP001"  # no __init__.py
