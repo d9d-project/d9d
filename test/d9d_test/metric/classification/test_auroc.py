@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 import torch
-from d9d.metric.impl import BinaryAUROCMetric
+from d9d.metric.impl.classification import BinaryAUROCMetric
 from sklearn.metrics import roc_auc_score
 
 from d9d_test.metric.infra import MetricCase, MetricParams, MetricStep, assert_metric_distributed, assert_metric_local

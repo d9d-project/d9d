@@ -3,7 +3,8 @@ import copy
 import pytest
 import torch
 from d9d.core.dist_context import FLAT_DOMAIN, DeviceMeshParameters
-from d9d.metric.impl import ComposeMetric, WeightedMeanMetric
+from d9d.metric.impl.aggregation import WeightedMeanMetric
+from d9d.metric.impl.container import ComposeMetric
 from torch.testing import assert_close
 from torch.utils._pytree import tree_map  # noqa: PLC2701
 

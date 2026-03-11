@@ -22,7 +22,7 @@ from d9d.loop.component import (
     TrainTaskOperator,
 )
 from d9d.loop.control import InferenceTask, TrainTask
-from d9d.metric.impl import ComposeMetric
+from d9d.metric.impl.container import ComposeMetric
 
 
 @dataclasses.dataclass(kw_only=True)

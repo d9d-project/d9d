@@ -6,7 +6,7 @@ from torch.distributed.tensor import DTensor
 from d9d.core.dist_context import DistributedContext
 from d9d.internals.grad_sync import GradientSynchronizer
 from d9d.loop.config import GradientManagerConfig
-from d9d.metric.impl import WeightedMeanMetric
+from d9d.metric.impl.aggregation import WeightedMeanMetric
 
 from .batch_maths import BatchMaths
 from .model_stage_factory import TrackedModules
