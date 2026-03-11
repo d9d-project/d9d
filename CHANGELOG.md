@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.6.0 (2026-03-11)
+
+### Bug Fixes
+
+- Render multi-process model state loading progress using multiple progress bars (fixes #1)
+  ([`defea97`](https://github.com/d9d-project/d9d/commit/defea97dafc4f07f29e722e5feb60b299652ffc9))
+
+### Features
+
+- Implement composition-based classificaiton metrics API
+  ([`7d7476c`](https://github.com/d9d-project/d9d/commit/7d7476c29db5ad6959eef6f6c47ca06651f72f1a))
+
+
 ## v0.5.4 (2026-03-10)
 
 ### Bug Fixes
