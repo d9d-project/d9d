@@ -16,4 +16,8 @@ First one is typically bound to a model class and is used for providing (cos, si
 
 Second one is typically bound to attention module implementation and is used for modifying query and key states in runtime.
 
+#### Embedding Layout Styles
+
+The package supports multiple internal memory layouts for RoPE operations via the `RotaryEmbeddingStyle` enumeration. It is critical that both the provider and applicator share the identical style configuration:
+
 ::: d9d.module.block.positional

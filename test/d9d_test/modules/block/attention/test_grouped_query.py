@@ -3,6 +3,7 @@ import dataclasses
 import pytest
 import torch
 from d9d.module.block.attention import GroupedQueryAttention
+from d9d.module.block.positional import RotaryEmbeddingStyle
 from torch import nn
 from transformers import Qwen3MoeConfig
 from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeAttention
@@ -58,6 +59,7 @@ def build_my(dtype: torch.dtype):
             qk_norm_eps=1e-5,
             head_dim=32,
             is_causal=True,
+            rope_style=RotaryEmbeddingStyle.HALF,
         )
         .cuda()
         .to(dtype)

@@ -3,7 +3,7 @@ from torch import nn
 
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.attention.sdpa import FlashSdpa
-from d9d.module.block.positional import RotaryEmbeddingApplicator
+from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddingStyle
 
 
 class GroupedQueryAttention(nn.Module, ModuleLateInit):
@@ -26,6 +26,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         head_dim: int,
         qk_norm_eps: float | None,
         is_causal: bool,
+        rope_style: RotaryEmbeddingStyle,
     ):
         """
         Constructs the GroupedQueryAttention layer.
@@ -37,6 +38,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             head_dim: Dimensionality of a single attention head.
             qk_norm_eps: Epsilon for LayerNorm/RMSNorm applied to Q and K. If None, normalization is disabled.
             is_causal: Whether to apply a causal mask (auto-regressive constraint).
+            rope_style: Rotary embedding layout style alignment.
         """
 
         super().__init__()
@@ -63,7 +65,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             self.q_norm = None
             self.k_norm = None
 
-        self.rope = RotaryEmbeddingApplicator()
+        self.rope = RotaryEmbeddingApplicator(style=rope_style)
         self.kernel = FlashSdpa()
         self._is_causal = is_causal
 

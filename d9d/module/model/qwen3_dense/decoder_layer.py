@@ -4,6 +4,7 @@ from torch import nn
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.attention import GroupedQueryAttention
 from d9d.module.block.ffn import SwiGLU
+from d9d.module.block.positional import RotaryEmbeddingStyle
 
 from .params import Qwen3DenseLayerParameters
 
@@ -33,6 +34,7 @@ class Qwen3DenseLayer(nn.Module, ModuleLateInit):
             is_causal=True,
             qk_norm_eps=params.rms_norm_eps,
             head_dim=params.head_dim,
+            rope_style=RotaryEmbeddingStyle.HALF,
         )
 
         self.mlp = SwiGLU(hidden_size=params.hidden_size, intermediate_size=params.intermediate_size, bias=False)

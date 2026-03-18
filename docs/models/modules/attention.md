@@ -12,15 +12,23 @@ The `d9d.module.block.attention` package provides optimized attention mechanism 
 
 ### Grouped-Query Attention
 
-`GroupedQueryAttention` is a  [Grouped-Query Attention](https://arxiv.org/pdf/2305.13245) implementation.
+`GroupedQueryAttention` is a [Grouped-Query Attention](https://arxiv.org/pdf/2305.13245) implementation.
 
 Due to its abstract nature it is also can be used as Multi-Head Attention and Multi-Query Attention module.
 
 Uses `FlashSDPA` kernel.
 
-Uses [Rotary Positional Encoding](positional.md)
+Uses [Rotary Positional Encoding](./positional.md).
 
 Supports optional [QK Normalization](https://arxiv.org/pdf/2302.05442).
+
+### Multi-Head Latent Attention
+
+`MultiHeadLatentAttention` is an implementation of the Multi-Head Latent Attention (MLA) mechanism introduced in [DeepSeek-V2](https://arxiv.org/abs/2405.04434).
+
+Uses `FlashSDPA` kernel.
+
+Uses [Rotary Positional Encoding](positional.md).
 
 ::: d9d.module.block.attention
 

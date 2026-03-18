@@ -9,7 +9,7 @@ from d9d.module.base import ModuleLateInit
 from d9d.module.block.embedding import SplitTokenEmbeddings
 from d9d.module.block.head import ClassificationHead, SplitLanguageModellingHead
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode, create_hidden_states_aggregator
-from d9d.module.block.positional import RotaryEmbeddingProvider
+from d9d.module.block.positional import RotaryEmbeddingProvider, RotaryEmbeddingStyle
 from d9d.pipelining.api import (
     ModuleSupportsPipelining,
     PipelineStageInfo,
@@ -68,7 +68,10 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         self.layers: Mapping[str, Qwen3MoELayer] = cast(Mapping[str, Qwen3MoELayer], layers)
 
         self.rope_provider = RotaryEmbeddingProvider(
-            max_position_ids=params.max_position_ids, rope_base=params.rope_base, head_dim=params.layer.head_dim
+            max_position_ids=params.max_position_ids,
+            rope_base=params.rope_base,
+            head_dim=params.layer.head_dim,
+            style=RotaryEmbeddingStyle.HALF,
         )
 
         if stage.is_current_stage_last:
