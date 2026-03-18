@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v0.7.0 (2026-03-18)
+
+### Features
+
+- Add Multi-Latent Attention implementation along with support for different RoPE layouts
+  ([`56684bc`](https://github.com/d9d-project/d9d/commit/56684bcb440e68a94a2d6ee8b6ada7d53b414482))
+
+- Add Qwen3 Dense model
+  ([`08047bd`](https://github.com/d9d-project/d9d/commit/08047bd82f65ff0b7910bb000ff00edafbeaad81))
+
+
 ## v0.6.0 (2026-03-11)
 
 ### Bug Fixes
