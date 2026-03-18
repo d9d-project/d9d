@@ -2,7 +2,7 @@ import pytest
 import torch
 import torch.distributed as dist
 from d9d.core.dist_context import BATCH_DOMAIN, DENSE_DOMAIN, DeviceMeshParameters, DistributedContext
-from d9d.module.parallelism.model.qwen3_moe import parallelize_qwen3_moe_for_causal_lm
+from d9d.module.parallelism.model.qwen3_dense import parallelize_qwen3_dense_for_causal_lm
 from d9d.pipelining.api import PipelineShardingSpec, PipelineStageInfo
 from d9d.pipelining.factory import (
     PipelineScheduleGPipeConfig,
@@ -11,28 +11,27 @@ from d9d.pipelining.factory import (
 from torch import nn
 from torch.distributed.tensor import DTensor, Replicate, Shard
 from torch.nn.attention import SDPBackend, sdpa_kernel
-from transformers import Qwen3MoeConfig, Qwen3MoeForCausalLM
+from transformers import Qwen3Config, Qwen3ForCausalLM
 
 from d9d_test.modules.checkers import check_grad_distance_all_local_dist, copy_params_local_to_dist
 from d9d_test.modules.grad_sync import sync_grads_manually
-from d9d_test.modules.model.qwen3_moe.factory import build_decoder
-from d9d_test.modules.model.qwen3_moe.util import check_lm_model_grad, clone_lm_model_weights
+from d9d_test.modules.model.qwen3_dense.factory import build_decoder
+from d9d_test.modules.model.qwen3_dense.util import check_lm_model_grad, clone_lm_model_weights
 from d9d_test.modules.model.util import build_decoder_inputs_hf, build_decoder_inputs_my
 
 
-def build_hf_model() -> Qwen3MoeForCausalLM:
+def build_hf_model() -> Qwen3ForCausalLM:
     torch.manual_seed(131231)
 
-    hf = Qwen3MoeForCausalLM(
-        Qwen3MoeConfig(
+    hf = Qwen3ForCausalLM(
+        Qwen3Config(
             vocab_size=100,
             num_hidden_layers=12,
             hidden_size=512,
-            moe_intermediate_size=256,
-            num_experts=8,
-            num_experts_per_tok=7,
+            intermediate_size=256,
             num_attention_heads=16,
             num_key_value_heads=4,
+            head_dim=32,
             hidden_act="silu",
             max_position_embeddings=10000,
             rms_norm_eps=1e-5,
@@ -90,11 +89,11 @@ def _build_distributed_model(
     stage: PipelineStageInfo,
     dist_ctx: DistributedContext,
     local_model: nn.Module,
-    stage_memo: list[tuple[PipelineStageInfo, Qwen3MoeForCausalLM]],
+    stage_memo: list[tuple[PipelineStageInfo, Qwen3ForCausalLM]],
     checkpointing: bool,
 ):
     model = build_decoder(stage=stage, checkpointing=checkpointing)
-    parallelize_qwen3_moe_for_causal_lm(dist_ctx, model, stage)
+    parallelize_qwen3_dense_for_causal_lm(dist_ctx, model, stage)
     copy_params_local_to_dist(local=local_model, dist=model)
     stage_memo.append(model)
     return model
@@ -113,40 +112,27 @@ def _shard_virtual_dp(tensor: torch.Tensor, dist_ctx: DistributedContext) -> tor
 @pytest.mark.parametrize(
     "mesh",
     [
-        # PP + DPR / EP
+        # PP + DPR
         DeviceMeshParameters(
             pipeline_parallel=2,
-            expert_parallel=4,
             tensor_parallel=1,
             context_parallel_shard=1,
             data_parallel_shard=1,
             data_parallel_replicate=4,
             context_parallel_replicate=1,
         ),
-        # PP + DPS / EP
+        # PP + DPS
         DeviceMeshParameters(
             pipeline_parallel=2,
-            expert_parallel=4,
             tensor_parallel=1,
             context_parallel_shard=1,
             data_parallel_shard=4,
             data_parallel_replicate=1,
             context_parallel_replicate=1,
         ),
-        # PP + DPR + DPS / EP
+        # PP + DPR + DPS
         DeviceMeshParameters(
             pipeline_parallel=2,
-            expert_parallel=4,
-            tensor_parallel=1,
-            context_parallel_shard=1,
-            data_parallel_shard=2,
-            data_parallel_replicate=2,
-            context_parallel_replicate=1,
-        ),
-        # PP + DPR + DPS / EP + R
-        DeviceMeshParameters(
-            pipeline_parallel=2,
-            expert_parallel=2,
             tensor_parallel=1,
             context_parallel_shard=1,
             data_parallel_shard=2,

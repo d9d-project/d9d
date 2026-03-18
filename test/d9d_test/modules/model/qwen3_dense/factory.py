@@ -1,10 +1,10 @@
 import torch
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.module.model.qwen3_moe import (
-    Qwen3MoEForCausalLM,
-    Qwen3MoEForCausalLMParameters,
-    Qwen3MoELayerParameters,
-    Qwen3MoEParameters,
+from d9d.module.model.qwen3_dense import (
+    Qwen3DenseForCausalLM,
+    Qwen3DenseForCausalLMParameters,
+    Qwen3DenseLayerParameters,
+    Qwen3DenseParameters,
 )
 from d9d.pipelining.api import PipelineStageInfo
 
@@ -13,14 +13,12 @@ def build_decoder(stage: PipelineStageInfo, checkpointing: bool):
     torch.manual_seed(123)
 
     model = (
-        Qwen3MoEForCausalLM(
-            params=Qwen3MoEForCausalLMParameters(
-                model=Qwen3MoEParameters(
-                    layer=Qwen3MoELayerParameters(
+        Qwen3DenseForCausalLM(
+            params=Qwen3DenseForCausalLMParameters(
+                model=Qwen3DenseParameters(
+                    layer=Qwen3DenseLayerParameters(
                         hidden_size=512,
                         intermediate_size=256,
-                        num_experts=8,
-                        experts_top_k=7,
                         num_attention_heads=16,
                         num_key_value_heads=4,
                         rms_norm_eps=1e-5,

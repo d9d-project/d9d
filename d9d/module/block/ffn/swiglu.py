@@ -13,19 +13,20 @@ class SwiGLU(nn.Module, ModuleLateInit):
     It corresponds to the standard MLP block used in architectures like LLaMA.
     """
 
-    def __init__(self, hidden_size: int, intermediate_size: int):
+    def __init__(self, hidden_size: int, intermediate_size: int, bias: bool = False):
         """
         Constructs a SwiGLU object.
 
         Args:
             hidden_size: The hidden dim size.
             intermediate_size: The intermediate dim size of the FFN.
+            bias: Whether to use bias in the linear projections.
         """
 
         super().__init__()
-        self.gate_proj = nn.Linear(hidden_size, intermediate_size)
-        self.up_proj = nn.Linear(hidden_size, intermediate_size)
-        self.down_proj = nn.Linear(intermediate_size, hidden_size)
+        self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
+        self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
+        self.down_proj = nn.Linear(intermediate_size, hidden_size, bias=bias)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
