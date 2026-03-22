@@ -23,6 +23,30 @@ from d9d.loop.control import (
     InferenceTaskProvider,
     InferenceTaskProviderContext,
     ModelProvider,
+    RegisterModelEventsContext,
+    RegisterTaskEventsContext,
+)
+from d9d.loop.event import (
+    EventBus,
+)
+from d9d.loop.event.catalogue.common import (
+    EventConfigurationStartedContext,
+    EventDataLoaderReadyContext,
+    EventModelStagesReadyContext,
+    EventStepContext,
+)
+from d9d.loop.event.catalogue.inference import (
+    EVENT_INFERENCE_CONFIG_STARTED,
+    EVENT_INFERENCE_DATA_LOADER_READY,
+    EVENT_INFERENCE_FINISHED,
+    EVENT_INFERENCE_FORWARD_POST,
+    EVENT_INFERENCE_FORWARD_PRE,
+    EVENT_INFERENCE_MODEL_STAGES_READY,
+    EVENT_INFERENCE_READY,
+    EVENT_INFERENCE_STEP_POST,
+    EVENT_INFERENCE_STEP_PRE,
+    EventInferenceFinishedContext,
+    EventInferenceReadyContext,
 )
 from d9d.loop.state import InferenceJobState
 from d9d.pipelining.factory import PipelineScheduleInferenceConfig
@@ -74,6 +98,12 @@ class InferenceConfigurator:
 
         task = self._task_provider(InferenceTaskProviderContext(dist_context=dist_context))
 
+        event_bus = EventBus()
+        self._model_provider.register_events(RegisterModelEventsContext(dist_context=dist_context, event_bus=event_bus))
+        task.register_events(RegisterTaskEventsContext(dist_context=dist_context, event_bus=event_bus))
+
+        event_bus.trigger(EVENT_INFERENCE_CONFIG_STARTED, EventConfigurationStartedContext(dist_context=dist_context))
+
         batch_maths = BatchMaths(
             dist_context=dist_context, config_batching=self._parameters.batching, config_pipelining=pipelining_config
         )
@@ -85,6 +115,7 @@ class InferenceConfigurator:
             batch_maths=batch_maths,
         )
         data_loader_infer = data_loader_factory.build_dataloader_for_infer_job()
+        event_bus.trigger(EVENT_INFERENCE_DATA_LOADER_READY, EventDataLoaderReadyContext(data_loader=data_loader_infer))
 
         stepper = Stepper(initial_step=0, total_steps=len(data_loader_infer))
 
@@ -102,6 +133,7 @@ class InferenceConfigurator:
             batch_maths=batch_maths,
             pipeline_callback=processor,
         ).build_pipeline_and_modules()
+        event_bus.trigger(EVENT_INFERENCE_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
 
         task_operator = InferenceTaskOperator(
             dist_context=dist_context, task=task, pipeline=schedule, pipeline_state=pipeline_state_handler
@@ -127,6 +159,7 @@ class InferenceConfigurator:
             profiler=profiler,
             timeout_manager=timeout_manager,
             task_operator=task_operator,
+            event_bus=event_bus,
         )
 
     def configure(self) -> "Inference":
@@ -195,6 +228,8 @@ class Inference:
 
             self._state.dist_context.wait_world()
 
+            step_ctx = EventStepContext(stepper=self._state.stepper)
+
             with (
                 tqdm(
                     desc="Inference",
@@ -205,9 +240,16 @@ class Inference:
                 self._state.garbage_collector as gc,
                 self._state.profiler.open() as profiler,
             ):
+                self._state.event_bus.trigger(EVENT_INFERENCE_READY, EventInferenceReadyContext())
+
                 for batch_group in self._state.data_loader:
-                    for batch in batch_group:
-                        self._state.task_operator.forward(batch)
+                    self._state.event_bus.trigger(EVENT_INFERENCE_STEP_PRE, step_ctx)
+
+                    with self._state.event_bus.bounded(
+                        EVENT_INFERENCE_FORWARD_PRE, EVENT_INFERENCE_FORWARD_POST, step_ctx
+                    ):
+                        for batch in batch_group:
+                            self._state.task_operator.forward(batch)
 
                     gc.collect_periodic()
 
@@ -216,6 +258,7 @@ class Inference:
 
                     self._state.timeout_manager.set_periodic()
 
+                    self._state.event_bus.trigger(EVENT_INFERENCE_STEP_POST, step_ctx)
                     self._state.stepper.step()
 
                     # checkpoint at the end of the step
@@ -224,3 +267,4 @@ class Inference:
                     bar.update()
 
                 self._state.task.finalize(FinalizeContext())
+                self._state.event_bus.trigger(EVENT_INFERENCE_FINISHED, EventInferenceFinishedContext())

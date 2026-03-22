@@ -22,6 +22,7 @@ from d9d.loop.component import (
     TrainTaskOperator,
 )
 from d9d.loop.control import InferenceTask, TrainTask
+from d9d.loop.event import EventBus
 from d9d.metric.impl.container import ComposeMetric
 
 
@@ -104,6 +105,7 @@ class TrainJobState(JobState):
     lr_scheduler: LRSchedulerProtocol
     gradient_clipper: GradientClipper
     exporter: ModelStageExporter
+    event_bus: EventBus
 
     def state_dict(self) -> dict[str, Any]:
         return {
@@ -133,10 +135,12 @@ class InferenceJobState(JobState):
     Attributes:
         task: The specific inference task logic definition.
         task_operator: Executor for running forward and backward passes.
+        event_bus: The event bus for this inference job.
     """
 
     task: InferenceTask
     task_operator: InferenceTaskOperator
+    event_bus: EventBus
 
     def state_dict(self) -> dict[str, Any]:
         return {

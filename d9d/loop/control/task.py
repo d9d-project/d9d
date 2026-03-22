@@ -9,6 +9,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import PyTree, ScalarTree
+from d9d.loop.event import EventBus
 from d9d.pipelining.api import PipelineShardingSpec
 
 if typing.TYPE_CHECKING:
@@ -55,6 +56,20 @@ class BuildForwardInputsResult:
 
 
 @dataclasses.dataclass(kw_only=True)
+class RegisterTaskEventsContext:
+    """
+    Context for registering task-specific events.
+
+    Attributes:
+        dist_context: The distributed execution context.
+        event_bus: The event bus for subscribing to events.
+    """
+
+    dist_context: DistributedContext
+    event_bus: EventBus
+
+
+@dataclasses.dataclass(kw_only=True)
 class FinalizeContext:
     """Context data provided when the task is being finalized."""
 
@@ -94,6 +109,15 @@ class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch]):
             state_dict: The state dictionary to load.
         """
         # do nothing by default
+
+    def register_events(self, context: RegisterTaskEventsContext) -> None:
+        """
+        Register task-specific event subscriptions.
+
+        Args:
+            context: Context providing access to the distributed environment
+                and the event bus.
+        """
 
     def finalize(self, ctx: FinalizeContext) -> None:
         """

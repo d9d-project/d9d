@@ -50,20 +50,25 @@ into a `Trainer` object with prepared `TrainJobState`.
 
 The `TrainingConfigurator.configure()` method does:
 
-1.  **Distributed Context Initialization**:
+1. **Distributed Context Initialization**:
     *   Constructs the global [DistributedContext](../core/dist_context.md), therefore initializing all the required NCCL process groups and `DeviceMesh`es.
 
-2.  **Seeding**:
+2. **Seeding**:
     *   Sets distributed seeds using the configured `base_seed`. This ensures model initialization and other initial states are deterministic. [More info](../internals/determinism.md).
 
-3.  **Task Instantiation**:
+3. **Event Bus Initialization**:
+    *   Creates the global `EventBus`. Tasks and providers use this to [register custom hooks](./interfaces/events.md).
+    *   Triggers `EVENT_TRAIN_CONFIG_STARTED` event.
+ 
+4. **Task Instantiation**:
     *   Instantiates the `TrainTask` object using specified `TrainTaskProvider`.
 
-4.  **Data Loader Construction**:
+5. **Data Loader Construction**:
     *   Calls the `DatasetProvider` to get the dataset and wraps it into a `DataLoader`. 
     *   The DataLoader will move all the Tensor data to this worker's device **automatically**.
+    *   Triggers `EVENT_TRAIN_DATA_LOADER_READY` event.
 
-5.  **Model Materialization**:
+6. **Model Materialization**:
     *   The `ModelStageFactory` runs. This is the heavy lifting of initialization:
         1.  **Meta Init**: `ModelProvider` creates the model on the `meta` device (no memory usage).
         2.  **Parallelization**: `ModelProvider` applies `DTensor` sharding/replication to parameters.
@@ -71,12 +76,14 @@ The `TrainingConfigurator.configure()` method does:
         4.  **Wait**: Hard barrier to ensure all ranks allocated memory successfully.
         5.  **Parameter Reset**: `model.reset_parameters()` is called to generate random weights on GPU.
         6.  **Source Loading (Optional)**: If configured, a pretrained checkpoint (e.g., from HF) is streamed into the model using `ModelStateMapper`.
+   *  Triggers `EVENT_TRAIN_MODEL_STAGES_READY` event.
 
-6.  **Optimizer and LR Scheduler Setup**:
+7. **Optimizer and LR Scheduler Setup**:
     *   `OptimizerFactory` iterates over the model parameters.
     *   Calls `OptimizerProvider` and `LRSchedulerProvider`.
+    *   Triggers both `EVENT_TRAIN_OPTIMIZER_READY` and `EVENT_TRAIN_LR_SCHEDULER_READY` events.
 
-7.  **State Assembly**:
+8. **State Assembly**:
     *   All components (including internal ones) are packed into the `TrainJobState`.
     *   The `Trainer` is instantiated with this state and returned.
 
@@ -107,43 +114,51 @@ Before the loop starts:
     *   **Profiler**: Starts `torch.profiler` hooks. [More info](../internals/profiling.md).
     *   **Gradient Manager**: Sets up backward hooks for synchronizing gradient states by all-reduce.
     *   **Gradient Clipper**: Looks for model parameters which gradients will be registered for clipping.
+4.  **Ready Hook Trigger**: `EVENT_TRAIN_READY` is fired to mark the start of the primary train sequence.
 
 #### 2. The Step Loop
 
 For every global step (`step`), the trainer performs the following actions in strict order:
 
-1.  **Microbatch Execution**
+1. Triggers `EVENT_TRAIN_STEP_PRE` event.
+2. **Microbatch Execution**
+    * Triggers `EVENT_TRAIN_FORWARD_BACKWARD_PRE` event.
     * The `DataLoader` yields a "Batch Group" containing $N$ microbatches (calculated automatically based on `BatchingConfig`). 
     * We delegate to the `TrainTask` for mapping data before feeding it into the model.
     * The gradients will be **accumulated locally** using either regular multiple forward-backward calls if pipeline parallelism is disabled, either using our internal [pipelining API](../internals/pipelining.md). We delegate to `TrainTask` to compute loss values between forward and backward passes.
     * Last gradient accumulation triggers all-reduce synchronization. Communications may start overlapping here.
     * We delegate to `TrainTask` to accumulate local metrics (e.g., token counts, accuracy) into the `Metric` state.
+    * Triggers `EVENT_TRAIN_FORWARD_BACKWARD_POST` event.
 
-2.  **Metric Synchronization**
+3. **Metric Synchronization**
     *   **Metric Sync Trigger**: `JobLogger` triggers an async reduction of all metrics across the world. [More info](../metric/overview.md).
 
-3.  **Gradient Synchronization**
+4. **Gradient Synchronization**
     *   **Wait & Scale**: The `GradientManager` waits for all backward hooks to finish. It synchronizes the *total weighted loss* across the world to determine the scaling factor, then divides all gradients by this factor (essential for correct averaging when batch sizes vary due to masking/packing). [More info](../internals/grad_sync.md).
 
-4.  **Gradient Clipping**
+5. **Gradient Clipping**
     *   The `GradientClipper` calculates the global L2 norm of all parameters.
     *   If `max_norm` is set, gradients are modified in-place.
     *   The total norm is logged.
     *   [More info](../internals/grad_norm.md).
 
-5.  **Optimization**
+6. **Optimization**
+    * Triggers `EVENT_TRAIN_OPTIMIZER_STEP_PRE` event.
     *   **Step**: The `Optimizer` updates model parameters.
     *   **Schedule**: The `LRScheduler` updates the learning rate for the *next* step.
     *   **Zero Grad**: The `GradientManager` clears gradients for the next iteration.
+    * Triggers `EVENT_TRAIN_OPTIMIZER_STEP_POST` event.
 
-6.  **Logging & Maintenance**
+7. **Logging & Maintenance**
     *   **Log**: Metrics are finalized and written to the tracker.
     *   **GC**: `ManualGarbageCollector` runs if the current step matches the GC period.
+    *   **Event-Based Logic**: Triggers `EVENT_TRAIN_STEP_POST` event.
     *   **Advance**: The `Stepper` increments the step count.
 
-7.  **Checkpointing**
+8. **Checkpointing**
     *   If the current step matches `checkpointing.period_steps`, checkpointing is triggered. This acts as a global barrier.
 
 #### 3. Finalization
 
-1.  **Task-specific**: We delegate to the `TrainTask` to do its specific finalization work.
+1. **Event-specific**: The system triggers `EVENT_TRAIN_FINISHED` event.
+2. **Task-specific**: We delegate to the `TrainTask` to do its specific finalization work.

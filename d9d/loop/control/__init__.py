@@ -7,6 +7,7 @@ from .model_provider import (
     ParallelizeModelStageContext,
     PrepareExportModelStageContext,
     PrepareExportModelStageResult,
+    RegisterModelEventsContext,
 )
 from .optimizer_provider import InitializeOptimizerStageContext, OptimizerProvider
 from .task import (
@@ -22,6 +23,7 @@ from .task import (
     InferenceTaskProvider,
     InferenceTaskProviderContext,
     ProcessOutputsContext,
+    RegisterTaskEventsContext,
     TrainTask,
     TrainTaskProvider,
     TrainTaskProviderContext,
@@ -54,6 +56,8 @@ __all__ = [
     "PrepareExportModelStageContext",
     "PrepareExportModelStageResult",
     "ProcessOutputsContext",
+    "RegisterModelEventsContext",
+    "RegisterTaskEventsContext",
     "TrainTask",
     "TrainTaskProvider",
     "TrainTaskProviderContext",

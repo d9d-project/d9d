@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import abc
 import dataclasses
 from typing import Generic, TypeVar
@@ -6,6 +8,7 @@ from torch import nn
 
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import ScalarTree
+from d9d.loop.event import EventBus
 from d9d.model_state.mapper import ModelStateMapper
 from d9d.pipelining.api import PipelineStageInfo
 
@@ -83,6 +86,20 @@ class PrepareExportModelStageResult:
     state_mapper: ModelStateMapper
 
 
+@dataclasses.dataclass(kw_only=True)
+class RegisterModelEventsContext:
+    """
+    Context for registering model-specific events.
+
+    Attributes:
+        dist_context: The distributed execution context.
+        event_bus: The event bus for subscribing to events.
+    """
+
+    dist_context: DistributedContext
+    event_bus: EventBus
+
+
 class ModelProvider(abc.ABC, Generic[TModel]):
     """
     Abstract interface for defining the lifecycle of a distributed model.
@@ -142,6 +159,15 @@ class ModelProvider(abc.ABC, Generic[TModel]):
 
         Returns:
             Result of this operation.
+        """
+
+    def register_events(self, context: RegisterModelEventsContext) -> None:
+        """
+        Register model-specific event subscriptions.
+
+        Args:
+            context: Context providing access to the distributed environment,
+                the built model modules, and the event bus.
         """
 
     def dump_hparams(self) -> ScalarTree:

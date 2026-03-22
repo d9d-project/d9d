@@ -30,8 +30,36 @@ from d9d.loop.control import (
     LRSchedulerProvider,
     ModelProvider,
     OptimizerProvider,
+    RegisterModelEventsContext,
+    RegisterTaskEventsContext,
     TrainTaskProvider,
     TrainTaskProviderContext,
+)
+from d9d.loop.event import EventBus
+from d9d.loop.event.catalogue.common import (
+    EventConfigurationStartedContext,
+    EventDataLoaderReadyContext,
+    EventModelStagesReadyContext,
+    EventStepContext,
+)
+from d9d.loop.event.catalogue.train import (
+    EVENT_TRAIN_CONFIG_STARTED,
+    EVENT_TRAIN_DATA_LOADER_READY,
+    EVENT_TRAIN_FINISHED,
+    EVENT_TRAIN_FORWARD_BACKWARD_POST,
+    EVENT_TRAIN_FORWARD_BACKWARD_PRE,
+    EVENT_TRAIN_LR_SCHEDULER_READY,
+    EVENT_TRAIN_MODEL_STAGES_READY,
+    EVENT_TRAIN_OPTIMIZER_READY,
+    EVENT_TRAIN_OPTIMIZER_STEP_POST,
+    EVENT_TRAIN_OPTIMIZER_STEP_PRE,
+    EVENT_TRAIN_READY,
+    EVENT_TRAIN_STEP_POST,
+    EVENT_TRAIN_STEP_PRE,
+    EventLRSchedulerReadyContext,
+    EventOptimizerReadyContext,
+    EventTrainFinishedContext,
+    EventTrainReadyContext,
 )
 from d9d.loop.state import TrainJobState
 from d9d.metric.impl.container import ComposeMetric
@@ -86,6 +114,12 @@ class TrainingConfigurator:
 
         task = self._task_provider(TrainTaskProviderContext(dist_context=dist_context))
 
+        event_bus = EventBus()
+        self._model_provider.register_events(RegisterModelEventsContext(dist_context=dist_context, event_bus=event_bus))
+        task.register_events(RegisterTaskEventsContext(dist_context=dist_context, event_bus=event_bus))
+
+        event_bus.trigger(EVENT_TRAIN_CONFIG_STARTED, EventConfigurationStartedContext(dist_context=dist_context))
+
         batch_maths = BatchMaths(
             dist_context=dist_context,
             config_batching=self._parameters.batching,
@@ -99,6 +133,7 @@ class TrainingConfigurator:
             batch_maths=batch_maths,
         )
         data_loader_train = data_loader_factory.build_dataloader_for_train_job()
+        event_bus.trigger(EVENT_TRAIN_DATA_LOADER_READY, EventDataLoaderReadyContext(data_loader=data_loader_train))
 
         stepper = Stepper(initial_step=0, total_steps=len(data_loader_train))
 
@@ -116,6 +151,7 @@ class TrainingConfigurator:
             batch_maths=batch_maths,
             pipeline_callback=loss_computer,
         ).build_pipeline_and_modules()
+        event_bus.trigger(EVENT_TRAIN_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
 
         metrics = ComposeMetric(task.create_metrics(CreateMetricsContext()).metrics)
 
@@ -141,6 +177,8 @@ class TrainingConfigurator:
             stepper=stepper,
             lr_scheduler_provider=self._lr_scheduler_provider,
         ).build_optimizer_and_scheduler()
+        event_bus.trigger(EVENT_TRAIN_OPTIMIZER_READY, EventOptimizerReadyContext(optimizer=optimizer))
+        event_bus.trigger(EVENT_TRAIN_LR_SCHEDULER_READY, EventLRSchedulerReadyContext(lr_scheduler=scheduler))
 
         gc = ManualGarbageCollector(dist_ctx=dist_context, config=self._parameters.gc, step=stepper)
 
@@ -191,6 +229,7 @@ class TrainingConfigurator:
             gradient_manager=gradient_manager,
             timeout_manager=timeout_manager,
             task_operator=task_operator,
+            event_bus=event_bus,
         )
 
     def configure(self) -> "Trainer":
@@ -241,6 +280,8 @@ class Trainer:
 
         self._state.dist_context.wait_world()
 
+        step_ctx = EventStepContext(stepper=self._state.stepper)
+
         with (
             tqdm(
                 desc="Training",
@@ -256,19 +297,24 @@ class Trainer:
             self._state.logger.install(),
         ):
             run.set_context({"stage": "train"})
+            self._state.event_bus.trigger(EVENT_TRAIN_READY, EventTrainReadyContext(run=run))
 
             for batch_group in self._state.data_loader:
                 run.set_step(self._state.stepper.current_step)
+                self._state.event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
 
-                for batch in batch_group:
-                    # we do both forward and backward passes
-                    # since GradientManager is installed - it should start performing
-                    # synchronization overlapping grad sync with compute
-                    loss = self._state.task_operator.forward_backward(batch)
+                with self._state.event_bus.bounded(
+                    EVENT_TRAIN_FORWARD_BACKWARD_PRE, EVENT_TRAIN_FORWARD_BACKWARD_POST, step_ctx
+                ):
+                    for batch in batch_group:
+                        # we do both forward and backward passes
+                        # since GradientManager is installed - it should start performing
+                        # synchronization overlapping grad sync with compute
+                        loss = self._state.task_operator.forward_backward(batch)
 
-                    # add loss for grad manager - it want it for grad reduction
-                    if loss is not None:
-                        self._state.gradient_manager.add_loss_with_weight(loss.loss, loss.loss_weight)
+                        # add loss for grad manager - it want it for grad reduction
+                        if loss is not None:
+                            self._state.gradient_manager.add_loss_with_weight(loss.loss, loss.loss_weight)
 
                 # metrics were successfully accumulated during forward passes - we can schedule their synchronization
                 self._state.logger.trigger_sync()
@@ -280,7 +326,10 @@ class Trainer:
                 self._state.gradient_clipper.clip_and_log(run)
 
                 # optimize (it won't sync grads - they are already Replicate-d)
-                self._state.optimizer.step()
+                with self._state.event_bus.bounded(
+                    EVENT_TRAIN_OPTIMIZER_STEP_PRE, EVENT_TRAIN_OPTIMIZER_STEP_POST, step_ctx
+                ):
+                    self._state.optimizer.step()
 
                 # update LR
                 self._state.lr_scheduler.step()
@@ -298,6 +347,7 @@ class Trainer:
 
                 self._state.timeout_manager.set_periodic()
 
+                self._state.event_bus.trigger(EVENT_TRAIN_STEP_POST, step_ctx)
                 self._state.stepper.step()
 
                 # checkpoint at the end of the step
@@ -306,6 +356,7 @@ class Trainer:
                 bar.update()
 
             self._state.task.finalize(FinalizeContext())
+            self._state.event_bus.trigger(EVENT_TRAIN_FINISHED, EventTrainFinishedContext())
 
     def export(self, export_to: Path, load_checkpoint: bool):
         """

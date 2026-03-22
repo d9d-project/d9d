@@ -12,5 +12,6 @@ For standard use cases (like standard Optimizers), `d9d` provides **Auto** imple
 *   **[User Tasks](./task.md)**: See how to implement `TrainTask` and `InferenceTask` to define your custom step logic, manipulate batch inputs, pass data across pipeline states, and compute losses.
 *   **[Model Definition](./model.md)**: Learn how to implement `ModelProvider` to initialize models, handle state mapping, and configure horizontal parallelism.
 *   **[Data Loading](./data.md)**: Understand the `DatasetProvider` for instantiating datasets, managing data collation, and configuring distributed-aware sharding.
+*   **[Events & Hooks](./events.md)**: Discover how to hook into specific moments of the train or inference lifecycle using the declarative Event Bus.
 *   **[Optimizers](./optimizer.md)**: Learn about the `AutoOptimizerProvider` for easy Pydantic-based configuration of standard optimizers, or how to write your own `OptimizerProvider`.
 *   **[Learning Rate Scheduler](./lr_scheduler.md)**: Explore the `AutoLRSchedulerProvider` for piecewise scheduling (warmup, hold, decay) or the custom `LRSchedulerProvider` interface.

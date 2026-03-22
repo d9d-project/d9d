@@ -20,6 +20,8 @@ It is responsible for logging metrics, mapping batch inputs before they are fed 
 
 **State Management**: `state_dict(...)`, `load_state_dict(...)`.
 
+**Events Registration**: `register_events(...)` allows you to link specific custom methods to framework-wide [Event Hooks](./events.md).
+
 ## InferenceTask
 
 The `InferenceTask` defines the logic for a single inference step. 
@@ -34,6 +36,8 @@ It is designed to handle the **forward-only** flow, processing the raw tensors s
 **Exit**: `finalize(...)`.
 
 **State Management**: `state_dict(...)`, `load_state_dict(...)`.
+
+**Events Registration**: `register_events(...)` allows hooking into the [Event Bus](./events.md) alongside regular execution.
 
 ## Pipeline State
 

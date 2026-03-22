@@ -30,6 +30,7 @@ nav = [
             "loop/interfaces/task.md",
             "loop/interfaces/model.md",
             "loop/interfaces/data.md",
+            "loop/interfaces/events.md",
             "loop/interfaces/optimizer.md",
             "loop/interfaces/lr_scheduler.md",
         ] }

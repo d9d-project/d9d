@@ -39,23 +39,28 @@ This class binds the infrastructure and user logic into a ready-to-execute `Infe
 
 The `InferenceConfigurator.configure()` method performs a setup sequence similar to training, but optimized for forward-only execution:
 
-1.  **Distributed Context Initialization**:
+1. **Distributed Context Initialization**:
     *   Constructs the global [DistributedContext](../core/dist_context.md).
 
-2.  **Seeding**:
+2. **Seeding**:
     *   Sets distributed seeds. Determinism is crucial in inference for reproducible sampling or validation splits.
 
-3.  **Task Instantiation**:
+3. **Event Bus Initialization**:
+    *   Creates the global `EventBus` for lifecycle extensions. Tasks and Providers can [register custom hooks](./interfaces/events.md).
+    *   Triggers `EVENT_INFERENCE_CONFIG_STARTED` event.
+
+4. **Task Instantiation**:
     *   Instantiates the `InferenceTask`. This defines how inputs are processed and what to do with the outputs (e.g., writing to a JSONL file).
 
-4.  **Data Loader Construction**:
+5. **Data Loader Construction**:
     *   Creates a distributed `DataLoader` that handles sharding the inference dataset across ranks.
 
-5.  **Model Materialization**:
+6. **Model Materialization**:
     *   The `ModelStageFactory` runs to build the model.
     *   **Note**: This reuses the exact same `ModelProvider` as training.
+    *   Triggers `EVENT_INFERENCE_MODEL_STAGES_READY` event.
 
-6.  **State Assembly**:
+7. **State Assembly**:
     *   Components are packed into `InferenceJobState`.
     *   The `Inference` engine is instantiated.
 
@@ -83,26 +88,32 @@ Before the loop starts:
     *   If the job was interrupted previously, it also restores the `Stepper` and `DataLoader` state to resume exactly where it left off.
 3.  **Context Entry**:
     *   Enters UI, Garbage Collector, and Profiler contexts.
+4.  **Ready Hook Trigger**: `EVENT_INFERENCE_READY` is fired to mark initialization completion.
 
 #### 2. The Step Loop
 
 For every step:
 
-1.  **Microbatch Execution**:
+1. Triggers `EVENT_INFERENCE_STEP_PRE` event.
+2. **Microbatch Execution**:
+    *   Triggers `EVENT_INFERENCE_FORWARD_PRE` event.  
     *   The `DataLoader` yields a batch group.
     *   The `InferenceTaskOperator` manages the execution. 
     *   Data is fed through the model.
     *   Unlike training, **no backward pass** is performed.
+    *   Triggers `EVENT_INFERENCE_FORWARD_POST` event.
 
-2.  **Maintenance**:
+3. **Maintenance**:
     *   **GC**: `ManualGarbageCollector` runs periodically to ensure peak memory usage is controlled.
+    *   **Event-Based Logic**: Triggers `EVENT_INFERENCE_STEP_POST` event.
     *   **Advance**: The `Stepper` increments.
 
-3.  **Checkpointing**:
+4. **Checkpointing**:
     *   If configured, the system saves the *progress* of the inference job. This allows restarting a long-running generation job on a massive dataset without re-processing the first half.
 
 #### 3. Finalization
 
-1.  **Task-specific**: 
+1. **Event-specific**: The system triggers `EVENT_INFERENCE_FINISHED` event.
+2. **Task-specific**: 
     *   Calls `InferenceTask.finalize()`. 
     *   This is typically used to close file handles (e.g., flushing the final lines of a generated dataset to disk).
