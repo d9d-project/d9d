@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.8.0 (2026-03-22)
+
+### Features
+
+- Add training hooks system based on event bus along with a set of predefined events
+  ([`13a76e2`](https://github.com/d9d-project/d9d/commit/13a76e26fc416c7f9bf6dd9ff3b6fc4e6281e97f))
+
+
 ## v0.7.0 (2026-03-18)
 
 ### Features
