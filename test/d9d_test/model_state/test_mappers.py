@@ -4,6 +4,7 @@ from d9d.core.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
 from d9d.model_state.mapper import ModelStateMapper, StateGroup
 from d9d.model_state.mapper.compose import (
     ModelStateMapperParallel,
+    ModelStateMapperPrefixScope,
     ModelStateMapperSequential,
     ModelStateMapperShard,
 )
@@ -14,6 +15,7 @@ from d9d.model_state.mapper.leaf import (
     ModelStateMapperRename,
     ModelStateMapperSelectChildModules,
     ModelStateMapperStackTensors,
+    ModelStateMapperUnstackTensors,
 )
 from torch.distributed.tensor import DTensor, Shard
 
@@ -185,15 +187,77 @@ def test_stack_tensors_mapper():
     expected_groups = frozenset([StateGroup(inputs=frozenset(["a", "b", "c"]), outputs=frozenset(["stacked"]))])
     assert mapper.state_dependency_groups() == expected_groups
 
-    t1 = torch.tensor([1, 1])
-    t2 = torch.tensor([2, 2])
-    t3 = torch.tensor([3, 3])
+    t1 = torch.tensor([1, 2])
+    t2 = torch.tensor([2, 3])
+    t3 = torch.tensor([3, 4])
 
     res = mapper.apply({"a": t1, "b": t2, "c": t3})
     assert res.keys() == {"stacked"}
     assert res["stacked"].shape == (3, 2)
     assert torch.equal(res["stacked"][0], t1)
+    assert torch.equal(res["stacked"][1], t2)
     assert torch.equal(res["stacked"][2], t3)
+
+
+@pytest.mark.local
+def test_stack_tensors_mapper_transpose():
+    mapper = ModelStateMapperStackTensors(["a", "b", "c"], "stacked", stack_dim=0, transpose_dims=(-1, -2))
+
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["a", "b", "c"]), outputs=frozenset(["stacked"]))])
+    assert mapper.state_dependency_groups() == expected_groups
+
+    t1 = torch.tensor([1, 2])
+    t2 = torch.tensor([2, 3])
+    t3 = torch.tensor([3, 4])
+
+    res = mapper.apply({"a": t1, "b": t2, "c": t3})
+    assert res.keys() == {"stacked"}
+    assert res["stacked"].shape == (2, 3)
+    assert torch.equal(res["stacked"][:, 0], t1)
+    assert torch.equal(res["stacked"][:, 1], t2)
+    assert torch.equal(res["stacked"][:, 2], t3)
+
+
+@pytest.mark.local
+def test_unstack_tensors_mapper():
+    mapper = ModelStateMapperUnstackTensors(
+        source_name="stacked",
+        target_names=["a", "b", "c"],
+        unstack_dim=0,
+    )
+
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["stacked"]), outputs=frozenset(["a", "b", "c"]))])
+    assert mapper.state_dependency_groups() == expected_groups
+
+    t_stacked = torch.tensor([[1, 2], [2, 3], [3, 4]])
+
+    res = mapper.apply({"stacked": t_stacked})
+    assert res.keys() == {"a", "b", "c"}
+    assert torch.equal(res["a"], torch.tensor([1, 2]))
+    assert torch.equal(res["b"], torch.tensor([2, 3]))
+    assert torch.equal(res["c"], torch.tensor([3, 4]))
+
+
+@pytest.mark.local
+def test_unstack_tensors_mapper_transpose():
+    mapper = ModelStateMapperUnstackTensors(
+        source_name="stacked",
+        target_names=["a", "b", "c"],
+        unstack_dim=0,
+        transpose_dims=(-1, -2),
+    )
+
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["stacked"]), outputs=frozenset(["a", "b", "c"]))])
+    assert mapper.state_dependency_groups() == expected_groups
+
+    # This shape is (2, 3), representing a stacked then transposed tensor
+    t_stacked = torch.tensor([[1, 2, 3], [2, 3, 4]])
+
+    res = mapper.apply({"stacked": t_stacked})
+    assert res.keys() == {"a", "b", "c"}
+    assert torch.equal(res["a"], torch.tensor([1, 2]))
+    assert torch.equal(res["b"], torch.tensor([2, 3]))
+    assert torch.equal(res["c"], torch.tensor([3, 4]))
 
 
 @pytest.mark.distributed
@@ -222,3 +286,28 @@ def test_dtensor_mapper_logic(dist_ctx_factory):
 
     # Verify content
     assert torch.equal(res_back["w"], full_tensor)
+
+
+@pytest.mark.local
+def test_prefix_scope_mapper():
+    child_mapper = MergeAddMapper("weight", "bias", "out")
+    prefix_mapper = ModelStateMapperPrefixScope(child_mapper, "model.layers.0.")
+
+    expected_groups = frozenset(
+        [
+            StateGroup(
+                inputs=frozenset(["model.layers.0.weight", "model.layers.0.bias"]),
+                outputs=frozenset(["model.layers.0.out"]),
+            )
+        ]
+    )
+    assert prefix_mapper.state_dependency_groups() == expected_groups
+
+    data = {
+        "model.layers.0.weight": torch.tensor(10),
+        "model.layers.0.bias": torch.tensor(5),
+    }
+
+    res = prefix_mapper.apply(data)
+    assert res.keys() == {"model.layers.0.out"}
+    assert res["model.layers.0.out"].item() == 15

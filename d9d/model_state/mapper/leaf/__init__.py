@@ -6,7 +6,7 @@ from .dtensor import ModelStateMapperDistribute, ModelStateMapperGatherFullTenso
 from .identity import ModelStateMapperIdentity
 from .rename import ModelStateMapperRename
 from .select_child import ModelStateMapperSelectChildModules
-from .stack import ModelStateMapperStackTensors
+from .stack import ModelStateMapperStackTensors, ModelStateMapperUnstackTensors
 
 __all__ = [
     "ModelStateMapperDistribute",
@@ -15,4 +15,5 @@ __all__ = [
     "ModelStateMapperRename",
     "ModelStateMapperSelectChildModules",
     "ModelStateMapperStackTensors",
+    "ModelStateMapperUnstackTensors",
 ]

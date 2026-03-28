@@ -5,11 +5,13 @@ are composed of other mappers.
 
 from .helper import filter_empty_mappers
 from .parallel import ModelStateMapperParallel
+from .prefix_scope import ModelStateMapperPrefixScope
 from .sequential import ModelStateMapperSequential
 from .shard import ModelStateMapperShard
 
 __all__ = [
     "ModelStateMapperParallel",
+    "ModelStateMapperPrefixScope",
     "ModelStateMapperSequential",
     "ModelStateMapperShard",
     "filter_empty_mappers",

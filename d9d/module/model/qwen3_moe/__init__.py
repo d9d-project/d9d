@@ -1,4 +1,12 @@
 from .decoder_layer import Qwen3MoELayer
+from .huggingface import (
+    mapper_from_huggingface_qwen3_moe,
+    mapper_from_huggingface_qwen3_moe_for_causal_lm,
+    mapper_from_huggingface_qwen3_moe_for_classification,
+    mapper_to_huggingface_qwen3_moe,
+    mapper_to_huggingface_qwen3_moe_for_causal_lm,
+    mapper_to_huggingface_qwen3_moe_for_classification,
+)
 from .model import Qwen3MoEForCausalLM, Qwen3MoEForClassification, Qwen3MoEModel
 from .params import (
     Qwen3MoEForCausalLMParameters,
@@ -16,4 +24,10 @@ __all__ = [
     "Qwen3MoELayerParameters",
     "Qwen3MoEModel",
     "Qwen3MoEParameters",
+    "mapper_from_huggingface_qwen3_moe",
+    "mapper_from_huggingface_qwen3_moe_for_causal_lm",
+    "mapper_from_huggingface_qwen3_moe_for_classification",
+    "mapper_to_huggingface_qwen3_moe",
+    "mapper_to_huggingface_qwen3_moe_for_causal_lm",
+    "mapper_to_huggingface_qwen3_moe_for_classification",
 ]
