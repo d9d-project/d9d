@@ -103,7 +103,7 @@ def mapper_from_huggingface_qwen3_dense_for_classification(
     return ModelStateMapperParallel(
         [
             ModelStateMapperPrefixScope(mapper_from_huggingface_qwen3_dense(params.model), prefix="model."),
-            ModelStateMapperRename(name_from="score.weight", name_to="cls_head.weight"),
+            ModelStateMapperRename(name_from="score.weight", name_to="cls_head.score.weight"),
         ]
     )
 
@@ -191,6 +191,6 @@ def mapper_to_huggingface_qwen3_dense_for_classification(
     return ModelStateMapperParallel(
         [
             ModelStateMapperPrefixScope(mapper_to_huggingface_qwen3_dense(params.model), prefix="model."),
-            ModelStateMapperRename(name_from="cls_head.weight", name_to="score.weight"),
+            ModelStateMapperRename(name_from="cls_head.score.weight", name_to="score.weight"),
         ]
     )
