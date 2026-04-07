@@ -46,7 +46,8 @@ class ShardMoESparseExpertsParallel(ParallelStyle):
         if not isinstance(module, MoELayer):
             raise TypeError("This plan should be applied only on MoELayer")
 
-        module.enable_distributed_communicator(device_mesh.get_group(self._shard_dim_name))
+        if device_mesh[self._shard_dim_name].size() > 1:
+            module.enable_distributed_communicator(device_mesh.get_group(self._shard_dim_name))
 
         for submod in module.modules():
             if isinstance(submod, GroupedLinear):
