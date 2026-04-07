@@ -1,113 +1,195 @@
+import dataclasses
+
 import pytest
 import torch
 from d9d.core.dist_context import BATCH_DOMAIN, EXPERT_DOMAIN, DeviceMeshParameters
+from d9d.model_state.mapper import ModelStateMapper
+from d9d.model_state.mapper.compose import ModelStateMapperParallel
+from d9d.model_state.mapper.leaf import ModelStateMapperRename, ModelStateMapperStackTensors
 from d9d.module.block.moe import MoELayer
 from d9d.module.parallelism.api import parallelize_expert_parallel
-from torch import nn
 from transformers import Qwen3MoeConfig
 from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeSparseMoeBlock
 
-from d9d_test.modules.block.moe.util import check_moe_qwen3_moe_grad, clone_moe_weights_qwen3_moe
-from d9d_test.modules.checkers import check_grad, check_grad_distance_all_local_dist
-from d9d_test.modules.grad_sync import sync_grads_manually
+from d9d_test.modules.helper import (
+    assert_mapped_gradients_close,
+    check_grad_distance_all_local_dist,
+    clone_module_weights,
+    copy_params_local_to_dist,
+    forward_tolerance_for,
+    sync_grads_manually,
+    torch_seed,
+)
 
-_NUM_DEVICES = 8
+_NUM_EXPERTS = 32
+_NUM_ACTIVATE_EXPERTS = 4
+_HIDDEN_SIZE = 512
+_MOE_INTERMEDIATE_SIZE = 256
 
 
-def build_moe_inputs(dtype: torch.dtype):
-    torch.manual_seed(4242)
-
-    hidden_states = torch.randn(16, 1024, 512).cuda().to(dtype)
-    moe_hf_pre = nn.Parameter(torch.zeros((1, 1, 512), dtype=dtype, device="cuda"))
-    moe_my_pre = nn.Parameter(torch.zeros((1, 1, 512), dtype=dtype, device="cuda"))
-
-    return hidden_states, moe_hf_pre, moe_my_pre
-
-
-def build_my_moe(dtype: torch.dtype):
-    torch.manual_seed(42)
-
-    moe = (
-        MoELayer(
-            hidden_dim=512,
-            num_grouped_experts=32,
-            intermediate_dim_grouped=256,
-            top_k=4,
-            router_renormalize_probabilities=True,
-        )
-        .cuda()
-        .to(dtype)
+def _mapper_from_hf_to_d9d() -> ModelStateMapper:
+    return ModelStateMapperParallel(
+        [
+            *(
+                ModelStateMapperStackTensors(
+                    source_names=[f"experts.{expert_i}.{proj_type}.weight" for expert_i in range(_NUM_EXPERTS)],
+                    target_name=f"grouped_experts.{proj_type}.weight",
+                    stack_dim=0,
+                    transpose_dims=(-1, -2),
+                )
+                for proj_type in ("down_proj", "gate_proj", "up_proj")
+            ),
+            ModelStateMapperRename("gate.weight", "router.gate.weight"),
+        ]
     )
-    moe.reset_parameters()
+
+
+@dataclasses.dataclass(frozen=True)
+class MoEInputsInit:
+    hidden_states: torch.Tensor
+    pre_init: torch.Tensor
+
+
+@dataclasses.dataclass(frozen=True)
+class MoEInputs:
+    hidden_states: torch.Tensor
+    pre: torch.nn.Parameter
+
+
+def build_moe_inputs(dtype: torch.dtype) -> MoEInputsInit:
+    with torch_seed(4242):
+        return MoEInputsInit(
+            hidden_states=torch.randn((16, 1024, _HIDDEN_SIZE), device="cuda", dtype=dtype),
+            pre_init=torch.zeros((1, 1, _HIDDEN_SIZE), device="cuda", dtype=dtype),
+        )
+
+
+def materialize_moe_inputs(init: MoEInputsInit) -> MoEInputs:
+    return MoEInputs(
+        hidden_states=init.hidden_states.clone(),
+        pre=torch.nn.Parameter(init.pre_init.clone()),
+    )
+
+
+def build_d9d_moe(dtype: torch.dtype) -> MoELayer:
+    with torch_seed(42):
+        moe = (
+            MoELayer(
+                hidden_dim=_HIDDEN_SIZE,
+                num_grouped_experts=_NUM_EXPERTS,
+                intermediate_dim_grouped=_MOE_INTERMEDIATE_SIZE,
+                top_k=_NUM_ACTIVATE_EXPERTS,
+                router_renormalize_probabilities=True,
+            )
+            .cuda()
+            .to(dtype)
+        )
+        moe.reset_parameters()
     return moe
 
 
-def build_hf_my_moe(dtype: torch.dtype):
-    torch.manual_seed(42)
-
-    moe_hf = (
-        Qwen3MoeSparseMoeBlock(
-            Qwen3MoeConfig(
-                num_experts=32,
-                num_experts_per_tok=4,
-                norm_topk_prob=True,
-                hidden_size=512,
-                moe_intermediate_size=256,
-                hidden_act="silu",
+def build_hf_moe(dtype: torch.dtype) -> Qwen3MoeSparseMoeBlock:
+    with torch_seed(43):
+        return (
+            Qwen3MoeSparseMoeBlock(
+                Qwen3MoeConfig(
+                    num_experts=_NUM_EXPERTS,
+                    num_experts_per_tok=_NUM_ACTIVATE_EXPERTS,
+                    norm_topk_prob=True,
+                    hidden_size=_HIDDEN_SIZE,
+                    moe_intermediate_size=_MOE_INTERMEDIATE_SIZE,
+                    hidden_act="silu",
+                )
             )
+            .cuda()
+            .to(dtype)
         )
-        .cuda()
-        .to(dtype)
-    )
-
-    moe_my = build_my_moe(dtype)
-
-    clone_moe_weights_qwen3_moe(my=moe_my, hf=moe_hf)
-
-    return moe_hf, moe_my
 
 
 @pytest.mark.local
 @pytest.mark.parametrize("dtype", [torch.bfloat16])
-def test_consistent_to_hf(dtype):
-    hidden_states, moe_hf_pre, moe_my_pre = build_moe_inputs(dtype)
-    moe_hf, moe_my = build_hf_my_moe(dtype)
+def test_consistent_to_hf(dtype: torch.dtype):
+    mapper = _mapper_from_hf_to_d9d()
 
-    hidden_states_hf, _ = moe_hf(hidden_states + moe_hf_pre)
-    hidden_states_my = moe_my(hidden_states + moe_my_pre)
+    init = build_moe_inputs(dtype)
 
-    assert torch.allclose(hidden_states_my, hidden_states_hf, atol=1e-3, rtol=0.01)
+    # Run HF module
+    inputs_hf = materialize_moe_inputs(init)
+    module_hf = build_hf_moe(dtype)
+    out_hf = module_hf(inputs_hf.hidden_states + inputs_hf.pre)[0]
+    out_hf.mean().backward()
 
-    hidden_states_hf.mean().backward()
-    hidden_states_my.mean().backward()
+    # Run d9d module
+    inputs_d9d = materialize_moe_inputs(init)
+    module_d9d = build_d9d_moe(dtype)
+    clone_module_weights(from_module=module_hf, to_module=module_d9d, map_with=mapper)
+    out_d9d = module_d9d(inputs_d9d.hidden_states + inputs_d9d.pre)
+    out_d9d.mean().backward()
 
-    check_grad(moe_my_pre.grad, moe_hf_pre.grad, atol=1e-7, rtol=0.01)
-    check_moe_qwen3_moe_grad(moe_my, moe_hf)
+    # Check
+    tol = forward_tolerance_for(dtype)
+    torch.testing.assert_close(
+        out_d9d,
+        out_hf,
+        atol=tol.atol,
+        rtol=tol.rtol,
+    )
+    torch.testing.assert_close(
+        out_d9d.mean(),
+        out_hf.mean(),
+        atol=tol.atol,
+        rtol=tol.rtol,
+    )
+    torch.testing.assert_close(
+        inputs_d9d.pre.grad,
+        inputs_hf.pre.grad,
+        atol=1e-7,
+        rtol=0.01,
+    )
+    assert_mapped_gradients_close(from_module=module_hf, to_module=module_d9d, map_with=mapper)
 
 
 @pytest.mark.distributed
 @pytest.mark.parametrize("dtype", [torch.bfloat16])
-def test_consistent_to_itself_expert_parallel(dtype, dist_ctx_factory):
+def test_consistent_to_itself_expert_parallel(dtype: torch.dtype, dist_ctx_factory):
     ctx = dist_ctx_factory(DeviceMeshParameters(expert_parallel=8, data_parallel_replicate=8))
-    expert_mesh = ctx.mesh_for(EXPERT_DOMAIN)
-    batch_mesh = ctx.mesh_for(BATCH_DOMAIN)
-    dp_size = batch_mesh["dp"].size()
+    init = build_moe_inputs(dtype)
 
-    hidden_states_in, pre_local, pre_dist = build_moe_inputs(dtype)
+    # Run Local
+    local_inputs = materialize_moe_inputs(init)
+    local = build_d9d_moe(dtype)
+    out_local = local(local_inputs.hidden_states + local_inputs.pre)
+    loss_local = out_local.sum() / local_inputs.hidden_states.shape[-1]
+    loss_local.backward()
 
-    loss_div_factor = hidden_states_in.shape[-1]
+    # Run dist
+    dist_inputs = materialize_moe_inputs(init)
+    dist_model = build_d9d_moe(dtype)
+    parallelize_expert_parallel(
+        dist_model,
+        mesh_experts=ctx.mesh_for(EXPERT_DOMAIN)["ep_replicate", "ep_shard"],
+    )
+    copy_params_local_to_dist(local, dist_model)
+    out_dist = dist_model(dist_inputs.hidden_states + dist_inputs.pre)
+    dp_size = int(ctx.mesh_for(BATCH_DOMAIN)["dp"].size())
+    loss_dist = (out_dist.sum() / dist_inputs.hidden_states.shape[-1]) / dp_size
+    loss_dist.backward()
 
-    moe_local = build_my_moe(dtype)
-    hidden_states_local = moe_local(hidden_states_in + pre_local)
-    (hidden_states_local.sum() / loss_div_factor).backward()
+    # Check
+    tol = forward_tolerance_for(dtype)
+    torch.testing.assert_close(
+        out_dist,
+        out_local,
+        atol=tol.atol,
+        rtol=tol.rtol,
+    )
 
-    moe_dist = build_my_moe(dtype)
-    parallelize_expert_parallel(moe_dist, mesh_experts=expert_mesh[["ep_replicate", "ep_shard"]])
-    hidden_states_dist = moe_dist(hidden_states_in + pre_dist)
-    (hidden_states_dist.sum() / loss_div_factor / dp_size).backward()
+    sync_grads_manually(dist_model)
+    check_grad_distance_all_local_dist(local, dist_model)
 
-    sync_grads_manually(moe_dist)
-
-    assert torch.allclose(hidden_states_dist, hidden_states_local, atol=1e-3, rtol=0.01)
-    check_grad(pre_dist.grad * 8, pre_local.grad, atol=1e-3, rtol=0.01)
-    check_grad_distance_all_local_dist(local=moe_local, dist=moe_dist)
+    torch.testing.assert_close(
+        dist_inputs.pre.grad * dp_size,
+        local_inputs.pre.grad,
+        atol=1e-3,
+        rtol=0.01,
+    )

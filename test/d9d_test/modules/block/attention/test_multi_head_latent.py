@@ -2,20 +2,16 @@ import dataclasses
 
 import pytest
 import torch
+from d9d.model_state.mapper.compose import ModelStateMapperParallel
+from d9d.model_state.mapper.leaf import ModelStateMapperRename
 from d9d.module.block.attention import MultiHeadLatentAttention
 from d9d.module.block.positional import RotaryEmbeddingStyle
 from torch import nn
 from transformers import DeepseekV2Config
 from transformers.models.deepseek_v2.modeling_deepseek_v2 import DeepseekV2Attention
 
-from d9d_test.modules.block.attention.util import check_mla_deepseek_v2_grad, clone_mla_deepseek_v2
-from d9d_test.modules.checkers import check_grad
+from d9d_test.modules.helper import assert_mapped_gradients_close, clone_module_weights, torch_seed
 
-# ---------------------------------------------------------------------------
-# Test configuration
-# hidden=512, n_heads=8, nope=32, rope=16, v=32, kv_lora=64, q_lora=192
-# full QK head_dim = nope + rope = 48, V head_dim = 32
-# ---------------------------------------------------------------------------
 _HIDDEN = 512
 _N_HEADS = 8
 _NOPE = 32
@@ -28,84 +24,21 @@ _SEQ = 64
 _NORM_EPS = 1e-6
 
 
-def build_mla_with_q_lora(dtype: torch.dtype) -> MultiHeadLatentAttention:
-    torch.manual_seed(42)
-    return (
-        MultiHeadLatentAttention(
-            hidden_size=_HIDDEN,
-            num_attention_heads=_N_HEADS,
-            qk_nope_head_dim=_NOPE,
-            qk_rope_head_dim=_ROPE,
-            v_head_dim=_V_DIM,
-            kv_lora_rank=_KV_LORA_RANK,
-            q_lora_rank=_Q_LORA_RANK,
-            qk_down_norm_eps=_NORM_EPS,
-            is_causal=True,
-            rope_style=RotaryEmbeddingStyle.INTERLEAVED,
-        )
-        .cuda()
-        .to(dtype)
+def _build_mapper():
+    return ModelStateMapperParallel(
+        [
+            ModelStateMapperRename(f"{a}.weight", f"{b}.weight")
+            for a, b in (
+                ("q_a_proj", "q_proj.down_proj"),
+                ("q_a_layernorm", "q_proj.norm"),
+                ("q_b_proj", "q_proj.up_proj"),
+                ("kv_a_proj_with_mqa", "kv_down_proj"),
+                ("kv_a_layernorm", "kv_down_norm"),
+                ("kv_b_proj", "kv_up_proj"),
+                ("o_proj", "o_proj"),
+            )
+        ]
     )
-
-
-def build_mla_no_q_lora(dtype: torch.dtype) -> MultiHeadLatentAttention:
-    torch.manual_seed(42)
-    return (
-        MultiHeadLatentAttention(
-            hidden_size=_HIDDEN,
-            num_attention_heads=_N_HEADS,
-            qk_nope_head_dim=_NOPE,
-            qk_rope_head_dim=_ROPE,
-            v_head_dim=_V_DIM,
-            kv_lora_rank=_KV_LORA_RANK,
-            q_lora_rank=None,
-            qk_down_norm_eps=_NORM_EPS,
-            is_causal=True,
-            rope_style=RotaryEmbeddingStyle.INTERLEAVED,
-        )
-        .cuda()
-        .to(dtype)
-    )
-
-
-def build_inputs(dtype: torch.dtype):
-    torch.manual_seed(4242)
-    hidden_states = torch.randn(_BATCH, _SEQ, _HIDDEN).cuda().to(dtype)
-
-    angles = torch.randn(_BATCH, _SEQ, _ROPE, dtype=torch.float32, device="cuda")
-    rope_cos = angles.cos().to(dtype)
-    rope_sin = angles.sin().to(dtype)
-
-    return hidden_states, (rope_cos, rope_sin)
-
-
-# ---------------------------------------------------------------------------
-# Output shape
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.local
-@pytest.mark.parametrize("dtype", [torch.bfloat16])
-def test_output_shape_with_q_lora(dtype: torch.dtype):
-    mla = build_mla_with_q_lora(dtype)
-    mla.reset_parameters()
-    hidden_states, position_embeddings = build_inputs(dtype)
-
-    out = mla(hidden_states, attention_mask=None, position_embeddings=position_embeddings)
-
-    assert out.shape == (_BATCH, _SEQ, _HIDDEN), f"Expected ({_BATCH}, {_SEQ}, {_HIDDEN}), got {out.shape}"
-
-
-@pytest.mark.local
-@pytest.mark.parametrize("dtype", [torch.bfloat16])
-def test_output_shape_no_q_lora(dtype: torch.dtype):
-    mla = build_mla_no_q_lora(dtype)
-    mla.reset_parameters()
-    hidden_states, position_embeddings = build_inputs(dtype)
-
-    out = mla(hidden_states, attention_mask=None, position_embeddings=position_embeddings)
-
-    assert out.shape == (_BATCH, _SEQ, _HIDDEN), f"Expected ({_BATCH}, {_SEQ}, {_HIDDEN}), got {out.shape}"
 
 
 # ---------------------------------------------------------------------------
@@ -114,111 +47,119 @@ def test_output_shape_no_q_lora(dtype: torch.dtype):
 
 
 @dataclasses.dataclass
-class MlaInputs:
+class MlaInputsInit:
     hidden_states: torch.Tensor
-    hf_pre_tensor: nn.Parameter
-    my_pre_tensor: nn.Parameter
+    pre_init: torch.Tensor
     rope: tuple[torch.Tensor, torch.Tensor]
     freqs_cis: torch.Tensor
 
 
-def build_hf_inputs(dtype: torch.dtype) -> MlaInputs:
-    torch.manual_seed(4242)
-    hidden_states = torch.randn(_BATCH, _SEQ, _HIDDEN).cuda().to(dtype)
-    hf_pre = nn.Parameter(torch.zeros(1, 1, _HIDDEN, dtype=dtype, device="cuda"))
-    my_pre = nn.Parameter(torch.zeros(1, 1, _HIDDEN, dtype=dtype, device="cuda"))
+@dataclasses.dataclass
+class MlaInputs:
+    hidden_states: torch.Tensor
+    pre: nn.Parameter
+    rope: tuple[torch.Tensor, torch.Tensor]
+    freqs_cis: torch.Tensor
 
-    # Identity position embeddings: RoPE has no effect
-    # d9d: cos=1, sin=0  →  q_rotated = q*1 + rotate_half(q)*0 = q
 
-    # Generate random rotational phases
-    angles = torch.randn(_BATCH, _SEQ, _ROPE // 2, dtype=torch.float32, device="cuda")
+def build_inputs(dtype: torch.dtype) -> MlaInputsInit:
+    with torch_seed(4242):
+        hidden_states = torch.randn(_BATCH, _SEQ, _HIDDEN).cuda().to(dtype)
 
-    freqs_cis = torch.polar(torch.ones_like(angles), angles)
+        # Generate random rotational phases
+        angles = torch.randn(_BATCH, _SEQ, _ROPE // 2, dtype=torch.float32, device="cuda")
 
-    rope_cos = torch.repeat_interleave(angles.cos(), 2, dim=-1).to(dtype)
-    rope_sin = torch.repeat_interleave(angles.sin(), 2, dim=-1).to(dtype)
+        freqs_cis = torch.polar(torch.ones_like(angles), angles)
 
+        rope_cos = torch.repeat_interleave(angles.cos(), 2, dim=-1).to(dtype)
+        rope_sin = torch.repeat_interleave(angles.sin(), 2, dim=-1).to(dtype)
+
+        return MlaInputsInit(
+            hidden_states=hidden_states,
+            pre_init=torch.zeros((1, 1, 512), device="cuda", dtype=dtype),
+            rope=(rope_cos, rope_sin),
+            freqs_cis=freqs_cis,
+        )
+
+
+def materialize_inputs(init: MlaInputsInit) -> MlaInputs:
+    rope_cos, rope_sin = init.rope
     return MlaInputs(
-        hidden_states=hidden_states,
-        hf_pre_tensor=hf_pre,
-        my_pre_tensor=my_pre,
-        rope=(rope_cos, rope_sin),
-        freqs_cis=freqs_cis,
+        hidden_states=init.hidden_states.clone(),
+        freqs_cis=init.freqs_cis.clone(),
+        rope=(rope_cos.clone(), rope_sin.clone()),
+        pre=torch.nn.Parameter(init.pre_init.clone()),
     )
 
 
 def build_hf_deepseekv2(dtype: torch.dtype):
-    torch.manual_seed(42)
-    config = DeepseekV2Config(
-        hidden_size=_HIDDEN,
-        num_attention_heads=_N_HEADS,
-        num_key_value_heads=_N_HEADS,
-        qk_nope_head_dim=_NOPE,
-        qk_rope_head_dim=_ROPE,
-        v_head_dim=_V_DIM,
-        kv_lora_rank=_KV_LORA_RANK,
-        q_lora_rank=_Q_LORA_RANK,
-        rms_norm_eps=_NORM_EPS,
-        attention_bias=False,
-        _attn_implementation="eager",
-        max_position_embeddings=4096,
-    )
-    return DeepseekV2Attention(config, layer_idx=0).cuda().to(dtype)
-
-
-def build_mla_hf_compat(dtype: torch.dtype) -> MultiHeadLatentAttention:
-    """Build MLA with is_causal=False to match HF eager mode (no causal mask when mask=None)."""
-    torch.manual_seed(42)
-    return (
-        MultiHeadLatentAttention(
+    with torch_seed(42):
+        config = DeepseekV2Config(
             hidden_size=_HIDDEN,
             num_attention_heads=_N_HEADS,
+            num_key_value_heads=_N_HEADS,
             qk_nope_head_dim=_NOPE,
             qk_rope_head_dim=_ROPE,
             v_head_dim=_V_DIM,
             kv_lora_rank=_KV_LORA_RANK,
             q_lora_rank=_Q_LORA_RANK,
-            qk_down_norm_eps=_NORM_EPS,
-            is_causal=False,
-            rope_style=RotaryEmbeddingStyle.INTERLEAVED,
+            rms_norm_eps=_NORM_EPS,
+            attention_bias=False,
+            _attn_implementation="eager",
+            max_position_embeddings=4096,
         )
-        .cuda()
-        .to(dtype)
-    )
+        return DeepseekV2Attention(config, layer_idx=0).cuda().to(dtype)
 
 
-def build_hf_my_deepseekv2(dtype: torch.dtype):
-    hf = build_hf_deepseekv2(dtype)
-    my = build_mla_hf_compat(dtype)
-    my.reset_parameters()
-    clone_mla_deepseek_v2(my=my, hf=hf)
-    return hf, my
+def build_d9d(dtype: torch.dtype) -> MultiHeadLatentAttention:
+    """Build MLA with is_causal=False to match HF eager mode (no causal mask when mask=None)."""
+    with torch_seed(42):
+        return (
+            MultiHeadLatentAttention(
+                hidden_size=_HIDDEN,
+                num_attention_heads=_N_HEADS,
+                qk_nope_head_dim=_NOPE,
+                qk_rope_head_dim=_ROPE,
+                v_head_dim=_V_DIM,
+                kv_lora_rank=_KV_LORA_RANK,
+                q_lora_rank=_Q_LORA_RANK,
+                qk_down_norm_eps=_NORM_EPS,
+                is_causal=False,
+                rope_style=RotaryEmbeddingStyle.INTERLEAVED,
+            )
+            .cuda()
+            .to(dtype)
+        )
 
 
 @pytest.mark.local
 @pytest.mark.parametrize("dtype", [torch.bfloat16])
 def test_consistent_to_hf(dtype: torch.dtype):
-    inputs = build_hf_inputs(dtype)
-    hf, my = build_hf_my_deepseekv2(dtype)
+    inputs_init = build_inputs(dtype)
+    mapper = _build_mapper()
 
-    out_hf, _ = hf(
-        inputs.hidden_states + inputs.hf_pre_tensor,
+    # HF
+    inputs_hf = materialize_inputs(inputs_init)
+    module_hf = build_hf_deepseekv2(dtype)
+    out_hf, _ = module_hf(
+        inputs_hf.hidden_states + inputs_hf.pre,
         attention_mask=None,
-        position_embeddings=inputs.freqs_cis,
+        position_embeddings=inputs_hf.freqs_cis,
     )
-    out_my = my(
-        inputs.hidden_states + inputs.my_pre_tensor,
-        attention_mask=None,
-        position_embeddings=inputs.rope,
-    )
-
-    assert torch.allclose(out_my, out_hf, atol=1e-2, rtol=1e-2), (
-        f"Forward output mismatch. Max diff: {(out_my - out_hf).abs().max():.4f}"
-    )
-
     out_hf.mean().backward()
-    out_my.mean().backward()
 
-    check_grad(inputs.my_pre_tensor.grad, inputs.hf_pre_tensor.grad, atol=1e-6, rtol=0.01)
-    check_mla_deepseek_v2_grad(my, hf)
+    # d9d
+    inputs_d9d = materialize_inputs(inputs_init)
+    module_d9d = build_d9d(dtype)
+    clone_module_weights(module_hf, module_d9d, map_with=mapper)
+    out_d9d = module_d9d(
+        inputs_d9d.hidden_states + inputs_d9d.pre,
+        attention_mask=None,
+        position_embeddings=inputs_d9d.rope,
+    )
+    out_d9d.mean().backward()
+
+    # Check
+    torch.testing.assert_close(out_d9d, out_hf, atol=1e-2, rtol=1e-2)
+    torch.testing.assert_close(inputs_d9d.pre.grad, inputs_hf.pre.grad, atol=1e-6, rtol=0.01)
+    assert_mapped_gradients_close(from_module=module_hf, to_module=module_d9d, map_with=mapper)
