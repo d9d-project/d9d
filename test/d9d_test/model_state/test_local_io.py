@@ -103,7 +103,7 @@ def test_save_load_complex_io_transformation(tmp_path, device):
     generator = [("a", t_a), ("b", t_b)]
 
     # 2. Define Mapper: (a, b) -> stack -> ab_stacked
-    mapper_save = ModelStateMapperStackTensors(["a", "b"], "ab_stacked", stack_dim=0)
+    mapper_save = ModelStateMapperStackTensors(["a", "b"], "ab_stacked", dim=0)
 
     dest = tmp_path / "stacked"
     write_model_state_local(dest, mapper_save, generator, show_progress=False)
