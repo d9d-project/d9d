@@ -1,13 +1,19 @@
 import dataclasses
+import math
 
 import pytest
 import torch
 from d9d.core.dist_context import BATCH_DOMAIN, EXPERT_DOMAIN, DeviceMeshParameters
 from d9d.model_state.mapper import ModelStateMapper
-from d9d.model_state.mapper.compose import ModelStateMapperParallel
-from d9d.model_state.mapper.leaf import ModelStateMapperRename, ModelStateMapperStackTensors
+from d9d.model_state.mapper.compose import ModelStateMapperParallel, ModelStateMapperSequential
+from d9d.model_state.mapper.leaf import (
+    ModelStateMapperChunkTensors,
+    ModelStateMapperRename,
+    ModelStateMapperTranspose,
+)
 from d9d.module.block.moe import MoELayer
 from d9d.module.parallelism.api import parallelize_expert_parallel
+from torch import nn
 from transformers import Qwen3MoeConfig
 from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeSparseMoeBlock
 
@@ -30,14 +36,24 @@ _MOE_INTERMEDIATE_SIZE = 256
 def _mapper_from_hf_to_d9d() -> ModelStateMapper:
     return ModelStateMapperParallel(
         [
-            *(
-                ModelStateMapperStackTensors(
-                    source_names=[f"experts.{expert_i}.{proj_type}.weight" for expert_i in range(_NUM_EXPERTS)],
-                    target_name=f"grouped_experts.{proj_type}.weight",
-                    stack_dim=0,
-                    transpose_dims=(-1, -2),
-                )
-                for proj_type in ("down_proj", "gate_proj", "up_proj")
+            ModelStateMapperSequential(
+                [
+                    ModelStateMapperTranspose("experts.gate_up_proj", dims=(-1, -2)),
+                    ModelStateMapperChunkTensors(
+                        source_name="experts.gate_up_proj",
+                        target_names=[
+                            "grouped_experts.gate_proj.weight",
+                            "grouped_experts.up_proj.weight",
+                        ],
+                        dim=-1,
+                    ),
+                ]
+            ),
+            ModelStateMapperSequential(
+                [
+                    ModelStateMapperTranspose("experts.down_proj", dims=(-1, -2)),
+                    ModelStateMapperRename("experts.down_proj", "grouped_experts.down_proj.weight"),
+                ]
             ),
             ModelStateMapperRename("gate.weight", "router.gate.weight"),
         ]
@@ -90,7 +106,7 @@ def build_d9d_moe(dtype: torch.dtype) -> MoELayer:
 
 def build_hf_moe(dtype: torch.dtype) -> Qwen3MoeSparseMoeBlock:
     with torch_seed(43):
-        return (
+        module = (
             Qwen3MoeSparseMoeBlock(
                 Qwen3MoeConfig(
                     num_experts=_NUM_EXPERTS,
@@ -104,6 +120,17 @@ def build_hf_moe(dtype: torch.dtype) -> Qwen3MoeSparseMoeBlock:
             .cuda()
             .to(dtype)
         )
+        nn.init.uniform_(
+            module.experts.gate_up_proj,
+            -1 / math.sqrt(_HIDDEN_SIZE),
+            1 / math.sqrt(_HIDDEN_SIZE),
+        )
+        nn.init.uniform_(
+            module.experts.down_proj,
+            -1 / math.sqrt(_MOE_INTERMEDIATE_SIZE),
+            1 / math.sqrt(_MOE_INTERMEDIATE_SIZE),
+        )
+        return module
 
 
 @pytest.mark.local
@@ -116,7 +143,7 @@ def test_consistent_to_hf(dtype: torch.dtype):
     # Run HF module
     inputs_hf = materialize_moe_inputs(init)
     module_hf = build_hf_moe(dtype)
-    out_hf = module_hf(inputs_hf.hidden_states + inputs_hf.pre)[0]
+    out_hf = module_hf(inputs_hf.hidden_states + inputs_hf.pre)
     out_hf.mean().backward()
 
     # Run d9d module

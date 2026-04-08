@@ -9,12 +9,15 @@ from d9d.model_state.mapper.compose import (
     ModelStateMapperShard,
 )
 from d9d.model_state.mapper.leaf import (
+    ModelStateMapperChunkTensors,
+    ModelStateMapperConcatenateTensors,
     ModelStateMapperDistribute,
     ModelStateMapperGatherFullTensor,
     ModelStateMapperIdentity,
     ModelStateMapperRename,
     ModelStateMapperSelectChildModules,
     ModelStateMapperStackTensors,
+    ModelStateMapperTranspose,
     ModelStateMapperUnstackTensors,
 )
 from torch.distributed.tensor import DTensor, Shard
@@ -181,8 +184,58 @@ def test_shard_mapper():
 
 
 @pytest.mark.local
+def test_transpose_mapper():
+    mapper = ModelStateMapperTranspose("foo", dims=(-1, -2))
+
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["foo"]), outputs=frozenset(["foo"]))])
+    assert mapper.state_dependency_groups() == expected_groups
+
+    tensor = torch.tensor([[1, 2, 3], [4, 5, 6]])  # shape (2, 3)
+    res = mapper.apply({"foo": tensor})
+
+    assert res.keys() == {"foo"}
+    assert res["foo"].shape == (3, 2)
+    assert torch.equal(res["foo"], torch.tensor([[1, 4], [2, 5], [3, 6]]))
+    assert res["foo"].is_contiguous()
+
+
+@pytest.mark.local
+def test_chunk_tensors_mapper():
+    mapper = ModelStateMapperChunkTensors("source", ["a", "b"], dim=0)
+
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["source"]), outputs=frozenset(["a", "b"]))])
+    assert mapper.state_dependency_groups() == expected_groups
+
+    t_source = torch.tensor([[1, 2], [3, 4], [5, 6], [7, 8]])  # shape (4, 2)
+    res = mapper.apply({"source": t_source})
+
+    assert res.keys() == {"a", "b"}
+    assert torch.equal(res["a"], torch.tensor([[1, 2], [3, 4]]))
+    assert torch.equal(res["b"], torch.tensor([[5, 6], [7, 8]]))
+    assert res["a"].is_contiguous()
+    assert res["b"].is_contiguous()
+
+
+@pytest.mark.local
+def test_unchunk_tensors_mapper():
+    mapper = ModelStateMapperConcatenateTensors(["a", "b"], "target", dim=0)
+
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["a", "b"]), outputs=frozenset(["target"]))])
+    assert mapper.state_dependency_groups() == expected_groups
+
+    t_a = torch.tensor([[1, 2], [3, 4]])
+    t_b = torch.tensor([[5, 6], [7, 8]])
+    res = mapper.apply({"a": t_a, "b": t_b})
+
+    assert res.keys() == {"target"}
+    assert res["target"].shape == (4, 2)
+    assert torch.equal(res["target"], torch.tensor([[1, 2], [3, 4], [5, 6], [7, 8]]))
+    assert res["target"].is_contiguous()
+
+
+@pytest.mark.local
 def test_stack_tensors_mapper():
-    mapper = ModelStateMapperStackTensors(["a", "b", "c"], "stacked", stack_dim=0)
+    mapper = ModelStateMapperStackTensors(["a", "b", "c"], "stacked", dim=0)
 
     expected_groups = frozenset([StateGroup(inputs=frozenset(["a", "b", "c"]), outputs=frozenset(["stacked"]))])
     assert mapper.state_dependency_groups() == expected_groups
@@ -200,58 +253,17 @@ def test_stack_tensors_mapper():
 
 
 @pytest.mark.local
-def test_stack_tensors_mapper_transpose():
-    mapper = ModelStateMapperStackTensors(["a", "b", "c"], "stacked", stack_dim=0, transpose_dims=(-1, -2))
-
-    expected_groups = frozenset([StateGroup(inputs=frozenset(["a", "b", "c"]), outputs=frozenset(["stacked"]))])
-    assert mapper.state_dependency_groups() == expected_groups
-
-    t1 = torch.tensor([1, 2])
-    t2 = torch.tensor([2, 3])
-    t3 = torch.tensor([3, 4])
-
-    res = mapper.apply({"a": t1, "b": t2, "c": t3})
-    assert res.keys() == {"stacked"}
-    assert res["stacked"].shape == (2, 3)
-    assert torch.equal(res["stacked"][:, 0], t1)
-    assert torch.equal(res["stacked"][:, 1], t2)
-    assert torch.equal(res["stacked"][:, 2], t3)
-
-
-@pytest.mark.local
 def test_unstack_tensors_mapper():
     mapper = ModelStateMapperUnstackTensors(
         source_name="stacked",
         target_names=["a", "b", "c"],
-        unstack_dim=0,
+        dim=0,
     )
 
     expected_groups = frozenset([StateGroup(inputs=frozenset(["stacked"]), outputs=frozenset(["a", "b", "c"]))])
     assert mapper.state_dependency_groups() == expected_groups
 
     t_stacked = torch.tensor([[1, 2], [2, 3], [3, 4]])
-
-    res = mapper.apply({"stacked": t_stacked})
-    assert res.keys() == {"a", "b", "c"}
-    assert torch.equal(res["a"], torch.tensor([1, 2]))
-    assert torch.equal(res["b"], torch.tensor([2, 3]))
-    assert torch.equal(res["c"], torch.tensor([3, 4]))
-
-
-@pytest.mark.local
-def test_unstack_tensors_mapper_transpose():
-    mapper = ModelStateMapperUnstackTensors(
-        source_name="stacked",
-        target_names=["a", "b", "c"],
-        unstack_dim=0,
-        transpose_dims=(-1, -2),
-    )
-
-    expected_groups = frozenset([StateGroup(inputs=frozenset(["stacked"]), outputs=frozenset(["a", "b", "c"]))])
-    assert mapper.state_dependency_groups() == expected_groups
-
-    # This shape is (2, 3), representing a stacked then transposed tensor
-    t_stacked = torch.tensor([[1, 2, 3], [2, 3, 4]])
 
     res = mapper.apply({"stacked": t_stacked})
     assert res.keys() == {"a", "b", "c"}

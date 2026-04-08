@@ -6,7 +6,7 @@ import torch
 from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 from d9d.model_state.mapper.compose.helper import filter_empty_mappers
 from d9d.model_state.mapper.compose.parallel import ModelStateMapperParallel
-from d9d.model_state.mapper.leaf.identity import ModelStateMapperIdentity
+from d9d.model_state.mapper.leaf.single_tensor import ModelStateMapperIdentity
 
 
 class ModelStateMapperSequential(ModelStateMapper):

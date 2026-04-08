@@ -9,6 +9,7 @@ from d9d.module.model.qwen3_dense import (
     mapper_to_huggingface_qwen3_dense_for_classification,
 )
 from d9d.module.model.qwen3_moe import (
+    Qwen3MoEExpertsFormat,
     Qwen3MoEForClassification,
     Qwen3MoEForClassificationParameters,
     mapper_from_huggingface_qwen3_moe_for_classification,
@@ -85,7 +86,8 @@ D9D_MODEL_FACTORIES_CLS = {
 
 HF_TO_D9D_MAPPER_CLS = {
     ModelCatalogue.QWEN3_MOE: mapper_from_huggingface_qwen3_moe_for_classification(
-        _D9D_PARAMS[ModelCatalogue.QWEN3_MOE]
+        _D9D_PARAMS[ModelCatalogue.QWEN3_MOE],
+        experts_format=Qwen3MoEExpertsFormat.FUSED,
     ),
     ModelCatalogue.QWEN3_DENSE: mapper_from_huggingface_qwen3_dense_for_classification(
         _D9D_PARAMS[ModelCatalogue.QWEN3_DENSE]
@@ -93,7 +95,10 @@ HF_TO_D9D_MAPPER_CLS = {
 }
 
 D9D_TO_HF_MAPPER_CLS = {
-    ModelCatalogue.QWEN3_MOE: mapper_to_huggingface_qwen3_moe_for_classification(_D9D_PARAMS[ModelCatalogue.QWEN3_MOE]),
+    ModelCatalogue.QWEN3_MOE: mapper_to_huggingface_qwen3_moe_for_classification(
+        _D9D_PARAMS[ModelCatalogue.QWEN3_MOE],
+        experts_format=Qwen3MoEExpertsFormat.FUSED,
+    ),
     ModelCatalogue.QWEN3_DENSE: mapper_to_huggingface_qwen3_dense_for_classification(
         _D9D_PARAMS[ModelCatalogue.QWEN3_DENSE]
     ),

@@ -58,7 +58,7 @@ from d9d.model_state.mapper.leaf import (
 stack_mapper = ModelStateMapperStackTensors(
     source_names=["attn.q.weight", "attn.k.weight", "attn.v.weight"],
     target_name="attn.qkv.weight",
-    stack_dim=0
+    dim=0
 )
 
 # To show what this mapper needs:
@@ -72,7 +72,7 @@ dummy_data = {
     "attn.v.weight": torch.randn(64, 64),
 }
 result = stack_mapper.apply(dummy_data)
-print(result["attn.qkv.weight"].shape) 
+print(result["attn.qkv.weight"].shape)
 # Output: torch.Size([3, 64, 64])
 ```
 
@@ -97,7 +97,7 @@ mapper = ModelStateMapperSequential([
     ModelStateMapperStackTensors(
         source_names=["layer.0.q", "layer.0.k", "layer.0.v"],
         target_name="layer.0.qkv",
-        stack_dim=0
+        dim=0
     )
 ])
 ```

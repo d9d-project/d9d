@@ -7,6 +7,7 @@ from d9d.module.model.qwen3_dense import (
     mapper_to_huggingface_qwen3_dense_for_causal_lm,
 )
 from d9d.module.model.qwen3_moe import (
+    Qwen3MoEExpertsFormat,
     Qwen3MoEForCausalLM,
     Qwen3MoEForCausalLMParameters,
     mapper_from_huggingface_qwen3_moe_for_causal_lm,
@@ -61,7 +62,8 @@ D9D_MODEL_FACTORIES_CAUSAL_LM = {
 
 HF_TO_D9D_MAPPER_CAUSAL_LM = {
     ModelCatalogue.QWEN3_MOE: mapper_from_huggingface_qwen3_moe_for_causal_lm(
-        Qwen3MoEForCausalLMParameters(model=D9D_MODEL_PARAMETERS[ModelCatalogue.QWEN3_MOE])
+        Qwen3MoEForCausalLMParameters(model=D9D_MODEL_PARAMETERS[ModelCatalogue.QWEN3_MOE]),
+        experts_format=Qwen3MoEExpertsFormat.FUSED,
     ),
     ModelCatalogue.QWEN3_DENSE: mapper_from_huggingface_qwen3_dense_for_causal_lm(
         Qwen3DenseForCausalLMParameters(model=D9D_MODEL_PARAMETERS[ModelCatalogue.QWEN3_DENSE])
@@ -71,7 +73,8 @@ HF_TO_D9D_MAPPER_CAUSAL_LM = {
 
 D9D_TO_HF_MAPPER_CAUSAL_LM = {
     ModelCatalogue.QWEN3_MOE: mapper_to_huggingface_qwen3_moe_for_causal_lm(
-        Qwen3MoEForCausalLMParameters(model=D9D_MODEL_PARAMETERS[ModelCatalogue.QWEN3_MOE])
+        Qwen3MoEForCausalLMParameters(model=D9D_MODEL_PARAMETERS[ModelCatalogue.QWEN3_MOE]),
+        experts_format=Qwen3MoEExpertsFormat.FUSED,
     ),
     ModelCatalogue.QWEN3_DENSE: mapper_to_huggingface_qwen3_dense_for_causal_lm(
         Qwen3DenseForCausalLMParameters(model=D9D_MODEL_PARAMETERS[ModelCatalogue.QWEN3_DENSE])
