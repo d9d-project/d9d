@@ -2,6 +2,25 @@
 
 <!-- version list -->
 
+## v0.9.0 (2026-04-08)
+
+### Bug Fixes
+
+- Allow using MoE parallelization function with [EP]=1
+  ([`fdc7d6d`](https://github.com/d9d-project/d9d/commit/fdc7d6d7cc100dd9eb7000c2da7edabe92fc01fe))
+
+- Fix huggingface mappers for classification models
+  ([`caa2e63`](https://github.com/d9d-project/d9d/commit/caa2e63d1b78f50c50c8355cba20eafe7ad36748))
+
+### Features
+
+- Add model state mappers that convert HuggingFace model states into d9d ones and vice versa
+  ([`47bae88`](https://github.com/d9d-project/d9d/commit/47bae88234329da95f4af90141f3ec7a94803f64))
+
+- Make HF model state mappers for Qwen3 MoE support new fused experts format from transformers v5
+  ([`cdecc29`](https://github.com/d9d-project/d9d/commit/cdecc29257d835d15ccbd0af99f5bf591875a7b4))
+
+
 ## v0.8.0 (2026-03-22)
 
 ### Features
