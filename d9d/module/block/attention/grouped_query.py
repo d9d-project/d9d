@@ -3,6 +3,7 @@ from torch import nn
 
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.attention.sdpa import FlashSdpa
+from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddingStyle
 
 
@@ -55,12 +56,12 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
 
         self.o_proj = nn.Linear(num_attention_heads * head_dim, hidden_size, bias=False)
 
-        self.q_norm: nn.RMSNorm | None
-        self.k_norm: nn.RMSNorm | None
+        self.q_norm: RMSNorm | None
+        self.k_norm: RMSNorm | None
 
         if qk_norm_eps is not None:
-            self.q_norm = nn.RMSNorm(normalized_shape=head_dim, eps=qk_norm_eps)
-            self.k_norm = nn.RMSNorm(normalized_shape=head_dim, eps=qk_norm_eps)
+            self.q_norm = RMSNorm(head_dim, eps=qk_norm_eps)
+            self.k_norm = RMSNorm(head_dim, eps=qk_norm_eps)
         else:
             self.q_norm = None
             self.k_norm = None

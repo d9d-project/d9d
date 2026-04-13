@@ -31,8 +31,8 @@ def _adamw_stochastic_bf16_kernel(
     step: int,  # Current step (for bias correction)
     seed: int,  # Random seed for stochastic rounding
     BLOCK_SIZE: tl.constexpr,
-    GRAD_IS_BF16: tl.constexpr,  # noqa: N803
-    STATE_IS_BF16: tl.constexpr,  # noqa: N803
+    GRAD_IS_BF16: tl.constexpr,
+    STATE_IS_BF16: tl.constexpr,
 ):
     pid = tl.program_id(axis=0)
     offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)

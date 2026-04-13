@@ -53,6 +53,7 @@ nav = [
             "models/modules/ffn.md",
             "models/modules/moe.md",
             "models/modules/positional.md",
+            "models/modules/normalization.md",
             "models/modules/hidden_states_aggregator.md",
         ] },
         "models/model_design.md",

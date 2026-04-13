@@ -9,6 +9,7 @@ from d9d.module.base import ModuleLateInit
 from d9d.module.block.embedding import SplitTokenEmbeddings
 from d9d.module.block.head import ClassificationHead, SplitLanguageModellingHead
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode, create_hidden_states_aggregator
+from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingProvider, RotaryEmbeddingStyle
 from d9d.pipelining.api import (
     ModuleSupportsPipelining,
@@ -77,7 +78,7 @@ class Qwen3DenseModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         )
 
         if stage.is_current_stage_last:
-            self.norm = nn.RMSNorm(normalized_shape=params.layer.hidden_size, eps=params.layer.rms_norm_eps)
+            self.norm = RMSNorm(params.layer.hidden_size, eps=params.layer.rms_norm_eps)
 
         self._stage = stage
         self._hidden_states_snapshot_mode = hidden_states_snapshot_mode

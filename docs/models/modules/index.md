@@ -13,3 +13,4 @@ The `d9d.module.block` package provides highly optimized, composable building bl
 *   **[Hidden States Aggregation](./hidden_states_aggregator.md)**
 *   **[Mixture of Experts (MoE)](./moe.md)**
 *   **[Positional Embeddings](./positional.md)**:
+*   **[Normalization Layers](./normalization.md)**:

@@ -4,6 +4,7 @@ from torch import nn
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.attention import GroupedQueryAttention
 from d9d.module.block.ffn import SwiGLU
+from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingStyle
 
 from .params import Qwen3DenseLayerParameters
@@ -39,8 +40,8 @@ class Qwen3DenseLayer(nn.Module, ModuleLateInit):
 
         self.mlp = SwiGLU(hidden_size=params.hidden_size, intermediate_size=params.intermediate_size, bias=False)
 
-        self.input_layernorm = nn.RMSNorm(params.hidden_size, eps=params.rms_norm_eps)
-        self.post_attention_layernorm = nn.RMSNorm(params.hidden_size, eps=params.rms_norm_eps)
+        self.input_layernorm = RMSNorm(params.hidden_size, eps=params.rms_norm_eps)
+        self.post_attention_layernorm = RMSNorm(params.hidden_size, eps=params.rms_norm_eps)
 
     def forward(
         self, hidden_states: torch.Tensor, position_embeddings: tuple[torch.Tensor, torch.Tensor]

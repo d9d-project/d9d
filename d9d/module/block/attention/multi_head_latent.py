@@ -4,6 +4,7 @@ from torch import nn
 
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.attention.sdpa import FlashSdpa
+from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddingStyle
 
 
@@ -25,7 +26,7 @@ class LowRankProjection(nn.Module):
 
         super().__init__()
         self.down_proj = nn.Linear(in_features, bottleneck, bias=False)
-        self.norm = nn.RMSNorm(bottleneck, eps=norm_eps)
+        self.norm = RMSNorm(bottleneck, eps=norm_eps)
         self.up_proj = nn.Linear(bottleneck, out_features, bias=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -127,7 +128,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
             kv_lora_rank + qk_rope_head_dim,
             bias=False,
         )
-        self.kv_down_norm = nn.RMSNorm(kv_lora_rank, eps=qk_down_norm_eps)
+        self.kv_down_norm = RMSNorm(kv_lora_rank, eps=qk_down_norm_eps)
         self.kv_up_proj = nn.Linear(
             kv_lora_rank,
             num_attention_heads * (qk_nope_head_dim + v_head_dim),
