@@ -19,6 +19,8 @@ def parallelize_expert_parallel(module: MoELayer, mesh_experts: DeviceMesh, expe
     Simultaneously, it configures the router to be fully replicated across
     the mesh.
 
+    If shared expert is enabled, it is also replicated across the mesh.
+
     Args:
         module: The MoE layer instance to parallelize.
         mesh_experts: The device mesh containing the expert parallel resources.
@@ -34,3 +36,12 @@ def parallelize_expert_parallel(module: MoELayer, mesh_experts: DeviceMesh, expe
             grad_placement=tuple(Replicate() for _ in range(mesh_experts.ndim)),
         ),
     )
+    if module.shared_expert is not None:
+        parallelize_module(
+            module.shared_expert,
+            mesh_experts,
+            ToLocalParallel(
+                param_placement=tuple(Replicate() for _ in range(mesh_experts.ndim)),
+                grad_placement=tuple(Replicate() for _ in range(mesh_experts.ndim)),
+            ),
+        )

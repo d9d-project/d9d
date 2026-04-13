@@ -11,9 +11,9 @@ from .communications import (
 )
 from .grouped_experts import GroupedSwiGLU
 from .router import TopKRouter
+from .shared_expert import SharedExpertParameters, SharedSwiGLU
 
 # TODO: implement expert bias
-# TODO: shared experts
 
 
 class MoELayer(nn.Module, ModuleLateInit):
@@ -34,6 +34,7 @@ class MoELayer(nn.Module, ModuleLateInit):
         num_grouped_experts: int,
         top_k: int,
         router_renormalize_probabilities: bool,
+        shared_expert: SharedExpertParameters | None = None,
     ):
         """
          Constructs the MoELayer.
@@ -44,6 +45,7 @@ class MoELayer(nn.Module, ModuleLateInit):
             num_grouped_experts: Total number of experts.
             top_k: Number of experts to route each token to.
             router_renormalize_probabilities: Configures router probability normalization behavior.
+            shared_expert: Optional configuration for a shared expert.
         """
 
         super().__init__()
@@ -57,6 +59,11 @@ class MoELayer(nn.Module, ModuleLateInit):
             hidden_dim=hidden_dim, intermediate_dim=intermediate_dim_grouped, num_experts=num_grouped_experts
         )
         self._communicator: ExpertCommunicationHandler = NoCommunicationHandler(num_grouped_experts)
+
+        if shared_expert is not None:
+            self.shared_expert = SharedSwiGLU(hidden_size=hidden_dim, params=shared_expert)
+        else:
+            self.shared_expert = None
 
         self._num_grouped_experts = num_grouped_experts
         self._hidden_dim = hidden_dim
@@ -100,6 +107,12 @@ class MoELayer(nn.Module, ModuleLateInit):
 
         old_shape = hidden_states.shape
         hidden_states = hidden_states.reshape(-1, hidden_states.shape[-1])
+
+        if self.shared_expert is not None:
+            shared_expert_result = self.shared_expert(hidden_states)
+        else:
+            shared_expert_result = None
+
         expert_indices, expert_scores = self.router(hidden_states)
         self._update_tokens_per_expert(expert_indices)
         hidden_states, expert_scores, expert_count = self._communicator.dispatch(
@@ -107,6 +120,10 @@ class MoELayer(nn.Module, ModuleLateInit):
         )
         hidden_states = self.grouped_experts(hidden_states, expert_scores, expert_count)
         hidden_states = self._communicator.combine(hidden_states)
+
+        if shared_expert_result is not None:
+            hidden_states = hidden_states + shared_expert_result
+
         hidden_states = hidden_states.reshape(*old_shape)
 
         return hidden_states
@@ -115,5 +132,7 @@ class MoELayer(nn.Module, ModuleLateInit):
         """Resets module parameters."""
         self.router.reset_parameters()
         self.grouped_experts.reset_parameters()
+        if self.shared_expert is not None:
+            self.shared_expert.reset_parameters()
 
         nn.init.zeros_(self.tokens_per_expert)

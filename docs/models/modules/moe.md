@@ -38,7 +38,7 @@ Uses efficient fused SiLU-Mul kernel.
 
 ### Shared Experts
 
-Currently not supported, feel free to contribute :)
+A shared expert processes all tokens passing through the MoE layer regardless of the router's sparse choices, providing a dense computational backbone. It is configured using `SharedExpertParameters` and includes an optionally enabled linear gating mechanism to dynamically scale the shared expert's output.
 
 ::: d9d.module.block.moe
 
