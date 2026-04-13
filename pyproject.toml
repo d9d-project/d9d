@@ -54,12 +54,15 @@ deep-ep = { version = ">=1.2.1", optional = true }  # For MoE, https://github.co
 
 cut-cross-entropy = { version = ">=25.9.3", optional = true }  # For efficient CE, https://github.com/apple/ml-cross-entropy
 
+fla-core = { version = ">=0.4.2", optional = true} # For efficient linear attention, https://github.com/fla-org/flash-linear-attention
+
 
 [tool.poetry.extras]
 aim = ["aim", "setuptools"]
 visualization = ["plotly"]
 moe = ["nv-grouped-gemm", "deep-ep"]
 cce = ["cut-cross-entropy"]
+linear-attention = ["fla-core"]
 
 
 [tool.poetry.group.dev.dependencies]

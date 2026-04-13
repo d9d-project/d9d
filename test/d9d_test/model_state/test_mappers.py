@@ -16,8 +16,10 @@ from d9d.model_state.mapper.leaf import (
     ModelStateMapperIdentity,
     ModelStateMapperRename,
     ModelStateMapperSelectChildModules,
+    ModelStateMapperSqueeze,
     ModelStateMapperStackTensors,
     ModelStateMapperTranspose,
+    ModelStateMapperUnsqueeze,
     ModelStateMapperUnstackTensors,
 )
 from torch.distributed.tensor import DTensor, Shard
@@ -323,3 +325,46 @@ def test_prefix_scope_mapper():
     res = prefix_mapper.apply(data)
     assert res.keys() == {"model.layers.0.out"}
     assert res["model.layers.0.out"].item() == 15
+
+
+@pytest.mark.local
+def test_squeeze_mapper_all():
+    mapper_all = ModelStateMapperSqueeze("foo")
+    expected_groups_all = frozenset([StateGroup(inputs=frozenset(["foo"]), outputs=frozenset(["foo"]))])
+    assert mapper_all.state_dependency_groups() == expected_groups_all
+
+    t_foo = torch.tensor([[[[1, 2], [3, 4]]]])  # shape (1, 1, 2, 2)
+    res_all = mapper_all.apply({"foo": t_foo})
+
+    assert res_all.keys() == {"foo"}
+    assert res_all["foo"].shape == (2, 2)
+    assert torch.equal(res_all["foo"], torch.tensor([[1, 2], [3, 4]]))
+
+
+@pytest.mark.local
+def test_squeeze_mapper_single_dim():
+    mapper_dim = ModelStateMapperSqueeze("bar", dim=1)
+    expected_groups_dim = frozenset([StateGroup(inputs=frozenset(["bar"]), outputs=frozenset(["bar"]))])
+    assert mapper_dim.state_dependency_groups() == expected_groups_dim
+
+    t_bar = torch.tensor([[[1, 2]], [[3, 4]]])  # shape (2, 1, 2)
+    res_dim = mapper_dim.apply({"bar": t_bar})
+
+    assert res_dim.keys() == {"bar"}
+    assert res_dim["bar"].shape == (2, 2)
+    assert torch.equal(res_dim["bar"], torch.tensor([[1, 2], [3, 4]]))
+
+
+@pytest.mark.local
+def test_unsqueeze_mapper():
+    mapper = ModelStateMapperUnsqueeze("foo", dim=1)
+
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["foo"]), outputs=frozenset(["foo"]))])
+    assert mapper.state_dependency_groups() == expected_groups
+
+    tensor = torch.tensor([[1, 2], [3, 4]])  # shape (2, 2)
+    res = mapper.apply({"foo": tensor})
+
+    assert res.keys() == {"foo"}
+    assert res["foo"].shape == (2, 1, 2)
+    assert torch.equal(res["foo"], torch.tensor([[[1, 2]], [[3, 4]]]))

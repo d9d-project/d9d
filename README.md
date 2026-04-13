@@ -17,6 +17,7 @@ uv add d9d
 
 * `d9d[aim]`: [Aim](https://aimstack.io/) experiment tracker integration.
 * `d9d[visualization]`: Plotting libraries required to some advanced visualization functionality.
+* `d9d[linear-attention]`: Efficient Linear Attention kernels.
 * `d9d[moe]`: Efficient Mixture of Experts GPU kernels. You should build and install some dependencies manually before installation: [DeepEP](https://github.com/deepseek-ai/DeepEP), [grouped-gemm](https://github.com/fanshiqing/grouped_gemm/).
 * `d9d[cce]`: Efficient Fused Cross-Entropy kernels. You should build and install some dependencies manually before installation: [Cut Cross Entropy](https://github.com/apple/ml-cross-entropy).
 

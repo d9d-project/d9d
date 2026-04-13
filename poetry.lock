@@ -1291,6 +1291,19 @@ files = [
 ]
 
 [[package]]
+name = "einops"
+version = "0.8.2"
+description = "A new flavour of deep learning operations"
+optional = true
+python-versions = ">=3.9"
+groups = ["main"]
+markers = "extra == \"linear-attention\""
+files = [
+    {file = "einops-0.8.2-py3-none-any.whl", hash = "sha256:54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193"},
+    {file = "einops-0.8.2.tar.gz", hash = "sha256:609da665570e5e265e27283aab09e7f279ade90c4f01bcfca111f3d3e13f2827"},
+]
+
+[[package]]
 name = "fastapi"
 version = "0.128.0"
 description = "FastAPI framework, high performance, easy to learn, fast to code, ready for production"
@@ -1325,6 +1338,23 @@ files = [
     {file = "filelock-3.20.3-py3-none-any.whl", hash = "sha256:4b0dda527ee31078689fc205ec4f1c1bf7d56cf88b6dc9426c4f230e46c2dce1"},
     {file = "filelock-3.20.3.tar.gz", hash = "sha256:18c57ee915c7ec61cff0ecf7f0f869936c7c30191bb0cf406f1341778d0834e1"},
 ]
+
+[[package]]
+name = "fla-core"
+version = "0.4.2"
+description = "Core operations for flash-linear-attention"
+optional = true
+python-versions = ">=3.10"
+groups = ["main"]
+markers = "extra == \"linear-attention\""
+files = [
+    {file = "fla_core-0.4.2-py3-none-any.whl", hash = "sha256:cba3db29380002da3cbfc0db94d6efac19aaf528900d19c05c2765e8f3cc485b"},
+    {file = "fla_core-0.4.2.tar.gz", hash = "sha256:e9fef6fcdf122029f9feb7dccfeb85eb9650e6aabc72d2a65b36558e9c590edd"},
+]
+
+[package.dependencies]
+einops = "*"
+torch = "*"
 
 [[package]]
 name = "fonttools"
@@ -1817,14 +1847,14 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "huggingface-hub"
-version = "1.9.1"
+version = "1.10.1"
 description = "Client library to download and publish models, datasets and other repos on the huggingface.co hub"
 optional = false
 python-versions = ">=3.10.0"
 groups = ["examples", "test"]
 files = [
-    {file = "huggingface_hub-1.9.1-py3-none-any.whl", hash = "sha256:8dae771b969b318203727a6c6c5209d25e661f6f0dd010fc09cc4a12cf81c657"},
-    {file = "huggingface_hub-1.9.1.tar.gz", hash = "sha256:442af372207cc24dcb089caf507fcd7dbc1217c11d6059a06f6b90afe64e8bd2"},
+    {file = "huggingface_hub-1.10.1-py3-none-any.whl", hash = "sha256:6b981107a62fbe68c74374418983399c632e35786dcd14642a9f2972633c8b5a"},
+    {file = "huggingface_hub-1.10.1.tar.gz", hash = "sha256:696c53cf9c2ac9befbfb5dd41d05392a031c69fc6930d1ed9671debd405b6fff"},
 ]
 
 [package.dependencies]
@@ -4868,14 +4898,14 @@ telegram = ["requests"]
 
 [[package]]
 name = "transformers"
-version = "5.5.0"
+version = "5.5.4"
 description = "Transformers: the model-definition framework for state-of-the-art machine learning models in text, vision, audio, and multimodal models, for both inference and training."
 optional = false
 python-versions = ">=3.10.0"
 groups = ["test"]
 files = [
-    {file = "transformers-5.5.0-py3-none-any.whl", hash = "sha256:821a9ff0961abbb29eb1eb686d78df1c85929fdf213a3fe49dc6bd94f9efa944"},
-    {file = "transformers-5.5.0.tar.gz", hash = "sha256:c8db656cf51c600cd8c75f06b20ef85c72e8b8ff9abc880c5d3e8bc70e0ddcbd"},
+    {file = "transformers-5.5.4-py3-none-any.whl", hash = "sha256:0bd6281b82966fe5a7a16f553ea517a9db1dee6284d7cb224dfd88fc0dd1c167"},
+    {file = "transformers-5.5.4.tar.gz", hash = "sha256:2e67cadba81fc7608cc07c4dd54f524820bc3d95b1cabd0ef3db7733c4f8b82e"},
 ]
 
 [package.dependencies]
@@ -5626,10 +5656,11 @@ pyyaml = ">=6.0.2"
 [extras]
 aim = ["aim", "setuptools"]
 cce = ["cut-cross-entropy"]
+linear-attention = ["fla-core"]
 moe = ["deep-ep", "nv-grouped-gemm"]
 visualization = ["plotly"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.15"
-content-hash = "0ea200cc0266f19b8b236b7bba3e5ff0003a1e669c12fce8a1c7217f7aa83222"
+content-hash = "27457f012337a0ecd98e6dca5d00a4a0daf965d69094566fe7cfa17e5648f42b"
