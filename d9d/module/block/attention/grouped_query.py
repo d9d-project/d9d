@@ -16,7 +16,8 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
     2.  Optional RMS Normalization on Q and K.
     3.  Rotary Positional Embedding (RoPE) application.
     4.  Scaled Dot Product Attention (via FlashAttention).
-    5.  Output projection.
+    5.  Optional sigmoid output gating.
+    6.  Output projection.
     """
 
     def __init__(
@@ -28,7 +29,9 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         qk_norm_eps: float | None,
         is_causal: bool,
         rope_style: RotaryEmbeddingStyle,
-    ):
+        enable_output_gate: bool = False,
+        qk_norm_zero_centered: bool = False,
+    ) -> None:
         """
         Constructs the GroupedQueryAttention layer.
 
@@ -40,6 +43,9 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             qk_norm_eps: Epsilon for LayerNorm/RMSNorm applied to Q and K. If None, normalization is disabled.
             is_causal: Whether to apply a causal mask (auto-regressive constraint).
             rope_style: Rotary embedding layout style alignment.
+            enable_output_gate: If True, enables sigmoid output gating (Qwen 3.5 style).
+            qk_norm_zero_centered: If True, utilizes zero-centered scaling weights for the optional Q and K
+                normalization layers.
         """
 
         super().__init__()
@@ -49,6 +55,11 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         self._scaling = head_dim**-0.5
 
         self.q_proj = nn.Linear(hidden_size, num_attention_heads * head_dim, bias=False)
+
+        if enable_output_gate:
+            self.gate_proj = nn.Linear(hidden_size, num_attention_heads * head_dim, bias=False)
+        else:
+            self.gate_proj = None
 
         self.k_proj = nn.Linear(hidden_size, num_key_value_heads * head_dim, bias=False)
 
@@ -60,8 +71,8 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         self.k_norm: RMSNorm | None
 
         if qk_norm_eps is not None:
-            self.q_norm = RMSNorm(head_dim, eps=qk_norm_eps)
-            self.k_norm = RMSNorm(head_dim, eps=qk_norm_eps)
+            self.q_norm = RMSNorm(head_dim, eps=qk_norm_eps, zero_centered=qk_norm_zero_centered)
+            self.k_norm = RMSNorm(head_dim, eps=qk_norm_eps, zero_centered=qk_norm_zero_centered)
         else:
             self.q_norm = None
             self.k_norm = None
@@ -116,17 +127,27 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         )
 
         outputs = outputs.reshape(*input_shape, -1).contiguous()
+
+        if self.gate_proj is not None:
+            outputs = outputs * torch.sigmoid(self.gate_proj(hidden_states))
+
         outputs = self.o_proj(outputs)
         return outputs
 
-    def reset_parameters(self):
+    def reset_parameters(self) -> None:
         """Resets module parameters."""
 
         self.q_proj.reset_parameters()
         self.k_proj.reset_parameters()
         self.v_proj.reset_parameters()
+
+        if self.gate_proj is not None:
+            self.gate_proj.reset_parameters()
+
         self.o_proj.reset_parameters()
+
         if self.q_norm is not None:
             self.q_norm.reset_parameters()
+
         if self.k_norm is not None:
             self.k_norm.reset_parameters()
