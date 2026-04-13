@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v0.11.0 (2026-04-13)
+
+### Features
+
+- Add Gated DeltaNet layer that use fla-core kernels
+  ([`e0e466f`](https://github.com/d9d-project/d9d/commit/e0e466f96e79414f66ef84ee57627300c3dfa3ff))
+
+- Add shared expert to MoE block
+  ([`0e93f45`](https://github.com/d9d-project/d9d/commit/0e93f45f8820d19a351432ffcfa7ed27a0c6b484))
+
+
 ## v0.10.0 (2026-04-13)
 
 ### Features
