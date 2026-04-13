@@ -2,6 +2,17 @@
 
 <!-- version list -->
 
+## v0.10.0 (2026-04-13)
+
+### Features
+
+- Add custom RMSNorm kernel supporting zero-centered weight
+  ([`365ad1f`](https://github.com/d9d-project/d9d/commit/365ad1f7027030fc534da462ef2255f5b92f15e3))
+
+- Add optional output gating for grouped query attention
+  ([`af3e411`](https://github.com/d9d-project/d9d/commit/af3e4112b2f4f4bf44542593de20f0e847e63a93))
+
+
 ## v0.9.0 (2026-04-08)
 
 ### Bug Fixes
