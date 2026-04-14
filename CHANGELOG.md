@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.12.0 (2026-04-14)
+
+### Features
+
+- Add partial RoPE to GQA
+  ([`4dcfe7e`](https://github.com/d9d-project/d9d/commit/4dcfe7e54f6eabe20e8f5b7984b3a6280cc00dcb))
+
+
 ## v0.11.0 (2026-04-13)
 
 ### Features
