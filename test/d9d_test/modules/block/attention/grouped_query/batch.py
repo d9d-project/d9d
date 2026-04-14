@@ -1,8 +1,14 @@
 import dataclasses
 
 import torch
+from d9d.module.block.positional import RotaryEmbeddingStyle
+from d9d.module.block.positional.rope import prepare_rotary_cos_sin_emb
 
 from d9d_test.modules.helper import torch_seed
+
+BATCH = 2
+SEQ_LEN = 1024
+HIDDEN_SIZE = 512
 
 
 @dataclasses.dataclass(frozen=True)
@@ -21,20 +27,28 @@ class AttentionInputs:
     pre: torch.nn.Parameter
 
 
-def build_inputs(dtype: torch.dtype) -> AttentionInputsInit:
+def build_inputs(dtype: torch.dtype, rope_dim: int = HIDDEN_SIZE // 16) -> AttentionInputsInit:
     with torch_seed(4242):
-        hidden_states = torch.randn(2, 1024, 512, device="cuda", dtype=dtype)
+        hidden_states = torch.randn(BATCH, SEQ_LEN, HIDDEN_SIZE, device="cuda", dtype=dtype)
         attention_mask = (
-            torch.triu(torch.ones((1024, 1024), device="cuda"), diagonal=1)[None, None, :, :]
+            torch.triu(torch.ones((SEQ_LEN, SEQ_LEN), device="cuda"), diagonal=1)[None, None, :, :]
             * torch.finfo(torch.bfloat16).min
         )
-        rope_cos = torch.randn(2, 1024, 512 // 16, device="cuda", dtype=dtype)
-        rope_sin = torch.randn(2, 1024, 512 // 16, device="cuda", dtype=dtype)
+        cos_emb, sin_emb = prepare_rotary_cos_sin_emb(
+            rope_base=10000,
+            head_dim=rope_dim,
+            max_position_ids=SEQ_LEN,
+            device=torch.device("cuda"),
+            dtype=dtype,
+            style=RotaryEmbeddingStyle.HALF,
+        )
+        rope_cos = cos_emb.unsqueeze(0).expand(BATCH, -1, -1)
+        rope_sin = sin_emb.unsqueeze(0).expand(BATCH, -1, -1)
         return AttentionInputsInit(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             rope=(rope_cos, rope_sin),
-            pre_init=torch.zeros((1, 1, 512), device="cuda", dtype=dtype),
+            pre_init=torch.zeros((1, 1, HIDDEN_SIZE), device="cuda", dtype=dtype),
         )
 
 

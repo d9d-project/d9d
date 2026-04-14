@@ -29,6 +29,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         qk_norm_eps: float | None,
         is_causal: bool,
         rope_style: RotaryEmbeddingStyle,
+        rope_dim: int | None = None,
         enable_output_gate: bool = False,
         qk_norm_zero_centered: bool = False,
     ) -> None:
@@ -43,6 +44,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             qk_norm_eps: Epsilon for LayerNorm/RMSNorm applied to Q and K. If None, normalization is disabled.
             is_causal: Whether to apply a causal mask (auto-regressive constraint).
             rope_style: Rotary embedding layout style alignment.
+            rope_dim: Dimension of the RoPE sub-vector. If ``None``, RoPE is applied to the full ``head_dim``.
             enable_output_gate: If True, enables sigmoid output gating (Qwen 3.5 style).
             qk_norm_zero_centered: If True, utilizes zero-centered scaling weights for the optional Q and K
                 normalization layers.
@@ -53,6 +55,8 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         self._head_dim = head_dim
         self._num_key_value_groups = num_attention_heads // num_key_value_heads
         self._scaling = head_dim**-0.5
+        self._rope_dim: int | None = rope_dim
+        self._nope_dim: int = head_dim - rope_dim if rope_dim is not None else 0
 
         self.q_proj = nn.Linear(hidden_size, num_attention_heads * head_dim, bias=False)
 
@@ -81,6 +85,20 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         self.kernel = FlashSdpa()
         self._is_causal = is_causal
 
+    def _apply_rope(
+        self,
+        query_states: torch.Tensor,
+        key_states: torch.Tensor,
+        cos: torch.Tensor,
+        sin: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        if self._rope_dim is not None:
+            q_rope, q_nope = query_states.split([self._rope_dim, self._nope_dim], dim=-1)
+            k_rope, k_nope = key_states.split([self._rope_dim, self._nope_dim], dim=-1)
+            q_rope, k_rope = self.rope(q_rope, k_rope, cos, sin)
+            return torch.cat([q_rope, q_nope], dim=-1), torch.cat([k_rope, k_nope], dim=-1)
+        return self.rope(query_states, key_states, cos, sin)
+
     def forward(
         self,
         hidden_states: torch.Tensor,
@@ -94,7 +112,8 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             hidden_states: Input tensor. Shape: `(batch, seq_len, hidden_size)`.
             attention_mask: Optional mask associated with the inputs.
             position_embeddings: Tuple of `(cos, sin)` tensors for RoPE application.
-                Each tensor should be of shape `(batch, seq_len, head_dim)`
+                Each tensor should be of shape `(batch, seq_len, rope_dim)` when partial RoPE is used,
+                or `(batch, seq_len, head_dim)` otherwise.
 
         Returns:
             The attention output tensor. Shape: `(batch, seq_len, hidden_size)`.
@@ -115,7 +134,8 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
 
         value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
 
-        query_states, key_states = self.rope(query_states, key_states, position_embeddings[0], position_embeddings[1])
+        cos, sin = position_embeddings
+        query_states, key_states = self._apply_rope(query_states, key_states, cos, sin)
 
         outputs = self.kernel(
             query_states,

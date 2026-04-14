@@ -51,6 +51,11 @@ class ModelStateMapperSplitQGate(ModelStateMapper):
         }
 
 
+HEAD_DIM = 32
+PARTIAL_ROTARY_FACTOR = 0.25
+ROPE_DIM = int(HEAD_DIM * PARTIAL_ROTARY_FACTOR)
+
+
 def build_hf(dtype: torch.dtype):
     with torch_seed(42):
         return (
@@ -61,7 +66,8 @@ def build_hf(dtype: torch.dtype):
                     num_key_value_heads=4,
                     attention_bias=False,
                     rms_norm_eps=1e-6,
-                    head_dim=32,
+                    head_dim=HEAD_DIM,
+                    partial_rotary_factor=PARTIAL_ROTARY_FACTOR,
                     _attn_implementation="eager",
                 ),
                 layer_idx=0,
@@ -79,9 +85,10 @@ def build_d9d(dtype: torch.dtype):
                 num_attention_heads=16,
                 num_key_value_heads=4,
                 qk_norm_eps=1e-6,
-                head_dim=32,
+                head_dim=HEAD_DIM,
                 is_causal=True,
                 rope_style=RotaryEmbeddingStyle.HALF,
+                rope_dim=ROPE_DIM,
                 enable_output_gate=True,
                 qk_norm_zero_centered=True,
             )
@@ -115,7 +122,7 @@ def _build_state_mapper():
 @pytest.mark.local
 @pytest.mark.parametrize("dtype", [torch.bfloat16])
 def test_consistent_to_hf(dtype):
-    init = build_inputs(dtype)
+    init = build_inputs(dtype, rope_dim=ROPE_DIM)
     mapper = _build_state_mapper()
 
     # HF
