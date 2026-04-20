@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.13.0 (2026-04-20)
+
+### Features
+
+- Migrate to Flash Attention 4
+  ([`19f8483`](https://github.com/d9d-project/d9d/commit/19f8483286e0303bddfc77f60bd1a415025babba))
+
+
 ## v0.12.0 (2026-04-14)
 
 ### Features
