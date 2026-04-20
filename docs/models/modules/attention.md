@@ -15,6 +15,8 @@ Due to its abstract nature it is also can be used as a Multi-Head Attention and 
 * Uses the `FlashSDPA` kernel for computation.
 * Uses [Rotary Positional Encoding](./positional.md).
 * Supports optional [QK Normalization](https://arxiv.org/pdf/2302.05442).
+* Supports attention sinking.
+* Supports sliding window.
 
 ### Multi-Head Latent Attention
 
@@ -25,7 +27,7 @@ Due to its abstract nature it is also can be used as a Multi-Head Attention and 
 
 ### Scaled Dot-Product Attention Kernels
 
-* `FlashSdpa` - FlashAttention 2 (using the new Torch SDPA API).
+* `FlashSdpa` - FlashAttention 4.
 
 ::: d9d.module.block.attention
     options:

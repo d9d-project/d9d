@@ -157,8 +157,8 @@ def _apply_rotary_pos_emb(
     style: RotaryEmbeddingStyle,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Applies mathematically rotated positional sequences."""
-    cos = cos.unsqueeze(1)
-    sin = sin.unsqueeze(1)
+    cos = cos.unsqueeze(2)
+    sin = sin.unsqueeze(2)
 
     match style:
         case RotaryEmbeddingStyle.HALF:

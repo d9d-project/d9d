@@ -125,14 +125,12 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         query_states = self.q_proj(hidden_states).view(hidden_shape)
         if self.q_norm is not None:
             query_states = self.q_norm(query_states)
-        query_states = query_states.transpose(1, 2)
 
         key_states = self.k_proj(hidden_states).view(hidden_shape)
         if self.k_norm is not None:
             key_states = self.k_norm(key_states)
-        key_states = key_states.transpose(1, 2)
 
-        value_states = self.v_proj(hidden_states).view(hidden_shape).transpose(1, 2)
+        value_states = self.v_proj(hidden_states).view(hidden_shape)
 
         cos, sin = position_embeddings
         query_states, key_states = self._apply_rope(query_states, key_states, cos, sin)
@@ -146,7 +144,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             scale=self._scaling,
         )
 
-        outputs = outputs.reshape(*input_shape, -1).contiguous()
+        outputs = outputs.reshape(*input_shape, -1)
 
         if self.gate_proj is not None:
             outputs = outputs * torch.sigmoid(self.gate_proj(hidden_states))

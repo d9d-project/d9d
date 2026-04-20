@@ -1,17 +1,38 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch.nn.attention import SDPBackend, sdpa_kernel
+
+from d9d.kernel.flash_attn import flash_attn_func
+
+# FA4's backward preprocess kernel requires head_dim to be a multiple of this
+# value; non-aligned dims trigger a CUTE predicate-shape bug.
+_FA4_HDIM_ALIGN = 32
 
 
 class FlashSdpa(nn.Module):
-    """Executes Scaled Dot Product Attention (SDPA) enforcing the FlashAttention backend."""
+    """Scaled Dot Product Attention using Flash Attention 4.
 
-    def __init__(self):
-        """
-        Constructs the FlashSdpa object.
-        """
+    When ``num_sinks`` is provided, a learnable per-head sink logit is added
+    to the softmax denominator (attention-sink mechanism).  This lets a
+    fraction of attention mass be absorbed by the sink, effectively
+    soft-gating the output without materializing an extra KV column.
+
+    Args:
+        num_sinks: Number of learnable sink scalars (one per query head).
+            ``None`` (default) disables sinks and gives plain attention.
+        window_size: Sliding-window size for local attention.  ``None``
+            (default) disables the window and uses full attention.
+    """
+
+    def __init__(self, num_sinks: int | None = None, window_size: int | None = None) -> None:
         super().__init__()
+
+        self.sinks = nn.Parameter(torch.zeros(num_sinks)) if num_sinks is not None else None
+
+        if window_size is not None and window_size < 0:
+            raise ValueError("`window_size` must be either `None` or a positive integer value")
+
+        self._window_size = window_size
 
     def forward(
         self,
@@ -23,30 +44,46 @@ class FlashSdpa(nn.Module):
         scale: float,
     ) -> torch.Tensor:
         """
-        Computes Scaled Dot-Product Attention using FlashAttention.
+        Computes Scaled Dot-Product Attention.
 
         Args:
-            query_states: Query tensor. Shape: `(batch, n_q_heads, seq_len, head_dim)`.
-            key_states: Key tensor. Shape: `(batch, n_kv_heads, seq_len, head_dim)`.
-            value_states: Value tensor. Shape: `(batch, n_kv_heads, seq_len, head_dim)`.
-            attention_mask: Optional attention mask (usually not needed for FlashAttn with causal=True).
-            is_causal: If True, applies a causal mask (upper triangular masking).
-            scale: Scaling factor applied to the dot products (usually `1 / sqrt(head_dim)`).
+            query_states: Query tensor. Shape: ``(batch, seq_len, n_q_heads, head_dim)``.
+            key_states: Key tensor. Shape: ``(batch, seq_len, n_kv_heads, head_dim)``.
+            value_states: Value tensor. Shape: ``(batch, seq_len, n_kv_heads, head_dim)``.
+            attention_mask: Unused. Present for interface compatibility.
+            is_causal: If True, applies a causal mask.
+            scale: Softmax scaling factor (usually ``1/sqrt(head_dim)``).
 
         Returns:
-            The attention output tensor, permuted to channel-last format.
-                Shape: `(batch, seq_len, n_q_heads, head_dim)`.
+            Attention output. Shape: ``(batch, seq_len, n_q_heads, head_dim)``.
         """
+        if self._window_size is not None and not is_causal:
+            raise ValueError("Sliding window attention requires is_causal=True")
 
-        with sdpa_kernel(SDPBackend.FLASH_ATTENTION):
-            results = F.scaled_dot_product_attention(
-                query_states,
-                key_states,
-                value_states,
-                attn_mask=attention_mask,
-                dropout_p=0.0,
-                is_causal=is_causal,
-                scale=scale,
-                enable_gqa=query_states.shape[1] != key_states.shape[1],
-            )
-            return results.transpose(1, 2).contiguous()
+        # Pad head_dim to the next multiple of _FA4_HDIM_ALIGN so that FA4's
+        # backward preprocess kernel avoids the broken predicate-masking path.
+        # Zero-padding is transparent: extra dims contribute 0 to QK^T and to
+        # the weighted sum over V.
+        head_dim = query_states.shape[-1]
+        pad = (-head_dim) % _FA4_HDIM_ALIGN
+        if pad:
+            query_states = F.pad(query_states, (0, pad))
+            key_states = F.pad(key_states, (0, pad))
+            value_states = F.pad(value_states, (0, pad))
+
+        window = (self._window_size, 0) if self._window_size is not None else (None, None)
+
+        out, *_ = flash_attn_func(
+            query_states,
+            key_states,
+            value_states,
+            softmax_scale=scale,
+            causal=is_causal,
+            window_size=window,
+            learnable_sink=self.sinks,
+        )
+
+        if pad:
+            out = out[..., :head_dim]
+
+        return out

@@ -171,8 +171,6 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         q = self.q_proj(hidden_states)
         q = q.view(b, s, self._n_heads, self._qk_head_dim)
         q_nope, q_rope = q.split([self._qk_nope_head_dim, self._qk_rope_head_dim], dim=-1)
-        q_nope = q_nope.transpose(1, 2)
-        q_rope = q_rope.transpose(1, 2)
         q_rope, _ = self.rope(q_rope, q_rope, cos, sin)
         q = torch.cat([q_nope, q_rope], dim=-1)
 
@@ -183,13 +181,10 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         kv_expanded = self.kv_up_proj(c_kv)
         kv_expanded = kv_expanded.view(b, s, self._n_heads, self._qk_nope_head_dim + self._v_head_dim)
         k_nope, v = kv_expanded.split([self._qk_nope_head_dim, self._v_head_dim], dim=-1)
-        k_nope = k_nope.transpose(1, 2)
-        v = v.transpose(1, 2)
 
         # k_rope is shared across all heads (MQA-style).
         # expand is lazy (no copy); contiguous() forces materialisation before rope.
-        k_rope = k_rope.unsqueeze(2).expand(-1, -1, self._n_heads, -1).transpose(1, 2)
-        k_rope = k_rope.contiguous()
+        k_rope = k_rope.unsqueeze(2).expand(-1, -1, self._n_heads, -1).contiguous()
         _, k_rope = self.rope(k_rope, k_rope, cos, sin)
         k = torch.cat([k_nope, k_rope], dim=-1)
 
@@ -213,7 +208,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         if pad_size > 0:
             out = out[..., : self._v_head_dim]
 
-        out = out.reshape(b, s, self._n_heads * self._v_head_dim).contiguous()
+        out = out.reshape(b, s, self._n_heads * self._v_head_dim)
         return self.o_proj(out)
 
     def reset_parameters(self):

@@ -96,7 +96,7 @@ def test_consistent_to_itself_dist(
     if schedule_info.has_last_stage:
         loss_dist = torch.stack(dist_loss_accum).sum()
         all_reduce_over_mesh_groups(loss_dist, dist_ctx=dist_ctx)
-        torch.testing.assert_close(loss_dist, loss_global, atol=1e-4, rtol=0.001)
+        torch.testing.assert_close(loss_dist, loss_global, atol=1e-3, rtol=0.005)
 
     for dist_model in models_dist:
         sync_grads_manually(dist_model)

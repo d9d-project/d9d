@@ -34,7 +34,7 @@ def test_inference_e2e(dist_ctx_factory, n_microbatches: int):
 
     full_stage_modules = [build_pp_model().eval() for _ in range(n_stages)]
     for m in full_stage_modules:
-        m.requires_grad_(False)  # noqa: FBT003
+        m.requires_grad_(False)
 
     ref_output = _do_standard_forward(full_stage_modules, x, y)
 
@@ -79,7 +79,7 @@ def test_inference_e2e_local(dist_ctx_factory):
 
     x, y = build_pp_inputs(x_with_grad=False)
     model = build_pp_model().eval()
-    model.requires_grad_(False)  # noqa: FBT003
+    model.requires_grad_(False)
 
     ref_output = _do_standard_forward([model], x, y)
 

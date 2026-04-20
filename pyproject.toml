@@ -56,6 +56,7 @@ cut-cross-entropy = { version = ">=25.9.3", optional = true }  # For efficient C
 
 fla-core = { version = ">=0.4.2", optional = true} # For efficient linear attention, https://github.com/fla-org/flash-linear-attention
 
+flash-attn-4 = { version = ">=4.0.0b8", optional = true } # For Flash Attention 4, https://github.com/Dao-AILab/flash-attention
 
 [tool.poetry.extras]
 aim = ["aim", "setuptools"]
@@ -63,6 +64,7 @@ visualization = ["plotly"]
 moe = ["nv-grouped-gemm", "deep-ep"]
 cce = ["cut-cross-entropy"]
 linear-attention = ["fla-core"]
+flash-attention = ["flash-attn-4"]
 
 
 [tool.poetry.group.dev.dependencies]
@@ -234,7 +236,8 @@ suppress-none-returning = true
     "D",  # no docs for tests sorry
     "ANN",  # no type annotations for tests
     "SLF001",  # private access is ok for tests
-    "PLC0415"  # imports outside top level are OK for tests
+    "PLC0415",  # imports outside top level are OK for tests
+    "FBT003",  # PyTorch APIs like requires_grad_() only accept positional bools
 ]
 "example/*.py" = [
     "INP001"  # no __init__.py

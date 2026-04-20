@@ -92,7 +92,7 @@ HF_MODEL_PARAMETERS = {
         attention_dropout=0.0,
         norm_topk_prob=True,
         router_aux_loss_coef=0.0,
-        _attn_implementation="sdpa",
+        _attn_implementation="flash_attention_4",
         pad_token_id=_PAD_TOKEN_ID,
     ),
     ModelCatalogue.QWEN3_DENSE: Qwen3Config(
@@ -114,7 +114,7 @@ HF_MODEL_PARAMETERS = {
         attention_dropout=0.0,
         norm_topk_prob=True,
         router_aux_loss_coef=0.0,
-        _attn_implementation="sdpa",
+        _attn_implementation="flash_attention_4",
         pad_token_id=_PAD_TOKEN_ID,
     ),
 }
