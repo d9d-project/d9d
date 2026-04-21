@@ -12,8 +12,6 @@ from transformers.models.qwen3_5_moe.modeling_qwen3_5_moe import Qwen3_5MoeGated
 from d9d_test.modules.helper import assert_mapped_gradients_close, clone_module_weights, torch_seed
 
 _HIDDEN = 512
-_N_HEADS = 8
-_N_KV_HEADS = 8
 _HEAD_QK_DIM = 64
 _HEAD_V_DIM = 64
 _CONV_SIZE = 4
@@ -90,12 +88,17 @@ def materialize_inputs(init: GdnInputsInit) -> GdnInputs:
     )
 
 
-def build_hf_qwen3_5_moe(dtype: torch.dtype) -> Qwen3_5MoeGatedDeltaNet:
+def build_hf_qwen3_5_moe(
+    dtype: torch.dtype,
+    *,
+    num_value_heads: int,
+    num_key_heads: int,
+) -> Qwen3_5MoeGatedDeltaNet:
     with torch_seed(42):
         config = Qwen3_5MoeTextConfig(
             hidden_size=_HIDDEN,
-            linear_num_value_heads=_N_HEADS,
-            linear_num_key_heads=_N_KV_HEADS,
+            linear_num_value_heads=num_value_heads,
+            linear_num_key_heads=num_key_heads,
             linear_key_head_dim=_HEAD_QK_DIM,
             linear_value_head_dim=_HEAD_V_DIM,
             linear_conv_kernel_dim=_CONV_SIZE,
@@ -105,13 +108,18 @@ def build_hf_qwen3_5_moe(dtype: torch.dtype) -> Qwen3_5MoeGatedDeltaNet:
         return Qwen3_5MoeGatedDeltaNet(config, layer_idx=0).cuda().to(dtype)
 
 
-def build_d9d(dtype: torch.dtype) -> GatedDeltaNet:
+def build_d9d(
+    dtype: torch.dtype,
+    *,
+    num_qk_heads: int,
+    num_value_heads: int,
+) -> GatedDeltaNet:
     with torch_seed(42):
         return (
             GatedDeltaNet(
                 hidden_size=_HIDDEN,
-                num_attention_heads=_N_HEADS,
-                num_key_value_heads=_N_KV_HEADS,
+                num_query_key_heads=num_qk_heads,
+                num_value_heads=num_value_heads,
                 head_qk_dim=_HEAD_QK_DIM,
                 head_v_dim=_HEAD_V_DIM,
                 conv_size=_CONV_SIZE,
@@ -132,13 +140,25 @@ def build_d9d(dtype: torch.dtype) -> GatedDeltaNet:
 @pytest.mark.local
 @pytest.mark.parametrize("dtype", [torch.bfloat16])
 @pytest.mark.parametrize("mask_style", ["ones", "none", "padded"])
-def test_consistent_to_hf(dtype: torch.dtype, mask_style: str) -> None:
+@pytest.mark.parametrize(
+    ("num_value_heads", "num_key_heads"),
+    [
+        pytest.param(8, 8, id="matched_kv_heads"),
+        pytest.param(16, 4, id="grouped_kv_heads"),
+    ],
+)
+def test_consistent_to_hf(
+    dtype: torch.dtype,
+    mask_style: str,
+    num_value_heads: int,
+    num_key_heads: int,
+) -> None:
     inputs_init = build_inputs(dtype, mask_style=mask_style)
     mapper = _build_mapper()
 
     # HF
     inputs_hf = materialize_inputs(inputs_init)
-    module_hf = build_hf_qwen3_5_moe(dtype)
+    module_hf = build_hf_qwen3_5_moe(dtype, num_value_heads=num_value_heads, num_key_heads=num_key_heads)
     out_hf = module_hf(
         hidden_states=inputs_hf.hidden_states + inputs_hf.pre,
         attention_mask=inputs_hf.attention_mask,
@@ -147,7 +167,7 @@ def test_consistent_to_hf(dtype: torch.dtype, mask_style: str) -> None:
 
     # d9d
     inputs_d9d = materialize_inputs(inputs_init)
-    module_d9d = build_d9d(dtype)
+    module_d9d = build_d9d(dtype, num_qk_heads=num_key_heads, num_value_heads=num_value_heads)
     clone_module_weights(module_hf, module_d9d, map_with=mapper)
 
     out_d9d = module_d9d(
