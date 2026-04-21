@@ -245,7 +245,7 @@ class GatedDeltaNet(nn.Module, ModuleLateInit):
             write strength (Beta).
         2.  Causal short depthwise convolution applied to Q, K, V.
         3.  Data-dependent decay computation (Mamba-style or log-sigmoid).
-        4.  GQA/MQA head expansion for K and V.
+        4.  GQA/MQA head expansion for Q and K.
         5.  Chunked Gated Delta Rule (with optional internal L2 norm on Q/K).
         6.  Per-head RMSNorm and SiLU-gated output projection.
     """
@@ -253,8 +253,8 @@ class GatedDeltaNet(nn.Module, ModuleLateInit):
     def __init__(
         self,
         hidden_size: int,
-        num_attention_heads: int,
-        num_key_value_heads: int,
+        num_query_key_heads: int,
+        num_value_heads: int,
         head_qk_dim: int,
         head_v_dim: int,
         norm_eps: float,
@@ -266,8 +266,8 @@ class GatedDeltaNet(nn.Module, ModuleLateInit):
 
         Args:
             hidden_size: Hidden size.
-            num_attention_heads: Number of query attention heads.
-            num_key_value_heads: Number of key and value attention heads.
+            num_query_key_heads: Number of query and key attention heads before grouped expansion.
+            num_value_heads: Number of value attention heads.
             head_qk_dim: Dimension allocated for a single query or key per head.
             head_v_dim: Dimension allocated for a single value per head.
             norm_eps: Small constant added for numerical stability to the normalization layer.
@@ -276,43 +276,41 @@ class GatedDeltaNet(nn.Module, ModuleLateInit):
             use_qk_l2norm: Whether to enable L2 normalization applied to Q/K internally.
 
         Raises:
-            ValueError: When num_attention_heads is not uniformly divisible by num_key_value_heads.
+            ValueError: When num_value_heads is not uniformly divisible by num_query_key_heads.
         """
         super().__init__()
 
-        if num_attention_heads % num_key_value_heads != 0:
+        if num_value_heads % num_query_key_heads != 0:
             raise ValueError(
-                f"num_attention_heads ({num_attention_heads}) must be divisible by "
-                f"num_key_value_heads ({num_key_value_heads})."
+                f"num_value_heads ({num_value_heads}) must be divisible by num_query_key_heads ({num_query_key_heads})."
             )
 
         self._hidden_size = hidden_size
-        self._num_heads = num_attention_heads
-        self._num_kv_heads = num_key_value_heads
-        self._num_kv_groups = num_attention_heads // num_key_value_heads
+        self._num_qk_heads = num_query_key_heads
+        self._num_v_heads = num_value_heads
+        self._num_qk_groups = num_value_heads // num_query_key_heads
         self._head_qk_dim = head_qk_dim
         self._head_v_dim = head_v_dim
         self._use_qk_l2norm = use_qk_l2norm
 
-        qk_dim = num_attention_heads * head_qk_dim
-        kv_qk_dim = num_key_value_heads * head_qk_dim
-        kv_v_dim = num_key_value_heads * head_v_dim
-        v_dim = num_attention_heads * head_v_dim
+        q_dim = num_query_key_heads * head_qk_dim
+        k_dim = num_query_key_heads * head_qk_dim
+        v_dim = num_value_heads * head_v_dim
 
-        self._qkv_split_sizes = [qk_dim, kv_qk_dim, kv_v_dim]
+        self._qkv_split_sizes = [q_dim, k_dim, v_dim]
 
         # --- Linear projections ---
-        self.qkv_proj = nn.Linear(hidden_size, qk_dim + kv_qk_dim + kv_v_dim, bias=False)
+        self.qkv_proj = nn.Linear(hidden_size, q_dim + k_dim + v_dim, bias=False)
         self.g_proj = nn.Linear(hidden_size, v_dim, bias=False)
-        self.b_proj = nn.Linear(hidden_size, num_attention_heads, bias=False)
+        self.b_proj = nn.Linear(hidden_size, num_value_heads, bias=False)
         self.decay_gate = _build_decay_gate(
             config=decay_gate,
             hidden_size=hidden_size,
-            num_heads=num_attention_heads,
+            num_heads=num_value_heads,
         )
 
         # --- Short causal convolutions ---
-        self.qkv_conv1d = CausalShortDepthwiseConv1d(qk_dim + kv_qk_dim + kv_v_dim, conv_size)
+        self.qkv_conv1d = CausalShortDepthwiseConv1d(q_dim + k_dim + v_dim, conv_size)
 
         # --- Output normalization & projection ---
         self.out_norm = RMSNorm(head_v_dim, eps=norm_eps)
@@ -344,20 +342,20 @@ class GatedDeltaNet(nn.Module, ModuleLateInit):
         gk = self.decay_gate(hidden_states)
         beta = torch.sigmoid(self.b_proj(hidden_states))
 
-        q = q.view(b, seq_len, self._num_heads, self._head_qk_dim)
-        k = k.view(b, seq_len, self._num_kv_heads, self._head_qk_dim)
-        v = v.view(b, seq_len, self._num_kv_heads, self._head_v_dim)
+        q = q.view(b, seq_len, self._num_qk_heads, self._head_qk_dim)
+        k = k.view(b, seq_len, self._num_qk_heads, self._head_qk_dim)
+        v = v.view(b, seq_len, self._num_v_heads, self._head_v_dim)
 
-        if self._num_kv_groups > 1:
+        if self._num_qk_groups > 1:
+            q = (
+                q.unsqueeze(3)
+                .expand(-1, -1, -1, self._num_qk_groups, -1)
+                .reshape(b, seq_len, self._num_v_heads, self._head_qk_dim)
+            )
             k = (
                 k.unsqueeze(3)
-                .expand(-1, -1, -1, self._num_kv_groups, -1)
-                .reshape(b, seq_len, self._num_heads, self._head_qk_dim)
-            )
-            v = (
-                v.unsqueeze(3)
-                .expand(-1, -1, -1, self._num_kv_groups, -1)
-                .reshape(b, seq_len, self._num_heads, self._head_v_dim)
+                .expand(-1, -1, -1, self._num_qk_groups, -1)
+                .reshape(b, seq_len, self._num_v_heads, self._head_qk_dim)
             )
 
         out, _ = chunk_gated_delta_rule(
