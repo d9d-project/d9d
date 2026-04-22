@@ -10,10 +10,8 @@ from .communications import (
     NoCommunicationHandler,
 )
 from .grouped_experts import GroupedSwiGLU
-from .router import TopKRouter
+from .router import RoutingResult, TopKRouter
 from .shared_expert import SharedExpertParameters, SharedSwiGLU
-
-# TODO: implement expert bias
 
 
 class MoELayer(nn.Module, ModuleLateInit):
@@ -113,7 +111,9 @@ class MoELayer(nn.Module, ModuleLateInit):
         else:
             shared_expert_result = None
 
-        expert_indices, expert_scores = self.router(hidden_states)
+        routing_result: RoutingResult = self.router(hidden_states)
+        expert_indices = routing_result.selected_expert_indices
+        expert_scores = routing_result.selected_probabilities
         self._update_tokens_per_expert(expert_indices)
         hidden_states, expert_scores, expert_count = self._communicator.dispatch(
             hidden_states, expert_indices, expert_scores

@@ -1,8 +1,24 @@
+import dataclasses
+
 import torch
 import torch.nn.functional as F
 from torch import nn
 
 from d9d.module.base import ModuleLateInit
+
+
+@dataclasses.dataclass(kw_only=True, slots=True)
+class RoutingResult:
+    """
+    Represents the result of a routing operation to select experts.
+
+    Attributes:
+        selected_expert_indices: Indices of the chosen experts per token.
+        selected_probabilities: Probabilities associated with the chosen experts.
+    """
+
+    selected_expert_indices: torch.Tensor
+    selected_probabilities: torch.Tensor
 
 
 class TopKRouter(nn.Module, ModuleLateInit):
@@ -19,7 +35,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
 
     def __init__(
         self, dim: int, num_experts: int, top_k: int, renormalize_probabilities: bool, enable_expert_bias: bool = False
-    ):
+    ) -> None:
         """
         Constructs the TopKRouter.
 
@@ -27,7 +43,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
             dim: Input feature dimensionality.
             num_experts: Total number of experts to choose from.
             top_k: Number of experts to select for each token.
-            renormalize_probabilities: If True, probabilities of selected experts will be renormalized to sum up to 1
+            renormalize_probabilities: If True, probabilities of selected experts will be renormalized to sum up to 1.
             enable_expert_bias: If True, adds a bias term to the routing scores before top-k selection. This can be
                 used for loss-free load balancing.
         """
@@ -48,7 +64,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
         self._top_k = top_k
         self._renormalize_probabilities = renormalize_probabilities
 
-    def forward(self, hidden_states: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+    def forward(self, hidden_states: torch.Tensor) -> RoutingResult:
         """
         Calculates routing decisions for the input tokens.
 
@@ -56,10 +72,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
             hidden_states: Input tokens. Shape: `(num_tokens, dim)`.
 
         Returns:
-            A tuple containing:
-
-            - Selected expert indices. Shape: `(num_tokens, top_k)`.
-            - Normalized routing weights for the selected experts. Shape: `(num_tokens, top_k)`.
+            The routing result containing the indices of the selected experts and their corresponding probabilities.
         """
 
         # scores shape (bs*slen, num_experts)
@@ -68,23 +81,26 @@ class TopKRouter(nn.Module, ModuleLateInit):
         scores = self.gate(hidden_states)
 
         # and now do softmax (before top-k to be able to apply expert bias)
-        scores = F.softmax(scores, dim=-1, dtype=torch.float32)
+        probs = F.softmax(scores, dim=-1, dtype=torch.float32)
 
         # select top-k
         if self.expert_bias is None:
-            scores, selected_experts_indices = torch.topk(scores, k=self._top_k, dim=-1)
+            selected_probs, selected_experts_indices = torch.topk(probs, k=self._top_k, dim=-1)
         else:
-            _, selected_experts_indices = torch.topk(scores + self.expert_bias, k=self._top_k, dim=-1)
-            scores = scores.gather(dim=-1, index=selected_experts_indices)
+            _, selected_experts_indices = torch.topk(probs + self.expert_bias, k=self._top_k, dim=-1)
+            selected_probs = probs.gather(dim=-1, index=selected_experts_indices)
 
         # re-normalize scores
-        denominator = scores.sum(dim=-1, keepdim=True) + 1e-20
-        scores = scores / denominator
+        if self._renormalize_probabilities:
+            denominator = selected_probs.sum(dim=-1, keepdim=True) + 1e-20
+            selected_probs = selected_probs / denominator
 
-        return selected_experts_indices, scores
+        return RoutingResult(selected_expert_indices=selected_experts_indices, selected_probabilities=selected_probs)
 
-    def reset_parameters(self):
-        """Resets module parameters."""
+    def reset_parameters(self) -> None:
+        """
+        Resets module parameters.
+        """
         if self.expert_bias is not None:
             nn.init.zeros_(self.expert_bias)
 
