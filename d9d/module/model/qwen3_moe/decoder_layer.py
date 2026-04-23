@@ -82,21 +82,6 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
 
         return hidden_states
 
-    def reset_moe_stats(self):
-        """
-        Resets statistical counters inside the MoE router (e.g., token counts per expert).
-        """
-
-        self.mlp.reset_stats()
-
-    @property
-    def moe_tokens_per_expert(self) -> torch.Tensor:
-        """
-        Returns the number of tokens routed to each expert.
-        """
-
-        return self.mlp.tokens_per_expert
-
     def reset_parameters(self):
         """
         Resets module parameters.

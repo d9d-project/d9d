@@ -145,25 +145,6 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             "hidden_states_snapshot": state_aggregator.pack_with_snapshot(hidden_states_snapshot),
         }
 
-    def reset_moe_stats(self):
-        """
-        Resets routing statistics for all MoE layers in this stage.
-        """
-
-        for layer_name in self._layers_iter:
-            self.layers[layer_name].reset_moe_stats()
-
-    @property
-    def moe_tokens_per_expert(self) -> torch.Tensor:
-        """
-        Retrieves the number of tokens routed to each expert across all layers.
-
-        Returns:
-            A tensor of shape (num_local_layers, num_experts) containing counts.
-        """
-
-        return torch.stack([self.layers[layer_name].moe_tokens_per_expert for layer_name in self._layers_iter], dim=0)
-
     def reset_parameters(self):
         """Resets module parameters"""
 
@@ -328,21 +309,6 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         if self._stage.is_current_stage_last:
             self.lm_head.reset_parameters()
 
-    def reset_moe_stats(self):
-        """
-        Resets MoE routing statistics in the backbone.
-        """
-
-        self.model.reset_moe_stats()
-
-    @property
-    def moe_tokens_per_expert(self) -> torch.Tensor:
-        """
-        Accesses MoE routing statistics from the backbone.
-        """
-
-        return self.model.moe_tokens_per_expert
-
     def infer_stage_inputs_from_pipeline_inputs(
         self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
@@ -452,21 +418,6 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
 
         if self._stage.is_current_stage_last:
             self.cls_head.reset_parameters()
-
-    def reset_moe_stats(self):
-        """
-        Resets MoE routing statistics in the backbone.
-        """
-
-        self.model.reset_moe_stats()
-
-    @property
-    def moe_tokens_per_expert(self) -> torch.Tensor:
-        """
-        Accesses MoE routing statistics from the backbone.
-        """
-
-        return self.model.moe_tokens_per_expert
 
     def infer_stage_inputs_from_pipeline_inputs(
         self, inputs: dict[str, torch.Tensor], n_microbatches: int
