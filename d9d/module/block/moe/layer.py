@@ -85,7 +85,9 @@ class MoELayer(nn.Module, ModuleLateInit):
 
     @torch.no_grad()
     def _update_tokens_per_expert(self, expert_indices: torch.Tensor):
-        self.tokens_per_expert.add_(expert_indices.view(-1).bincount(minlength=self._num_grouped_experts))
+        flat_indices = expert_indices.view(-1)
+        ones = torch.ones_like(flat_indices, dtype=self.tokens_per_expert.dtype)
+        self.tokens_per_expert.scatter_add_(0, flat_indices, ones)
 
     @torch.no_grad()
     def reset_stats(self):

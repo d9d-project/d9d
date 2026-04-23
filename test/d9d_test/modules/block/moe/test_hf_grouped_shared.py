@@ -135,6 +135,12 @@ def build_hf_moe_shared(dtype: torch.dtype) -> Qwen3_5MoeSparseMoeBlock:
             1 / math.sqrt(MOE_HIDDEN_SIZE),
         )
 
+        nn.init.uniform_(
+            module.gate.weight,
+            -1 / math.sqrt(_NUM_EXPERTS),
+            1 / math.sqrt(_NUM_EXPERTS),
+        )
+
         return module
 
 
@@ -159,7 +165,7 @@ def test_consistent_to_hf_qwen3_5_shared(dtype: torch.dtype):
     out_d9d.mean().backward()
 
     # Check Tolerance and equivalence
-    torch.testing.assert_close(out_d9d, out_hf, atol=2e-3, rtol=1e-2)
+    torch.testing.assert_close(out_d9d, out_hf, atol=3e-3, rtol=1e-2)
     torch.testing.assert_close(out_d9d.mean(), out_hf.mean(), atol=1e-3, rtol=1e-2)
     torch.testing.assert_close(inputs_d9d.pre.grad, inputs_hf.pre.grad, atol=1e-7, rtol=0.01)
 

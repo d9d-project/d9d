@@ -18,7 +18,6 @@ from d9d_test.modules.block.moe.batch import MOE_HIDDEN_SIZE, build_moe_inputs, 
 from d9d_test.modules.helper import (
     assert_mapped_gradients_close,
     clone_module_weights,
-    forward_tolerance_for,
     torch_seed,
 )
 
@@ -97,6 +96,11 @@ def build_hf_moe(dtype: torch.dtype) -> Qwen3MoeSparseMoeBlock:
             -1 / math.sqrt(_MOE_INTERMEDIATE_SIZE),
             1 / math.sqrt(_MOE_INTERMEDIATE_SIZE),
         )
+        nn.init.uniform_(
+            module.gate.weight,
+            -1 / math.sqrt(_NUM_EXPERTS),
+            1 / math.sqrt(_NUM_EXPERTS),
+        )
         return module
 
 
@@ -121,8 +125,7 @@ def test_consistent_to_hf(dtype: torch.dtype):
     out_d9d.mean().backward()
 
     # Check
-    tol = forward_tolerance_for(dtype)
-    torch.testing.assert_close(out_d9d, out_hf, atol=tol.atol, rtol=tol.rtol)
-    torch.testing.assert_close(out_d9d.mean(), out_hf.mean(), atol=tol.atol, rtol=tol.rtol)
+    torch.testing.assert_close(out_d9d, out_hf, atol=3e-3, rtol=1e-2)
+    torch.testing.assert_close(out_d9d.mean(), out_hf.mean(), atol=1e-5, rtol=1e-5)
     torch.testing.assert_close(inputs_d9d.pre.grad, inputs_hf.pre.grad, atol=1e-7, rtol=0.01)
     assert_mapped_gradients_close(from_module=module_hf, to_module=module_d9d, map_with=mapper)
