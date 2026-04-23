@@ -2,6 +2,23 @@
 
 <!-- version list -->
 
+## v0.13.1 (2026-04-23)
+
+### Bug Fixes
+
+- Correct GQA/MQA head expansion logic for Q and K
+  ([`62b73bd`](https://github.com/d9d-project/d9d/commit/62b73bd38a9111f18c763b7d0acf065f317edb50))
+
+- Introduce RoutingResult and fix probability renormalization
+  ([`a1dabe3`](https://github.com/d9d-project/d9d/commit/a1dabe338bd9726a9f1027050a73c81474cc78c0))
+
+- Remove GPU-CPU sync that was happening during bincount() call in MoE layer
+  ([`534facc`](https://github.com/d9d-project/d9d/commit/534facc1bf25b9451ae99164d48d9462492f6edb))
+
+- Remove MoE statistics interface from qwen3 decoder layer and module
+  ([`99e0379`](https://github.com/d9d-project/d9d/commit/99e0379e4df07a4762054b5f9654d69bdecfc8ad))
+
+
 ## v0.13.0 (2026-04-20)
 
 ### Features
