@@ -27,6 +27,7 @@ Repository = "https://github.com/d9d-project/d9d"
 Documentation = "https://d9d-project.github.io/d9d"
 Homepage = "https://d9d-project.github.io/d9d"
 Issues = "https://github.com/d9d-project/d9d/issues"
+"Discord Server" = "https://discord.gg/sNRjDbxVrg"
 
 
 [build-system]

@@ -166,3 +166,7 @@ alternate_style = true
 
 [project.markdown_extensions.pymdownx.arithmatex]
 generic = true
+
+[[project.extra.social]]
+icon = "fontawesome/brands/discord"
+link = "https://discord.gg/sNRjDbxVrg"

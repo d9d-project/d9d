@@ -1,5 +1,10 @@
 # The d9d Project
 
+![PyPI - Version](https://img.shields.io/pypi/v/d9d)
+![PyPI - License](https://img.shields.io/pypi/l/d9d)
+[![Discord](https://img.shields.io/badge/Discord-%235865F2.svg?logo=discord&logoColor=white)](https://discord.gg/sNRjDbxVrg)
+[![Docs](https://img.shields.io/badge/docs-latest-blue.svg)](https://d9d-project.github.io/d9d/)
+
 **d9d** is a distributed training framework built on top of PyTorch 2.0. It aims to be hackable, modular, and efficient, designed to scale from single-GPU debugging to massive clusters running 6D-Parallelism.
 
 [LET'S START TRAINING 🚀](https://d9d-project.github.io/d9d/)
@@ -62,3 +67,10 @@ To achieve the balance between hackability and performance, d9d adheres to speci
 *   **Pragmatic Efficiency**: While we prefer native PyTorch, we are eager to integrate non-native solutions if they improve MFU. For example, we implement MoE using **DeepEp** communications, reindexing kernels from **Megatron-LM**, and efficient grouped-GEMM implementations.
 *   **Graph-Based State Management**: Our IO system treats model checkpoints as directed acyclic graphs. This allows you to transform architectures (e.g., merging `q`, `k`, `v` into `qkv`) on-the-fly while streaming from disk, without massive memory overhead.
 *   **DTensors**: We mandate that distributed parameters be represented as `torch.distributed.tensor.DTensor`. This simplifies checkpointing by making them topology-aware automatically. We leverage modern PyTorch 2.0 APIs (`DeviceMesh`) as much as possible.
+
+## Community & Support
+
+If you need help, want to discuss large-scale training strategies, or want to contribute to **d9d**, come join our community!
+
+* 💬 **Discord:** [Join the d9d server](https://discord.gg/sNRjDbxVrg) for real-time chat, support, and framework hacking.
+* 🐛 **Issues:** For bug reports and feature requests, please use the [GitHub Issue Tracker](https://github.com/d9d-project/d9d/issues).

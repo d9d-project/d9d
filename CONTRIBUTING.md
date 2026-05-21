@@ -4,7 +4,9 @@ First off, thank you for considering contributing to **d9d**!
 
 We aim to build a distributed training framework that is **efficient, hackable, and reliable**. To maintain this balance, we adhere to a strong engineering culture: strict type-checking, rigorous linting, and a structured proposal process for major changes.
 
- This document outlines the standards and workflows for contributing to the project.
+This document outlines the standards and workflows for contributing to the project.
+
+Before starting work on a major feature, we highly recommend jumping into our [Discord server](https://discord.gg/sNRjDbxVrg) to discuss your approach with the core maintainers!
 
 ## Development Setup
 
