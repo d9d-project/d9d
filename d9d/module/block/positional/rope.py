@@ -4,6 +4,7 @@ import torch
 from torch import nn
 
 from d9d.module.base import ModuleLateInit
+from d9d.module.block.positional.rope_scaling import NoRopeScaling, RopeScaling
 
 
 class RotaryEmbeddingStyle(StrEnum):
@@ -19,24 +20,6 @@ class RotaryEmbeddingStyle(StrEnum):
     INTERLEAVED = "interleaved"
 
 
-def _prepare_rope_inverse_frequencies(rope_base: int, inside_dim: int) -> torch.Tensor:
-    """
-    Calculates inverse frequencies for RoPE calculation.
-
-    Args:
-        rope_base: Base for the geometric progression.
-        inside_dim: Dimension of the attention head (must be even).
-
-    Returns:
-        A tensor containing the inverse frequencies.
-    """
-
-    power = torch.arange(0, inside_dim, 2, dtype=torch.int64).to(dtype=torch.float) / inside_dim
-    freq = rope_base**power
-    inv_freq = 1.0 / freq
-    return inv_freq
-
-
 def prepare_rotary_cos_sin_emb(
     rope_base: int,
     head_dim: int,
@@ -44,6 +27,7 @@ def prepare_rotary_cos_sin_emb(
     device: torch.device,
     dtype: torch.dtype,
     style: RotaryEmbeddingStyle,
+    rope_scaling: RopeScaling | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Precomputes rotary cosine and sine embeddings.
@@ -55,13 +39,19 @@ def prepare_rotary_cos_sin_emb(
         device: Target device for the tensors.
         dtype: Target data type for the tensors.
         style: RoPE layout style.
+        rope_scaling: Optional scaling configuration. When ``None`` (default),
+            standard geometric-progression inverse frequencies are used with no
+            mscale applied (equivalent to ``NoRopeScaling()``).
 
     Returns:
         A tuple containing cosine and sine tensors.
     """
 
+    if rope_scaling is None:
+        rope_scaling = NoRopeScaling()
+
     position_ids = torch.arange(0, max_position_ids, dtype=torch.long)
-    freqs = _prepare_rope_inverse_frequencies(rope_base, head_dim)
+    freqs = rope_scaling.inverse_frequencies(rope_base, head_dim)
 
     arguments = (freqs[:, None] @ position_ids[None, :].float()).T
 
@@ -75,6 +65,11 @@ def prepare_rotary_cos_sin_emb(
 
     cos = emb.cos()
     sin = emb.sin()
+
+    mscale = rope_scaling.attention_mscale
+    cos = cos * mscale
+    sin = sin * mscale
+
     return cos.to(device=device, dtype=dtype), sin.to(device=device, dtype=dtype)
 
 
@@ -87,6 +82,7 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
         head_dim: int,
         max_position_ids: int,
         style: RotaryEmbeddingStyle,
+        rope_scaling: RopeScaling | None = None,
     ) -> None:
         """
         Constructs the RotaryEmbeddingProvider.
@@ -96,6 +92,8 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
             head_dim: Dimensionality of the attention head.
             max_position_ids: Maximum supported sequence length for caching.
             style: Embedding layout alignment.
+            rope_scaling: Optional scaling configuration for extended context lengths.
+                When ``None`` (default), ``NoRopeScaling`` is used — no scaling applied.
         """
 
         super().__init__()
@@ -103,6 +101,7 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
         self._head_dim = head_dim
         self._max_position_ids = max_position_ids
         self._style = style
+        self._rope_scaling: RopeScaling = rope_scaling if rope_scaling is not None else NoRopeScaling()
         self.cos_emb = nn.Buffer(torch.empty(max_position_ids, head_dim), persistent=False)
         self.sin_emb = nn.Buffer(torch.empty(max_position_ids, head_dim), persistent=False)
 
@@ -129,6 +128,7 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
                 device=self.cos_emb.device,
                 dtype=self.cos_emb.dtype,
                 style=self._style,
+                rope_scaling=self._rope_scaling,
             )
             self.cos_emb.data = cos
             self.sin_emb.data = sin
