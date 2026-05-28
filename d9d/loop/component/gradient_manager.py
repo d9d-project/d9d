@@ -4,6 +4,7 @@ import torch
 from torch.distributed.tensor import DTensor
 
 from d9d.core.dist_context import DistributedContext
+from d9d.core.offload import OffloadContext, OnloadContext
 from d9d.internals.grad_sync import GradientSynchronizer
 from d9d.loop.config import GradientManagerConfig
 from d9d.metric.impl.aggregation import WeightedMeanMetric
@@ -53,6 +54,10 @@ class GradientManager:
         )
         self._grads_to_scale: list[torch.Tensor] | None = None
 
+        self._installed = False
+        self._offloaded = False
+        self._in_flight_count = 0
+
     def _setup_grad_dtype(self):
         if self._config.grad_dtype is None:
             return
@@ -98,7 +103,9 @@ class GradientManager:
         self._setup_grad_dtype()
         self._grad_sync.bind()
         self._bind_grads_to_scale()
+        self._installed = True
         yield
+        self._installed = False
         self._unbind_grads_to_scale()
         self._grad_sync.unbind()
 
@@ -112,6 +119,7 @@ class GradientManager:
         """
 
         self._loss.update(loss, loss_weight)
+        self._in_flight_count += 1
 
     def sync_and_scale(self):
         """
@@ -151,3 +159,69 @@ class GradientManager:
 
         self._grad_sync.zero_grad()
         self._loss.reset()
+        self._in_flight_count = 0
+
+    @property
+    def has_in_flight_gradients(self) -> bool:
+        """
+        Checks whether a gradient accumulation is currently in flight.
+
+        The counter is raised by "add_loss_with_weight" and reset by "zero_grad". While it is
+        non-zero, partial accumulation state lives in the synchronizer buckets, so offloading
+        the gradient state would lose it.
+        """
+
+        return self._in_flight_count > 0
+
+    def offload(self, ctx: OffloadContext) -> None:
+        """
+        Releases the GPU memory of the gradient state to host memory.
+
+        The synchronizer bucket buffers (if installed) are released and the residual loss
+        accumulator is reset. The much larger model and optimizer state is offloaded separately.
+
+        Args:
+            ctx: Context for this operation.
+
+        Raises:
+            RuntimeError: If the gradient state is already offloaded.
+        """
+
+        if self._offloaded:
+            raise RuntimeError("GradientManager is already offloaded.")
+
+        if self._installed:
+            self._unbind_grads_to_scale()
+            self._grad_sync.unbind()
+        else:
+            for module in self._tracked_modules.modules:
+                for param in module.parameters():
+                    param.grad = None
+
+        self._loss.reset()
+        self._offloaded = True
+
+    def onload(self, ctx: OnloadContext) -> None:
+        """
+        Restores GPU residency of the gradient state released by "offload".
+
+        Args:
+            ctx: Context for this operation.
+
+        Raises:
+            RuntimeError: If the gradient state is not offloaded.
+        """
+
+        if not self._offloaded:
+            raise RuntimeError("GradientManager is not offloaded.")
+
+        if self._installed:
+            self._setup_grad_dtype()
+            self._grad_sync.bind()
+            self._bind_grads_to_scale()
+
+        self._offloaded = False
+
+    def is_offloaded(self) -> bool:
+        """Reports whether the gradient state is currently on host memory."""
+        return self._offloaded
