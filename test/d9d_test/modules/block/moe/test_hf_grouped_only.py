@@ -9,7 +9,7 @@ from d9d.model_state.mapper.leaf import (
     ModelStateMapperRename,
     ModelStateMapperTranspose,
 )
-from d9d.module.block.moe import MoELayer
+from d9d.module.block.moe import MoELayer, TopKRouter
 from torch import nn
 from transformers import Qwen3MoeConfig
 from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeSparseMoeBlock
@@ -60,8 +60,12 @@ def build_d9d_moe(dtype: torch.dtype) -> MoELayer:
                 hidden_dim=MOE_HIDDEN_SIZE,
                 num_grouped_experts=_NUM_EXPERTS,
                 intermediate_dim_grouped=_MOE_INTERMEDIATE_SIZE,
-                top_k=_NUM_ACTIVATE_EXPERTS,
-                router_renormalize_probabilities=True,
+                router=TopKRouter(
+                    dim=MOE_HIDDEN_SIZE,
+                    num_experts=_NUM_EXPERTS,
+                    top_k=_NUM_ACTIVATE_EXPERTS,
+                    renormalize_probabilities=True,
+                ),
             )
             .cuda()
             .to(dtype)

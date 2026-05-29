@@ -3,7 +3,7 @@ from torch import nn
 
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.attention import GroupedQueryAttention
-from d9d.module.block.moe import MoELayer
+from d9d.module.block.moe import MoELayer, TopKRouter
 from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingStyle
 
@@ -42,8 +42,12 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
             hidden_dim=params.hidden_size,
             num_grouped_experts=params.num_experts,
             intermediate_dim_grouped=params.intermediate_size,
-            top_k=params.experts_top_k,
-            router_renormalize_probabilities=True,
+            router=TopKRouter(
+                dim=params.hidden_size,
+                num_experts=params.num_experts,
+                top_k=params.experts_top_k,
+                renormalize_probabilities=True,
+            ),
         )
 
         self.input_layernorm = RMSNorm(params.hidden_size, eps=params.rms_norm_eps)
