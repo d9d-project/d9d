@@ -1,3 +1,5 @@
+from typing import cast
+
 import torch
 from torch import nn
 from torch.distributed import ProcessGroup
@@ -9,7 +11,7 @@ from .communications import (
     NoCommunicationHandler,
 )
 from .grouped_experts import GroupedSwiGLU
-from .router import RoutingResult, TopKRouter
+from .router import RoutingResult
 from .shared_expert import SharedExpertParameters, SharedSwiGLU
 
 
@@ -29,29 +31,23 @@ class MoELayer(nn.Module, ModuleLateInit):
         hidden_dim: int,
         intermediate_dim_grouped: int,
         num_grouped_experts: int,
-        top_k: int,
-        router_renormalize_probabilities: bool,
+        router: nn.Module,
         shared_expert: SharedExpertParameters | None = None,
     ):
         """
-         Constructs the MoELayer.
+        Constructs the MoELayer.
 
         Args:
             hidden_dim: Hidden size.
             intermediate_dim_grouped: Intermediate dimension for the Expert FFNs.
             num_grouped_experts: Total number of experts.
-            top_k: Number of experts to route each token to.
-            router_renormalize_probabilities: Configures router probability normalization behavior.
+            router: Router module. Must accept ``(num_tokens, hidden_dim)`` and return a
+                ``RoutingResult``. Use ``TopKRouter`` or ``SigmoidGroupedTopKRouter``.
             shared_expert: Optional configuration for a shared expert.
         """
 
         super().__init__()
-        self.router = TopKRouter(
-            dim=hidden_dim,
-            num_experts=num_grouped_experts,
-            top_k=top_k,
-            renormalize_probabilities=router_renormalize_probabilities,
-        )
+        self.router = router
         self.grouped_experts = GroupedSwiGLU(
             hidden_dim=hidden_dim, intermediate_dim=intermediate_dim_grouped, num_experts=num_grouped_experts
         )
@@ -77,11 +73,11 @@ class MoELayer(nn.Module, ModuleLateInit):
         Args:
             group: The PyTorch process group spanning the expert parallel ranks.
         """
-        # Lazy load the handler to prevent early DeepEP bindings/evaluation
         from .communications.deepep import DeepEpCommunicationHandler  # noqa: PLC0415
 
         communicator = DeepEpCommunicationHandler(num_experts=self._num_grouped_experts)
-        communicator.setup(group, self._hidden_dim, self.router.gate.weight.dtype)
+        gate = cast(nn.Linear, self.router.gate)
+        communicator.setup(group, self._hidden_dim, gate.weight.dtype)
         self._communicator = communicator
 
     @torch.no_grad()
@@ -133,7 +129,7 @@ class MoELayer(nn.Module, ModuleLateInit):
 
     def reset_parameters(self):
         """Resets module parameters."""
-        self.router.reset_parameters()
+        cast(ModuleLateInit, self.router).reset_parameters()
         self.grouped_experts.reset_parameters()
         if self.shared_expert is not None:
             self.shared_expert.reset_parameters()

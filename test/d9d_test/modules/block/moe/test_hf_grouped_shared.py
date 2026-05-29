@@ -9,7 +9,7 @@ from d9d.model_state.mapper.leaf import (
     ModelStateMapperRename,
     ModelStateMapperTranspose,
 )
-from d9d.module.block.moe import MoELayer, SharedExpertParameters
+from d9d.module.block.moe import MoELayer, SharedExpertParameters, TopKRouter
 from torch import nn
 from transformers import Qwen3_5MoeConfig
 from transformers.models.qwen3_5_moe.modeling_qwen3_5_moe import Qwen3_5MoeSparseMoeBlock
@@ -68,8 +68,12 @@ def build_d9d_moe_shared(dtype: torch.dtype) -> MoELayer:
                 hidden_dim=MOE_HIDDEN_SIZE,
                 num_grouped_experts=_NUM_EXPERTS,
                 intermediate_dim_grouped=_MOE_INTERMEDIATE_SIZE,
-                top_k=_NUM_ACTIVATE_EXPERTS,
-                router_renormalize_probabilities=True,
+                router=TopKRouter(
+                    dim=MOE_HIDDEN_SIZE,
+                    num_experts=_NUM_EXPERTS,
+                    top_k=_NUM_ACTIVATE_EXPERTS,
+                    renormalize_probabilities=True,
+                ),
                 shared_expert=SharedExpertParameters(
                     intermediate_size=_SHARED_EXPERT_INTERMEDIATE_SIZE,
                     enable_gate=True,
