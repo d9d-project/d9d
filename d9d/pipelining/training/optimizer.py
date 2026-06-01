@@ -65,6 +65,9 @@ class PipelinedOptimizer(OptimizerProtocol):
                     if not torch.is_tensor(value):
                         continue
                     mirror[optimizer_index, id(param), key] = offload_tensor(value, pin_memory=ctx.pin_memory)
+
+        # Drain the pending non-blocking device-to-host copies before the device storage is released.
+        torch.cuda.synchronize(ctx.dist_context.current_device)
         self._offload_mirror = mirror
 
     def onload(self, ctx: OnloadContext) -> None:
@@ -81,16 +84,17 @@ class PipelinedOptimizer(OptimizerProtocol):
         if self._offload_mirror is None:
             raise RuntimeError("PipelinedOptimizer is not offloaded.")
 
+        device = ctx.dist_context.current_device
         for optimizer_index, optimizer in enumerate(self._optimizers):
             for param, param_state in cast(torch.optim.Optimizer, optimizer).state.items():
                 for key, value in param_state.items():
                     if not torch.is_tensor(value):
                         continue
                     offloaded = self._offload_mirror[optimizer_index, id(param), key]
-                    onload_tensor(value, offloaded, device=ctx.device)
+                    onload_tensor(value, offloaded, device=device)
 
         # Drain pending host-to-device copies before the host mirror buffers are released.
-        torch.cuda.synchronize(ctx.device)
+        torch.cuda.synchronize(device)
         self._offload_mirror = None
 
     def is_offloaded(self) -> bool:

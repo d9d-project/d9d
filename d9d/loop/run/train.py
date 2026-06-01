@@ -1,12 +1,10 @@
 from collections.abc import Iterable
 from pathlib import Path
-from typing import cast
 
-import torch
 from tqdm import tqdm
 
 from d9d.core.dist_context import DeviceMeshParameters
-from d9d.core.offload import DEFAULT_SLEEP_TAGS, Offloadable, OffloadContext, OnloadContext, SleepTag
+from d9d.core.offload import DEFAULT_SLEEP_TAGS, SleepTag
 from d9d.internals.determinism import set_seeds
 from d9d.internals.pipeline_state import PipelineStateHandler
 from d9d.loop.component import (
@@ -58,18 +56,14 @@ from d9d.loop.event.catalogue.train import (
     EVENT_TRAIN_OPTIMIZER_STEP_POST,
     EVENT_TRAIN_OPTIMIZER_STEP_PRE,
     EVENT_TRAIN_READY,
-    EVENT_TRAIN_SLEEP_POST,
-    EVENT_TRAIN_SLEEP_PRE,
     EVENT_TRAIN_STEP_POST,
     EVENT_TRAIN_STEP_PRE,
-    EVENT_TRAIN_WAKE_POST,
-    EVENT_TRAIN_WAKE_PRE,
     EventLRSchedulerReadyContext,
     EventOptimizerReadyContext,
-    EventSleepContext,
     EventTrainFinishedContext,
     EventTrainReadyContext,
 )
+from d9d.loop.run.sleeper import TrainSleeper
 from d9d.loop.state import TrainJobState
 from d9d.metric.impl.container import ComposeMetric
 
@@ -272,8 +266,10 @@ class Trainer:
         Args:
             state: The encapsulated state object containing all initialized
                 components (model, optimizer, dist_context, etc.).
+            sleeper: The encapsulated sleep/wake lifecycle for colocated RL.
         """
         self._state = state
+        self._sleeper = TrainSleeper(state)
 
     def train(self):
         """
@@ -383,38 +379,7 @@ class Trainer:
             RuntimeError: If called during an in-flight gradient accumulation.
         """
 
-        requested = frozenset(tags)
-        if SleepTag.COMMS in requested:
-            raise NotImplementedError(
-                "SleepTag.COMMS is not yet implemented. Only SleepTag.TENSOR_STATES is supported."
-            )
-        if SleepTag.TENSOR_STATES not in requested or self.is_sleeping(SleepTag.TENSOR_STATES):
-            return
-
-        if self._state.gradient_manager.has_in_flight_gradients:
-            raise RuntimeError(
-                "Trainer.sleep() was called during an in-flight gradient accumulation. "
-                "Sleep is only legal between steps, e.g. from an EVENT_TRAIN_STEP_POST handler."
-            )
-
-        event_context = EventSleepContext(tags=requested)
-        self._state.event_bus.trigger(EVENT_TRAIN_SLEEP_PRE, event_context)
-        self._state.dist_context.wait_world()
-
-        offload_context = OffloadContext(
-            dist_context=self._state.dist_context,
-            host_device=torch.device("cpu"),
-            pin_memory=False,
-        )
-        self._state.gradient_manager.offload(offload_context)
-        cast(Offloadable, self._state.optimizer).offload(offload_context)
-        self._state.tracked_modules.offload(offload_context)
-
-        torch.cuda.synchronize(self._state.dist_context.current_device)
-        torch.cuda.empty_cache()
-
-        self._state.dist_context.wait_world()
-        self._state.event_bus.trigger(EVENT_TRAIN_SLEEP_POST, event_context)
+        self._sleeper.sleep(tags)
 
     def wake(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
         """
@@ -430,28 +395,7 @@ class Trainer:
             NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
         """
 
-        requested = frozenset(tags)
-        if SleepTag.COMMS in requested:
-            raise NotImplementedError(
-                "SleepTag.COMMS is not yet implemented. Only SleepTag.TENSOR_STATES is supported."
-            )
-        if SleepTag.TENSOR_STATES not in requested or not self.is_sleeping(SleepTag.TENSOR_STATES):
-            return
-
-        event_context = EventSleepContext(tags=requested)
-        self._state.event_bus.trigger(EVENT_TRAIN_WAKE_PRE, event_context)
-        self._state.dist_context.wait_world()
-
-        onload_context = OnloadContext(
-            dist_context=self._state.dist_context,
-            device=self._state.dist_context.current_device,
-        )
-        self._state.tracked_modules.onload(onload_context)
-        cast(Offloadable, self._state.optimizer).onload(onload_context)
-        self._state.gradient_manager.onload(onload_context)
-
-        self._state.dist_context.wait_world()
-        self._state.event_bus.trigger(EVENT_TRAIN_WAKE_POST, event_context)
+        self._sleeper.wake(tags)
 
     def is_sleeping(self, tag: SleepTag) -> bool:
         """
@@ -464,9 +408,7 @@ class Trainer:
             True if the subsystem is offloaded to host memory, False otherwise.
         """
 
-        if tag is SleepTag.TENSOR_STATES:
-            return self._state.tracked_modules.is_offloaded()
-        return False
+        return self._sleeper.is_sleeping(tag)
 
     def export(self, export_to: Path, load_checkpoint: bool):
         """

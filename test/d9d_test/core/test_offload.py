@@ -36,11 +36,11 @@ def test_offload_tensor_round_trip(dtype):
 def test_tracked_modules_offload_guards(dist_ctx_factory):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())
     tracked = TrackedModules(dist_ctx, [nn.Linear(8, 4)], lambda _name, _tensor: True)
-    offload_ctx = OffloadContext(dist_context=dist_ctx, host_device=torch.device("cpu"), pin_memory=False)
+    offload_ctx = OffloadContext(dist_context=dist_ctx, pin_memory=False)
 
     assert not tracked.is_offloaded()
     with pytest.raises(RuntimeError, match="not offloaded"):
-        tracked.onload(OnloadContext(dist_context=dist_ctx, device=torch.device("cpu")))
+        tracked.onload(OnloadContext(dist_context=dist_ctx))
 
     tracked.offload(offload_ctx)
     assert tracked.is_offloaded()
@@ -95,14 +95,14 @@ def test_tracked_modules_round_trip(dist_ctx_factory):
     snapshots = [p.detach().clone() for p in params]
 
     mem_before = torch.cuda.memory_allocated(device)
-    tracked.offload(OffloadContext(dist_context=dist_ctx, host_device=torch.device("cpu"), pin_memory=False))
+    tracked.offload(OffloadContext(dist_context=dist_ctx, pin_memory=False))
 
     assert tracked.is_offloaded()
     assert all(p.device.type == "cpu" for p in module.parameters())
     # the GPU storage of the parameters must actually be released
     assert mem_before - torch.cuda.memory_allocated(device) >= 0.9 * param_bytes
 
-    tracked.onload(OnloadContext(dist_context=dist_ctx, device=device))
+    tracked.onload(OnloadContext(dist_context=dist_ctx))
 
     assert not tracked.is_offloaded()
     # parameter object identity is preserved across the round trip
@@ -138,7 +138,7 @@ def test_pipelined_optimizer_round_trip(dist_ctx_factory):
     }
 
     assert not optimizer.is_offloaded()
-    optimizer.offload(OffloadContext(dist_context=dist_ctx, host_device=torch.device("cpu"), pin_memory=False))
+    optimizer.offload(OffloadContext(dist_context=dist_ctx, pin_memory=False))
 
     assert optimizer.is_offloaded()
     for param, state in inner.state.items():
@@ -148,7 +148,7 @@ def test_pipelined_optimizer_round_trip(dist_ctx_factory):
                 # the optimizer-state dict entry is the same tensor object as before offload
                 assert id(value) == state_ids[id(param)][key]
 
-    optimizer.onload(OnloadContext(dist_context=dist_ctx, device=device))
+    optimizer.onload(OnloadContext(dist_context=dist_ctx))
 
     assert not optimizer.is_offloaded()
     for param, state in inner.state.items():

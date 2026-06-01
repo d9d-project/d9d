@@ -4,7 +4,7 @@ import torch
 from torch.distributed.tensor import DTensor
 
 from d9d.core.dist_context import DistributedContext
-from d9d.core.offload import OffloadContext, OnloadContext
+from d9d.core.offload import Offloadable, OffloadContext, OnloadContext
 from d9d.internals.grad_sync import GradientSynchronizer
 from d9d.loop.config import GradientManagerConfig
 from d9d.metric.impl.aggregation import WeightedMeanMetric
@@ -13,7 +13,7 @@ from .batch_maths import BatchMaths
 from .model_stage_factory import TrackedModules
 
 
-class GradientManager:
+class GradientManager(Offloadable):
     """
     Manages the lifecycle of gradients during the training loop.
 
@@ -90,6 +90,15 @@ class GradientManager:
         if len(self._grads_to_scale) > 0:
             torch._foreach_mul_(self._grads_to_scale, scale_factor)
 
+    def _bind(self):
+        self._setup_grad_dtype()
+        self._grad_sync.bind()
+        self._bind_grads_to_scale()
+
+    def _unbind(self):
+        self._unbind_grads_to_scale()
+        self._grad_sync.unbind()
+
     @contextmanager
     def install(self):
         """
@@ -100,14 +109,11 @@ class GradientManager:
         as the boundary for the accumulation phase.
         """
 
-        self._setup_grad_dtype()
-        self._grad_sync.bind()
-        self._bind_grads_to_scale()
+        self._bind()
         self._installed = True
         yield
         self._installed = False
-        self._unbind_grads_to_scale()
-        self._grad_sync.unbind()
+        self._unbind()
 
     def add_loss_with_weight(self, loss: torch.Tensor, loss_weight: torch.Tensor):
         """
@@ -177,27 +183,22 @@ class GradientManager:
         """
         Releases the GPU memory of the gradient state to host memory.
 
-        The synchronizer bucket buffers (if installed) are released and the residual loss
-        accumulator is reset. The much larger model and optimizer state is offloaded separately.
+        The synchronizer bucket buffers are released and the residual loss accumulator is reset.
 
         Args:
             ctx: Context for this operation.
 
         Raises:
-            RuntimeError: If the gradient state is already offloaded.
+            RuntimeError: If the gradient state is already offloaded, or if the manager has
+                not been installed.
         """
 
         if self._offloaded:
             raise RuntimeError("GradientManager is already offloaded.")
+        if not self._installed:
+            raise RuntimeError("GradientManager must be installed before it can be offloaded.")
 
-        if self._installed:
-            self._unbind_grads_to_scale()
-            self._grad_sync.unbind()
-        else:
-            for module in self._tracked_modules.modules:
-                for param in module.parameters():
-                    param.grad = None
-
+        self._unbind()
         self._loss.reset()
         self._offloaded = True
 
@@ -216,9 +217,7 @@ class GradientManager:
             raise RuntimeError("GradientManager is not offloaded.")
 
         if self._installed:
-            self._setup_grad_dtype()
-            self._grad_sync.bind()
-            self._bind_grads_to_scale()
+            self._bind()
 
         self._offloaded = False
 
