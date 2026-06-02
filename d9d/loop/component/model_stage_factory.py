@@ -7,7 +7,7 @@ from torch import nn
 from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
-from d9d.core.offload import OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
+from d9d.core.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 from d9d.loop.config import ModelStageFactoryConfig, PipeliningConfig
 from d9d.loop.control import InitializeModelStageContext, ModelProvider, ParallelizeModelStageContext
 from d9d.model_state.io import load_model_state
@@ -32,7 +32,7 @@ def _stateful_predicate_always(key: str, value: torch.Tensor) -> bool:
     return True
 
 
-class TrackedModules(Stateful):
+class TrackedModules(Stateful, Offloadable):
     """
     Wraps a list of model stages and manages their state for distributed checkpointing.
 

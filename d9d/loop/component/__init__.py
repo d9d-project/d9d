@@ -13,6 +13,7 @@ from .pipeline_result_processing import InferenceProcessor, LossComputer, Pipeli
 from .stepper import Stepper
 from .task_operator import ForwardResult, InferenceTaskOperator, TrainTaskOperator
 from .timeout_manager import TimeoutManager
+from .train_sleeper import TrainSleeper
 
 __all__ = [
     "BatchMaths",
@@ -34,5 +35,6 @@ __all__ = [
     "Stepper",
     "TimeoutManager",
     "TrackedModules",
+    "TrainSleeper",
     "TrainTaskOperator",
 ]

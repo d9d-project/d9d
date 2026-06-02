@@ -22,6 +22,7 @@ from d9d.loop.component import (
     StateCheckpointer,
     Stepper,
     TimeoutManager,
+    TrainSleeper,
     TrainTaskOperator,
 )
 from d9d.loop.config import TrainerConfig
@@ -63,7 +64,6 @@ from d9d.loop.event.catalogue.train import (
     EventTrainFinishedContext,
     EventTrainReadyContext,
 )
-from d9d.loop.run.sleeper import TrainSleeper
 from d9d.loop.state import TrainJobState
 from d9d.metric.impl.container import ComposeMetric
 
@@ -269,7 +269,13 @@ class Trainer:
             sleeper: The encapsulated sleep/wake lifecycle for colocated RL.
         """
         self._state = state
-        self._sleeper = TrainSleeper(state)
+        self._sleeper = TrainSleeper(
+            dist_context=state.dist_context,
+            tracked_modules=state.tracked_modules,
+            optimizer=state.optimizer,
+            gradient_manager=state.gradient_manager,
+            event_bus=state.event_bus,
+        )
 
     def train(self):
         """

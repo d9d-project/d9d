@@ -3,11 +3,11 @@ from typing import Any, cast
 import torch
 from torch.distributed import DeviceMesh
 
-from d9d.core.offload import OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
+from d9d.core.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 from d9d.core.protocol import OptimizerProtocol
 
 
-class PipelinedOptimizer(OptimizerProtocol):
+class PipelinedOptimizer(OptimizerProtocol, Offloadable):
     """
     Wrapper that manages multiple optimizers for a pipeline parallel rank.
 
