@@ -1,5 +1,5 @@
 import itertools
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import torch
@@ -7,6 +7,7 @@ from torch import nn
 from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
+from d9d.core.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 from d9d.loop.config import ModelStageFactoryConfig, PipeliningConfig
 from d9d.loop.control import InitializeModelStageContext, ModelProvider, ParallelizeModelStageContext
 from d9d.model_state.io import load_model_state
@@ -31,7 +32,7 @@ def _stateful_predicate_always(key: str, value: torch.Tensor) -> bool:
     return True
 
 
-class TrackedModules(Stateful):
+class TrackedModules(Stateful, Offloadable):
     """
     Wraps a list of model stages and manages their state for distributed checkpointing.
 
@@ -53,11 +54,71 @@ class TrackedModules(Stateful):
         self._dist_context = dist_context
         self._modules = modules
         self._stateful_predicate = stateful_predicate
+        self._offload_mirror: dict[int, OffloadedTensor] | None = None
 
     @property
     def modules(self) -> list[nn.Module]:
         """Returns the list of underlying PyTorch model modules."""
         return self._modules
+
+    def _tensors(self) -> Iterator[torch.Tensor]:
+        """Yields every parameter and buffer (persistent and non-persistent) of all tracked modules."""
+        return itertools.chain.from_iterable(
+            itertools.chain(module.parameters(), module.buffers()) for module in self._modules
+        )
+
+    def offload(self, ctx: OffloadContext) -> None:
+        """
+        Releases the GPU memory of all model parameters and buffers, moving them to host memory.
+
+        Each tensor's local storage is swapped in place for a host copy. The parameter/buffer
+        objects themselves - including DTensor wrappers - are preserved, so optimizer state keys,
+        gradient hooks and any external references (e.g. a frozen reference model held by a task)
+        remain valid.
+
+        Args:
+            ctx: Context for this operation.
+
+        Raises:
+            RuntimeError: If the modules are already offloaded.
+        """
+
+        if self._offload_mirror is not None:
+            raise RuntimeError("TrackedModules is already offloaded.")
+
+        mirror: dict[int, OffloadedTensor] = {}
+        for tensor in self._tensors():
+            mirror[id(tensor)] = offload_tensor(tensor, pin_memory=ctx.pin_memory)
+
+        # Drain the pending non-blocking device-to-host copies before the device storage is released.
+        torch.cuda.synchronize(ctx.dist_context.current_device)
+        self._offload_mirror = mirror
+
+    def onload(self, ctx: OnloadContext) -> None:
+        """
+        Restores GPU residency of all model parameters and buffers released by "offload".
+
+        Args:
+            ctx: Context for this operation.
+
+        Raises:
+            RuntimeError: If the modules are not offloaded.
+        """
+
+        if self._offload_mirror is None:
+            raise RuntimeError("TrackedModules is not offloaded.")
+
+        device = ctx.dist_context.current_device
+        for tensor in self._tensors():
+            onload_tensor(tensor, self._offload_mirror[id(tensor)], device=device)
+
+        # Drain pending host-to-device copies before the host mirror buffers are released.
+        torch.cuda.synchronize(device)
+        self._offload_mirror = None
+
+    def is_offloaded(self) -> bool:
+        """Reports whether the model parameters and buffers are currently on host memory."""
+        return self._offload_mirror is not None
 
     def _whitelisted_params(self, module: nn.Module) -> set[str]:
         allow_saving = set()

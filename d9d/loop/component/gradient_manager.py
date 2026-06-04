@@ -4,6 +4,7 @@ import torch
 from torch.distributed.tensor import DTensor
 
 from d9d.core.dist_context import DistributedContext
+from d9d.core.offload import Offloadable, OffloadContext, OnloadContext
 from d9d.internals.grad_sync import GradientSynchronizer
 from d9d.loop.config import GradientManagerConfig
 from d9d.metric.impl.aggregation import WeightedMeanMetric
@@ -12,7 +13,7 @@ from .batch_maths import BatchMaths
 from .model_stage_factory import TrackedModules
 
 
-class GradientManager:
+class GradientManager(Offloadable):
     """
     Manages the lifecycle of gradients during the training loop.
 
@@ -53,6 +54,10 @@ class GradientManager:
         )
         self._grads_to_scale: list[torch.Tensor] | None = None
 
+        self._installed = False
+        self._offloaded = False
+        self._in_flight_count = 0
+
     def _setup_grad_dtype(self):
         if self._config.grad_dtype is None:
             return
@@ -85,6 +90,15 @@ class GradientManager:
         if len(self._grads_to_scale) > 0:
             torch._foreach_mul_(self._grads_to_scale, scale_factor)
 
+    def _bind(self):
+        self._setup_grad_dtype()
+        self._grad_sync.bind()
+        self._bind_grads_to_scale()
+
+    def _unbind(self):
+        self._unbind_grads_to_scale()
+        self._grad_sync.unbind()
+
     @contextmanager
     def install(self):
         """
@@ -95,12 +109,11 @@ class GradientManager:
         as the boundary for the accumulation phase.
         """
 
-        self._setup_grad_dtype()
-        self._grad_sync.bind()
-        self._bind_grads_to_scale()
+        self._bind()
+        self._installed = True
         yield
-        self._unbind_grads_to_scale()
-        self._grad_sync.unbind()
+        self._installed = False
+        self._unbind()
 
     def add_loss_with_weight(self, loss: torch.Tensor, loss_weight: torch.Tensor):
         """
@@ -112,6 +125,7 @@ class GradientManager:
         """
 
         self._loss.update(loss, loss_weight)
+        self._in_flight_count += 1
 
     def sync_and_scale(self):
         """
@@ -151,3 +165,62 @@ class GradientManager:
 
         self._grad_sync.zero_grad()
         self._loss.reset()
+        self._in_flight_count = 0
+
+    @property
+    def has_in_flight_gradients(self) -> bool:
+        """
+        Checks whether a gradient accumulation is currently in flight.
+
+        The counter is raised by "add_loss_with_weight" and reset by "zero_grad". While it is
+        non-zero, partial accumulation state lives in the synchronizer buckets, so offloading
+        the gradient state would lose it.
+        """
+
+        return self._in_flight_count > 0
+
+    def offload(self, ctx: OffloadContext) -> None:
+        """
+        Releases the GPU memory of the gradient state to host memory.
+
+        The synchronizer bucket buffers are released and the residual loss accumulator is reset.
+
+        Args:
+            ctx: Context for this operation.
+
+        Raises:
+            RuntimeError: If the gradient state is already offloaded, or if the manager has
+                not been installed.
+        """
+
+        if self._offloaded:
+            raise RuntimeError("GradientManager is already offloaded.")
+        if not self._installed:
+            raise RuntimeError("GradientManager must be installed before it can be offloaded.")
+
+        self._unbind()
+        self._loss.reset()
+        self._offloaded = True
+
+    def onload(self, ctx: OnloadContext) -> None:
+        """
+        Restores GPU residency of the gradient state released by "offload".
+
+        Args:
+            ctx: Context for this operation.
+
+        Raises:
+            RuntimeError: If the gradient state is not offloaded.
+        """
+
+        if not self._offloaded:
+            raise RuntimeError("GradientManager is not offloaded.")
+
+        if self._installed:
+            self._bind()
+
+        self._offloaded = False
+
+    def is_offloaded(self) -> bool:
+        """Reports whether the gradient state is currently on host memory."""
+        return self._offloaded

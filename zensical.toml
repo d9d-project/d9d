@@ -19,6 +19,7 @@ nav = [
         "core/dist_ops.md",
         "core/sharding.md",
         "core/types.md",
+        "core/offload.md",
         "core/autograd_extensions.md"
     ] },
     { "Training and Inference" = [

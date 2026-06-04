@@ -1,5 +1,6 @@
 import dataclasses
 
+from d9d.core.offload import SleepTag
 from d9d.core.protocol import LRSchedulerProtocol, OptimizerProtocol
 from d9d.loop.event import Event
 from d9d.tracker import BaseTrackerRun
@@ -52,6 +53,18 @@ class EventTrainFinishedContext:
     """
 
 
+@dataclasses.dataclass(kw_only=True)
+class EventSleepContext:
+    """
+    Context provided for a sleep or wake lifecycle transition.
+
+    Attributes:
+        tags: The set of subsystem tags involved in this transition.
+    """
+
+    tags: frozenset[SleepTag]
+
+
 # Configuration Events
 
 EVENT_TRAIN_CONFIG_STARTED = Event[EventConfigurationStartedContext](id="train.configuration.start")
@@ -95,3 +108,18 @@ EVENT_TRAIN_OPTIMIZER_STEP_POST = Event[EventStepContext](id="train.optimizer_st
 
 EVENT_TRAIN_FINISHED = Event[EventTrainFinishedContext](id="train.finished")
 """Triggered when the entire training execution loop finishes successfully."""
+
+
+# Sleep / Wake Events
+
+EVENT_TRAIN_SLEEP_PRE = Event[EventSleepContext](id="train.sleep.pre")
+"""Triggered before any subsystem is offloaded. The training state is still fully resident on GPU."""
+
+EVENT_TRAIN_SLEEP_POST = Event[EventSleepContext](id="train.sleep.post")
+"""Triggered after every selected subsystem has been offloaded and the device cache has been emptied."""
+
+EVENT_TRAIN_WAKE_PRE = Event[EventSleepContext](id="train.wake.pre")
+"""Triggered before any subsystem is restored to GPU."""
+
+EVENT_TRAIN_WAKE_POST = Event[EventSleepContext](id="train.wake.post")
+"""Triggered after every selected subsystem has been restored to GPU."""

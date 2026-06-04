@@ -1,8 +1,10 @@
+from collections.abc import Iterable
 from pathlib import Path
 
 from tqdm import tqdm
 
 from d9d.core.dist_context import DeviceMeshParameters
+from d9d.core.offload import DEFAULT_SLEEP_TAGS, SleepTag
 from d9d.internals.determinism import set_seeds
 from d9d.internals.pipeline_state import PipelineStateHandler
 from d9d.loop.component import (
@@ -20,6 +22,7 @@ from d9d.loop.component import (
     StateCheckpointer,
     Stepper,
     TimeoutManager,
+    TrainSleeper,
     TrainTaskOperator,
 )
 from d9d.loop.config import TrainerConfig
@@ -265,6 +268,13 @@ class Trainer:
                 components (model, optimizer, dist_context, etc.).
         """
         self._state = state
+        self._sleeper = TrainSleeper(
+            dist_context=state.dist_context,
+            tracked_modules=state.tracked_modules,
+            optimizer=state.optimizer,
+            gradient_manager=state.gradient_manager,
+            event_bus=state.event_bus,
+        )
 
     def train(self):
         """
@@ -357,6 +367,53 @@ class Trainer:
 
             self._state.task.finalize(FinalizeContext())
             self._state.event_bus.trigger(EVENT_TRAIN_FINISHED, EventTrainFinishedContext())
+
+    def sleep(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
+        """
+        Releases the GPU-resident training state selected by "tags" to host memory.
+
+        This frees the GPU for a colocated workload, such as a rollout engine in colocated RL.
+        The call is collective: every rank must invoke it with identical tags. Requesting a tag
+        whose subsystem is already offloaded is a no-op.
+
+        Args:
+            tags: The subsystems to offload. Defaults to "SleepTag.TENSOR_STATES".
+
+        Raises:
+            NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
+            RuntimeError: If called during an in-flight gradient accumulation.
+        """
+
+        self._sleeper.sleep(tags)
+
+    def wake(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
+        """
+        Restores GPU residency of the training state previously released by "sleep".
+
+        The call is collective: every rank must invoke it with identical tags. Requesting a tag
+        whose subsystem is not offloaded is a no-op.
+
+        Args:
+            tags: The subsystems to restore. Defaults to "SleepTag.TENSOR_STATES".
+
+        Raises:
+            NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
+        """
+
+        self._sleeper.wake(tags)
+
+    def is_sleeping(self, tag: SleepTag) -> bool:
+        """
+        Reports whether the subsystem identified by "tag" is currently offloaded.
+
+        Args:
+            tag: The subsystem to query.
+
+        Returns:
+            True if the subsystem is offloaded to host memory, False otherwise.
+        """
+
+        return self._sleeper.is_sleeping(tag)
 
     def export(self, export_to: Path, load_checkpoint: bool):
         """
