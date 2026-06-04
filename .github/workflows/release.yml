@@ -8,7 +8,6 @@ on:
 permissions:
   contents: read
 
-
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -21,8 +20,18 @@ jobs:
       contents: write
 
     steps:
+      - name: Generate App Token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.RELEASE_APP_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0
 
       - name: Setup | Force release branch to be at workflow sha
         run: |
@@ -35,10 +44,9 @@ jobs:
 
       - name: Semantic Version Release
         id: release
-        # Adjust tag with desired version if applicable.
         uses: python-semantic-release/python-semantic-release@v10.5.3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
           git_committer_name: "github-actions[bot]"
           git_committer_email: "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -46,7 +54,7 @@ jobs:
         uses: python-semantic-release/publish-action@v10.5.3
         if: steps.release.outputs.released == 'true'
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ steps.app-token.outputs.token }}
           tag: ${{ steps.release.outputs.tag }}
 
       - name: Distribution Artifacts
