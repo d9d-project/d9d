@@ -266,7 +266,6 @@ class Trainer:
         Args:
             state: The encapsulated state object containing all initialized
                 components (model, optimizer, dist_context, etc.).
-            sleeper: The encapsulated sleep/wake lifecycle for colocated RL.
         """
         self._state = state
         self._sleeper = TrainSleeper(
