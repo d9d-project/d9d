@@ -162,3 +162,38 @@ For every global step (`step`), the trainer performs the following actions in st
 
 1. **Event-specific**: The system triggers `EVENT_TRAIN_FINISHED` event.
 2. **Task-specific**: We delegate to the `TrainTask` to do its specific finalization work.
+
+## Sleep & Wake (Colocated RL)
+
+In **colocated RL**, a rollout/inference engine shares the same physical GPUs as the Trainer. The two cannot occupy the device at once, so the Trainer must temporarily hand the GPU back. The `Trainer.sleep()` / `Trainer.wake()` pair does exactly this: `sleep()` releases the training state to host memory and frees the device cache; `wake()` restores it. The underlying mechanism is the [State Offloading](../core/offload.md) subsystem.
+
+```python
+trainer = TrainingConfigurator(...).configure()
+
+# ... after a training step, between steps ...
+trainer.sleep()                 # offload training state, free the GPU
+rollout_engine.generate(...)    # colocated inference runs on the freed device
+trainer.wake()                  # restore training state, resume stepping
+```
+
+### What gets offloaded
+
+A `sleep()` selects subsystems via [`SleepTag`](../core/offload.md#sleep-tags). The default, `SleepTag.TENSOR_STATES`, offloads **all GPU tensor state as a single unit**:
+
+* **Model** parameters and buffers (`TrackedModules`),
+* **Optimizer** state (`PipelinedOptimizer`),
+* **Gradient** buckets and the residual loss accumulator (`GradientManager`).
+
+`SleepTag.COMMS` (NCCL process groups) is reserved but **not yet implemented** - requesting it raises `NotImplementedError`.
+
+The round trip preserves object identity, optimizer state-dict keys and `DTensor` metadata, so any external reference (e.g. a frozen reference model held by a task) stays valid after waking. See the [round-trip invariant](../core/offload.md) for details.
+
+### Orchestration & ordering
+
+`sleep()` performs, in order:
+
+1. Fire `EVENT_TRAIN_SLEEP_PRE` (state still fully GPU-resident) and barrier.
+2. Offload gradient state → optimizer state → model parameters and buffers.
+3. Barrier and fire `EVENT_TRAIN_SLEEP_POST`.
+
+`wake()` restores in the reverse order (model → optimizer → gradient state), bracketed by `EVENT_TRAIN_WAKE_PRE` / `EVENT_TRAIN_WAKE_POST` and barriers.
