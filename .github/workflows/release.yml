@@ -59,6 +59,7 @@ jobs:
 
       - name: Distribution Artifacts
         uses: actions/upload-artifact@v4
+        if: steps.release.outputs.released == 'true'
         with:
           name: distribution-artifacts
           path: dist
