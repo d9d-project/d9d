@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.15.0 (2026-06-04)
+
+### Features
+
+- Implement wake-sleep API for trainer
+  ([`b209861`](https://github.com/d9d-project/d9d/commit/b2098618ea2587d08f34ca783047ea007b15669e))
+
+
 ## v0.14.0 (2026-05-21)
 
 ### Bug Fixes
