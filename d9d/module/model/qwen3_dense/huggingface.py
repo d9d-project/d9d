@@ -106,7 +106,6 @@ def mapper_from_huggingface_qwen3_dense_for_classification(
     Returns:
         A composite state mapper.
     """
-
     return ModelStateMapperParallel(
         [
             ModelStateMapperPrefixScope(
@@ -130,7 +129,6 @@ def mapper_from_huggingface_qwen3_dense_for_embedding(
     Returns:
         A composite state mapper.
     """
-
     return ModelStateMapperPrefixScope(mapper_from_huggingface_qwen3_dense(params.model), target_prefix="model.")
 
 
@@ -246,7 +244,6 @@ def mapper_to_huggingface_qwen3_dense_for_embedding(
     Raises:
         ValueError: If the model has a trained embedding projection.
     """
-
     if params.embedding_dim is not None:
         raise ValueError("Cannot convert a model with trained embedding projection back to HuggingFace")
 

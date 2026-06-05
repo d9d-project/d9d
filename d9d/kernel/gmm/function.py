@@ -72,5 +72,4 @@ def gmm(
     Returns:
         Result of matrix multiplication.
     """
-
     return GroupedGemm.apply(a, b, batch_sizes, a_grad_direction, b_grad_direction, trans_b)

@@ -75,7 +75,6 @@ class StochasticAdamW(Optimizer):
         Raises:
             ValueError: If any of the provided hyperparameters are invalid.
         """
-
         if lr <= 0:
             raise ValueError(f"Invalid learning rate: {lr}")
         if eps <= 0:

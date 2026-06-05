@@ -27,7 +27,6 @@ class JobProfiler:
             config: Configuration settings for profiling.
             stepper: Object tracking the current global step of the training loop.
         """
-
         self._config = config
         if config is None or not config.enabled:
             self._profiler = None
@@ -49,7 +48,6 @@ class JobProfiler:
         Yields:
             The active Profiler instance if profiling is enabled, otherwise None.
         """
-
         if self._profiler is None:
             yield None
         else:

@@ -31,7 +31,6 @@ class TimeoutManager:
             dist_context: The distributed context where timeouts are applied.
             config: Configuration containing initialization and step timeout values.
         """
-
         self._dist_context = dist_context
         self._config = config
         self._state = TimeoutState.none
@@ -46,7 +45,6 @@ class TimeoutManager:
         Raises:
             ValueError: If the timeout state has already been initialized.
         """
-
         if self._state != TimeoutState.none:
             raise ValueError("Can only set init timeout from initial state")
 

@@ -19,5 +19,4 @@ def identity_mapper_from_module(module: nn.Module) -> ModelStateMapper:
     Returns:
         A composite identity mapper for the module's state.
     """
-
     return ModelStateMapperParallel([ModelStateMapperIdentity(key) for key in module.state_dict()])

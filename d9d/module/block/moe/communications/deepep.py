@@ -21,7 +21,6 @@ def get_hidden_state_bytes(x: torch.Tensor) -> int:
     Returns:
         The size of a row in bytes.
     """
-
     return x.size(1) * max(x.element_size(), 2)
 
 
@@ -36,7 +35,6 @@ def init_deepep_buffer(group: torch.distributed.ProcessGroup, hidden_bytes: int)
         group: The process group intended for communication.
         hidden_bytes: Size of a single hidden state vector in bytes.
     """
-
     global _buffer  # noqa: PLW0603
     num_nvl_bytes, num_rdma_bytes = 0, 0
     for config in (
@@ -159,7 +157,6 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
 
     def __init__(self, num_experts: int):
         """Constructs the DeepEpCommunicationHandler."""
-
         self._num_experts = num_experts
         self._num_experts_per_shard = None  # late-initialization
 
@@ -181,7 +178,6 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
         Raises:
             ValueError: If num_experts is not divisible by the group size.
         """
-
         init_deepep_buffer(group, hidden_size * hidden_dtype.itemsize)
 
         if self._num_experts % group.size() != 0:

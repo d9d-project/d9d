@@ -26,7 +26,6 @@ def parallelize_replicate(
      module: The module to parallelize.
      mesh: The device mesh over which to replicate the module.
     """
-
     parallelize_module(
         module,
         mesh,

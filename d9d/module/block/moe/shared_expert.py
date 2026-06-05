@@ -36,7 +36,6 @@ class SharedSwiGLU(nn.Module, ModuleLateInit):
             hidden_size: Dimensionality of the hidden state.
             params: Configuration parameters for the shared expert.
         """
-
         super().__init__()
         self.expert = SwiGLU(hidden_size=hidden_size, intermediate_size=params.intermediate_size)
 
@@ -55,7 +54,6 @@ class SharedSwiGLU(nn.Module, ModuleLateInit):
         Returns:
             Output tensor after applying the expert and optional gating.
         """
-
         x = self.expert(hidden_states)
 
         if self.gate is not None:
@@ -67,7 +65,6 @@ class SharedSwiGLU(nn.Module, ModuleLateInit):
         """
         Resets module parameters.
         """
-
         self.expert.reset_parameters()
 
         if self.gate is not None:

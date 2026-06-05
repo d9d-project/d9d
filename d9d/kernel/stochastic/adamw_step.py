@@ -136,7 +136,6 @@ def adamw_stochastic_bf16_(  # noqa: C901
             if input tensors are not contiguous (for those that require in-place modification),
             if the optimizer states (exp_avg, exp_avg_sq) have different dtypes.
     """
-
     # check shape equality
     if grads.shape != params.shape:
         raise ValueError("Shape mismatch between grads and params.")

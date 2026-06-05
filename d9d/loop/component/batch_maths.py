@@ -31,7 +31,6 @@ class BatchMaths:
             ValueError: If global batch size is not divisible by the product of
                 Data Parallel size and Microbatch size.
         """
-
         self._dist_context = dist_context
         self._config_batching = config_batching
         self._config_pipelining = config_pipelining
@@ -55,7 +54,6 @@ class BatchMaths:
         """
         Returns the global batch size across the world.
         """
-
         return self._config_batching.global_batch_size
 
     @property
@@ -66,7 +64,6 @@ class BatchMaths:
         If pipeline parallelism is enabled, this is the total number of microbatches
         processed to form one global batch. If disabled, this returns 1.
         """
-
         if not self._dist_context.mesh_params.has_pipeline_parallel:
             return 1
 
@@ -81,7 +78,6 @@ class BatchMaths:
         internally by the pipeline schedule). If disabled, this is the number of
         forward/backward passes the training loop must execute before an optimizer step.
         """
-
         if self._dist_context.mesh_params.has_pipeline_parallel:
             return 1
 
@@ -94,7 +90,6 @@ class BatchMaths:
 
         This is calculated as `microbatch_size * total_microbatches_per_step`.
         """
-
         return self._config_batching.microbatch_size * self.num_microbatches_pipelining
 
     @property
@@ -105,5 +100,4 @@ class BatchMaths:
         This represents the total gradient accumulation factor, regardless of whether
         it is handled by a pipeline schedule or a simple loop.
         """
-
         return self.num_microbatches_pipelining * self.num_microbatches_gradient_accumulation

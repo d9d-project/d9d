@@ -58,7 +58,6 @@ def copy_fp32_to_bf16_stochastic_(
         ValueError: If target is not contiguous, if source/target shapes do not match,
             or if dtypes are not FP32 and BF16 respectively.
     """
-
     if not source.is_contiguous():
         source = source.contiguous()
 

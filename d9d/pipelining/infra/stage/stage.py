@@ -35,7 +35,6 @@ class PipelineStage:
             group: The distributed process group for pipeline communications.
             stage_to_host_topology: Dict mapping stage ID to PP rank hosting it.
         """
-
         self._info = info
         self._module = module
         self._group = group
@@ -67,7 +66,6 @@ class PipelineStage:
         Raises:
             TypeError: If the module does not support pipelining.
         """
-
         self._has_backward = has_backward
 
         prev_stage_idx = None if self._info.is_current_stage_first else self._info.current_stage - 1
@@ -122,7 +120,6 @@ class PipelineStage:
         Raises:
             ValueError: If the forward communication handler is not configured.
         """
-
         if self._forward_comm is None:
             raise ValueError("You must configure stage buffers first")
 
@@ -141,7 +138,6 @@ class PipelineStage:
         Raises:
             ValueError: If the stage is not configured for backward passes.
         """
-
         if not self._has_backward:
             raise ValueError()
 
@@ -154,7 +150,6 @@ class PipelineStage:
         Raises:
             ValueError: If the stage is not configured for backward passes or if buffers are not initialized.
         """
-
         if not self._has_backward:
             raise ValueError()
 
@@ -173,7 +168,6 @@ class PipelineStage:
         Raises:
             ValueError: If the forward communication handler is not configured.
         """
-
         if self._forward_comm is None:
             raise ValueError("You must configure stage buffers first")
 
@@ -189,7 +183,6 @@ class PipelineStage:
         Raises:
             ValueError: If the forward communication handler is not configured.
         """
-
         if self._forward_comm is None:
             raise ValueError("You must configure stage buffers first")
 
@@ -206,7 +199,6 @@ class PipelineStage:
         Raises:
             ValueError: If the backward communication handler is not configured.
         """
-
         if not self._has_backward:
             return []
 
@@ -225,7 +217,6 @@ class PipelineStage:
         Raises:
             ValueError: If the backward communication handler is not configured.
         """
-
         if not self._has_backward:
             return []
 
@@ -255,7 +246,6 @@ class PipelineStage:
         Raises:
             ValueError: If the forward communication handler is not configured.
         """
-
         if self._forward_comm is None:
             raise ValueError("You must configure stage buffers first")
 
@@ -283,7 +273,6 @@ class PipelineStage:
         Raises:
             ValueError: If the stage is not configured for backward passes or if buffers are not initialized.
         """
-
         if not self._has_backward:
             raise ValueError()
 
@@ -331,7 +320,6 @@ class PipelineStage:
         Raises:
             ValueError: If the stage is not configured for backward passes.
         """
-
         if not self._has_backward:
             raise ValueError()
 
@@ -339,7 +327,6 @@ class PipelineStage:
 
     def reset(self):
         """Resets the internal state of communication handlers, clearing gradients on buffers."""
-
         if self._forward_comm is not None:
             self._forward_comm.reset()
         if self._backward_comm is not None:

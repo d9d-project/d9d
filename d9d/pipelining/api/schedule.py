@@ -27,7 +27,6 @@ class PipelineSchedule(abc.ABC):
             sharding_spec: A specification defining how inputs and kwargs should be split
                 into micro-batches. If None, assumes standard split-by-zero-dim behavior.
         """
-
         ...
 
     @abc.abstractmethod
@@ -43,5 +42,4 @@ class PipelineSchedule(abc.ABC):
              inputs: A dictionary of global input tensors.
              kwargs: A dictionary of global keyword arguments.
         """
-
         ...

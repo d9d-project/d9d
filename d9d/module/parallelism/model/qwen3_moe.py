@@ -29,7 +29,6 @@ def parallelize_qwen3_moe_model(dist_context: DistributedContext, model: Qwen3Mo
     Raises:
         ValueError: If Tensor Parallel or Context Parallel is enabled in the context.
     """
-
     dims = dist_context.mesh_params
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
     expert_mesh = dist_context.mesh_for(EXPERT_DOMAIN)
@@ -80,7 +79,6 @@ def parallelize_qwen3_moe_for_causal_lm(
         model: The Qwen3 MoE Causal LM model to parallelize.
         stage: Information about the current pipeline stage.
     """
-
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
     parallelize_qwen3_moe_model(dist_context, model.model, stage)
@@ -107,7 +105,6 @@ def parallelize_qwen3_moe_for_classification(
         model: The Qwen3 MoE classification model to parallelize.
         stage: Information about the current pipeline stage.
     """
-
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
     parallelize_qwen3_moe_model(dist_context, model.model, stage)
@@ -134,7 +131,6 @@ def parallelize_qwen3_moe_for_embedding(
         model: The Qwen3 MoE embedding model to parallelize.
         stage: Information about the current pipeline stage.
     """
-
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
     parallelize_qwen3_moe_model(dist_context, model.model, stage)

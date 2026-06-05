@@ -19,25 +19,21 @@ class Stepper(Stateful):
             initial_step: The starting step number.
             total_steps: The total number of steps in the training loop.
         """
-
         self._current_step = initial_step
         self._total_steps = total_steps
 
     def step(self):
         """Increments the current step counter by one."""
-
         self._current_step += 1
 
     @property
     def current_step(self) -> int:
         """The current step number."""
-
         return self._current_step
 
     @property
     def total_steps(self) -> int:
         """The total number of steps configured for the loop."""
-
         return self._total_steps
 
     def state_dict(self) -> dict[str, Any]:
@@ -46,7 +42,6 @@ class Stepper(Stateful):
         Returns:
             A dictionary containing the current step and total steps.
         """
-
         return {"current_step": self._current_step, "total_steps": self._total_steps}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
@@ -59,7 +54,6 @@ class Stepper(Stateful):
             ValueError: If the total steps in the state dictionary do not match
                 the total steps configured in this stepper.
         """
-
         if state_dict["total_steps"] != self._total_steps:
             raise ValueError(
                 f"Step count differs: saved {state_dict['total_steps']}, "
@@ -89,7 +83,6 @@ class Stepper(Stateful):
             ValueError: If the action period is less than or equal to zero, or
                 if the provided action configuration is completely invalid.
         """
-
         position_shift = 0 if is_post_step_action else 1
 
         shifted_step = self._current_step + position_shift

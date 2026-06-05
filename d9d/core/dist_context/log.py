@@ -16,7 +16,6 @@ def build_dist_logger(qualifier: str, level: int) -> logging.Logger:
     Returns:
         A configured logging.Logger instance.
     """
-
     dist_logger = logging.getLogger("d9d")
     dist_logger.setLevel(level)
     dist_logger.handlers.clear()

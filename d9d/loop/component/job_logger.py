@@ -70,7 +70,6 @@ class JobLogger(Stateful):
             run_config: Run configuration.
             additional_hparams: Supplemental hyperparameters to log for this run.
         """
-
         self._dist_context = dist_context
         self._config = config
         self._stepper = stepper
@@ -95,7 +94,6 @@ class JobLogger(Stateful):
         Yields:
             The active tracker run interface.
         """
-
         with self._tracker.open(self._run_config) as run:
             yield run
 
@@ -107,7 +105,6 @@ class JobLogger(Stateful):
         This context manager ensures async metrics are bound to the device before
         usage and unbound afterwards.
         """
-
         self._metric_collector.bind()
         yield
         self._metric_collector.unbind()
@@ -121,7 +118,6 @@ class JobLogger(Stateful):
         across ranks. This allows communication to overlap with other operations
         before `log` is called.
         """
-
         if not self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
             return
 
@@ -140,7 +136,6 @@ class JobLogger(Stateful):
             run: The active tracker run interface for sending data.
             loss_value: Tensor containing the scalar loss for the current step.
         """
-
         run.scalar("loss", loss_value.item())
 
         if not self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):

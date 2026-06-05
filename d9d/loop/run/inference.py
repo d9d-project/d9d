@@ -79,7 +79,6 @@ class InferenceConfigurator:
             model_provider: Factory for defining and creating model stages.
             data_provider: Factory for providing inference datasets.
         """
-
         self._mesh = mesh
         self._parameters = parameters
         self._task_provider = task_provider
@@ -172,7 +171,6 @@ class InferenceConfigurator:
         Returns:
             Inference: A ready-to-use inference engine instance encapsulating the job state.
         """
-
         state = self._build_new_state()
 
         return Inference(state)
@@ -194,7 +192,6 @@ class Inference:
         Args:
             state: The encapsulated state object containing all initialized components.
         """
-
         self._state = state
 
     def _enable_eval_mode(self):
@@ -214,7 +211,6 @@ class Inference:
         5. Handles periodic garbage collection and profiling.
         6. Finalizes the task upon completion.
         """
-
         with torch.inference_mode():
             self._enable_eval_mode()
 

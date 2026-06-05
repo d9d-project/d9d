@@ -128,7 +128,6 @@ class ModelProvider(abc.ABC, Generic[TModel]):
         Returns:
             Result of this operation.
         """
-
         ...
 
     @abc.abstractmethod
@@ -177,5 +176,4 @@ class ModelProvider(abc.ABC, Generic[TModel]):
         Returns:
             A dictionary of hyperparameter names and values.
         """
-
         return {}

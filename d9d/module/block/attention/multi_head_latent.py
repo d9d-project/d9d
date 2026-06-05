@@ -23,7 +23,6 @@ class LowRankProjection(nn.Module):
             out_features: Output dimensionality.
             norm_eps: Epsilon value for the intermediate RMSNorm layer.
         """
-
         super().__init__()
         self.down_proj = nn.Linear(in_features, bottleneck, bias=False)
         self.norm = RMSNorm(bottleneck, eps=norm_eps)
@@ -39,12 +38,10 @@ class LowRankProjection(nn.Module):
         Returns:
             Projected output tensor.
         """
-
         return self.up_proj(self.norm(self.down_proj(x)))
 
     def reset_parameters(self):
         """Resets module parameters."""
-
         self.down_proj.reset_parameters()
         self.norm.reset_parameters()
         self.up_proj.reset_parameters()

@@ -17,7 +17,6 @@ def identity_mapper_from_mapper_outputs(mapper: ModelStateMapper) -> ModelStateM
     Returns:
         A composite mapper that acts as a pass-through for every key produced by the source `mapper`.
     """
-
     mappers: list[ModelStateMapper] = []
 
     for state_group in mapper.state_dependency_groups():

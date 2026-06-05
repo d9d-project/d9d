@@ -24,7 +24,6 @@ class OfflinePipelineExecutor(PipelineSchedule):
             callback: Function to compute loss or process pipeline results.
             do_backward: Whether to execute the backward pass.
         """
-
         self._model = model
         self._callback = callback
         self._do_backward = do_backward

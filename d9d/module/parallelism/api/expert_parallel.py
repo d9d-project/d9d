@@ -26,7 +26,6 @@ def parallelize_expert_parallel(module: MoELayer, mesh_experts: DeviceMesh, expe
         mesh_experts: The device mesh containing the expert parallel resources.
         expert_shard_dim: The name of the mesh dimension where experts should be sharded.
     """
-
     parallelize_module(module, mesh_experts, ShardMoESparseExpertsParallel(shard_dim_name=expert_shard_dim))
     parallelize_module(
         module.router,

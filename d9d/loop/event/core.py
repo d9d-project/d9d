@@ -35,7 +35,6 @@ class EventBus:
         """
         Constructs an EventBus object.
         """
-
         self._handlers: dict[Event, list[Callable[[Any], None]]] = defaultdict(list)
 
     def subscribe(self, event: Event[TContext], handler: Callable[[TContext], None]) -> None:
@@ -46,7 +45,6 @@ class EventBus:
             event: The event descriptor to subscribe to.
             handler: The callback function to execute when the event is triggered.
         """
-
         self._handlers[event].append(handler)
 
     def trigger(self, event: Event[TContext], context: TContext) -> None:
@@ -57,7 +55,6 @@ class EventBus:
             event: The event descriptor to trigger.
             context: The data associated with the event to pass to the handlers.
         """
-
         for handler in self._handlers[event]:
             handler(context)
 
@@ -76,7 +73,6 @@ class EventBus:
         Yields:
             None
         """
-
         self.trigger(event_pre, context)
         yield
         self.trigger(event_post, context)

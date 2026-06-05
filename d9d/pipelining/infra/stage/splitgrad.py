@@ -29,7 +29,6 @@ def stage_backward_full(
         A list of gradients corresponding to the `inputs`. If some input does not require gradient - its result will
             be None.
     """
-
     with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs, GradDirection.weight):
         torch.autograd.backward(tensors=outputs, grad_tensors=output_grads)
 
@@ -117,7 +116,6 @@ def _reverse_closure(
     Returns:
         A tuple containing the set of all closure nodes and the set of visited target nodes.
     """
-
     closure: set[Node] = set()
     visited_target_nodes = set()
     to_visit: deque[Node] = deque()
@@ -159,7 +157,6 @@ def _get_param_groups(
     Returns:
         A list of distinct parameter groups.
     """
-
     inputs_closure, _ = _reverse_closure(inputs, set(), reverse_edges_dict)
 
     node_to_group_map: dict[Node, dict[str, set[Node]]] = {}
@@ -251,7 +248,6 @@ def stage_backward_input(
         A result object containing input gradients, prepared parameter groups,
         and ownership tokens to maintain graph validity.
     """
-
     outputs_grad_fn = [grad_fn for x in outputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
     inputs_grad_fn = [grad_fn for x in inputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
     weights_grad_fn = [grad_fn for x in weights if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
@@ -319,7 +315,6 @@ def stage_backward_weight(  # noqa: C901
     Raises:
         ValueError: If backward weight is attempted without intermediate gradients.
     """
-
     grad_acc_to_weight = {}
     all_weights = []  # Keep order
 

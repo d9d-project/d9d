@@ -21,7 +21,6 @@ def state_dict_main_process(dist_context: DistributedContext, obj: Stateful) -> 
         A dictionary containing the object's state under the 'main_process' key on
             the main rank, and an empty dictionary on all other ranks.
     """
-
     if dist_context.is_main_process:
         return {"main_process": obj.state_dict()}
     else:
@@ -37,6 +36,5 @@ def load_state_dict_main_process(dist_context: DistributedContext, obj: Stateful
         obj: The stateful object to restore.
         state_dict: The state dictionary created by "state_dict_main_process" function.
     """
-
     if dist_context.is_main_process:
         obj.load_state_dict(state_dict["main_process"])

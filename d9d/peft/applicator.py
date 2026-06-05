@@ -23,7 +23,6 @@ def inject_peft_and_freeze(method: PeftMethod, module: nn.Module) -> ModelStateM
     Returns:
         A ModelStateMapper capable of loading checkpoint weights into the modified structure.
     """
-
     for param in module.parameters():
         param.requires_grad = False
 
@@ -43,5 +42,4 @@ def merge_peft(method: PeftMethod, module: nn.Module):
         method: The PEFT method strategy originally applied.
         module: The PyTorch module to merge.
     """
-
     method.merge(module)

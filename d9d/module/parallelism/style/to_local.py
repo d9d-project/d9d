@@ -50,7 +50,6 @@ class ToLocalParallel(ParallelStyle):
             param_placement: Tuple of placements defining how parameters are distributed.
             grad_placement: Tuple of placements defining how gradients are synchronized.
         """
-
         self._grad_placement = grad_placement
         self._param_placement = param_placement
 

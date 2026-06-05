@@ -19,7 +19,6 @@ class DeviceMeshDomain(abc.ABC):
     @abc.abstractmethod
     def name(self) -> str:
         """Returns the unique identifier for this mesh domain."""
-
         ...
 
     @abc.abstractmethod
@@ -33,7 +32,6 @@ class DeviceMeshDomain(abc.ABC):
         Returns:
             The initialized PyTorch DeviceMesh for this specific domain.
         """
-
         ...
 
 

@@ -62,7 +62,6 @@ class LocalGradientBucket(AbstractGradientBucket):
         Args:
             params: List of parameters to manage.
         """
-
         self._params = params
 
     def bind(self):
@@ -85,7 +84,6 @@ class LocalGradientBucket(AbstractGradientBucket):
         """
         Directly zeros the grad attribute of the parameters.
         """
-
         for param in self._params:
             param.grad = None
 
@@ -108,7 +106,6 @@ class AccumulationCounter:
             require_accumulations: Number of accumulations required before sync.
             parameters: List of parameters to track.
         """
-
         self._require_accumulations = require_accumulations
         self._param_to_sync_count = {param: 0 for param in parameters}
 
@@ -116,7 +113,6 @@ class AccumulationCounter:
         """
         Resets all counters to zero.
         """
-
         self._param_to_sync_count = {param: 0 for param in self._param_to_sync_count}
 
     def update(self, param: nn.Parameter):
@@ -126,7 +122,6 @@ class AccumulationCounter:
         Args:
             param: The parameter that finished a backward step.
         """
-
         self._param_to_sync_count[param] += 1
 
     def is_ready(self) -> bool:
@@ -136,7 +131,6 @@ class AccumulationCounter:
         Returns:
             True if synchronization can proceed.
         """
-
         return all(x == self._require_accumulations for x in self._param_to_sync_count.values())
 
 
@@ -171,7 +165,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         Raises:
             ValueError: If any parameter does not contain DTensor data.
         """
-
         if not all(isinstance(x.data, DTensor) for x in parameters):
             raise ValueError("All parameters passed in synchronizable bucket should contain DTensor data")
 
@@ -192,7 +185,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         """
         Allocates the flat buffer and redirects parameter gradients to view into it.
         """
-
         buffer_size = sum(cast(DTensor, param.data).to_local().numel() for param in self._params)
 
         self._buffer = torch.zeros((buffer_size,), dtype=self._grad_dtype, device=self._device)
@@ -223,7 +215,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         Raises:
             ValueError: If the bucket is already ready to sync but hasn't been synced yet.
         """
-
         self._accum_counter.update(param)
 
         if not self._accum_counter.is_ready():
@@ -246,7 +237,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         """
         Registers post-accumulate hooks on all parameters.
         """
-
         hooks = []
         for param in self._params:
             hooks.append(param.register_post_accumulate_grad_hook(self._post_accumulation_hook))
@@ -257,7 +247,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         """
         Allocates the contiguous buffer and registers hooks.
         """
-
         self._bind_buffer()
         self._bind_hooks()
 
@@ -265,7 +254,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         """
         Deallocates the buffer and clears parameter gradients.
         """
-
         self._buffer = None
 
         for param in self._params:
@@ -275,7 +263,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         """
         Removes all registered hooks.
         """
-
         if self._hooks is None:
             return
 
@@ -288,7 +275,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         """
         Cleans up buffer and hooks.
         """
-
         self._unbind_buffer()
         self._unbind_hooks()
 
@@ -300,7 +286,6 @@ class SyncGradientBucket(AbstractGradientBucket):
         Raises:
             ValueError: If the buffer is not initialized (call bind first).
         """
-
         buffer = self._buffer
         if buffer is None:
             raise ValueError("Buffer is not initialized")

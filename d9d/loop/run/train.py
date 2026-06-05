@@ -383,7 +383,6 @@ class Trainer:
             NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
             RuntimeError: If called during an in-flight gradient accumulation.
         """
-
         self._sleeper.sleep(tags)
 
     def wake(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
@@ -399,7 +398,6 @@ class Trainer:
         Raises:
             NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
         """
-
         self._sleeper.wake(tags)
 
     def is_sleeping(self, tag: SleepTag) -> bool:
@@ -412,7 +410,6 @@ class Trainer:
         Returns:
             True if the subsystem is offloaded to host memory, False otherwise.
         """
-
         return self._sleeper.is_sleeping(tag)
 
     def export(self, export_to: Path, load_checkpoint: bool):

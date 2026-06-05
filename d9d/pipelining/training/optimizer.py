@@ -54,7 +54,6 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
         Raises:
             RuntimeError: If the optimizer state is already offloaded.
         """
-
         if self._offload_mirror is not None:
             raise RuntimeError("PipelinedOptimizer is already offloaded.")
 
@@ -80,7 +79,6 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
         Raises:
             RuntimeError: If the optimizer state is not offloaded.
         """
-
         if self._offload_mirror is None:
             raise RuntimeError("PipelinedOptimizer is not offloaded.")
 

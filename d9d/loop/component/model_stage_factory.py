@@ -53,7 +53,6 @@ class TrackedModules(Stateful, Offloadable):
         self, dist_context: DistributedContext, modules: list[nn.Module], stateful_predicate: StatefulPredicate
     ):
         """Constructs a TrackedModules object."""
-
         if dist_context.mesh_params.is_distributed:
             self._pp_rank = dist_context.mesh_for(REGULAR_DOMAIN)["pp"].get_local_rank()
         else:
@@ -94,7 +93,6 @@ class TrackedModules(Stateful, Offloadable):
         Raises:
             RuntimeError: If the modules are already offloaded.
         """
-
         if self._offload_mirror is not None:
             raise RuntimeError("TrackedModules is already offloaded.")
 
@@ -116,7 +114,6 @@ class TrackedModules(Stateful, Offloadable):
         Raises:
             RuntimeError: If the modules are not offloaded.
         """
-
         if self._offload_mirror is None:
             raise RuntimeError("TrackedModules is not offloaded.")
 
@@ -159,7 +156,6 @@ class TrackedModules(Stateful, Offloadable):
         Returns:
             A dictionary containing the states of all managed modules.
         """
-
         ret = {
             f"pp_{self._pp_rank}_stage_{i}": self._state_dict_stage(module) for i, module in enumerate(self._modules)
         }
@@ -189,7 +185,6 @@ class TrackedModules(Stateful, Offloadable):
             ValueError: If required keys are missing or unexpected keys are present
                 based on the allow-list predicate.
         """
-
         for i, module in enumerate(self._modules):
             self._load_state_dict_stage(module, state_dict[f"pp_{self._pp_rank}_stage_{i}"])
 
@@ -216,7 +211,6 @@ class ModelStageFactory:
         pipeline_callback: PipelineOutputsProcessor,
     ):
         """Constructs a ModelStageFactory object."""
-
         self._model_provider = model_provider
         self._dist_context = dist_context
         self._config_model = config_model
@@ -274,7 +268,6 @@ class ModelStageFactory:
            The pipeline schedule information.
            The `TrackedModules` instance wrapping the created model stage(s).
         """
-
         if self._config_model.checkpoint_only_trainable_parameters:
             stateful_predicate = _stateful_predicate_requires_grad
         else:

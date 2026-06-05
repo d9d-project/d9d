@@ -58,7 +58,6 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         Returns:
             The output tensor. Shape: `(total_tokens, out_features)`.
         """
-
         weight: torch.Tensor = self.weight
 
         if isinstance(weight, DTensor):

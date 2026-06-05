@@ -51,7 +51,6 @@ class PeftMethod(abc.ABC, Generic[TConfig]):
         Args:
             module: The PyTorch module to update.
         """
-
         ...
 
     @classmethod
@@ -66,5 +65,4 @@ class PeftMethod(abc.ABC, Generic[TConfig]):
         Returns:
             An instance of the PeftMethod.
         """
-
         ...

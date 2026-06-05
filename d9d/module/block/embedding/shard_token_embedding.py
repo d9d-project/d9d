@@ -44,7 +44,6 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
                 split_vocab_size.
             hidden_size: The dimensionality of the embedding vectors.
         """
-
         super().__init__()
 
         token_embedding = nn.ModuleDict(
@@ -69,7 +68,6 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
         Raises:
             ValueError: If no splits were configured.
         """
-
         output_embeds: torch.Tensor | None = None
 
         for split_name in self._split_order:
@@ -95,6 +93,5 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
         """
         Resets parameters for all registered embedding splits.
         """
-
         for layer in self.token_embedding.values():
             layer.reset_parameters()

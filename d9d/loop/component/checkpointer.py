@@ -122,7 +122,6 @@ class StateCheckpointer:
         Args:
             state: The Stateful object to save.
         """
-
         if self._stepper.should_do_action(
             self._config.period_steps, enable_on_last_step_if_periodic=True, is_post_step_action=True
         ):
@@ -162,5 +161,4 @@ class StateCheckpointer:
         Args:
             state: The stateful object to which loaded parameters will be applied.
         """
-
         self._load(state)

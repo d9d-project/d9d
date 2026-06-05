@@ -61,7 +61,6 @@ class ActionBase(abc.ABC):
         Args:
             ctx: The runtime context containing stages, data, and communication handlers.
         """
-
         ...
 
     @property

@@ -46,7 +46,6 @@ class LRSchedulerProtocol(Protocol):
 
     def step(self):
         """Performs a single learning rate scheduling step."""
-
         ...
 
     def state_dict(self) -> dict[str, Any]:

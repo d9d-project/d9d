@@ -25,7 +25,6 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         Args:
             params: Configuration parameters for the layer.
         """
-
         super().__init__()
 
         self.self_attn = GroupedQueryAttention(
@@ -62,7 +61,6 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         Returns:
             Output tensor after attention and MoE blocks, shape `(batch, seq_len, hidden_dim)`.
         """
-
         residual = hidden_states
 
         hidden_states = self.input_layernorm(hidden_states)
@@ -86,7 +84,6 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         """
         Resets module parameters.
         """
-
         self.self_attn.reset_parameters()
         self.mlp.reset_parameters()
         self.input_layernorm.reset_parameters()

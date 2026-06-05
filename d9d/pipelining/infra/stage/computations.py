@@ -43,7 +43,6 @@ class ForwardComputeHandler:
             stage_index: Logical index of the stage.
             module: The PyTorch module representing this stage computation.
         """
-
         self._stage_idx = stage_index
         self._module = module
 
@@ -62,7 +61,6 @@ class ForwardComputeHandler:
             RuntimeError: If the forward pass implementation fails.
             ValueError: If the module output is not a dictionary.
         """
-
         # Compute forward
         try:
             output = self._module(**inputs, **kwargs)
@@ -86,7 +84,6 @@ class ForwardComputeHandler:
         Returns:
             Dictionary of output tensors.
         """
-
         return self._cache[microbatch_index].outputs
 
     def pop_inputs_outputs(self, microbatch_index: int) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
@@ -101,7 +98,6 @@ class ForwardComputeHandler:
         Returns:
             A tuple containing (inputs, outputs).
         """
-
         cache = self._cache.pop(microbatch_index)
         return cache.inputs, cache.outputs
 
@@ -149,7 +145,6 @@ class BackwardComputeHandler:
             stage_index: Logical index of the stage.
             module: The PyTorch module to compute gradients for.
         """
-
         self._stage_idx = stage_index
         self._module = module
 
@@ -177,7 +172,6 @@ class BackwardComputeHandler:
         Raises:
             ValueError: If a double backward is attempted for the same microbatch.
         """
-
         if microbatch_index in self._cache:
             raise ValueError(f"S{self._stage_idx}B{microbatch_index} double backward")
 
@@ -216,7 +210,6 @@ class BackwardComputeHandler:
         Raises:
             ValueError: If a double backward is attempted.
         """
-
         if microbatch_index in self._cache:
             raise ValueError("Double backward pass")
 
@@ -255,7 +248,6 @@ class BackwardComputeHandler:
         Raises:
             ValueError: If `backward_input` was not called before or if called twice.
         """
-
         if microbatch_index not in self._cache:
             raise ValueError(f"S{self._stage_idx}BW{microbatch_index} - weight backward with no input backward before")
 

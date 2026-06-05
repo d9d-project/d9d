@@ -17,7 +17,6 @@ class ConfusionMatrixAccumulator(Stateful):
         Args:
             num_outputs: The number of distinct classes to track.
         """
-
         self._num_outputs = num_outputs
         self._tp = MetricAccumulator(torch.zeros(num_outputs, dtype=torch.long))
         self._fp = MetricAccumulator(torch.zeros(num_outputs, dtype=torch.long))
@@ -32,7 +31,6 @@ class ConfusionMatrixAccumulator(Stateful):
             A single confusion matrix containing 1D tensors of counts for each
             tracked output/class.
         """
-
         return ConfusionMatrix(tp=self._tp.value, fp=self._fp.value, tn=self._tn.value, fn=self._fn.value)
 
     def update(self, preds: torch.Tensor, targets: torch.Tensor):
@@ -46,7 +44,6 @@ class ConfusionMatrixAccumulator(Stateful):
             ValueError: If predictions and targets have mismatched shapes, or if the
                 last dimension does not match the configured number of outputs.
         """
-
         # preds/targets are pre-processed binary tensors
         if preds.shape != targets.shape:
             raise ValueError(f"preds and targets must have same shape, got {preds.shape} and {targets.shape}")
@@ -71,7 +68,6 @@ class ConfusionMatrixAccumulator(Stateful):
 
     def sync(self):
         """Synchronizes the accumulated metrics across all distributed workers."""
-
         self._tp.sync()
         self._fp.sync()
         self._tn.sync()
@@ -79,7 +75,6 @@ class ConfusionMatrixAccumulator(Stateful):
 
     def reset(self):
         """Resets all internal metric accumulators to zero."""
-
         self._tp.reset()
         self._fp.reset()
         self._tn.reset()
@@ -91,7 +86,6 @@ class ConfusionMatrixAccumulator(Stateful):
         Args:
             device: The target device to move the internal tensors to.
         """
-
         self._tp.to(device)
         self._fp.to(device)
         self._tn.to(device)
@@ -103,7 +97,6 @@ class ConfusionMatrixAccumulator(Stateful):
         Returns:
             A dictionary containing the state bounds of all internal accumulators.
         """
-
         return {
             "tp": self._tp.state_dict(),
             "fp": self._fp.state_dict(),
@@ -117,7 +110,6 @@ class ConfusionMatrixAccumulator(Stateful):
         Args:
             state_dict: The state dictionary to inject into the accumulator.
         """
-
         self._tp.load_state_dict(state_dict["tp"])
         self._fp.load_state_dict(state_dict["fp"])
         self._tn.load_state_dict(state_dict["tn"])

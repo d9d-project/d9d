@@ -47,7 +47,6 @@ class TopKRouter(nn.Module, ModuleLateInit):
             enable_expert_bias: If True, adds a bias term to the routing scores before top-k selection. This can be
                 used for loss-free load balancing.
         """
-
         super().__init__()
         self.gate = nn.Linear(dim, num_experts, bias=False)
 
@@ -74,7 +73,6 @@ class TopKRouter(nn.Module, ModuleLateInit):
         Returns:
             The routing result containing the indices of the selected experts and their corresponding probabilities.
         """
-
         # scores shape (bs*slen, num_experts)
 
         # gate

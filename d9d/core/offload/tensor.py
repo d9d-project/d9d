@@ -41,7 +41,6 @@ def offload_tensor(tensor: torch.Tensor, *, pin_memory: bool) -> OffloadedTensor
     Returns:
         A handle holding the host buffer; pass back to "onload_tensor" with the same tensor.
     """
-
     local = _local_storage_holder(tensor)
     host = torch.empty_like(local, device="cpu", pin_memory=pin_memory)
     host.copy_(local, non_blocking=True)
@@ -61,7 +60,6 @@ def onload_tensor(tensor: torch.Tensor, offloaded: OffloadedTensor, *, device: t
         offloaded: The handle returned by "offload_tensor".
         device: The accelerator device to restore the local storage onto.
     """
-
     local = _local_storage_holder(tensor)
     fresh = torch.empty_like(local, device=device)
     fresh.copy_(offloaded.host, non_blocking=True)

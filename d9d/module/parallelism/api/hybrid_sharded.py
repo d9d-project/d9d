@@ -30,7 +30,6 @@ def parallelize_hsdp(
     Raises:
         ValueError: If the device mesh does not have named dimensions.
     """
-
     replicate_dims = mesh.mesh_dim_names
 
     if replicate_dims is None:

@@ -49,7 +49,6 @@ def prepare_rotary_cos_sin_emb(
     Raises:
         ValueError: If an unknown RoPE style is provided.
     """
-
     if rope_scaling is None:
         rope_scaling = NoRopeScaling()
 
@@ -98,7 +97,6 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
             rope_scaling: Optional scaling configuration for extended context lengths.
                 When ``None`` (default), ``NoRopeScaling`` is used — no scaling applied.
         """
-
         super().__init__()
         self._rope_base = rope_base
         self._head_dim = head_dim
@@ -118,7 +116,6 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
         Returns:
             A tuple of (cos, sin) tensors aligned with the input positions.
         """
-
         return self.cos_emb[position_ids], self.sin_emb[position_ids]
 
     def reset_parameters(self) -> None:
@@ -201,7 +198,6 @@ class RotaryEmbeddingApplicator(nn.Module):
         Args:
             style: Rotary embedding layout style alignment.
         """
-
         super().__init__()
         self._style = style
 
@@ -226,7 +222,6 @@ class RotaryEmbeddingApplicator(nn.Module):
         Returns:
             A tuple containing the rotated query and key tensors.
         """
-
         query_states, key_states = _apply_rotary_pos_emb(
             query_states, key_states, position_embedding_cos, position_embedding_sin, style=self._style
         )

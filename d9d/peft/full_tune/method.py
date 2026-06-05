@@ -21,7 +21,6 @@ class FullTune(PeftMethod[FullTuneConfig]):
         Args:
             config: Configuration defining the module name patterns to fine-tune.
         """
-
         self._config = config
 
     def inject(self, module: nn.Module) -> PeftInjectionResult:

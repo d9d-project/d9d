@@ -31,7 +31,6 @@ def parallelize_fsdp(module: nn.Module, mesh: DeviceMesh, *args: Any, **kwargs: 
         ValueError: If the mesh does not have exactly one dimension.
         RuntimeError: If the module was not converted to an FSDPModule.
     """
-
     if mesh.ndim != 1:
         raise ValueError(
             "FSDP mesh should contain exactly one dimension - for HSDP, please apply parallelize_replicate(...) first!"

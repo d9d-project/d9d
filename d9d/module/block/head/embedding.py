@@ -63,6 +63,5 @@ class EmbeddingHead(nn.Module, ModuleLateInit):
 
     def reset_parameters(self) -> None:
         """Resets module parameters."""
-
         if self.projection is not None:
             self.projection.reset_parameters()

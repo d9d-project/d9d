@@ -105,7 +105,6 @@ class BaseTracker(abc.ABC, Stateful, Generic[TConfig]):
         Yields:
             An active BaseTrackerRun instance for logging metrics.
         """
-
         ...
 
     @classmethod
@@ -120,5 +119,4 @@ class BaseTracker(abc.ABC, Stateful, Generic[TConfig]):
         Returns:
             An initialized instance of the tracker.
         """
-
         ...

@@ -71,7 +71,6 @@ def group_parameters_for_norm(parameters: Iterable[nn.Parameter]) -> ParametersF
     Returns:
         A dictionary mapping synchronization groups to lists of parameters.
     """
-
     grouped_params: ParametersForNorm = defaultdict(list)
     for param in parameters:
         if not param.requires_grad:

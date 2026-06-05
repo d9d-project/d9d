@@ -44,7 +44,6 @@ class MoELayer(nn.Module, ModuleLateInit):
             router_renormalize_probabilities: Configures router probability normalization behavior.
             shared_expert: Optional configuration for a shared expert.
         """
-
         super().__init__()
         self.router = TopKRouter(
             dim=hidden_dim,
@@ -105,7 +104,6 @@ class MoELayer(nn.Module, ModuleLateInit):
         Returns:
             Output tensor combined from experts. Shape: `(batch_size, seq_len, hidden_dim)`.
         """
-
         old_shape = hidden_states.shape
         hidden_states = hidden_states.reshape(-1, hidden_states.shape[-1])
 

@@ -23,7 +23,6 @@ class PeftStack(PeftMethod[PeftStackConfig]):
         Args:
             methods: A list of instantiated PEFT methods to apply in order.
         """
-
         self._methods = methods
 
     def inject(self, module: nn.Module) -> PeftInjectionResult:
@@ -68,6 +67,5 @@ def peft_method_from_config(config: TConfig) -> PeftMethod[TConfig]:
     Returns:
         The corresponding method instance.
     """
-
     method_cls = cast(type[PeftMethod[TConfig]], _PEFT_CONFIG_MAP[type(config)])
     return method_cls.from_config(config)

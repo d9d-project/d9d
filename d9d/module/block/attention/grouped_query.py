@@ -49,7 +49,6 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             qk_norm_zero_centered: If True, utilizes zero-centered scaling weights for the optional Q and K
                 normalization layers.
         """
-
         super().__init__()
 
         self._head_dim = head_dim
@@ -118,7 +117,6 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         Returns:
             The attention output tensor. Shape: `(batch, seq_len, hidden_size)`.
         """
-
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self._head_dim)
 
@@ -154,7 +152,6 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
 
     def reset_parameters(self) -> None:
         """Resets module parameters."""
-
         self.q_proj.reset_parameters()
         self.k_proj.reset_parameters()
         self.v_proj.reset_parameters()

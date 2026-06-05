@@ -29,7 +29,6 @@ def parallelize_qwen3_dense_model(dist_context: DistributedContext, model: Qwen3
     Raises:
         ValueError: If Tensor Parallel or Context Parallel is enabled in the context.
     """
-
     dims = dist_context.mesh_params
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
@@ -79,7 +78,6 @@ def parallelize_qwen3_dense_for_causal_lm(
         model: The Qwen3 Dense Causal LM model to parallelize.
         stage: Information about the current pipeline stage.
     """
-
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
     parallelize_qwen3_dense_model(dist_context, model.model, stage)
@@ -106,7 +104,6 @@ def parallelize_qwen3_dense_for_classification(
         model: The Qwen3 Dense classification model to parallelize.
         stage: Information about the current pipeline stage.
     """
-
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
     parallelize_qwen3_dense_model(dist_context, model.model, stage)
@@ -133,7 +130,6 @@ def parallelize_qwen3_dense_for_embedding(
         model: The Qwen3 Dense embedding model to parallelize.
         stage: Information about the current pipeline stage.
     """
-
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
     parallelize_qwen3_dense_model(dist_context, model.model, stage)

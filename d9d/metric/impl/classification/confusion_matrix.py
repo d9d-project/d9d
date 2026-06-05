@@ -107,7 +107,6 @@ class ConfusionMatrixMetricBuilder:
 
     def __init__(self) -> None:
         """Constructs the ConfusionMatrixMetric object."""
-
         self._num_outputs: int | None = None
         self._processor: ClassificationPredictionsProcessor | None = None
         self._statistic: ConfusionMatrixStatistic | None = None

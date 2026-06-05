@@ -57,7 +57,6 @@ class OptimizerFactory:
         Returns:
             A tuple containing the initialized pipeline-aware optimizer and scheduler.
         """
-
         optimizers: list[OptimizerProtocol] = []
         lr_schedulers: list[LRSchedulerProtocol] = []
         for module in self._tracked_modules.modules:

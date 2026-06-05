@@ -60,7 +60,6 @@ def curve_from_config(config: AnyCurveConfig) -> CurveBase:
     Returns:
         The instantiated curve.
     """
-
     match config:
         case CurveLinearConfig():
             return CurveLinear()
@@ -154,7 +153,6 @@ def piecewise_scheduler_from_config(
     Returns:
         A configured learning rate scheduler.
     """
-
     builder = piecewise_schedule(config.initial_multiplier, total_steps)
 
     for phase in config.phases:

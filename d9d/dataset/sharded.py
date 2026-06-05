@@ -67,7 +67,6 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         Raises:
             ValueError: If the dataset does not implement __len__.
         """
-
         if not isinstance(dataset, Sized):
             raise ValueError("Dataset should implement __len__ method")
 
@@ -93,7 +92,6 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         Raises:
             ValueError: If the indexing mode is unknown.
         """
-
         match self._indexing_mode:
             case ShardIndexingMode.sequential:
                 base_index = index * self._total_shards + self._current_shard
@@ -120,7 +118,6 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         Returns:
             The data item.
         """
-
         base_index = self._get_base_index_unsafe(index)
         if base_index >= len(self._dataset):
             base_index = len(self._dataset) - 1
@@ -139,7 +136,6 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         Raises:
             ValueError: If the indexing mode is unknown.
         """
-
         ceil_len = math.ceil(len(self._dataset) / self._total_shards)
 
         if self._pad_to_equal_size_across_shards:
@@ -198,7 +194,6 @@ def shard_dataset_data_parallel(
     Returns:
         A dataset instance representing the local shard.
     """
-
     if dist_context.mesh_params.is_distributed:
         dp_mesh = dist_context.mesh_for(BATCH_DOMAIN)["dp"]
         n_shards = dp_mesh.size()

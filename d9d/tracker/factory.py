@@ -45,7 +45,6 @@ def tracker_from_config(config: AnyTrackerConfig) -> BaseTracker:
     Raises:
         ImportError: If the dependencies for the requested provider are not installed.
     """
-
     tracker_type = _MAP[type(config)]
 
     if isinstance(tracker_type, _TrackerImportFailed):

@@ -18,7 +18,6 @@ class PipelineStateGlobal(PipelineState):
         Args:
             storage: The underlying storage backend.
         """
-
         self._storage = storage
 
     def __setitem__(self, key: str, value: Any):
@@ -44,7 +43,6 @@ class PipelineStateShard(PipelineState):
             storage: The underlying storage backend.
             current_shard: The index of the partial shard this view represents.
         """
-
         self._storage = storage
         self._current_shard = current_shard
 
@@ -74,7 +72,6 @@ class PipelineStateHandler:
             sharding_spec: A definition of how specific keys should be sharded.
             num_shards: The total number of shards in the pipeline.
         """
-
         self._storage = PipelineStateStorage(
             sharding_spec={(k,): v for k, v in sharding_spec.items()}, num_shards=num_shards
         )
@@ -86,7 +83,6 @@ class PipelineStateHandler:
         Returns:
             A PipelineState interface that accesses the full, aggregated data.
         """
-
         return PipelineStateGlobal(self._storage)
 
     def sharded_state(self, shard_id: int) -> PipelineState:
@@ -99,12 +95,10 @@ class PipelineStateHandler:
         Returns:
             A PipelineState interface that accesses partial data for the given shard.
         """
-
         return PipelineStateShard(self._storage, shard_id)
 
     def reset(self):
         """
         Resets the underlying storage, clearing all state.
         """
-
         self._storage.reset()

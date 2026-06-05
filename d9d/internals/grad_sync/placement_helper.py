@@ -13,7 +13,6 @@ def dist_grad_from_local(data: DTensor, local_grad: Tensor) -> DTensor:
     Returns:
         A new DTensor wrapping the local gradient.
     """
-
     return DTensor.from_local(
         local_grad, shape=data.shape, stride=data.stride(), device_mesh=data.device_mesh, placements=data.placements
     )

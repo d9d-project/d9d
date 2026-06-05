@@ -123,7 +123,6 @@ def clip_grad_norm_distributed_(
     Returns:
         The calculated global gradient norm.
     """
-
     with record_function("Gradient Clipping"):
         global_norm_pow = _get_global_norm_pow_pp(
             parameter_groups=parameter_groups, norm_type=norm_type, pp_mesh=pp_mesh

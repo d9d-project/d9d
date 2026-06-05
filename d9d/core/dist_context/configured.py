@@ -78,7 +78,6 @@ class DistributedContext:
     @property
     def logger(self) -> logging.Logger:
         """Returns the logger instance configured for distributed logging."""
-
         return self._logger
 
     def mesh_for(self, domain: str) -> DeviceMesh:
@@ -106,7 +105,6 @@ class DistributedContext:
         Raises:
             ValueError: If the specified domain does not exist.
         """
-
         if domain not in self._meshes:
             raise ValueError(f"Domain {domain} does not exist")
         return self._meshes[domain]
@@ -114,18 +112,15 @@ class DistributedContext:
     @property
     def is_main_process(self) -> bool:
         """Checks if the current process is the global rank 0."""
-
         return self._global_rank == 0
 
     @property
     def is_local_main_process(self) -> bool:
         """Checks if the current process is the rank 0 on the specific node."""
-
         return self._local_rank == 0
 
     def wait_world(self):
         """Blocks process execution until all ranks reach this point."""
-
         if self._params.is_distributed:
             torch.distributed.barrier(device_ids=[torch.cuda.current_device()])
         torch.cuda.synchronize()
@@ -137,7 +132,6 @@ class DistributedContext:
         Args:
             timeout_seconds: New timeout duration in seconds.
         """
-
         if not self._params.is_distributed:  # does nothing for local setups
             return
 
@@ -176,7 +170,6 @@ class DistributedContext:
         All other ranks wait at the entrance. The global main process waits at the
         exit to synchronize before continuing.
         """
-
         if not self.is_main_process:
             self.wait_world()
 
@@ -188,35 +181,29 @@ class DistributedContext:
     @property
     def current_device(self) -> torch.device:
         """Returns the CUDA device associated with this rank."""
-
         return self._current_device
 
     @property
     def mesh_params(self) -> "DeviceMeshParameters":
         """Returns the parameters used to initialize this context."""
-
         return self._params
 
     @property
     def master_addr(self) -> str:
         """Returns the IP address or domain name of the master node."""
-
         return self._master_addr
 
     @property
     def node_rank(self) -> int:
         """Returns the index of the node this process is running on."""
-
         return self._node_rank
 
     @property
     def local_rank(self) -> int:
         """Returns the rank of the current process within its node."""
-
         return self._local_rank
 
     @property
     def num_nodes(self) -> int:
         """Returns the total number of nodes in the cluster."""
-
         return self._num_nodes

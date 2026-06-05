@@ -38,7 +38,6 @@ class GlobalGradContext:
 
     def __init__(self):
         """Constructs a GlobalGradContext object with all directions enabled by default."""
-
         # both directions by default
         self._enabled_directions: set[GradDirection] = {GradDirection.inputs, GradDirection.weight}
 
@@ -53,7 +52,6 @@ class GlobalGradContext:
         Returns:
             True if the direction is enabled or None is passed, False otherwise.
         """
-
         if direction is None:
             return True
 

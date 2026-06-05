@@ -33,7 +33,6 @@ def named_modules_without_lora(
     Yields:
         Tuple of (name, module).
     """
-
     if isinstance(module, _LORA_MODULES):
         return
 
@@ -74,7 +73,6 @@ class LoRA(PeftMethod[LoRAConfig]):
         Args:
             config: LoRA configuration containing patterns and hyperparameters.
         """
-
         self._config = config
 
     def inject(self, module: nn.Module) -> PeftInjectionResult:

@@ -59,7 +59,6 @@ class IteratorBatchGroup(Iterator):
             device: The target device to move tensors to.
             batch_group_size: The number of micro-batches to yield within one group.
         """
-
         self._base = base
         self._device = device
 
@@ -78,7 +77,6 @@ class IteratorBatchGroup(Iterator):
         Raises:
             StopIteration: If the underlying iterator is exhausted.
         """
-
         if self._is_end:
             raise StopIteration()
 
@@ -103,7 +101,6 @@ class IteratorBatchGroup(Iterator):
 
     def __iter__(self) -> Self:
         """Returns self."""
-
         return self
 
 
@@ -136,7 +133,6 @@ class StatefulDataLoaderDataParallelAware(StatefulDataLoader):
             group_size: The number of batches to group together (e.g., for gradient accumulation).
             **kwargs: Standard arguments passed to the parent DataLoader.
         """
-
         super().__init__(dataset, **kwargs)
         self._dp_rank = dp_rank
         self._device = device
@@ -176,7 +172,6 @@ class DataLoaderFactory:
             config_data_loading: Specific configuration for data loading.
             batch_maths: BatchMaths object.
         """
-
         self._dist_context = dist_context
         self._provider = provider
 
@@ -218,7 +213,6 @@ class DataLoaderFactory:
         Returns:
             A configured StatefulDataLoader instance.
         """
-
         return self._build_dataloader(
             self._provider,
             batch_size=self._batch_maths.data_loader_batch_size,
@@ -236,7 +230,6 @@ class DataLoaderFactory:
         Returns:
             A configured StatefulDataLoader instance.
         """
-
         return self._build_dataloader(
             self._provider, batch_size=self._batch_maths.data_loader_batch_size, group_size=1, drop_last=False
         )

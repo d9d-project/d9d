@@ -38,7 +38,6 @@ class PiecewiseScheduleEngine:
         Raises:
             ValueError: If the phases list is empty.
         """
-
         if len(phases) == 0:
             raise ValueError("Scheduler should contain at least one phase")
 
@@ -55,7 +54,6 @@ class PiecewiseScheduleEngine:
             The calculated multiplier. If the step is outside defined phases,
             it clamps to the nearest boundary value.
         """
-
         if step < 0:
             return self._phases[0].start_value
 

@@ -66,7 +66,6 @@ def check_action_communication_dependencies_fulfilled(
     Returns:
         True if all dependencies are satisfied, False otherwise.
     """
-
     return all(
         _check_action_communication_dependencies_fulfilled(sub, rank_events, num_stages)
         for sub in _get_sub_actions(action)
@@ -140,7 +139,6 @@ def add_communication_ops(
     Raises:
         RuntimeError: If the schedule simulation enters a deadlock state.
     """
-
     compute_actions = copy.deepcopy(compute_actions)
 
     full_actions: dict[int, list[ActionBase]] = {rank: [] for rank in compute_actions}

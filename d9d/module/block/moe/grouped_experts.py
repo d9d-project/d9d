@@ -24,7 +24,6 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
             intermediate_dim: Dimensionality of the intermediate projection.
             num_experts: Total number of experts managed by this local instance.
         """
-
         super().__init__()
         self._num_experts = num_experts
 
@@ -53,7 +52,6 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
             The computed and weighted output tokens (still permuted).
             Shape: `(total_tokens, hidden_dim)`.
         """
-
         if permuted_x.numel() == 0:  # handle cases when there are no routed experts to this instance
             return permuted_x
 
@@ -67,7 +65,6 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
 
     def reset_parameters(self):
         """Resets parameters for all internal linear projections."""
-
         self.gate_proj.reset_parameters()
         self.up_proj.reset_parameters()
         self.down_proj.reset_parameters()

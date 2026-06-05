@@ -39,7 +39,6 @@ class LossComputer(PipelineOutputsProcessor[torch.Tensor]):
             task: The user-defined training task containing loss computation logic.
             stepper: Component tracking current step and progress.
         """
-
         self._state = state
         self._task = task
         self._stepper = stepper
@@ -62,7 +61,6 @@ class LossComputer(PipelineOutputsProcessor[torch.Tensor]):
         Returns:
             The calculated loss multiplied by its weight.
         """
-
         state = self._state.sharded_state(shard_id=microbatch_idx)
 
         computation = self._task.compute_loss(
@@ -97,7 +95,6 @@ class InferenceProcessor(PipelineOutputsProcessor[None]):
             state: Handler for managing global and sharded pipeline states.
             task: The user-defined inference task containing processing logic.
         """
-
         self._state = state
         self._task = task
 
@@ -112,7 +109,6 @@ class InferenceProcessor(PipelineOutputsProcessor[None]):
             pipeline_outputs: Dictionary containing model output tensors.
             microbatch_idx: Index of the current microbatch, or None if not using microbatching.
         """
-
         state = self._state.sharded_state(shard_id=microbatch_idx)
 
         self._task.process_outputs(ProcessOutputsContext(pipeline_results=pipeline_outputs, state=state))

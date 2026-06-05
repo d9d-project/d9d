@@ -62,7 +62,6 @@ class CausalShortDepthwiseConv1d(nn.Module, ModuleLateInit):
 
     def reset_parameters(self) -> None:
         """Resets the learnable parameters."""
-
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
 
 
@@ -98,7 +97,6 @@ class LogSigmoidDecayGate(nn.Module, ModuleLateInit):
 
     def reset_parameters(self) -> None:
         """Resets the learnable parameters."""
-
         self.proj.reset_parameters()
 
 
@@ -151,7 +149,6 @@ class MambaDecayGate(nn.Module, ModuleLateInit):
             Decay gate in log-space of shape `(batch, seq_len, num_heads)`, with values
                 in `(-∞, 0]`.
         """
-
         gk = self.proj(x).unsqueeze(-1)
         gate = fused_kda_gate(gk, A_log=self.A_log, dt_bias=self.dt_bias)
 
@@ -159,7 +156,6 @@ class MambaDecayGate(nn.Module, ModuleLateInit):
 
     def reset_parameters(self) -> None:
         """Resets the learnable parameters for this module."""
-
         self.proj.reset_parameters()
 
         nn.init.uniform_(self.A_log, 0.0, self._normalizer)

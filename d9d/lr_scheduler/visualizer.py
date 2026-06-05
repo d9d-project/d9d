@@ -37,7 +37,6 @@ def visualize_lr_scheduler(factory: SchedulerFactory, num_steps: int, init_lr: f
     Raises:
         ImportError: If the `plotly` library is not installed.
     """
-
     try:
         import plotly.graph_objects as go  # noqa: PLC0415
     except ImportError as e:

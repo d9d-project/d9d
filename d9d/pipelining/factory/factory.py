@@ -118,7 +118,6 @@ def build_schedule(
         A tuple containing the schedule info (executor and metadata) and a list
         of local PyTorch modules created for this rank.
     """
-
     if dist_context.mesh_params.is_distributed:
         return _build_schedule_distributed(
             dist_context=dist_context,

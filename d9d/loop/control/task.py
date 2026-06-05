@@ -88,7 +88,6 @@ class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch]):
         Returns:
             Result object.
         """
-
         ...
 
     def state_dict(self) -> dict[str, Any]:
@@ -98,7 +97,6 @@ class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch]):
         Returns:
             A dictionary containing the task's state.
         """
-
         return {}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
@@ -205,7 +203,6 @@ class TrainTask(BaseTask, abc.ABC, typing.Generic[TBatch]):
         Returns:
             Result object.
         """
-
         ...
 
     def create_metrics(self, ctx: CreateMetricsContext) -> CreateMetricsResult:
@@ -218,7 +215,6 @@ class TrainTask(BaseTask, abc.ABC, typing.Generic[TBatch]):
         Returns:
             Result object.
         """
-
         return CreateMetricsResult(metrics={})
 
     def update_metrics(self, ctx: UpdateMetricsContext):
@@ -236,7 +232,6 @@ class TrainTask(BaseTask, abc.ABC, typing.Generic[TBatch]):
         Returns:
             A dictionary of hyperparameter names and values.
         """
-
         return {}
 
 
@@ -266,7 +261,6 @@ class TrainTaskProvider(Protocol):
         Returns:
             An instantiated TrainTask.
         """
-
         ...
 
 
@@ -295,7 +289,6 @@ class InferenceTask(BaseTask, abc.ABC, typing.Generic[TBatch]):
         Args:
             ctx: Context containing the model outputs and pipeline state.
         """
-
         ...
 
 

@@ -30,7 +30,6 @@ class GradientClipper:
             config: Configuration defining max norm and logging frequency.
             stepper: Stepper instance used to track the current training step.
         """
-
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
         self._config = config
@@ -50,7 +49,6 @@ class GradientClipper:
         It calculates necessary metadata (such as segregating shared parameters) to ensure
         correct global norm calculation across the pipeline parallel mesh.
         """
-
         self._parameter_groups = group_parameters_for_norm(self._all_parameters())
         yield
         self._parameter_groups = None
@@ -69,7 +67,6 @@ class GradientClipper:
         Raises:
             ValueError: If called outside the ``install`` context manager scope.
         """
-
         should_log = self._stepper.should_do_action(self._config.log_total_steps)
 
         if not self._config.max_norm and not should_log:

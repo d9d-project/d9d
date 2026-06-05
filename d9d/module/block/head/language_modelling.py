@@ -34,7 +34,6 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
                 concatenated. This determines the mapping of global indices to specific heads.
             hidden_size: The input dimensionality (hidden state size).
         """
-
         super().__init__()
 
         lm_head = nn.ModuleDict(
@@ -61,7 +60,6 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
             A tensor containing per-token loss values (reduction='none'), matching the
             shape of the labels tensor.
         """
-
         lm_head_weight = torch.cat([self.lm_head[split_name].weight for split_name in self._split_order], dim=0)
 
         losses = linear_cross_entropy(
@@ -71,6 +69,5 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
 
     def reset_parameters(self):
         """Resets module parameters."""
-
         for head in self.lm_head.values():
             head.reset_parameters()

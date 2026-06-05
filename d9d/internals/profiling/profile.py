@@ -31,7 +31,6 @@ class Profiler:
             active_steps: Number of steps to actively record traces.
             dist_context: The distributed context object.
         """
-
         self._save_dir = save_dir
         self._period = period_steps
         self._warmup = warmup_steps
@@ -86,7 +85,6 @@ class Profiler:
         Yields:
             The configured torch profiler instance.
         """
-
         wait = self._period - (self._active + self._warmup)
         warmup = self._warmup
         active = self._active

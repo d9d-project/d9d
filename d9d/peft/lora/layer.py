@@ -30,7 +30,6 @@ class LoRALinear(nn.Module):
         Raises:
             ValueError: If the base layer has a bias (currently unsupported).
         """
-
         super().__init__()
         self.lora_A = nn.Linear(
             base_layer.in_features, params.r, bias=False, device=base_layer.weight.device, dtype=base_layer.weight.dtype
@@ -63,7 +62,6 @@ class LoRALinear(nn.Module):
         Returns:
             The output of base(x) + scale * (B @ A @ dropout(x)).
         """
-
         base_x = self.base(x)
         adapt_x = self._scale * self.lora_B(self.lora_A(self.dropout(x)))
         return base_x + adapt_x
@@ -76,7 +74,6 @@ class LoRALinear(nn.Module):
         Returns:
             The modified base linear layer with updated weights.
         """
-
         mod = self.base
         mod.weight.data += (self.lora_B.weight.data @ self.lora_A.weight.data) * self._scale
         return mod
@@ -85,7 +82,6 @@ class LoRALinear(nn.Module):
         """
         Resets LoRA parameters. A is random, B is zeroed.
         """
-
         self.lora_A.reset_parameters()
         nn.init.zeros_(self.lora_B.weight)
 
@@ -109,7 +105,6 @@ class LoRAGroupedLinear(nn.Module):
             base_layer: The original GroupedLinear layer to wrap.
             params: LoRA hyperparameters.
         """
-
         super().__init__()
         self.lora_A = GroupedLinear(
             base_layer.n_groups,
@@ -144,7 +139,6 @@ class LoRAGroupedLinear(nn.Module):
         Returns:
             Combined output of base and LoRA path.
         """
-
         base_x = self.base(x, x_groups)
         adapt_x = self._scale * self.lora_B(self.lora_A(self.dropout(x), x_groups), x_groups)
         return base_x + adapt_x
@@ -157,7 +151,6 @@ class LoRAGroupedLinear(nn.Module):
         Returns:
             The modified GroupedLinear layer.
         """
-
         mod = self.base
         mod.weight.data += (torch.bmm(self.lora_A.weight.data, self.lora_B.weight.data)) * self._scale
         return mod
@@ -166,6 +159,5 @@ class LoRAGroupedLinear(nn.Module):
         """
         Resets LoRA parameters. A is random, B is zeroed.
         """
-
         self.lora_A.reset_parameters()
         nn.init.zeros_(self.lora_B.weight)

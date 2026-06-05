@@ -39,7 +39,6 @@ class GradientManager(Offloadable):
             batch_maths: Calculation utility for batch sizes and accumulation steps.
             config: Configuration for gradient handling.
         """
-
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
         self._batch_maths = batch_maths
@@ -108,7 +107,6 @@ class GradientManager(Offloadable):
         the `GradientSynchronizer`, and binds gradients for later scaling. It acts
         as the boundary for the accumulation phase.
         """
-
         self._bind()
         self._installed = True
         yield
@@ -123,7 +121,6 @@ class GradientManager(Offloadable):
             loss: The computed loss scalar.
             loss_weight: The weight asscociated with this loss.
         """
-
         self._loss.update(loss, loss_weight)
         self._in_flight_count += 1
 
@@ -138,7 +135,6 @@ class GradientManager(Offloadable):
         3. Scales the gradients by the inverse of the total accumulated weight to
            normalize them.
         """
-
         self._grad_sync.wait()
 
         if self._dist_context.mesh_params.is_distributed:
@@ -152,7 +148,6 @@ class GradientManager(Offloadable):
         Returns:
             The averaged loss scalar across all accumulation steps and ranks.
         """
-
         return self._loss.compute()
 
     def zero_grad(self):
@@ -162,7 +157,6 @@ class GradientManager(Offloadable):
         This clears the accumulated gradients in the synchronizer and resets the
         loss metrics.
         """
-
         self._grad_sync.zero_grad()
         self._loss.reset()
         self._in_flight_count = 0
@@ -176,7 +170,6 @@ class GradientManager(Offloadable):
         non-zero, partial accumulation state lives in the synchronizer buckets, so offloading
         the gradient state would lose it.
         """
-
         return self._in_flight_count > 0
 
     def offload(self, ctx: OffloadContext) -> None:
@@ -192,7 +185,6 @@ class GradientManager(Offloadable):
             RuntimeError: If the gradient state is already offloaded, or if the manager has
                 not been installed.
         """
-
         if self._offloaded:
             raise RuntimeError("GradientManager is already offloaded.")
         if not self._installed:
@@ -212,7 +204,6 @@ class GradientManager(Offloadable):
         Raises:
             RuntimeError: If the gradient state is not offloaded.
         """
-
         if not self._offloaded:
             raise RuntimeError("GradientManager is not offloaded.")
 

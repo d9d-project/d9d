@@ -86,7 +86,6 @@ class OneHotProcessor(ClassificationPredictionsProcessor):
         Raises:
             ValueError: If the targets tensor shape is incompatible with the predictions.
         """
-
         if preds.shape[-1] != self._num_classes:
             raise ValueError(
                 f"Expected last dimension of preds to equal num_classes={self._num_classes}, got {preds.shape[-1]}"

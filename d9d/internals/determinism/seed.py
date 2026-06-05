@@ -30,7 +30,6 @@ def set_seeds(
             be distinct (e.g., 'pp' for pipeline parallelism). Ranks along other dimensions
             will share the seed.
     """
-
     # Mutate seed based on PP rank if distributed
     if dist_context.mesh_params.is_distributed:
         distinct_mesh = dist_context.mesh_for(REGULAR_DOMAIN)[distinct_seed_mesh_dim]

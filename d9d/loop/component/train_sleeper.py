@@ -46,7 +46,6 @@ class TrainSleeper:
             gradient_manager: Component handling gradient synchronization state.
             event_bus: The event bus used to emit the sleep/wake lifecycle events.
         """
-
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
         self._optimizer = optimizer
@@ -68,7 +67,6 @@ class TrainSleeper:
             NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
             RuntimeError: If called during an in-flight gradient accumulation.
         """
-
         requested = frozenset(tags)
         if SleepTag.COMMS in requested:
             raise NotImplementedError(
@@ -111,7 +109,6 @@ class TrainSleeper:
         Raises:
             NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
         """
-
         requested = frozenset(tags)
         if SleepTag.COMMS in requested:
             raise NotImplementedError(
@@ -142,7 +139,6 @@ class TrainSleeper:
         Returns:
             True if the subsystem is offloaded to host memory, False otherwise.
         """
-
         if tag is SleepTag.TENSOR_STATES:
             return self._tracked_modules.is_offloaded()
         return False

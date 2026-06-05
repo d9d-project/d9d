@@ -42,7 +42,6 @@ def shard_spec_on_dim(tree: PyTree[Any], dim: int) -> ShardingSpec:
     Raises:
         ValueError: If a tensor exists in the tree with rank less than or equal to 'dim'.
     """
-
     return pytree.tree_map(
         lambda x: _tree_item_to_shard(x, dim), tree, is_leaf=lambda x: isinstance(x, (torch.Tensor, list))
     )
@@ -60,5 +59,4 @@ def shard_spec_nothing(tree: PyTree[Any]) -> ShardingSpec:
     Returns:
         A new PyTree matching the input structure, containing strictly SpecReplicate for all leaves.
     """
-
     return pytree.tree_map(lambda _: SpecReplicate(), tree, is_leaf=lambda x: isinstance(x, (torch.Tensor, list)))

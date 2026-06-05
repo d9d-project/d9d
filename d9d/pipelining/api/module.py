@@ -25,7 +25,6 @@ class PipelineStageInfo:
         Returns:
             True if current_stage is 0.
         """
-
         return self.current_stage == 0
 
     @property
@@ -36,7 +35,6 @@ class PipelineStageInfo:
         Returns:
             True if current_stage is the last index.
         """
-
         return self.current_stage == self.num_stages - 1
 
 
@@ -71,7 +69,6 @@ def distribute_layers_for_pipeline_stage(
         ValueError: If the pipeline configuration results in a stage having zero
             or negative layers assigned (pipeline too long for the model size).
     """
-
     num_layers_virtual = num_layers + num_virtual_layers_pre + num_virtual_layers_post
 
     base_layers_per_stage = num_layers_virtual // stage.num_stages
@@ -128,7 +125,6 @@ class ModuleSupportsPipelining(typing.Protocol):
         Returns:
             Dictionary of input tensors expected by this specific stage locally.
         """
-
         ...
 
     def infer_stage_outputs_from_pipeline_inputs(
@@ -144,5 +140,4 @@ class ModuleSupportsPipelining(typing.Protocol):
         Returns:
             Dictionary of output tensors produced by this specific stage locally.
         """
-
         ...

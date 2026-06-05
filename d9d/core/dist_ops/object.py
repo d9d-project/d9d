@@ -20,7 +20,6 @@ def gather_object(obj: T, group: dist.ProcessGroup, group_dst: int) -> list[T] |
     Returns:
         A list of objects from all ranks on the destination rank; None on other ranks.
     """
-
     if group.rank() == group_dst:
         # We initialize with None, but we cast to list[T] because we know
         # dist.gather_object will populate these slots with actual objects.

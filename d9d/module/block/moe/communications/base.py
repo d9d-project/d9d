@@ -32,7 +32,6 @@ class ExpertCommunicationHandler(abc.ABC):
             - Permuted weights matching the hidden states order. Shape: `(num_received_tokens)`.
             - Expert count tensor indicating how many tokens each local expert received. Shape: `(num_local_experts)`.
         """
-
         ...
 
     @abc.abstractmethod

@@ -31,7 +31,6 @@ class AutoLRSchedulerProvider(LRSchedulerProvider):
 
     def __init__(self, config: AutoLRSchedulerConfig):
         """Constructs the AutoLRSchedulerProvider object."""
-
         self._config = config
 
     def __call__(self, context: InitializeLRSchedulerContext) -> LRSchedulerProtocol:

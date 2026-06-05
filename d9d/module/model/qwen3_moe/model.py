@@ -49,7 +49,6 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode
             enable_checkpointing: If True, enables activation checkpointing for transformer layers to save memory.
         """
-
         super().__init__()
 
         if stage.is_current_stage_first:
@@ -155,7 +154,6 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
 
     def reset_parameters(self):
         """Resets module parameters"""
-
         if self._stage.is_current_stage_first:
             self.embed_tokens.reset_parameters()
 
@@ -247,7 +245,6 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode.
             enable_checkpointing: Whether to enable activation checkpointing.
         """
-
         super().__init__()
 
         self.model = Qwen3MoEModel(
@@ -294,7 +291,6 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             Dictionary containing 'hidden_states', optionally 'hidden_states_snapshot',
             and per-token 'logps' if on the last stage.
         """
-
         model_outputs = self.model(
             input_ids=input_ids,
             hidden_states=hidden_states,
@@ -311,7 +307,6 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         """
         Resets module parameters.
         """
-
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:
@@ -356,7 +351,6 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
             hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode.
             enable_checkpointing: Whether to enable activation checkpointing.
         """
-
         super().__init__()
 
         self.model = Qwen3MoEModel(
@@ -403,7 +397,6 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
             Dictionary containing 'hidden_states', optionally 'hidden_states_snapshot'.
                 If on the last stage, also contains 'scores' (logits) of shape [batch, num_labels].
         """
-
         model_outputs = self.model(
             input_ids=input_ids,
             hidden_states=hidden_states,
@@ -421,7 +414,6 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
         """
         Resets module parameters.
         """
-
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:
@@ -467,7 +459,6 @@ class Qwen3MoEForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode.
             enable_checkpointing: Whether to enable activation checkpointing.
         """
-
         super().__init__()
 
         self.model = Qwen3MoEModel(
@@ -513,7 +504,6 @@ class Qwen3MoEForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             Dictionary containing 'hidden_states', optionally 'hidden_states_snapshot'.
                 If on the last stage, also contains 'embeddings'.
         """
-
         model_outputs = self.model(
             input_ids=input_ids,
             hidden_states=hidden_states,
@@ -531,7 +521,6 @@ class Qwen3MoEForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         """
         Resets module parameters.
         """
-
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:

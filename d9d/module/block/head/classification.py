@@ -23,7 +23,6 @@ class ClassificationHead(nn.Module, ModuleLateInit):
             num_labels: The number of output classes.
             dropout: The dropout probability.
         """
-
         super().__init__()
 
         self.dropout = nn.Dropout(dropout)
@@ -43,7 +42,6 @@ class ClassificationHead(nn.Module, ModuleLateInit):
         Returns:
             A tensor containing the unnormalized logits.
         """
-
         if pooling_mask is not None:
             hidden_states = hidden_states[pooling_mask == 1]
         logits = self.score(self.dropout(hidden_states))

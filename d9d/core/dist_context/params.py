@@ -37,19 +37,16 @@ class DeviceMeshParameters(BaseModel):
     @property
     def has_pipeline_parallel(self) -> bool:
         """Checks if pipeline parallelism is enabled (degree > 1)."""
-
         return self.pipeline_parallel > 1
 
     @property
     def has_data_parallel_replicate(self) -> bool:
         """Checks if data parallel replication is enabled (degree > 1)."""
-
         return self.data_parallel_replicate > 1
 
     @property
     def has_data_parallel_shard(self) -> bool:
         """Checks if data parallel sharding is enabled (degree > 1)."""
-
         return self.data_parallel_shard > 1
 
     @property
@@ -72,7 +69,6 @@ class DeviceMeshParameters(BaseModel):
     @property
     def is_distributed(self) -> bool:
         """Checks if any form of parallelism is enabled."""
-
         return (
             self.has_pipeline_parallel
             or self.has_data_parallel_replicate
@@ -108,5 +104,4 @@ class DeviceMeshParameters(BaseModel):
         Returns:
             A new DistributedContext instance containing the initialized device meshes.
         """
-
         return DistributedContext(self, log_level)

@@ -16,7 +16,6 @@ class WeightedMeanMetric(Metric[torch.Tensor]):
 
     def __init__(self):
         """Constructs a WeightedMeanMetric object."""
-
         self._value = MetricAccumulator(torch.scalar_tensor(0, dtype=torch.float32))
         self._weight = MetricAccumulator(torch.scalar_tensor(0, dtype=torch.float32))
 
@@ -47,7 +46,6 @@ class WeightedMeanMetric(Metric[torch.Tensor]):
         Returns:
             Scalar tensor with total weight.
         """
-
         return self._weight.value
 
     def state_dict(self) -> dict[str, Any]:

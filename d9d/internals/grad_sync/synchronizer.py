@@ -23,7 +23,6 @@ def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
     Raises:
         ValueError: If a tensor placement is unknown.
     """
-
     reduce_dims: set[int] = set()
 
     for dim_i, dim_placement in enumerate(data.placements):
@@ -71,7 +70,6 @@ def _group_params_for_buckets(
     Returns:
         Dictionary mapping group markers to lists of parameters.
     """
-
     regrouped_params = defaultdict(list)
     for param_group_i, param_group in enumerate(param_groups):
         # iterate in reverse order to maximize overlap
@@ -108,7 +106,6 @@ def _make_bucket(
     Raises:
         ValueError: If the gradient dtype is None for a sync bucket.
     """
-
     if group_marker.reduce_mesh is None:
         return LocalGradientBucket(parameters)
     else:
@@ -142,7 +139,6 @@ def _fill_buckets(
     Returns:
         List of configured gradient buckets.
     """
-
     # TODO: Better grouping - probably we could trace autograd graph and use some topological clustering here
     # TODO: to maximize overlap even better - current implementation just iterates over parameters in reverse order
     buckets = []
@@ -199,7 +195,6 @@ class GradientSynchronizer:
             bucket_size_mb: Maximal size of a single gradient bucket in MB.
             require_accumulations: Number of micro-batches to accumulate before reducing.
         """
-
         self._param_groups = param_groups
         self._bucket_size_mb = bucket_size_mb
         self._require_accumulations = require_accumulations
@@ -215,7 +210,6 @@ class GradientSynchronizer:
         Groups parameters, creates buckets, allocates memory, and registers hooks.
         Must be called before the backward pass.
         """
-
         stream = torch.cuda.Stream()
         self._communicate_stream = stream
         self._buckets = _fill_buckets(
@@ -234,7 +228,6 @@ class GradientSynchronizer:
 
         Destroys buckets, frees memory buffers, and removes hooks.
         """
-
         for bucket in self._buckets:
             bucket.unbind()
 
@@ -245,7 +238,6 @@ class GradientSynchronizer:
         """
         Waits for all bucket operations (async reductions) to complete.
         """
-
         torch.cuda.current_stream().wait_stream(self._communicate_stream)
 
         for bucket in self._buckets:
@@ -255,6 +247,5 @@ class GradientSynchronizer:
         """
         Resets gradients and accumulation counters for all managed parameters.
         """
-
         for bucket in self._buckets:
             bucket.zero_grad()

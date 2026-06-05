@@ -68,7 +68,6 @@ class TrainTaskOperator:
             pipeline_state: Handler for transient state storage during the step.
             metrics: Metric collection to update after the pass.
         """
-
         self._dist_context = dist_context
         self._task = task
         self._pipeline = pipeline
@@ -95,7 +94,6 @@ class TrainTaskOperator:
             Returns `None` if this rank is an intermediate pipeline stage that does
             not compute loss.
         """
-
         try:
             # Do forward and backward pass
             _run_pipeline(pipeline_state=self._pipeline_state, task=self._task, pipeline=self._pipeline, batch=batch)
@@ -136,7 +134,6 @@ class InferenceTaskOperator:
             pipeline: Information about the pipeline schedule.
             pipeline_state: Handler for transient state storage during the step.
         """
-
         self._dist_context = dist_context
         self._task = task
         self._pipeline = pipeline
@@ -155,7 +152,6 @@ class InferenceTaskOperator:
         Args:
             batch: The input batch data.
         """
-
         try:
             # Do forward pass
             _run_pipeline(pipeline_state=self._pipeline_state, task=self._task, pipeline=self._pipeline, batch=batch)

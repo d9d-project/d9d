@@ -23,7 +23,6 @@ def _detach_leaf(x: TMap) -> TMap:
     Returns:
         The detached tensor or original object.
     """
-
     if isinstance(x, torch.Tensor):
         return cast(TMap, x.detach())
     return x
@@ -52,7 +51,6 @@ class PipelineStateStorage:
             sharding_spec: Dictionary mapping state keys to their sharding behaviors.
             num_shards: Total number of shards involved in the storage.
         """
-
         self._sharding_spec_orig = copy.deepcopy(sharding_spec)
 
         self._state: dict[StateKey, Any] = {}
@@ -98,7 +96,6 @@ class PipelineStateStorage:
             key: The identifier key.
             state: The unified value to store.
         """
-
         state = pytree.tree_map(_detach_leaf, state)
 
         if key not in self._state_sharding_spec:
@@ -120,7 +117,6 @@ class PipelineStateStorage:
         Raises:
             ValueError: If trying to store sharded state into an unsharded container.
         """
-
         if key not in self._state:
             self._state[key] = ShardedState()
 
@@ -182,7 +178,6 @@ class PipelineStateStorage:
         Returns:
             The aggregated global data.
         """
-
         self._ensure_global(key)
         return self._state[key]
 
@@ -197,7 +192,6 @@ class PipelineStateStorage:
         Returns:
             The data slice corresponding to the shard.
         """
-
         self._ensure_sharded(key)
         state = self._state[key]
 
@@ -216,12 +210,10 @@ class PipelineStateStorage:
         Returns:
             True if present.
         """
-
         return key in self._state
 
     def reset(self):
         """
         Clears all stored state.
         """
-
         self._state.clear()

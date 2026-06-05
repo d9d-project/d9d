@@ -22,7 +22,6 @@ class PiecewiseScheduleBuilder:
             initial_multiplier: The starting learning rate multiplier (usually 0.0 or 1.0).
             total_steps: The total number of training steps. Required if using percentage-based methods.
         """
-
         self._phases: list[SchedulePhase] = []
         self._total_steps = total_steps
         self._last_end_step = 0
@@ -40,7 +39,6 @@ class PiecewiseScheduleBuilder:
         Returns:
             The builder instance for chaining.
         """
-
         self._phases.append(
             SchedulePhase(
                 start_step=self._last_end_step,
@@ -72,7 +70,6 @@ class PiecewiseScheduleBuilder:
             ValueError: If total_steps was not provided in constructor or if the target
                 percentage implies a step count earlier than the current cursor.
         """
-
         if self._total_steps is None:
             raise ValueError("You must define 'total_steps' in the constructor to use percentage-based methods.")
 
@@ -100,7 +97,6 @@ class PiecewiseScheduleBuilder:
         Returns:
             The builder instance for chaining.
         """
-
         return self.until_percentage(1.0, target_multiplier, curve)
 
     def build(self, optimizer: Optimizer) -> LRSchedulerProtocol:
@@ -116,7 +112,6 @@ class PiecewiseScheduleBuilder:
         Raises:
             ValueError: If the defined phases exceed the total_steps provided.
         """
-
         if self._total_steps is not None and self._last_end_step > self._total_steps:
             raise ValueError(
                 f"Schedule defined for {self._last_end_step} steps, but total_steps is {self._total_steps}."
@@ -137,5 +132,4 @@ def piecewise_schedule(initial_multiplier: float, total_steps: int | None = None
     Returns:
         A builder instance to configure phases.
     """
-
     return PiecewiseScheduleBuilder(initial_multiplier=initial_multiplier, total_steps=total_steps)

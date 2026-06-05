@@ -112,7 +112,6 @@ def read_model_state(
     Yields:
         A tuple containing the transformed parameter name and its tensor value.
     """
-
     yield from _StateLoadingFlow(
         src_dir=src_dir, device=device, mapper=mapper, show_progress=show_progress, position=position
     ).load()

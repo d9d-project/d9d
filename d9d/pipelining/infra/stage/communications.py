@@ -88,7 +88,6 @@ class StageCommunicationHandler:
             stage_idx_to_host_rank: Mapping from logical stage indices to physical world ranks.
             group: The process group strictly for pipeline communication.
         """
-
         self._input_handlers = self._build_inputs(
             name=name,
             stage_index=stage_index,
@@ -149,7 +148,6 @@ class StageCommunicationHandler:
         Args:
             requires_grad: Whether the buffers should require gradients.
         """
-
         for inputs in self._input_handlers.values():
             for info in inputs.values():
                 if isinstance(info, ReceiveStageInput):
@@ -169,7 +167,6 @@ class StageCommunicationHandler:
         Raises:
             RuntimeError: If tried to set a buffer for a no-receive stage input.
         """
-
         for input_name, input_value in inputs.items():
             handler = self._input_handlers[microbatch_index][input_name]
             if not isinstance(handler, ReceiveStageInput):
@@ -212,7 +209,6 @@ class StageCommunicationHandler:
         Raises:
             ValueError: If an unknown input handler type is encountered.
         """
-
         ops = []
 
         inputs = self._input_handlers[microbatch_index]
@@ -244,7 +240,6 @@ class StageCommunicationHandler:
         Raises:
             ValueError: If an unknown output handler type is encountered.
         """
-
         ops = []
 
         # sort ops by parameter names to ensure receive ops are ordered the same for send and recv
@@ -266,7 +261,6 @@ class StageCommunicationHandler:
 
     def reset(self):
         """Resets the internal state, specifically clearing gradients on input buffers."""
-
         for inp_handlers in self._input_handlers.values():
             for inp_handler in inp_handlers.values():
                 if isinstance(inp_handler, ReceiveStageInput):

@@ -68,7 +68,6 @@ def save_model_state(
         shard_size_gb: Max size per shard file in Gigabytes.
         show_progress: Whether to display a progress bar.
     """
-
     write_model_state_local(
         dest_dir=dest_dir,
         mapper=_augment_mapper_for_extraction([model], mapper),

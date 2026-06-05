@@ -53,7 +53,6 @@ class CurvePoly(CurveBase):
         Args:
             power: The exponent of the polynomial. 1.0 is linear, 2.0 is quadratic, etc.
         """
-
         self._power = power
 
     def compute(self, start: float, end: float, step_p: float) -> float:

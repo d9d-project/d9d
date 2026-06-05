@@ -25,7 +25,6 @@ class PipelineProgramBuilder(abc.ABC):
     @abc.abstractmethod
     def num_stages_per_rank(self) -> int:
         """Returns the number of model stages designated for each rank."""
-
         ...
 
     @property

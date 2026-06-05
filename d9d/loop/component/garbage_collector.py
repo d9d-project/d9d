@@ -39,7 +39,6 @@ class ManualGarbageCollector(AbstractContextManager):
         Returns:
             The calling instance.
         """
-
         gc.disable()
         self._collect(generation=2)
 
@@ -56,7 +55,6 @@ class ManualGarbageCollector(AbstractContextManager):
             exc_value: The exception instance raised (if any).
             traceback: The traceback object (if any).
         """
-
         gc.enable()
         self._collect(generation=2)
 
@@ -66,7 +64,6 @@ class ManualGarbageCollector(AbstractContextManager):
 
         This typically performs a faster (generation 1) collection rather than a full sweep.
         """
-
         if self._step.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=False):
             self._collect(generation=1)
 
@@ -76,7 +73,6 @@ class ManualGarbageCollector(AbstractContextManager):
 
         This performs a generation 2 collection.
         """
-
         self._collect(generation=2)
 
     def _collect(self, generation: int):

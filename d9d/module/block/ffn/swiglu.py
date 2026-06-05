@@ -22,7 +22,6 @@ class SwiGLU(nn.Module, ModuleLateInit):
             intermediate_size: The intermediate dim size of the FFN.
             bias: Whether to use bias in the linear projections.
         """
-
         super().__init__()
         self.gate_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
         self.up_proj = nn.Linear(hidden_size, intermediate_size, bias=bias)
@@ -38,12 +37,10 @@ class SwiGLU(nn.Module, ModuleLateInit):
         Returns:
             Output tensor. Shape: `(batch_size, seq_len, hidden_dim)`.
         """
-
         return self.down_proj(silu_mul(self.gate_proj(x), self.up_proj(x)))
 
     def reset_parameters(self):
         """Resets module parameters."""
-
         self.gate_proj.reset_parameters()
         self.up_proj.reset_parameters()
         self.down_proj.reset_parameters()

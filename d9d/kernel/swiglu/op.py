@@ -65,7 +65,6 @@ def silu_mul_forward(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     Raises:
         ValueError: If inputs x and y do not match in shape or device.
     """
-
     if x.shape != y.shape or x.device != y.device:
         raise ValueError("Inputs x and y must have the same shape, be on same device.")
 
@@ -148,7 +147,6 @@ def silu_mul_backward(grad_output: torch.Tensor, x: torch.Tensor, y: torch.Tenso
     Returns:
         A tuple of (grad_x, grad_y).
     """
-
     if not grad_output.is_contiguous():
         grad_output = grad_output.contiguous()
     if not x.is_contiguous():

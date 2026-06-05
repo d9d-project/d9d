@@ -53,7 +53,6 @@ def pad_stack_1d(
     Raises:
         ValueError: If no items are provided or if `pad_to_multiple_of` is <= 0.
     """
-
     if not items:
         raise ValueError("Cannot stack 0 items")
     if pad_to_multiple_of is not None and pad_to_multiple_of <= 0:
