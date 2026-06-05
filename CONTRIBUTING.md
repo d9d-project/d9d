@@ -82,8 +82,34 @@ They are not enforced by tooling, but PRs that violate them may be asked to chan
 * **Polymorphism for configurable objects via discriminated unions.** When a configurable object has selectable behavior, model the choices as a Pydantic discriminated union and resolve them in a `build_*()` factory with an exhaustive `match (case _: raise)`.
 
 ### Linting & Formatting
-We use [Ruff](https://docs.astral.sh/ruff/) for both linting and formatting. 
-Configuration is strict (see `pyproject.toml` for enabled rules).
+We use [Ruff](https://docs.astral.sh/ruff/) for both linting and formatting.
+Configuration is strict (see `pyproject.toml` for the authoritative list of enabled rules).
+
+The rule set is broad. The conventions below summarize what it means in practice so you can write
+conforming code without memorizing rule codes.
+
+#### Formatting
+*   Double quotes, 4-space indentation, 120-char line length.
+*   Imports are auto-sorted (`I`). Run `make lint` to fix ordering.
+
+#### Typing & annotations
+*   **Annotate everything public** (`ANN`): function args and return types. `None` returns may be omitted.
+*   `typing.Any` is allowed (`ANN401` is off) but should be a last resort.
+*   Prefer modern syntax (`UP`, `FA`): `X | Y` over `Optional`/`Union`, builtin generics (`list[int]`),
+    and `from __future__ import annotations` where it helps.
+
+#### Naming
+*   `snake_case` for functions/variables, `PascalCase` for classes, `UPPER_CASE` for constants.
+*   Exceptions: `F` (for `nn.functional`) and `BLOCK_SIZE`/uppercase kernel args are allowed.
+*   Private attributes should be prefixed with `_`: `self._something = ...`
+
+#### Boundaries
+*   Every package needs `__init__.py` (`INP`); `/example/` is exempt.
+
+#### Tests
+*   Use idiomatic `pytest` (`PT`): `pytest.raises`, fixtures, parametrization.
+*   Tests relax several rules: `assert` is allowed, no docstrings/annotations required, private
+    access and non-top-level imports are fine.
 
 ### Type Checking
 We use **[ty](https://github.com/astral-sh/ty)** to ensure type safety.
@@ -100,6 +126,8 @@ We have two tiers of tests:
 
 **Requirement:** All PRs must pass `make test`. If you add a feature, you must add corresponding tests.
 
+## Documentation
+
 ### Docstrings
 
 We follow the [Google Python style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) for docstrings.
@@ -109,12 +137,13 @@ We follow the [Google Python style](https://google.github.io/styleguide/pyguide.
 *   **Document `__init__`:** Write a docstring even for `__init__`, but keep it short and to the point, e.g. `"""Constructs the ``Trainer`` object."""`.
 *   **Public API coverage:** Always write docstrings for everything considered public API.
 
-## Documentation
+### Documentation Site
 
-Documentation is built with **Zensical**.
-*   **Docstrings:** Public APIs must have clear docstrings.
-*   **Building:** Run `make mkdocs` to preview changes.
-*   **Location:** Source files are in `docs/` and documented code in `d9d/`.
+The site is built with **Zensical**.
+
+*   **Location:** Page sources live in `docs/`; the code they document lives in `d9d/`.
+*   **Building:** Run `make mkdocs` to preview changes locally.
+*   **Registering pages (`zensical.toml`):** The site navigation is **not** auto-generated from the `docs/` directory - it is defined explicitly in the `nav` table of `zensical.toml`. Whenever you add, remove, rename, or move a page under `docs/`, you must update `nav` accordingly. New top-level subsystems should also be added to the appropriate section (and mirrored in `docs/toc.md`).
 
 ## Commit Messages & PRs
 
