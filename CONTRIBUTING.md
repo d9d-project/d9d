@@ -100,6 +100,15 @@ We have two tiers of tests:
 
 **Requirement:** All PRs must pass `make test`. If you add a feature, you must add corresponding tests.
 
+### Docstrings
+
+We follow the [Google Python style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) for docstrings.
+
+*   **Style:** Use Google-style docstrings (`Args:`, `Returns:`, `Raises:`, etc.).
+*   **No type annotations in docstrings:** Types are already declared in the signature and checked by `ty`. Do not repeat them in the docstring.
+*   **Document `__init__`:** Write a docstring even for `__init__`, but keep it short and to the point, e.g. `"""Constructs the ``Trainer`` object."""`.
+*   **Public API coverage:** Always write docstrings for everything considered public API.
+
 ## Documentation
 
 Documentation is built with **Zensical**.
