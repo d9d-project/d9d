@@ -78,6 +78,8 @@ They are not enforced by tooling, but PRs that violate them may be asked to chan
 * **Validate eagerly, fail fast.** Validate constructor args up front; raise if a method is called outside its required lifecycle scope rather than silently misbehaving.
 * **Decide behavior from explicit inputs, not inferred state.** Drive branching with an explicit parameter, not by sniffing the shape/dtype/contents of the data. Inferred checks silently encode invariants the caller and the next reader won't know are there - make them part of the signature instead.
 * **Validate at the boundary; trust within it**. Data crossing an untrusted boundary (user config, deserialized state) is validated once at the edge into a model that guarantees its own invariants — that's the validation layer, and we use `pydantic` for it. Pass trusted internal data as plain `dataclasses` and assume it is already valid. Don't re-validate trusted internal data, and don't pass unvalidated raw input deeper than the edge.
+* **Separate configuration from behavior.** Config objects describe; classes behave. Don't merge them into one dataclass that needs `__post_init__` magic.
+* **Polymorphism for configurable objects via discriminated unions.** When a configurable object has selectable behavior, model the choices as a Pydantic discriminated union and resolve them in a `build_*()` factory with an exhaustive `match (case _: raise)`.
 
 ### Linting & Formatting
 We use [Ruff](https://docs.astral.sh/ruff/) for both linting and formatting. 
