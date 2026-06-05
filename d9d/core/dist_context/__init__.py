@@ -1,6 +1,4 @@
-"""
-This package configures the distributed environment and device meshes.
-"""
+"""This package configures the distributed environment and device meshes."""
 
 from .configured import DistributedContext
 from .device_mesh_domains import BATCH_DOMAIN, DENSE_DOMAIN, EXPERT_DOMAIN, FLAT_DOMAIN, REGULAR_DOMAIN

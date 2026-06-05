@@ -7,8 +7,7 @@ from d9d.peft.lora.config import LoRAConfig
 
 
 class PeftStackConfig(BaseModel):
-    """
-    Configuration for applying a stack of multiple PEFT methods sequentially.
+    """Configuration for applying a stack of multiple PEFT methods sequentially.
 
     Attributes:
         kind: Discriminator field, always "stack".

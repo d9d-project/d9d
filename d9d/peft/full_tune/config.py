@@ -5,8 +5,7 @@ from pydantic import BaseModel
 
 
 class FullTuneConfig(BaseModel):
-    """
-    Configuration for Full Fine-Tuning.
+    """Configuration for Full Fine-Tuning.
 
     Allows specifying which modules should be fully fine-tuned using regex patterns.
 

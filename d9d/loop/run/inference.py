@@ -53,8 +53,7 @@ from d9d.pipelining.factory import PipelineScheduleInferenceConfig
 
 
 class InferenceConfigurator:
-    """
-    Orchestrates the assembly of the distributed inference environment.
+    """Orchestrates the assembly of the distributed inference environment.
 
     This class binds the infrastructure configuration (DeviceMesh), the inference
     parameters, and the user-defined logic (Providers) to create a fully
@@ -69,8 +68,7 @@ class InferenceConfigurator:
         model_provider: ModelProvider,
         data_provider: DatasetProvider,
     ):
-        """
-        Constructs a configurator capable of building the full inference state.
+        """Constructs a configurator capable of building the full inference state.
 
         Args:
             mesh: Definition of the distributed device mesh topology.
@@ -79,7 +77,6 @@ class InferenceConfigurator:
             model_provider: Factory for defining and creating model stages.
             data_provider: Factory for providing inference datasets.
         """
-
         self._mesh = mesh
         self._parameters = parameters
         self._task_provider = task_provider
@@ -163,8 +160,7 @@ class InferenceConfigurator:
         )
 
     def configure(self) -> "Inference":
-        """
-        Instantiates all inference components and returns a configured Inference engine.
+        """Instantiates all inference components and returns a configured Inference engine.
 
         This method triggers the creation of the distributed context, sets seeds,
         builds the model, data loaders, and attaches all auxiliary components.
@@ -172,15 +168,13 @@ class InferenceConfigurator:
         Returns:
             Inference: A ready-to-use inference engine instance encapsulating the job state.
         """
-
         state = self._build_new_state()
 
         return Inference(state)
 
 
 class Inference:
-    """
-    The main execution engine for running a distributed inference job.
+    """The main execution engine for running a distributed inference job.
 
     This class manages the inference loop, lifecycle events, distributed synchronization,
     and periodic side-effects (profiling, checkpointing). It ensures the model is in
@@ -188,13 +182,11 @@ class Inference:
     """
 
     def __init__(self, state: InferenceJobState):
-        """
-        Constructs an Inference engine from a pre-built job state.
+        """Constructs an Inference engine from a pre-built job state.
 
         Args:
             state: The encapsulated state object containing all initialized components.
         """
-
         self._state = state
 
     def _enable_eval_mode(self):
@@ -202,8 +194,7 @@ class Inference:
             module.eval()
 
     def infer(self):
-        """
-        Executes the full inference workflow.
+        """Executes the full inference workflow.
 
         This method:
 
@@ -214,7 +205,6 @@ class Inference:
         5. Handles periodic garbage collection and profiling.
         6. Finalizes the task upon completion.
         """
-
         with torch.inference_mode():
             self._enable_eval_mode()
 

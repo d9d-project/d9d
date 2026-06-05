@@ -24,8 +24,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
         callback: PipelineLossFn | PipelineResultFn,
         program: dict[int, list[ActionBase]],
     ):
-        """
-        Constructs the schedule executor.
+        """Constructs the schedule executor.
 
         Args:
             dist_context: The distributed context.
@@ -34,7 +33,6 @@ class PipelineScheduleExecutor(PipelineSchedule):
             callback: Function to compute loss or process pipeline results.
             program: The execution plan mapping rank ID to a list of actions.
         """
-
         self._dist_ctx = dist_context
         self._stages = {stage.info.current_stage: stage for stage in stages}
         self._num_microbatches = num_microbatches

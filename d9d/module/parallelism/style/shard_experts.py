@@ -12,8 +12,7 @@ from d9d.module.block.moe import GroupedLinear, MoELayer
 
 
 class ShardMoESparseExpertsParallel(ParallelStyle):
-    """
-    Parallel style that shards MoE experts across a specific mesh dimension.
+    """Parallel style that shards MoE experts across a specific mesh dimension.
 
     This style is designed for ``MoELayer`` instances using ``GroupedLinear`` for experts.
     It splits the experts across the specified

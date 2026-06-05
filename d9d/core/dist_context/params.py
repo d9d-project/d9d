@@ -7,8 +7,7 @@ from .configured import DistributedContext
 
 
 class DeviceMeshParameters(BaseModel):
-    """
-    Configuration parameters for initializing Distributed Device Meshes.
+    """Configuration parameters for initializing Distributed Device Meshes.
 
     Attributes:
         pipeline_parallel: Degree of pipeline parallelism (PP).
@@ -37,19 +36,16 @@ class DeviceMeshParameters(BaseModel):
     @property
     def has_pipeline_parallel(self) -> bool:
         """Checks if pipeline parallelism is enabled (degree > 1)."""
-
         return self.pipeline_parallel > 1
 
     @property
     def has_data_parallel_replicate(self) -> bool:
         """Checks if data parallel replication is enabled (degree > 1)."""
-
         return self.data_parallel_replicate > 1
 
     @property
     def has_data_parallel_shard(self) -> bool:
         """Checks if data parallel sharding is enabled (degree > 1)."""
-
         return self.data_parallel_shard > 1
 
     @property
@@ -72,7 +68,6 @@ class DeviceMeshParameters(BaseModel):
     @property
     def is_distributed(self) -> bool:
         """Checks if any form of parallelism is enabled."""
-
         return (
             self.has_pipeline_parallel
             or self.has_data_parallel_replicate
@@ -85,7 +80,6 @@ class DeviceMeshParameters(BaseModel):
 
     @model_validator(mode="after")
     def _check_ep_divisibility(self) -> Self:
-        """Validates that DP/CP/TP dimensions can support the requested EP/ETP degrees."""
         dp_cp_tp_degree = (
             self.data_parallel_shard
             * self.data_parallel_replicate
@@ -103,11 +97,9 @@ class DeviceMeshParameters(BaseModel):
         return self
 
     def build(self, log_level: int = logging.INFO) -> "DistributedContext":
-        """
-        Initializes the DistributedContext using these parameters.
+        """Initializes the DistributedContext using these parameters.
 
         Returns:
             A new DistributedContext instance containing the initialized device meshes.
         """
-
         return DistributedContext(self, log_level)

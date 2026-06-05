@@ -10,8 +10,7 @@ from d9d.module.base import ModuleLateInit
 
 
 class GroupedLinear(nn.Module, ModuleLateInit):
-    """
-    Applies a linear transformation using Grouped GEMM (Generalized Matrix Multiplication).
+    """Applies a linear transformation using Grouped GEMM (Generalized Matrix Multiplication).
 
     This module allows efficient execution of multiple linear layers (experts) in parallel, where each expert
     processes a variable number of tokens.
@@ -26,8 +25,7 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ):
-        """
-        Constructs the GroupedLinear layer.
+        """Constructs the GroupedLinear layer.
 
         Args:
             n_groups: Number of groups (experts).
@@ -46,8 +44,7 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         self.reset_parameters()
 
     def forward(self, x: torch.Tensor, x_groups: torch.Tensor) -> torch.Tensor:
-        """
-        Performs the grouped matrix multiplication.
+        """Performs the grouped matrix multiplication.
 
         Args:
             x: Flattened input tensor containing tokens for all groups.
@@ -58,7 +55,6 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         Returns:
             The output tensor. Shape: `(total_tokens, out_features)`.
         """
-
         weight: torch.Tensor = self.weight
 
         if isinstance(weight, DTensor):

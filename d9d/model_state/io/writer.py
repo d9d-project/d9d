@@ -18,9 +18,7 @@ from d9d.model_state.mapper import ModelStateMapper
 
 
 class _StateWritingFlowLocal:
-    """
-    Internal orchestration logic for buffering, transforming, and sharding model states during save.
-    """
+    """Internal orchestration logic for buffering, transforming, and sharding model states during save."""
 
     def __init__(
         self,
@@ -181,8 +179,7 @@ def write_model_state_local(
     shard_size_gb: float = 4.0,
     show_progress: bool = True,
 ):
-    """
-    Saves model states to disk in a single local process.
+    """Saves model states to disk in a single local process.
 
     This function uses a streaming approach. It analyzes the mapper to determine which files
     need to be saved. Tensors are loaded into memory only when needed and evicted immediately
@@ -219,8 +216,7 @@ def write_model_state_distributed(
     show_progress: bool = True,
     position: int | None = None,
 ):
-    """
-    Saves model states in a distributed setup (multiple processes).
+    """Saves model states in a distributed setup (multiple processes).
 
     This function uses a streaming approach. It analyzes the mapper to determine which files
     need to be saved. Tensors are loaded into memory only when needed and evicted immediately
@@ -238,7 +234,6 @@ def write_model_state_distributed(
         position: Row index for the tqdm bar. Pass the process local rank to stack one bar
             per rank without interleaving. ``None`` lets tqdm use its default (single bar).
     """
-
     current_idx = _StateWritingFlowLocal(
         dest_dir=dest_dir,
         mapper=mapper,
@@ -264,8 +259,7 @@ def write_model_state_pipeline_parallel(
     show_progress: bool = True,
     position: int | None = None,
 ):
-    """
-    Saves model states in a complex ND distributed training setting.
+    """Saves model states in a complex ND distributed training setting.
 
     This function uses a streaming approach. It analyzes the mapper to determine which files
     need to be saved. Tensors are loaded into memory only when needed and evicted immediately
@@ -284,8 +278,10 @@ def write_model_state_pipeline_parallel(
         show_progress: Whether to show the progress bar.
         position: Row index for the tqdm bar. Pass the process local rank to stack one bar
             per rank without interleaving. ``None`` lets tqdm use its default (single bar).
-    """
 
+    Raises:
+        ValueError: If the DeviceMesh has no dimension names or coordinates.
+    """
     pipeline_rank = device_mesh[pipeline_dim_name].get_rank()
 
     mesh_dim_names = device_mesh.mesh_dim_names

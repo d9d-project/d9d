@@ -13,8 +13,7 @@ from ..component.runtime import (
 
 
 class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
-    """
-    Builder for the Zero Bubble V (ZBV) Pipeline Schedule.
+    """Builder for the Zero Bubble V (ZBV) Pipeline Schedule.
 
     This schedule is designed for V-shape topologies (2 stages per rank) and
     utilizes the Zero Bubble optimizations by splitting backward passes.

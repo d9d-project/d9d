@@ -9,8 +9,7 @@ from .types import StepActionPeriod
 
 
 class BatchingConfig(BaseModel):
-    """
-    Configuration for batch sizing logic.
+    """Configuration for batch sizing logic.
 
     Attributes:
         global_batch_size: The total effective batch size across all distributed
@@ -24,8 +23,7 @@ class BatchingConfig(BaseModel):
 
 
 class DeterminismConfig(BaseModel):
-    """
-    Configuration for reproducibility and random number generation.
+    """Configuration for reproducibility and random number generation.
 
     Attributes:
         base_seed: The base integer seed used to initialize random number
@@ -36,8 +34,7 @@ class DeterminismConfig(BaseModel):
 
 
 class PipeliningConfig(BaseModel):
-    """
-    Configuration for pipeline parallelism orchestration.
+    """Configuration for pipeline parallelism orchestration.
 
     Attributes:
         schedule: The specific scheduling strategy configuration used to manage pipeline execution.
@@ -47,8 +44,7 @@ class PipeliningConfig(BaseModel):
 
 
 class GarbageCollectionConfig(BaseModel):
-    """
-    Configuration for manual Python garbage collection control.
+    """Configuration for manual Python garbage collection control.
 
     Attributes:
         period_steps: How frequently to manually trigger the Python garbage collector.
@@ -58,8 +54,7 @@ class GarbageCollectionConfig(BaseModel):
 
 
 class DataLoadingConfig(BaseModel):
-    """
-    Configuration for PyTorch DataLoaders.
+    """Configuration for PyTorch DataLoaders.
 
     Attributes:
         num_workers: The number of subprocesses to use for data loading.
@@ -74,8 +69,7 @@ class DataLoadingConfig(BaseModel):
 
 
 class CheckpointingConfig(BaseModel):
-    """
-    Configuration for saving model snapshots.
+    """Configuration for saving model snapshots.
 
     Attributes:
         save_dir: The root directory where checkpoints will be stored.
@@ -90,8 +84,7 @@ class CheckpointingConfig(BaseModel):
 
 
 class ModelStageFactoryConfig(BaseModel):
-    """
-    Configuration for initializing model weights.
+    """Configuration for initializing model weights.
 
     Attributes:
         source_checkpoint: Path to an initial checkpoint to load into the model
@@ -105,8 +98,7 @@ class ModelStageFactoryConfig(BaseModel):
 
 
 class GradientClippingConfig(BaseModel):
-    """
-    Configuration for gradient norm clipping.
+    """Configuration for gradient norm clipping.
 
     Attributes:
         max_norm: The maximum norm value for gradient clipping. If None,
@@ -119,8 +111,7 @@ class GradientClippingConfig(BaseModel):
 
 
 class ProfilingConfig(BaseModel):
-    """
-    Configuration for the PyTorch Profiler.
+    """Configuration for the PyTorch Profiler.
 
     Attributes:
         enabled: Whether to enable the profiler.
@@ -140,8 +131,7 @@ class ProfilingConfig(BaseModel):
 
 
 class JobLoggerConfig(BaseModel):
-    """
-    Configuration for experiment tracking and logging.
+    """Configuration for experiment tracking and logging.
 
     Attributes:
         period_steps: How frequently metrics are flushed to the logger.
@@ -153,8 +143,7 @@ class JobLoggerConfig(BaseModel):
 
 
 class GradientManagerConfig(BaseModel):
-    """
-    Configuration for gradient synchronization.
+    """Configuration for gradient synchronization.
 
     Attributes:
         grad_dtype: The data type to use for storing the gradient. If None, follows the model's dtype.
@@ -166,8 +155,7 @@ class GradientManagerConfig(BaseModel):
 
 
 class TimeoutConfig(BaseModel):
-    """
-    Configuration for distributed process group timeouts.
+    """Configuration for distributed process group timeouts.
 
     Attributes:
         init_timeout: Timeout in seconds for initializing the process group.
@@ -179,8 +167,7 @@ class TimeoutConfig(BaseModel):
 
 
 class TrainerConfig(BaseModel):
-    """
-    Top-level configuration object defining a complete training job.
+    """Top-level configuration object defining a complete training job.
 
     Attributes:
         run: Meta-information about the run (name, ID, tags).
@@ -215,8 +202,7 @@ class TrainerConfig(BaseModel):
 
 
 class InferenceConfig(BaseModel):
-    """
-    Top-level configuration object defining an inference/evaluation job.
+    """Top-level configuration object defining an inference/evaluation job.
 
     Attributes:
         batching: Batch sizing strategy.

@@ -1,5 +1,4 @@
-"""
-Pipeline Schedule Building Components.
+"""Pipeline Schedule Building Components.
 
 This package provides the core building blocks and compiler passes used to generate
 execution schedules for distributed pipelines.

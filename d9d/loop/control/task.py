@@ -23,8 +23,7 @@ TBatch = typing.TypeVar("TBatch", bound=PyTree)
 
 @dataclasses.dataclass(kw_only=True)
 class BuildForwardInputsContext(typing.Generic[TBatch]):
-    """
-    Context data to prepare inputs for the model forward pass.
+    """Context data to prepare inputs for the model forward pass.
 
     Attributes:
         batch: The raw batch data loaded from the DataLoader object.
@@ -38,8 +37,7 @@ class BuildForwardInputsContext(typing.Generic[TBatch]):
 
 @dataclasses.dataclass(kw_only=True)
 class BuildForwardInputsResult:
-    """
-    The result of processing the raw batch into model inputs.
+    """The result of processing the raw batch into model inputs.
 
     Attributes:
         inputs: A dictionary of inputs that are passed to model pipeline as input data
@@ -57,8 +55,7 @@ class BuildForwardInputsResult:
 
 @dataclasses.dataclass(kw_only=True)
 class RegisterTaskEventsContext:
-    """
-    Context for registering task-specific events.
+    """Context for registering task-specific events.
 
     Attributes:
         dist_context: The distributed execution context.
@@ -79,8 +76,7 @@ class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch]):
 
     @abc.abstractmethod
     def build_forward_inputs(self, ctx: BuildForwardInputsContext[TBatch]) -> BuildForwardInputsResult:
-        """
-        Transforms raw data loaded from the DataLoader into arguments for the model.
+        """Transforms raw data loaded from the DataLoader into arguments for the model.
 
         Args:
             ctx: Context object.
@@ -88,22 +84,18 @@ class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch]):
         Returns:
             Result object.
         """
-
         ...
 
     def state_dict(self) -> dict[str, Any]:
-        """
-        Returns the state dictionary for checkpointing this task.
+        """Returns the state dictionary for checkpointing this task.
 
         Returns:
             A dictionary containing the task's state.
         """
-
         return {}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        """
-        Restores the task's state from the provided dictionary.
+        """Restores the task's state from the provided dictionary.
 
         Args:
             state_dict: The state dictionary to load.
@@ -111,8 +103,7 @@ class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch]):
         # do nothing by default
 
     def register_events(self, context: RegisterTaskEventsContext) -> None:
-        """
-        Register task-specific event subscriptions.
+        """Register task-specific event subscriptions.
 
         Args:
             context: Context providing access to the distributed environment
@@ -120,8 +111,7 @@ class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch]):
         """
 
     def finalize(self, ctx: FinalizeContext) -> None:
-        """
-        Performs cleanup or final actions when the task execution finishes.
+        """Performs cleanup or final actions when the task execution finishes.
 
         Args:
              ctx: Context object.
@@ -130,8 +120,7 @@ class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch]):
 
 @dataclasses.dataclass(kw_only=True)
 class ComputeLossContext:
-    """
-    Context data provided to calculate the loss during training.
+    """Context data provided to calculate the loss during training.
 
     Attributes:
         pipeline_results: The outputs returned by the model's forward pass.
@@ -147,8 +136,7 @@ class ComputeLossContext:
 
 @dataclasses.dataclass(kw_only=True)
 class ComputeLossResult:
-    """
-    The result of the loss computation.
+    """The result of the loss computation.
 
     Attributes:
         loss: The scalar tensor representing the loss to be backpropagated.
@@ -167,8 +155,7 @@ class CreateMetricsContext:
 
 @dataclasses.dataclass(kw_only=True)
 class CreateMetricsResult:
-    """
-    Result of metric initialization.
+    """Result of metric initialization.
 
     Attributes:
         metrics: A dictionary mapping metric names to Metric instances.
@@ -179,8 +166,7 @@ class CreateMetricsResult:
 
 @dataclasses.dataclass(kw_only=True)
 class UpdateMetricsContext:
-    """
-    Context data provided to update metrics after a step.
+    """Context data provided to update metrics after a step.
 
     Attributes:
         state: The current state of the pipeline.
@@ -196,8 +182,7 @@ class TrainTask(BaseTask, abc.ABC, typing.Generic[TBatch]):
 
     @abc.abstractmethod
     def compute_loss(self, ctx: ComputeLossContext) -> ComputeLossResult:
-        """
-        Calculates the loss based on model outputs.
+        """Calculates the loss based on model outputs.
 
         Args:
             ctx: Context object.
@@ -205,12 +190,10 @@ class TrainTask(BaseTask, abc.ABC, typing.Generic[TBatch]):
         Returns:
             Result object.
         """
-
         ...
 
     def create_metrics(self, ctx: CreateMetricsContext) -> CreateMetricsResult:
-        """
-        Initializes metrics to be tracked during training.
+        """Initializes metrics to be tracked during training.
 
         Args:
              ctx: Context object.
@@ -218,32 +201,27 @@ class TrainTask(BaseTask, abc.ABC, typing.Generic[TBatch]):
         Returns:
             Result object.
         """
-
         return CreateMetricsResult(metrics={})
 
     def update_metrics(self, ctx: UpdateMetricsContext):
-        """
-        Updates the state of the metrics at the end of training step.
+        """Updates the state of the metrics at the end of training step.
 
         Args:
             ctx: Context object.
         """
 
     def dump_hparams(self) -> ScalarTree:
-        """
-        Exports hyperparameters associated with this task for logging.
+        """Exports hyperparameters associated with this task for logging.
 
         Returns:
             A dictionary of hyperparameter names and values.
         """
-
         return {}
 
 
 @dataclasses.dataclass(kw_only=True)
 class TrainTaskProviderContext:
-    """
-    Context data provided to the factory creating a TrainTask.
+    """Context data provided to the factory creating a TrainTask.
 
     Attributes:
         dist_context: Information about the distributed environment.
@@ -257,8 +235,7 @@ class TrainTaskProvider(Protocol):
     """Protocol that creates a TrainTask instance."""
 
     def __call__(self, ctx: TrainTaskProviderContext) -> TrainTask:
-        """
-        Creates and returns a new TrainTask.
+        """Creates and returns a new TrainTask.
 
         Args:
             ctx: Context object.
@@ -266,14 +243,12 @@ class TrainTaskProvider(Protocol):
         Returns:
             An instantiated TrainTask.
         """
-
         ...
 
 
 @dataclasses.dataclass(kw_only=True)
 class ProcessOutputsContext:
-    """
-    Context data provided to process outputs during inference.
+    """Context data provided to process outputs during inference.
 
     Attributes:
         pipeline_results: The outputs returned by the model's forward pass.
@@ -289,20 +264,17 @@ class InferenceTask(BaseTask, abc.ABC, typing.Generic[TBatch]):
 
     @abc.abstractmethod
     def process_outputs(self, ctx: ProcessOutputsContext):
-        """
-        Processes the model outputs (e.g. saving to disk, decoding tokens).
+        """Processes the model outputs (e.g. saving to disk, decoding tokens).
 
         Args:
             ctx: Context containing the model outputs and pipeline state.
         """
-
         ...
 
 
 @dataclasses.dataclass(kw_only=True)
 class InferenceTaskProviderContext:
-    """
-    Context data provided to the factory creating an InferenceTask.
+    """Context data provided to the factory creating an InferenceTask.
 
     Attributes:
         dist_context: Information about the distributed environment.
@@ -316,8 +288,7 @@ class InferenceTaskProvider(Protocol):
     """Protocol for a callable that creates an InferenceTask instance."""
 
     def __call__(self, ctx: InferenceTaskProviderContext) -> InferenceTask:
-        """
-        Creates and returns a new InferenceTask.
+        """Creates and returns a new InferenceTask.
 
         Args:
             ctx: Context providing distributed environment information.

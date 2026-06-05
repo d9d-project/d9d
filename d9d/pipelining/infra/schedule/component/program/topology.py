@@ -3,8 +3,7 @@ from enum import StrEnum
 
 
 class ScheduleStyle(StrEnum):
-    """
-    Defines the strategy for mapping logical stages to physical ranks.
+    """Defines the strategy for mapping logical stages to physical ranks.
 
     Attributes:
         loop: Assigns stages in a round-robin circular fashion (mod pp_size).
@@ -16,8 +15,7 @@ class ScheduleStyle(StrEnum):
 
 
 def build_stage_to_host_rank_topology(pp_size: int, num_stages: int, style: ScheduleStyle) -> dict[int, int]:
-    """
-    Constructs the mapping from stage index to rank index.
+    """Constructs the mapping from stage index to rank index.
 
     Args:
         pp_size: Number of pipeline parallel ranks.
@@ -31,7 +29,6 @@ def build_stage_to_host_rank_topology(pp_size: int, num_stages: int, style: Sche
         ValueError: If the style is unknown or if V-style parameters are invalid
             (num_stages must be divisible by pp_size).
     """
-
     match style:
         case ScheduleStyle.loop:
             return {stage_index: stage_index % pp_size for stage_index in range(num_stages)}
@@ -57,8 +54,7 @@ def build_stage_to_host_rank_topology(pp_size: int, num_stages: int, style: Sche
 
 
 def invert_stage_to_host_rank_topology(stage_to_host: dict[int, int]) -> dict[int, list[int]]:
-    """
-    Inverts the topology mapping to list execution stages per rank.
+    """Inverts the topology mapping to list execution stages per rank.
 
     Args:
         stage_to_host: Mapping from stage index to rank index.
@@ -67,7 +63,6 @@ def invert_stage_to_host_rank_topology(stage_to_host: dict[int, int]) -> dict[in
         A dictionary where keys are Rank IDs and values are lists of Stage IDs
         managed by that rank.
     """
-
     host_to_stage = defaultdict(list)
     for stage_idx, host in stage_to_host.items():
         host_to_stage[host].append(stage_idx)

@@ -15,8 +15,8 @@ from d9d.module.block.normalization import RMSNorm
 
 
 class CausalShortDepthwiseConv1d(nn.Module, ModuleLateInit):
-    """
-    Causal 1D depthwise convolution (short convolution) as used in Mamba/FLA architectures.
+    """Causal 1D depthwise convolution (short convolution) as used in Mamba/FLA architectures.
+
     Applies a grouped (depthwise) 1D convolution with left-padding to ensure causality,
     followed by an optional activation function.
     """
@@ -62,13 +62,12 @@ class CausalShortDepthwiseConv1d(nn.Module, ModuleLateInit):
 
     def reset_parameters(self) -> None:
         """Resets the learnable parameters."""
-
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
 
 
 class LogSigmoidDecayGate(nn.Module, ModuleLateInit):
-    """
-    Decay gate using scaled log-sigmoid.
+    """Decay gate using scaled log-sigmoid.
+
     Used in GLA, original Delta Net, HGRN-2.
     """
 
@@ -98,13 +97,12 @@ class LogSigmoidDecayGate(nn.Module, ModuleLateInit):
 
     def reset_parameters(self) -> None:
         """Resets the learnable parameters."""
-
         self.proj.reset_parameters()
 
 
 class MambaDecayGate(nn.Module, ModuleLateInit):
-    """
-    Mamba-style decay gate with learnable A_log and dt_bias.
+    """Mamba-style decay gate with learnable A_log and dt_bias.
+
     Used in Mamba, Mamba-2, Qwen3-Next, Qwen3.5.
     """
 
@@ -151,7 +149,6 @@ class MambaDecayGate(nn.Module, ModuleLateInit):
             Decay gate in log-space of shape `(batch, seq_len, num_heads)`, with values
                 in `(-∞, 0]`.
         """
-
         gk = self.proj(x).unsqueeze(-1)
         gate = fused_kda_gate(gk, A_log=self.A_log, dt_bias=self.dt_bias)
 
@@ -159,7 +156,6 @@ class MambaDecayGate(nn.Module, ModuleLateInit):
 
     def reset_parameters(self) -> None:
         """Resets the learnable parameters for this module."""
-
         self.proj.reset_parameters()
 
         nn.init.uniform_(self.A_log, 0.0, self._normalizer)
@@ -234,8 +230,7 @@ def _build_decay_gate(
 
 
 class GatedDeltaNet(nn.Module, ModuleLateInit):
-    """
-    Implements Gated DeltaNet (GDN) attention mechanism.
+    """Implements Gated DeltaNet (GDN) attention mechanism.
 
     This module combines linear attention based on the Delta Rule with Mamba-style
     data-dependent gating and short causal convolutions.

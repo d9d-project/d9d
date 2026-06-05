@@ -20,8 +20,7 @@ from .model_stage_factory import TrackedModules
 
 
 class TrainSleeper:
-    """
-    Offloads and restores the GPU-resident training state for a colocated RL hand-off.
+    """Offloads and restores the GPU-resident training state for a colocated RL hand-off.
 
     This encapsulates the sleep/wake lifecycle on behalf of the "Trainer": it fans the
     offload/onload calls out to the "Offloadable" subsystems in the correct order, surrounds
@@ -36,8 +35,7 @@ class TrainSleeper:
         gradient_manager: GradientManager,
         event_bus: EventBus,
     ):
-        """
-        Constructs the TrainSleeper.
+        """Constructs the TrainSleeper.
 
         Args:
             dist_context: The distributed context.
@@ -46,7 +44,6 @@ class TrainSleeper:
             gradient_manager: Component handling gradient synchronization state.
             event_bus: The event bus used to emit the sleep/wake lifecycle events.
         """
-
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
         self._optimizer = optimizer
@@ -54,8 +51,7 @@ class TrainSleeper:
         self._event_bus = event_bus
 
     def sleep(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
-        """
-        Releases the GPU-resident training state selected by "tags" to host memory.
+        """Releases the GPU-resident training state selected by "tags" to host memory.
 
         This frees the GPU for a colocated workload, such as a rollout engine in colocated RL.
         The call is collective: every rank must invoke it with identical tags. Requesting a tag
@@ -68,7 +64,6 @@ class TrainSleeper:
             NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
             RuntimeError: If called during an in-flight gradient accumulation.
         """
-
         requested = frozenset(tags)
         if SleepTag.COMMS in requested:
             raise NotImplementedError(
@@ -99,8 +94,7 @@ class TrainSleeper:
         self._event_bus.trigger(EVENT_TRAIN_SLEEP_POST, event_context)
 
     def wake(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
-        """
-        Restores GPU residency of the training state previously released by "sleep".
+        """Restores GPU residency of the training state previously released by "sleep".
 
         The call is collective: every rank must invoke it with identical tags. Requesting a tag
         whose subsystem is not offloaded is a no-op.
@@ -111,7 +105,6 @@ class TrainSleeper:
         Raises:
             NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
         """
-
         requested = frozenset(tags)
         if SleepTag.COMMS in requested:
             raise NotImplementedError(
@@ -133,8 +126,7 @@ class TrainSleeper:
         self._event_bus.trigger(EVENT_TRAIN_WAKE_POST, event_context)
 
     def is_sleeping(self, tag: SleepTag) -> bool:
-        """
-        Reports whether the subsystem identified by "tag" is currently offloaded.
+        """Reports whether the subsystem identified by "tag" is currently offloaded.
 
         Args:
             tag: The subsystem to query.
@@ -142,7 +134,6 @@ class TrainSleeper:
         Returns:
             True if the subsystem is offloaded to host memory, False otherwise.
         """
-
         if tag is SleepTag.TENSOR_STATES:
             return self._tracked_modules.is_offloaded()
         return False

@@ -1,6 +1,4 @@
-"""
-Pipelining Runtime Package.
-"""
+"""Pipelining Runtime Package."""
 
 from .action import (
     ActionBase,

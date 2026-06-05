@@ -20,8 +20,7 @@ from .pipeline_result_processing import STATE_LOSS, STATE_LOSS_WEIGHT
 
 @dataclasses.dataclass(kw_only=True)
 class ForwardResult:
-    """
-    Encapsulates the scalar results of a forward pass step.
+    """Encapsulates the scalar results of a forward pass step.
 
     Attributes:
         loss: The computed loss tensor.
@@ -43,8 +42,7 @@ def _run_pipeline(task: BaseTask, pipeline: PipelineScheduleInfo, pipeline_state
 
 
 class TrainTaskOperator:
-    """
-    Orchestrates the execution of the forward and backward passes for a specific training task.
+    """Orchestrates the execution of the forward and backward passes for a specific training task.
 
     It manages input construction, schedule execution,
     loss computation, and metric updates within the lifecycle of a single step.
@@ -58,8 +56,7 @@ class TrainTaskOperator:
         pipeline_state: PipelineStateHandler,
         metrics: ComposeMetric,
     ):
-        """
-        Constructs the TrainTaskOperator.
+        """Constructs the TrainTaskOperator.
 
         Args:
             dist_context: The distributed context.
@@ -68,7 +65,6 @@ class TrainTaskOperator:
             pipeline_state: Handler for transient state storage during the step.
             metrics: Metric collection to update after the pass.
         """
-
         self._dist_context = dist_context
         self._task = task
         self._pipeline = pipeline
@@ -76,8 +72,7 @@ class TrainTaskOperator:
         self._metrics = metrics
 
     def forward_backward(self, batch: PyTree) -> ForwardResult | None:
-        """
-        Executes the forward and backward passes for a single batch.
+        """Executes the forward and backward passes for a single batch.
 
         This method handles:
 
@@ -95,7 +90,6 @@ class TrainTaskOperator:
             Returns `None` if this rank is an intermediate pipeline stage that does
             not compute loss.
         """
-
         try:
             # Do forward and backward pass
             _run_pipeline(pipeline_state=self._pipeline_state, task=self._task, pipeline=self._pipeline, batch=batch)
@@ -113,8 +107,7 @@ class TrainTaskOperator:
 
 
 class InferenceTaskOperator:
-    """
-    Orchestrates the execution of the forward pass for a specific inference task.
+    """Orchestrates the execution of the forward pass for a specific inference task.
 
     It manages input
     construction, schedule execution, and state lifecycle management.
@@ -127,8 +120,7 @@ class InferenceTaskOperator:
         pipeline: PipelineScheduleInfo,
         pipeline_state: PipelineStateHandler,
     ):
-        """
-        Constructs the InferenceTaskOperator.
+        """Constructs the InferenceTaskOperator.
 
         Args:
             dist_context: The distributed context.
@@ -136,15 +128,13 @@ class InferenceTaskOperator:
             pipeline: Information about the pipeline schedule.
             pipeline_state: Handler for transient state storage during the step.
         """
-
         self._dist_context = dist_context
         self._task = task
         self._pipeline = pipeline
         self._pipeline_state = pipeline_state
 
     def forward(self, batch: PyTree) -> None:
-        """
-        Executes the forward pass for a single batch.
+        """Executes the forward pass for a single batch.
 
         This method handles:
 
@@ -155,7 +145,6 @@ class InferenceTaskOperator:
         Args:
             batch: The input batch data.
         """
-
         try:
             # Do forward pass
             _run_pipeline(pipeline_state=self._pipeline_state, task=self._task, pipeline=self._pipeline, batch=batch)

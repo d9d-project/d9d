@@ -34,7 +34,6 @@ def token_pooling_mask_from_attention_mask(
     Raises:
         ValueError: If the provided pooling type is not supported.
     """
-
     match pooling_type:
         case TokenPoolingType.first:
             mask = torch.zeros_like(attention_mask, dtype=torch.long)

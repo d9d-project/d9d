@@ -12,8 +12,7 @@ from d9d.module.block.moe.communications import ExpertCommunicationHandler
 
 
 class NoCommunicationHandler(ExpertCommunicationHandler):
-    """
-    Handles MoE routing within a single device or when no cross-device routing is needed.
+    """Handles MoE routing within a single device or when no cross-device routing is needed.
 
     This handler does not perform network operations. It only permutes elements
     mostly for local logical grouping or debugging.

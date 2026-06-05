@@ -11,8 +11,7 @@ from d9d.core.protocol import LRSchedulerProtocol
 
 @dataclasses.dataclass(kw_only=True)
 class InitializeLRSchedulerContext:
-    """
-    Context data required to initialize an LR scheduler.
+    """Context data required to initialize an LR scheduler.
 
     Attributes:
         dist_context: The distributed context.
@@ -27,14 +26,11 @@ class InitializeLRSchedulerContext:
 
 @typing.runtime_checkable
 class LRSchedulerProvider(Protocol):
-    """
-    Protocol for defining how Learning Rate schedulers are created.
-    """
+    """Protocol for defining how Learning Rate schedulers are created."""
 
     @abc.abstractmethod
     def __call__(self, context: InitializeLRSchedulerContext) -> LRSchedulerProtocol:
-        """
-        Initializes the LR scheduler for a specific model pipeline stage.
+        """Initializes the LR scheduler for a specific model pipeline stage.
 
         Args:
             context: Context for this operation.

@@ -1,6 +1,4 @@
-"""
-This package provides core components of the state mapping system.
-"""
+"""This package provides core components of the state mapping system."""
 
 from .abc import ModelStateMapper, StateGroup
 

@@ -8,8 +8,7 @@ from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddi
 
 
 class GroupedQueryAttention(nn.Module, ModuleLateInit):
-    """
-    Implements Grouped Query Attention (GQA) with RoPE and optional QK Normalization.
+    """Implements Grouped Query Attention (GQA) with RoPE and optional QK Normalization.
 
     This module performs the full attention mechanism pipeline:
     1.  Linear projection to Q, K, V.
@@ -33,8 +32,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         enable_output_gate: bool = False,
         qk_norm_zero_centered: bool = False,
     ) -> None:
-        """
-        Constructs the GroupedQueryAttention layer.
+        """Constructs the GroupedQueryAttention layer.
 
         Args:
             hidden_size: Hidden size.
@@ -49,7 +47,6 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             qk_norm_zero_centered: If True, utilizes zero-centered scaling weights for the optional Q and K
                 normalization layers.
         """
-
         super().__init__()
 
         self._head_dim = head_dim
@@ -105,8 +102,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         attention_mask: torch.Tensor | None,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        """
-        Computes the attention operation.
+        """Computes the attention operation.
 
         Args:
             hidden_states: Input tensor. Shape: `(batch, seq_len, hidden_size)`.
@@ -118,7 +114,6 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         Returns:
             The attention output tensor. Shape: `(batch, seq_len, hidden_size)`.
         """
-
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self._head_dim)
 
@@ -154,7 +149,6 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
 
     def reset_parameters(self) -> None:
         """Resets module parameters."""
-
         self.q_proj.reset_parameters()
         self.k_proj.reset_parameters()
         self.v_proj.reset_parameters()

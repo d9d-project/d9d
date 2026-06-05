@@ -96,8 +96,7 @@ def build_schedule(
     model_provider: Callable[[PipelineStageInfo], nn.Module],
     callback: PipelineLossFn | PipelineResultFn,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
-    """
-    Constructs the pipeline schedule and instantiates model stages.
+    """Constructs the pipeline schedule and instantiates model stages.
 
     This function coordinates the creation of the pipeline. If the context is
     distributed, it builds a parallel schedule (`PipelineScheduleExecutor`) by
@@ -118,7 +117,6 @@ def build_schedule(
         A tuple containing the schedule info (executor and metadata) and a list
         of local PyTorch modules created for this rank.
     """
-
     if dist_context.mesh_params.is_distributed:
         return _build_schedule_distributed(
             dist_context=dist_context,

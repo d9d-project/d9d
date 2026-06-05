@@ -3,8 +3,7 @@ from d9d.loop.config import BatchingConfig, PipeliningConfig
 
 
 class BatchMaths:
-    """
-    Calculates derived batching dimensions and iteration counts for distributed training loops.
+    """Calculates derived batching dimensions and iteration counts for distributed training loops.
 
     This class bridges the gap between global configuration (Global Batch Size) and
     local execution constraints (Microbatch Size, Data Parallel World Size).
@@ -16,8 +15,7 @@ class BatchMaths:
         config_batching: BatchingConfig,
         config_pipelining: PipeliningConfig | None,
     ):
-        """
-        Constructs the batch mathematics calculator.
+        """Constructs the batch mathematics calculator.
 
         Validates that the Global Batch Size is perfectly divisible by the
         effective parallel microbatch capacity (DP size * Microbatch size).
@@ -31,7 +29,6 @@ class BatchMaths:
             ValueError: If global batch size is not divisible by the product of
                 Data Parallel size and Microbatch size.
         """
-
         self._dist_context = dist_context
         self._config_batching = config_batching
         self._config_pipelining = config_pipelining
@@ -52,21 +49,16 @@ class BatchMaths:
 
     @property
     def global_batch_size(self) -> int:
-        """
-        Returns the global batch size across the world.
-        """
-
+        """Returns the global batch size across the world."""
         return self._config_batching.global_batch_size
 
     @property
     def num_microbatches_pipelining(self) -> int:
-        """
-        Returns the number of microbatches handled by the pipeline scheduler per step.
+        """Returns the number of microbatches handled by the pipeline scheduler per step.
 
         If pipeline parallelism is enabled, this is the total number of microbatches
         processed to form one global batch. If disabled, this returns 1.
         """
-
         if not self._dist_context.mesh_params.has_pipeline_parallel:
             return 1
 
@@ -74,14 +66,12 @@ class BatchMaths:
 
     @property
     def num_microbatches_gradient_accumulation(self) -> int:
-        """
-        Returns the number of gradient accumulation iterations for non-pipelined training.
+        """Returns the number of gradient accumulation iterations for non-pipelined training.
 
         If pipeline parallelism is enabled, this returns 1 (as accumulation is handled
         internally by the pipeline schedule). If disabled, this is the number of
         forward/backward passes the training loop must execute before an optimizer step.
         """
-
         if self._dist_context.mesh_params.has_pipeline_parallel:
             return 1
 
@@ -89,21 +79,17 @@ class BatchMaths:
 
     @property
     def data_loader_batch_size(self) -> int:
-        """
-        Returns the quantity of samples this local rank needs to fetch for one optimizer step.
+        """Returns the quantity of samples this local rank needs to fetch for one optimizer step.
 
         This is calculated as `microbatch_size * total_microbatches_per_step`.
         """
-
         return self._config_batching.microbatch_size * self.num_microbatches_pipelining
 
     @property
     def num_backward_calls(self) -> int:
-        """
-        Returns the total number of backward passes executed per optimizer step.
+        """Returns the total number of backward passes executed per optimizer step.
 
         This represents the total gradient accumulation factor, regardless of whether
         it is handled by a pipeline schedule or a simple loop.
         """
-
         return self.num_microbatches_pipelining * self.num_microbatches_gradient_accumulation

@@ -1,6 +1,7 @@
-"""
-Complex state mappers are built using composition. This package provides ModelStateMapper implementations that
-are composed of other mappers.
+"""ModelStateMapper implementations built via composition.
+
+Complex state mappers are built using composition. This package provides
+ModelStateMapper implementations that are composed of other mappers.
 """
 
 from .helper import filter_empty_mappers

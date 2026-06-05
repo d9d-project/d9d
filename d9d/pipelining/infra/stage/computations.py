@@ -20,51 +20,42 @@ from .struct_helper import DictFlattener
 
 @dataclasses.dataclass(slots=True)
 class ForwardCache:
-    """
-    Stores the inputs and outputs of a forward pass to be used later in the backward pass.
-    """
+    """Stores the inputs and outputs of a forward pass to be used later in the backward pass."""
 
     inputs: dict[str, torch.Tensor]
     outputs: dict[str, torch.Tensor]
 
 
 class ForwardComputeHandler:
-    """
-    Handles the execution of the forward pass for a pipeline stage module.
+    """Handles the execution of the forward pass for a pipeline stage module.
 
     Maintains a cache of inputs and outputs indexed by microbatch ID.
     """
 
     def __init__(self, stage_index: int, module: nn.Module):
-        """
-        Constructs a ForwardComputeHandler object.
+        """Constructs a ForwardComputeHandler object.
 
         Args:
             stage_index: Logical index of the stage.
             module: The PyTorch module representing this stage computation.
         """
-
         self._stage_idx = stage_index
         self._module = module
 
         self._cache: dict[int, ForwardCache] = {}
 
     def run(self, microbatch_index: int, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
-        """
-        Executes the module's forward pass.
+        """Executes the module's forward pass.
 
         Args:
             microbatch_index: Identifier for the current microbatch.
             inputs: Dictionary of input tensors.
             kwargs: Additional keyword arguments for the module.
 
-        Returns:
-            The output of the module.
-
         Raises:
             RuntimeError: If the forward pass implementation fails.
+            ValueError: If the module output is not a dictionary.
         """
-
         # Compute forward
         try:
             output = self._module(**inputs, **kwargs)
@@ -79,8 +70,7 @@ class ForwardComputeHandler:
         self._cache[microbatch_index] = ForwardCache(inputs=inputs, outputs=output)
 
     def get_outputs(self, microbatch_index: int) -> dict[str, torch.Tensor]:
-        """
-        Retrieves cached outputs for a specific microbatch without removing them.
+        """Retrieves cached outputs for a specific microbatch without removing them.
 
         Args:
             microbatch_index: Identifier for the microbatch.
@@ -88,12 +78,10 @@ class ForwardComputeHandler:
         Returns:
             Dictionary of output tensors.
         """
-
         return self._cache[microbatch_index].outputs
 
     def pop_inputs_outputs(self, microbatch_index: int) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
-        """
-        Retrieves and removes the cached inputs and outputs for a specific microbatch.
+        """Retrieves and removes the cached inputs and outputs for a specific microbatch.
 
         Typically called when initiating the backward pass.
 
@@ -103,16 +91,13 @@ class ForwardComputeHandler:
         Returns:
             A tuple containing (inputs, outputs).
         """
-
         cache = self._cache.pop(microbatch_index)
         return cache.inputs, cache.outputs
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class BackwardCacheInputForWeight:
-    """
-    State preserved after calculating input gradients, pending weight gradient calculation.
-    """
+    """State preserved after calculating input gradients, pending weight gradient calculation."""
 
     inputs_grad: dict[str, torch.Tensor]
     param_groups: list[ParamGroup]
@@ -128,30 +113,25 @@ class BackwardCacheInputForFull:
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class BackwardCacheFull:
-    """
-    State preserved after calculating weight gradients.
-    """
+    """State preserved after calculating weight gradients."""
 
     inputs_grad: dict[str, torch.Tensor | None]
 
 
 class BackwardComputeHandler:
-    """
-    Handles the execution of backward passes for a pipeline stage.
+    """Handles the execution of backward passes for a pipeline stage.
 
     Supports splitting the backward pass into input-gradients and weight-gradients
     phases, which is necessary for schedules like ZB.
     """
 
     def __init__(self, stage_index: int, module: nn.Module):
-        """
-        Constructs a BackwardComputeHandler object.
+        """Constructs a BackwardComputeHandler object.
 
         Args:
             stage_index: Logical index of the stage.
             module: The PyTorch module to compute gradients for.
         """
-
         self._stage_idx = stage_index
         self._module = module
 
@@ -167,16 +147,17 @@ class BackwardComputeHandler:
         outputs: dict[str, torch.Tensor],
         outputs_grad: dict[str, torch.Tensor] | None,
     ):
-        """
-        Performs a full backward pass (both inputs and weights).
+        """Performs a full backward pass (both inputs and weights).
 
         Args:
             microbatch_index: Identifier for the microbatch.
             inputs: The inputs used in the forward pass.
             outputs: The outputs produced by the forward pass.
             outputs_grad: Gradients of the loss with respect to the outputs.
-        """
 
+        Raises:
+            ValueError: If a double backward is attempted for the same microbatch.
+        """
         if microbatch_index in self._cache:
             raise ValueError(f"S{self._stage_idx}B{microbatch_index} double backward")
 
@@ -201,8 +182,7 @@ class BackwardComputeHandler:
         outputs: dict[str, torch.Tensor],
         outputs_grad: dict[str, torch.Tensor] | None,
     ):
-        """
-        Performs a partial backward pass to compute gradients with respect to inputs only.
+        """Performs a partial backward pass to compute gradients with respect to inputs only.
 
         This prepares the computation state for a subsequent `backward_weight` call.
 
@@ -211,8 +191,10 @@ class BackwardComputeHandler:
             inputs: The inputs used in the forward pass.
             outputs: The outputs produced by the forward pass.
             outputs_grad: Gradients of the loss with respect to the outputs.
-        """
 
+        Raises:
+            ValueError: If a double backward is attempted.
+        """
         if microbatch_index in self._cache:
             raise ValueError("Double backward pass")
 
@@ -240,15 +222,16 @@ class BackwardComputeHandler:
             )
 
     def backward_weight(self, microbatch_index: int):
-        """
-        Performs a partial backward pass to accumulate gradients into weights.
+        """Performs a partial backward pass to accumulate gradients into weights.
 
         Must be preceded by `backward_input` for the same microbatch index.
 
         Args:
             microbatch_index: Identifier for the microbatch.
-        """
 
+        Raises:
+            ValueError: If `backward_input` was not called before or if called twice.
+        """
         if microbatch_index not in self._cache:
             raise ValueError(f"S{self._stage_idx}BW{microbatch_index} - weight backward with no input backward before")
 
@@ -267,14 +250,16 @@ class BackwardComputeHandler:
                 raise ValueError("Previous backward was not input backward")
 
     def pop_for_sending(self, microbatch_index: int) -> dict[str, torch.Tensor]:
-        """
-        Retrieves the calculated input gradients for a microbatch.
+        """Retrieves the calculated input gradients for a microbatch.
 
         Args:
             microbatch_index: Identifier for the microbatch.
 
         Returns:
             Dictionary of gradient tensors.
+
+        Raises:
+            ValueError: If the required backward pass was not performed or if gradients are missing.
         """
         cached = self._cache[microbatch_index]
 

@@ -3,8 +3,7 @@ from enum import StrEnum
 
 
 class GradDirection(StrEnum):
-    """
-    Enum representing the specific gradient edges to compute.
+    """Enum representing the specific gradient edges to compute.
 
     This is used to manually control gradient flow in custom autograd functions
     during split backward passes.
@@ -19,8 +18,7 @@ class GradDirection(StrEnum):
 
 
 class GlobalGradContext:
-    """
-    Global state manager for controlling gradient computation in custom autograd functions.
+    """Global state manager for controlling gradient computation in custom autograd functions.
 
     This context addresses a limitation in PyTorch where custom `torch.autograd.Function`
     implementations set `ctx.needs_input_grad` to True for all edges requiring grad,
@@ -38,13 +36,11 @@ class GlobalGradContext:
 
     def __init__(self):
         """Constructs a GlobalGradContext object with all directions enabled by default."""
-
         # both directions by default
         self._enabled_directions: set[GradDirection] = {GradDirection.inputs, GradDirection.weight}
 
     def check_direction(self, direction: GradDirection | None) -> bool:
-        """
-        Checks if the gradient calculation for the given direction is currently enabled.
+        """Checks if the gradient calculation for the given direction is currently enabled.
 
         Args:
             direction: The direction to check (inputs or weights). If None,
@@ -53,7 +49,6 @@ class GlobalGradContext:
         Returns:
             True if the direction is enabled or None is passed, False otherwise.
         """
-
         if direction is None:
             return True
 
@@ -61,8 +56,7 @@ class GlobalGradContext:
 
     @contextmanager
     def with_directions(self, *directions: GradDirection):
-        """
-        Context manager that sets the enabled gradient directions.
+        """Context manager that sets the enabled gradient directions.
 
         This overrides the current state for the duration of the context
         and restores the previous state afterwards.

@@ -3,8 +3,7 @@ import sys
 
 
 def build_dist_logger(qualifier: str, level: int) -> logging.Logger:
-    """
-    Configures and returns a logger instance for d9d.
+    """Configures and returns a logger instance for d9d.
 
     The logger is configured to write to stdout with a formatter that includes
     the provided rank qualifier, allowing for easier debugging in distributed logs.
@@ -16,7 +15,6 @@ def build_dist_logger(qualifier: str, level: int) -> logging.Logger:
     Returns:
         A configured logging.Logger instance.
     """
-
     dist_logger = logging.getLogger("d9d")
     dist_logger.setLevel(level)
     dist_logger.handlers.clear()

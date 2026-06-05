@@ -1,5 +1,4 @@
-"""
-Horizontal parallelism strategies and utilities for d9d modules.
+"""Horizontal parallelism strategies and utilities for d9d modules.
 
 This package provides high-level helper functions to apply specific distributed
 parallelism strategies to PyTorch modules compatible with the d9d ecosystem.

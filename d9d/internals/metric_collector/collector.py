@@ -47,7 +47,6 @@ class AsyncMetricCollector:
         Raises:
             RuntimeError: If the collector has not been bound via .bind().
         """
-
         if self._stream is None:
             raise RuntimeError("AsyncMetricSynchronizer is not bound. Call .bind() first.")
 
@@ -73,7 +72,6 @@ class AsyncMetricCollector:
             RuntimeError: If the collector is not bound or if schedule_collection
                 was not called prior to this method.
         """
-
         if self._stream is None:
             raise RuntimeError("AsyncMetricSynchronizer is not bound. Call .bind() first.")
 

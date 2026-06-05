@@ -12,8 +12,7 @@ def _force_fsdp_grad_reduction_policy(module: FSDPModule):
 
 
 def parallelize_fsdp(module: nn.Module, mesh: DeviceMesh, *args: Any, **kwargs: Any):
-    """
-    Applies Fully Sharded Data Parallel (FSDP) with forced gradient summation.
+    """Applies Fully Sharded Data Parallel (FSDP) with forced gradient summation.
 
     This function wraps the provided module with PyTorch's ``fully_shard`` API using
     the specified device mesh. Unlike standard FSDP usage, this function explicitly
@@ -26,8 +25,11 @@ def parallelize_fsdp(module: nn.Module, mesh: DeviceMesh, *args: Any, **kwargs: 
         mesh: The device mesh over which to shard the module.
         *args: Additional positional arguments passed to ``fully_shard``.
         **kwargs: Additional keyword arguments passed to ``fully_shard``.
-    """
 
+    Raises:
+        ValueError: If the mesh does not have exactly one dimension.
+        RuntimeError: If the module was not converted to an FSDPModule.
+    """
     if mesh.ndim != 1:
         raise ValueError(
             "FSDP mesh should contain exactly one dimension - for HSDP, please apply parallelize_replicate(...) first!"

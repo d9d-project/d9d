@@ -9,13 +9,10 @@ from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddi
 
 
 class LowRankProjection(nn.Module):
-    """
-    Implements a low-rank linear projection with an intermediate normalization layer.
-    """
+    """Implements a low-rank linear projection with an intermediate normalization layer."""
 
     def __init__(self, in_features: int, bottleneck: int, out_features: int, norm_eps: float):
-        """
-        Constructs the LowRankProjection object.
+        """Constructs the LowRankProjection object.
 
         Args:
             in_features: Input dimensionality.
@@ -23,15 +20,13 @@ class LowRankProjection(nn.Module):
             out_features: Output dimensionality.
             norm_eps: Epsilon value for the intermediate RMSNorm layer.
         """
-
         super().__init__()
         self.down_proj = nn.Linear(in_features, bottleneck, bias=False)
         self.norm = RMSNorm(bottleneck, eps=norm_eps)
         self.up_proj = nn.Linear(bottleneck, out_features, bias=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Applies the low-rank projection to the inputs.
+        """Applies the low-rank projection to the inputs.
 
         Args:
             x: Input tensor.
@@ -39,20 +34,17 @@ class LowRankProjection(nn.Module):
         Returns:
             Projected output tensor.
         """
-
         return self.up_proj(self.norm(self.down_proj(x)))
 
     def reset_parameters(self):
         """Resets module parameters."""
-
         self.down_proj.reset_parameters()
         self.norm.reset_parameters()
         self.up_proj.reset_parameters()
 
 
 class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
-    """
-    Implements Multi-Head Latent Attention (MLA) from DeepSeek-V2.
+    """Implements Multi-Head Latent Attention (MLA) from DeepSeek-V2.
 
     This module performs the full attention mechanism pipeline:
 
@@ -79,8 +71,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         is_causal: bool,
         rope_style: RotaryEmbeddingStyle,
     ):
-        """
-        Constructs the MultiHeadLatentAttention layer.
+        """Constructs the MultiHeadLatentAttention layer.
 
         Args:
             hidden_size: Model hidden dimension.
@@ -93,6 +84,9 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
             qk_down_norm_eps: Epsilon for the RMSNorm applied to the KV and Q latent representations.
             is_causal: Whether to apply a causal mask (auto-regressive).
             rope_style: Rotary embedding layout style alignment.
+
+        Raises:
+            ValueError: If v_head_dim exceeds qk_head_dim.
         """
         super().__init__()
 
@@ -152,8 +146,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         attention_mask: torch.Tensor | None,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        """
-        Computes Multi-Head Latent Attention.
+        """Computes Multi-Head Latent Attention.
 
         Args:
             hidden_states: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.

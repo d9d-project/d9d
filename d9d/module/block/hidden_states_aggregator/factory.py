@@ -36,7 +36,6 @@ def create_hidden_states_aggregator(
         ValueError: If 'mean' mode is selected but 'agg_mask' is None, or if
             an unknown mode is provided.
     """
-
     match mode:
         case HiddenStatesAggregationMode.no:
             return HiddenStatesAggregatorNoOp()

@@ -8,8 +8,7 @@ from d9d.core.protocol import OptimizerProtocol
 
 
 class PipelinedOptimizer(OptimizerProtocol, Offloadable):
-    """
-    Wrapper that manages multiple optimizers for a pipeline parallel rank.
+    """Wrapper that manages multiple optimizers for a pipeline parallel rank.
 
     In a pipeline parallel setup, a single rank might host multiple stages, each having its own parameters
     and optimizer.
@@ -41,8 +40,7 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
             optimizer.zero_grad()
 
     def offload(self, ctx: OffloadContext) -> None:
-        """
-        Releases the GPU memory of the optimizer state, moving its tensors to host memory.
+        """Releases the GPU memory of the optimizer state, moving its tensors to host memory.
 
         Each tensor entry of "optimizer.state" has its local storage swapped in place to a host
         copy; the tensor objects (including DTensor wrappers) themselves are preserved, so the
@@ -54,7 +52,6 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
         Raises:
             RuntimeError: If the optimizer state is already offloaded.
         """
-
         if self._offload_mirror is not None:
             raise RuntimeError("PipelinedOptimizer is already offloaded.")
 
@@ -71,8 +68,7 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
         self._offload_mirror = mirror
 
     def onload(self, ctx: OnloadContext) -> None:
-        """
-        Restores GPU residency of the optimizer state released by "offload".
+        """Restores GPU residency of the optimizer state released by "offload".
 
         Args:
             ctx: Context for this operation.
@@ -80,7 +76,6 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
         Raises:
             RuntimeError: If the optimizer state is not offloaded.
         """
-
         if self._offload_mirror is None:
             raise RuntimeError("PipelinedOptimizer is not offloaded.")
 
@@ -98,5 +93,9 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
         self._offload_mirror = None
 
     def is_offloaded(self) -> bool:
-        """Reports whether the optimizer state is currently on host memory."""
+        """Reports whether the optimizer state is currently on host memory.
+
+        Returns:
+            True if the state is offloaded, False otherwise.
+        """
         return self._offload_mirror is not None

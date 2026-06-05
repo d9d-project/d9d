@@ -14,8 +14,7 @@ from .shared_expert import SharedExpertParameters, SharedSwiGLU
 
 
 class MoELayer(nn.Module, ModuleLateInit):
-    """
-    A complete Mixture-of-Experts (MoE) block comprising routing, communication, and computation.
+    """A complete Mixture-of-Experts (MoE) block comprising routing, communication, and computation.
 
     This layer integrates:
 
@@ -33,8 +32,7 @@ class MoELayer(nn.Module, ModuleLateInit):
         router_renormalize_probabilities: bool,
         shared_expert: SharedExpertParameters | None = None,
     ):
-        """
-         Constructs the MoELayer.
+        """Constructs the MoELayer.
 
         Args:
             hidden_dim: Hidden size.
@@ -44,7 +42,6 @@ class MoELayer(nn.Module, ModuleLateInit):
             router_renormalize_probabilities: Configures router probability normalization behavior.
             shared_expert: Optional configuration for a shared expert.
         """
-
         super().__init__()
         self.router = TopKRouter(
             dim=hidden_dim,
@@ -68,8 +65,7 @@ class MoELayer(nn.Module, ModuleLateInit):
         self.tokens_per_expert = nn.Buffer(torch.empty((num_grouped_experts,), dtype=torch.int64), persistent=False)
 
     def enable_distributed_communicator(self, group: ProcessGroup):
-        """
-        Switches from local no-op communication to distributed DeepEP communication.
+        """Switches from local no-op communication to distributed DeepEP communication.
 
         This should be called during model initialization if the model is running in a
         distributed Expert Parallel environment.
@@ -96,8 +92,7 @@ class MoELayer(nn.Module, ModuleLateInit):
         self.tokens_per_expert.zero_()
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        """
-        Routes tokens to experts, computes, and combines results.
+        """Routes tokens to experts, computes, and combines results.
 
         Args:
             hidden_states: Input tensor. Shape: `(batch_size, seq_len, hidden_dim)`.
@@ -105,7 +100,6 @@ class MoELayer(nn.Module, ModuleLateInit):
         Returns:
             Output tensor combined from experts. Shape: `(batch_size, seq_len, hidden_dim)`.
         """
-
         old_shape = hidden_states.shape
         hidden_states = hidden_states.reshape(-1, hidden_states.shape[-1])
 

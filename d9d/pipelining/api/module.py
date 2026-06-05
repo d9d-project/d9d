@@ -6,8 +6,7 @@ import torch
 
 @dataclasses.dataclass
 class PipelineStageInfo:
-    """
-    Holds information about the current position within the distributed pipeline.
+    """Holds information about the current position within the distributed pipeline.
 
     Attributes:
         current_stage: The 0-based index of the current pipeline stage.
@@ -19,32 +18,27 @@ class PipelineStageInfo:
 
     @property
     def is_current_stage_first(self) -> bool:
-        """
-        Determines if this is the first stage in the pipeline.
+        """Determines if this is the first stage in the pipeline.
 
         Returns:
             True if current_stage is 0.
         """
-
         return self.current_stage == 0
 
     @property
     def is_current_stage_last(self) -> bool:
-        """
-        Determines if this is the last stage in the pipeline.
+        """Determines if this is the last stage in the pipeline.
 
         Returns:
             True if current_stage is the last index.
         """
-
         return self.current_stage == self.num_stages - 1
 
 
 def distribute_layers_for_pipeline_stage(
     num_layers: int, num_virtual_layers_pre: int, num_virtual_layers_post: int, stage: PipelineStageInfo
 ) -> tuple[int, int]:
-    """
-    Calculates the layer index range for a specific pipeline stage.
+    """Calculates the layer index range for a specific pipeline stage.
 
     This function distributes a given number of layers across multiple pipeline
     stages as evenly as possible. It accounts for additional, non-layer
@@ -71,7 +65,6 @@ def distribute_layers_for_pipeline_stage(
         ValueError: If the pipeline configuration results in a stage having zero
             or negative layers assigned (pipeline too long for the model size).
     """
-
     num_layers_virtual = num_layers + num_virtual_layers_pre + num_virtual_layers_post
 
     base_layers_per_stage = num_layers_virtual // stage.num_stages
@@ -107,8 +100,7 @@ def distribute_layers_for_pipeline_stage(
 
 @typing.runtime_checkable
 class ModuleSupportsPipelining(typing.Protocol):
-    """
-    Protocol for modules that support pipeline parallelism metadata inference.
+    """Protocol for modules that support pipeline parallelism metadata inference.
 
     Classes implementing this protocol enable the framework to pre-calculate
     tensor shapes and types required for inter-stage communication (p2p)
@@ -118,8 +110,7 @@ class ModuleSupportsPipelining(typing.Protocol):
     def infer_stage_inputs_from_pipeline_inputs(
         self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
-        """
-        Infers the input tensors metadata for the current pipeline stage based on global batch inputs.
+        """Infers the input tensors metadata for the current pipeline stage based on global batch inputs.
 
         Args:
             inputs: Global inputs for the pipeline.
@@ -128,14 +119,12 @@ class ModuleSupportsPipelining(typing.Protocol):
         Returns:
             Dictionary of input tensors expected by this specific stage locally.
         """
-
         ...
 
     def infer_stage_outputs_from_pipeline_inputs(
         self, inputs: dict[str, torch.Tensor], n_microbatches: int
     ) -> dict[str, torch.Tensor]:
-        """
-        Infers the output tensors metadata for the current pipeline stage based on global batch inputs.
+        """Infers the output tensors metadata for the current pipeline stage based on global batch inputs.
 
         Args:
             inputs: Global inputs for the pipeline (typically a batch).
@@ -144,5 +133,4 @@ class ModuleSupportsPipelining(typing.Protocol):
         Returns:
             Dictionary of output tensors produced by this specific stage locally.
         """
-
         ...

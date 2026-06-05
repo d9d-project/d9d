@@ -5,8 +5,7 @@ from .curves import CurveBase
 
 @dataclasses.dataclass
 class SchedulePhase:
-    """
-    Data container representing a single phase in a piecewise schedule.
+    """Data container representing a single phase in a piecewise schedule.
 
     Attributes:
         start_step: The absolute step index where this phase begins.
@@ -24,13 +23,10 @@ class SchedulePhase:
 
 
 class PiecewiseScheduleEngine:
-    """
-    Runtime engine that calculates multipliers based on a list of defined phases.
-    """
+    """Runtime engine that calculates multipliers based on a list of defined phases."""
 
     def __init__(self, phases: list[SchedulePhase]):
-        """
-        Constructs the schedule engine.
+        """Constructs the schedule engine.
 
         Args:
             phases: A sequential list of schedule phases.
@@ -38,15 +34,13 @@ class PiecewiseScheduleEngine:
         Raises:
             ValueError: If the phases list is empty.
         """
-
         if len(phases) == 0:
             raise ValueError("Scheduler should contain at least one phase")
 
         self._phases = phases
 
     def get_factor(self, step: int) -> float:
-        """
-        Computes the learning rate multiplier for the given step.
+        """Computes the learning rate multiplier for the given step.
 
         Args:
             step: The global training step.
@@ -55,7 +49,6 @@ class PiecewiseScheduleEngine:
             The calculated multiplier. If the step is outside defined phases,
             it clamps to the nearest boundary value.
         """
-
         if step < 0:
             return self._phases[0].start_value
 

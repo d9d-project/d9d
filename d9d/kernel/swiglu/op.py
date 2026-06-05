@@ -52,8 +52,7 @@ def _silu_mul_kernel(
 
 
 def silu_mul_forward(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-    """
-    Computes the forward pass of silu(x)*y using Triton.
+    """Computes the forward pass of silu(x)*y using Triton.
 
     Args:
         x: Input tensor x.
@@ -65,7 +64,6 @@ def silu_mul_forward(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
     Raises:
         ValueError: If inputs x and y do not match in shape or device.
     """
-
     if x.shape != y.shape or x.device != y.device:
         raise ValueError("Inputs x and y must have the same shape, be on same device.")
 
@@ -137,8 +135,7 @@ def _silu_mul_backward_kernel(
 
 
 def silu_mul_backward(grad_output: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Computes the backward pass of silu(x)*y using Triton.
+    """Computes the backward pass of silu(x)*y using Triton.
 
     Args:
         grad_output: Gradient of the loss with respect to the output.
@@ -148,7 +145,6 @@ def silu_mul_backward(grad_output: torch.Tensor, x: torch.Tensor, y: torch.Tenso
     Returns:
         A tuple of (grad_x, grad_y).
     """
-
     if not grad_output.is_contiguous():
         grad_output = grad_output.contiguous()
     if not x.is_contiguous():

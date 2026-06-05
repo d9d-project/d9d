@@ -107,8 +107,7 @@ def adamw_stochastic_bf16_(  # noqa: C901
     step: int,
     generator: torch.Generator | None = None,
 ) -> None:
-    """
-    Performs a single in-place AdamW optimization step.
+    """Performs a single in-place AdamW optimization step.
 
     It is specifically designed for scenarios where parameters are stored in BFloat16.
 
@@ -136,7 +135,6 @@ def adamw_stochastic_bf16_(  # noqa: C901
             if input tensors are not contiguous (for those that require in-place modification),
             if the optimizer states (exp_avg, exp_avg_sq) have different dtypes.
     """
-
     # check shape equality
     if grads.shape != params.shape:
         raise ValueError("Shape mismatch between grads and params.")

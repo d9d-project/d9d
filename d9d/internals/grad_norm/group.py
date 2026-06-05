@@ -11,8 +11,7 @@ from torch.distributed.tensor import DTensor, Shard
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
 class GradNormGroup:
-    """
-    Defines a group of parameters that share the same distributed properties.
+    """Defines a group of parameters that share the same distributed properties.
 
     This grouping is used to batch gradient norm reductions efficiently. Parameters
     sharing the same device mesh shards can be reduced in a single communication collective.
@@ -60,8 +59,7 @@ def _group_sort_key(item: tuple[GradNormGroup, list[nn.Parameter]]) -> Any:
 
 
 def group_parameters_for_norm(parameters: Iterable[nn.Parameter]) -> ParametersForNorm:
-    """
-    Groups parameters based on their distributed tensor characteristics.
+    """Groups parameters based on their distributed tensor characteristics.
 
     Groups parameters by their sharding meshes, device, and gradient data type.
 
@@ -71,7 +69,6 @@ def group_parameters_for_norm(parameters: Iterable[nn.Parameter]) -> ParametersF
     Returns:
         A dictionary mapping synchronization groups to lists of parameters.
     """
-
     grouped_params: ParametersForNorm = defaultdict(list)
     for param in parameters:
         if not param.requires_grad:

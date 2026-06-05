@@ -99,8 +99,7 @@ def _clip_grad_with_norm_(parameter_groups: ParametersForNorm, max_norm: float, 
 def clip_grad_norm_distributed_(
     parameter_groups: ParametersForNorm, max_norm: float | None, norm_type: float, pp_mesh: DeviceMesh | None
 ) -> torch.Tensor:
-    """
-    Clips gradient norms in a fully distributed environment.
+    """Clips gradient norms in a fully distributed environment.
 
     This function calculates the global gradient norm across all dimensions of parallelism
     (Horizontal - DP/CP/TP/EP/..., and Pipeline) and scales the gradients in-place to ensure the norm
@@ -123,7 +122,6 @@ def clip_grad_norm_distributed_(
     Returns:
         The calculated global gradient norm.
     """
-
     with record_function("Gradient Clipping"):
         global_norm_pow = _get_global_norm_pow_pp(
             parameter_groups=parameter_groups, norm_type=norm_type, pp_mesh=pp_mesh

@@ -6,8 +6,7 @@ from d9d.module.base import ModuleLateInit
 
 
 class RMSNorm(nn.Module, ModuleLateInit):
-    """
-    Implements Root Mean Square (RMS) Normalization.
+    """Implements Root Mean Square (RMS) Normalization.
 
     This module normalizes the input tensor across its last dimension using the root mean square
     statistic, applying learnable scaling weights. It can optionally use zero-centered weights.
@@ -17,8 +16,7 @@ class RMSNorm(nn.Module, ModuleLateInit):
     """
 
     def __init__(self, hidden_size: int, eps: float = 1e-6, zero_centered: bool = False) -> None:
-        """
-        Constructs an RMSNorm object.
+        """Constructs an RMSNorm object.
 
         Args:
             hidden_size: The dimensionality of the hidden size to normalize.
@@ -33,8 +31,7 @@ class RMSNorm(nn.Module, ModuleLateInit):
         self.weight = nn.Parameter(torch.empty((hidden_size,)))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Applies RMS Normalization to the input tensor.
+        """Applies RMS Normalization to the input tensor.
 
         Args:
             x: Input tensor to be normalized. The normalization is applied over the last dimension.

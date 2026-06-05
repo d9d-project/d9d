@@ -42,8 +42,7 @@ def _flatten_pytree_for_metrics(tree: PyTree[float]) -> dict[str, float]:
 
 
 class JobLogger(Stateful):
-    """
-    Handles the logging of training metrics and loss values.
+    """Handles the logging of training metrics and loss values.
 
     This class coordinates with the distributed context and metric calculators
     to log instantaneous loss values and periodic aggregated metrics to the
@@ -59,8 +58,7 @@ class JobLogger(Stateful):
         run_config: RunConfig,
         additional_hparams: ScalarTree,
     ):
-        """
-        Constructs JobLogger object.
+        """Constructs JobLogger object.
 
         Args:
             dist_context: The distributed context.
@@ -70,7 +68,6 @@ class JobLogger(Stateful):
             run_config: Run configuration.
             additional_hparams: Supplemental hyperparameters to log for this run.
         """
-
         self._dist_context = dist_context
         self._config = config
         self._stepper = stepper
@@ -89,47 +86,40 @@ class JobLogger(Stateful):
 
     @contextmanager
     def new_run(self) -> Generator[BaseTrackerRun, None, None]:
-        """
-        Creates a context manager for a new experiment run.
+        """Creates a context manager for a new experiment run.
 
         Yields:
             The active tracker run interface.
         """
-
         with self._tracker.open(self._run_config) as run:
             yield run
 
     @contextmanager
     def install(self):
-        """
-        Prepares the metric collector resources (e.g., CUDA streams).
+        """Prepares the metric collector resources (e.g., CUDA streams).
 
         This context manager ensures async metrics are bound to the device before
         usage and unbound afterwards.
         """
-
         self._metric_collector.bind()
         yield
         self._metric_collector.unbind()
 
     def trigger_sync(self):
-        """
-        Conditionally initiates the synchronization of distributed metrics.
+        """Conditionally initiates the synchronization of distributed metrics.
 
         Checks if the current step is scheduled for metric logging. If so, it
         triggers the asynchronous communication required to aggregate metric values
         across ranks. This allows communication to overlap with other operations
         before `log` is called.
         """
-
         if not self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
             return
 
         self._metric_collector.schedule_collection(self._dist_context)
 
     def log(self, run: BaseTrackerRun, loss_value: torch.Tensor):
-        """
-        Logs the current loss and conditional metric results.
+        """Logs the current loss and conditional metric results.
 
         This method always logs the provided loss value. Periodically (determined
         by the stepper configuration), it retrieves the asynchronous results from
@@ -140,7 +130,6 @@ class JobLogger(Stateful):
             run: The active tracker run interface for sending data.
             loss_value: Tensor containing the scalar loss for the current step.
         """
-
         run.scalar("loss", loss_value.item())
 
         if not self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):

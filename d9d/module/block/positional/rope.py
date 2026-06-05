@@ -8,8 +8,7 @@ from d9d.module.block.positional.rope_scaling import NoRopeScaling, RopeScaling
 
 
 class RotaryEmbeddingStyle(StrEnum):
-    """
-    Supported Rotary Positional Embedding (RoPE) layout styles.
+    """Supported Rotary Positional Embedding (RoPE) layout styles.
 
     Attributes:
         HALF: Applies transformations by splitting the feature dimension into two halves.
@@ -29,8 +28,7 @@ def prepare_rotary_cos_sin_emb(
     style: RotaryEmbeddingStyle,
     rope_scaling: RopeScaling | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Precomputes rotary cosine and sine embeddings.
+    """Precomputes rotary cosine and sine embeddings.
 
     Args:
         rope_base: Base frequency for calculation.
@@ -45,8 +43,10 @@ def prepare_rotary_cos_sin_emb(
 
     Returns:
         A tuple containing cosine and sine tensors.
-    """
 
+    Raises:
+        ValueError: If an unknown RoPE style is provided.
+    """
     if rope_scaling is None:
         rope_scaling = NoRopeScaling()
 
@@ -84,8 +84,7 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
         style: RotaryEmbeddingStyle,
         rope_scaling: RopeScaling | None = None,
     ) -> None:
-        """
-        Constructs the RotaryEmbeddingProvider.
+        """Constructs the RotaryEmbeddingProvider.
 
         Args:
             rope_base: Base geometrical progression period for RoPE.
@@ -95,7 +94,6 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
             rope_scaling: Optional scaling configuration for extended context lengths.
                 When ``None`` (default), ``NoRopeScaling`` is used — no scaling applied.
         """
-
         super().__init__()
         self._rope_base = rope_base
         self._head_dim = head_dim
@@ -106,8 +104,7 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
         self.sin_emb = nn.Buffer(torch.empty(max_position_ids, head_dim), persistent=False)
 
     def forward(self, position_ids: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Retrieves cached cosine and sine embeddings for specific positions.
+        """Retrieves cached cosine and sine embeddings for specific positions.
 
         Args:
             position_ids: Tensor of position indices.
@@ -115,7 +112,6 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
         Returns:
             A tuple of (cos, sin) tensors aligned with the input positions.
         """
-
         return self.cos_emb[position_ids], self.sin_emb[position_ids]
 
     def reset_parameters(self) -> None:
@@ -135,14 +131,22 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
 
 
 def _rotate_half(x: torch.Tensor) -> torch.Tensor:
-    """Rotates half-chunked elements."""
+    """Rotates half-chunked elements.
+
+    Returns:
+        The rotated tensor.
+    """
     x1 = x[..., : x.shape[-1] // 2]
     x2 = x[..., x.shape[-1] // 2 :]
     return torch.cat((-x2, x1), dim=-1)
 
 
 def _rotate_every_two(x: torch.Tensor) -> torch.Tensor:
-    """Rotates interleaved complex pairs."""
+    """Rotates interleaved complex pairs.
+
+    Returns:
+        The rotated tensor.
+    """
     x_unflattened = x.view(*x.shape[:-1], -1, 2)
     x1 = x_unflattened[..., 0]
     x2 = x_unflattened[..., 1]
@@ -156,7 +160,14 @@ def _apply_rotary_pos_emb(
     sin: torch.Tensor,
     style: RotaryEmbeddingStyle,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Applies mathematically rotated positional sequences."""
+    """Applies mathematically rotated positional sequences.
+
+    Returns:
+        A tuple of rotated (q, k) tensors.
+
+    Raises:
+        ValueError: If an unknown RoPE style is provided.
+    """
     cos = cos.unsqueeze(2)
     sin = sin.unsqueeze(2)
 
@@ -177,13 +188,11 @@ class RotaryEmbeddingApplicator(nn.Module):
     """Applies Rotary Positional Embeddings (RoPE) to Q and K projections."""
 
     def __init__(self, style: RotaryEmbeddingStyle) -> None:
-        """
-        Constructs RotaryEmbeddingApplicator object.
+        """Constructs RotaryEmbeddingApplicator object.
 
         Args:
             style: Rotary embedding layout style alignment.
         """
-
         super().__init__()
         self._style = style
 
@@ -194,8 +203,7 @@ class RotaryEmbeddingApplicator(nn.Module):
         position_embedding_cos: torch.Tensor,
         position_embedding_sin: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """
-        Rotates query and key states using provided cosine and sine embeddings.
+        """Rotates query and key states using provided cosine and sine embeddings.
 
         Args:
             query_states: Query tensor. Shape: `(batch, n_heads, seq_len, head_dim)`.
@@ -208,7 +216,6 @@ class RotaryEmbeddingApplicator(nn.Module):
         Returns:
             A tuple containing the rotated query and key tensors.
         """
-
         query_states, key_states = _apply_rotary_pos_emb(
             query_states, key_states, position_embedding_cos, position_embedding_sin, style=self._style
         )

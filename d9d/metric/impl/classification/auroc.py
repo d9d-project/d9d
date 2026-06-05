@@ -88,7 +88,6 @@ class BinaryAUROCMetric(Metric[torch.Tensor]):
         Raises:
             ValueError: If `probs` or `labels` have different number of elements.
         """
-
         probs = probs.reshape(-1)
         labels = labels.reshape(-1)
 

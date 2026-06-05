@@ -24,8 +24,7 @@ def _build_token_start_end_indices(
 
 
 class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
-    """
-    A token embedding layer composed of multiple named, independent embedding tables.
+    """A token embedding layer composed of multiple named, independent embedding tables.
 
     This class maintains a dictionary of embedding layers, mapping contiguous
     ranges of global vocabulary indices to specific named splits (e.g., 'orig',
@@ -34,8 +33,7 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
     """
 
     def __init__(self, split_vocab_size: dict[str, int], split_order: Sequence[str], hidden_size: int):
-        """
-        Constructs the SplitTokenEmbeddings object.
+        """Constructs the SplitTokenEmbeddings object.
 
         Args:
             split_vocab_size: A dictionary mapping split names to their vocabulary sizes.
@@ -44,7 +42,6 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
                 split_vocab_size.
             hidden_size: The dimensionality of the embedding vectors.
         """
-
         super().__init__()
 
         token_embedding = nn.ModuleDict(
@@ -57,16 +54,17 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
         self._split_order = split_order
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """
-        Retrieves embeddings for the input indices by routing them to appropriate internal layers.
+        """Retrieves embeddings for the input indices by routing them to appropriate internal layers.
 
         Args:
             input_ids: Tensor of arbitrary shape containing global vocabulary indices.
 
         Returns:
             Tensor of same shape as input_ids plus a last dimension of hidden_size.
-        """
 
+        Raises:
+            ValueError: If no splits were configured.
+        """
         output_embeds: torch.Tensor | None = None
 
         for split_name in self._split_order:
@@ -89,9 +87,6 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
         return output_embeds
 
     def reset_parameters(self):
-        """
-        Resets parameters for all registered embedding splits.
-        """
-
+        """Resets parameters for all registered embedding splits."""
         for layer in self.token_embedding.values():
             layer.reset_parameters()

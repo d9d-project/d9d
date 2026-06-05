@@ -10,8 +10,7 @@ from d9d.model_state.mapper import ModelStateMapper
 
 @dataclasses.dataclass(slots=True)
 class PeftInjectionResult:
-    """
-    Encapsulates the result of injecting a PEFT method into a model.
+    """Encapsulates the result of injecting a PEFT method into a model.
 
     Attributes:
         parameters_to_train: A list of parameters that should remain trainable.
@@ -26,14 +25,11 @@ TConfig = TypeVar("TConfig", bound=BaseModel)
 
 
 class PeftMethod(abc.ABC, Generic[TConfig]):
-    """
-    Abstract base class for all Parameter-Efficient Fine-Tuning methods.
-    """
+    """Abstract base class for all Parameter-Efficient Fine-Tuning methods."""
 
     @abc.abstractmethod
     def inject(self, module: nn.Module) -> PeftInjectionResult:
-        """
-        Modifies the module in-place to apply the PEFT strategy.
+        """Modifies the module in-place to apply the PEFT strategy.
 
         Args:
             module: The PyTorch module to modify.
@@ -45,20 +41,17 @@ class PeftMethod(abc.ABC, Generic[TConfig]):
 
     @abc.abstractmethod
     def merge(self, module: nn.Module):
-        """
-        Merges the trained adapters back into the base model parameters.
+        """Merges the trained adapters back into the base model parameters.
 
         Args:
             module: The PyTorch module to update.
         """
-
         ...
 
     @classmethod
     @abc.abstractmethod
     def from_config(cls, config: TConfig) -> Self:
-        """
-        Creates an instance of the method from a configuration object.
+        """Creates an instance of the method from a configuration object.
 
         Args:
             config: The configuration object.
@@ -66,5 +59,4 @@ class PeftMethod(abc.ABC, Generic[TConfig]):
         Returns:
             An instance of the PeftMethod.
         """
-
         ...

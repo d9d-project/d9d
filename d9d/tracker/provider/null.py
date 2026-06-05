@@ -9,8 +9,7 @@ from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig
 
 
 class NullTrackerConfig(BaseModel):
-    """
-    Configuration for the Null (no-op) tracker.
+    """Configuration for the Null (no-op) tracker.
 
     Attributes:
         provider: Discriminator field, must be 'null'.
@@ -20,8 +19,7 @@ class NullTrackerConfig(BaseModel):
 
 
 class NullRun(BaseTrackerRun):
-    """
-    No-op implementation of a tracking run.
+    """No-op implementation of a tracking run.
 
     Discard all inputs; useful for testing or when tracking is disabled.
     """
@@ -40,8 +38,7 @@ class NullRun(BaseTrackerRun):
 
 
 class NullTracker(BaseTracker[NullTrackerConfig]):
-    """
-    No-op tracker factory.
+    """No-op tracker factory.
 
     Does not modify state or perform any IO.
     """

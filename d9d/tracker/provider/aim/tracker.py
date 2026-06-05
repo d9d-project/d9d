@@ -11,16 +11,13 @@ from .config import AimConfig
 
 
 class AimState(TypedDict):
-    """
-    State dictionary format for persisting Aim tracker state.
-    """
+    """State dictionary format for persisting Aim tracker state."""
 
     restart_hash: str | None
 
 
 class AimRun(BaseTrackerRun):
-    """
-    Active run implementation for Aim.
+    """Active run implementation for Aim.
 
     Wraps the underlying `aim.Run` object to adhere to the d9d BaseTrackerRun interface.
     """
@@ -59,8 +56,7 @@ class AimRun(BaseTrackerRun):
 
 
 class AimTracker(BaseTracker[AimConfig]):
-    """
-    Aim-based tracker implementation.
+    """Aim-based tracker implementation.
 
     Caches the run hash to allow experiment resumption from checkpoints.
     """

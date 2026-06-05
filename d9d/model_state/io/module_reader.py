@@ -46,8 +46,7 @@ def load_model_state(
     show_progress: bool = True,
     position: int | None = None,
 ):
-    """
-    High-level utility to stream a checkpoint directly into a PyTorch module.
+    """High-level utility to stream a checkpoint directly into a PyTorch module.
 
     This function orchestrates the full loading lifecycle:
 
@@ -72,7 +71,6 @@ def load_model_state(
         position: Row index for the tqdm bar. Pass the process local rank to stack one bar
             per rank without interleaving. ``None`` lets tqdm use its default (single bar).
     """
-
     for state_name, state_value in read_model_state(
         src_dir=src_dir,
         mapper=_augment_mapper_for_injection(model, mapper),

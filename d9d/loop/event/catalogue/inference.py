@@ -12,16 +12,12 @@ from .common import (
 
 @dataclasses.dataclass(kw_only=True)
 class EventInferenceReadyContext:
-    """
-    Context provided when inference is fully ready to begin and the checkpoint is loaded.
-    """
+    """Context provided when inference is fully ready to begin and the checkpoint is loaded."""
 
 
 @dataclasses.dataclass(kw_only=True)
 class EventInferenceFinishedContext:
-    """
-    Context provided when the entire inference loop has completed successfully.
-    """
+    """Context provided when the entire inference loop has completed successfully."""
 
 
 # Configuration Events

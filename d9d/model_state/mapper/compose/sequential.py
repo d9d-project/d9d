@@ -10,8 +10,7 @@ from d9d.model_state.mapper.leaf.single_tensor import ModelStateMapperIdentity
 
 
 class ModelStateMapperSequential(ModelStateMapper):
-    """
-    Executes a list of mappers in a specific sequence (pipeline).
+    """Executes a list of mappers in a specific sequence (pipeline).
 
     This class manages the data flow from one mapper to the next. It abstracts
     away intermediate states, exposing only the inputs required by the first

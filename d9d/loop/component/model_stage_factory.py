@@ -23,18 +23,25 @@ StatefulPredicate = Callable[[str, torch.Tensor], bool]
 
 
 def _stateful_predicate_requires_grad(key: str, value: torch.Tensor) -> bool:
-    """Predicate that allows saving only tensors that require gradients."""
+    """Predicate that allows saving only tensors that require gradients.
+
+    Returns:
+        True if the tensor requires gradients, False otherwise.
+    """
     return value.requires_grad
 
 
 def _stateful_predicate_always(key: str, value: torch.Tensor) -> bool:
-    """Predicate that always allows saving."""
+    """Predicate that always allows saving.
+
+    Returns:
+        Always returns True.
+    """
     return True
 
 
 class TrackedModules(Stateful, Offloadable):
-    """
-    Wraps a list of model stages and manages their state for distributed checkpointing.
+    """Wraps a list of model stages and manages their state for distributed checkpointing.
 
     This class implements the PyTorch Distributed `Stateful` protocol, aggregating
     the state dictionaries of multiple pipeline stages assigned to the current rank.
@@ -45,7 +52,6 @@ class TrackedModules(Stateful, Offloadable):
         self, dist_context: DistributedContext, modules: list[nn.Module], stateful_predicate: StatefulPredicate
     ):
         """Constructs a TrackedModules object."""
-
         if dist_context.mesh_params.is_distributed:
             self._pp_rank = dist_context.mesh_for(REGULAR_DOMAIN)["pp"].get_local_rank()
         else:
@@ -62,14 +68,17 @@ class TrackedModules(Stateful, Offloadable):
         return self._modules
 
     def _tensors(self) -> Iterator[torch.Tensor]:
-        """Yields every parameter and buffer (persistent and non-persistent) of all tracked modules."""
+        """Yields every parameter and buffer (persistent and non-persistent) of all tracked modules.
+
+        Returns:
+            An iterator over all tensors in the tracked modules.
+        """
         return itertools.chain.from_iterable(
             itertools.chain(module.parameters(), module.buffers()) for module in self._modules
         )
 
     def offload(self, ctx: OffloadContext) -> None:
-        """
-        Releases the GPU memory of all model parameters and buffers, moving them to host memory.
+        """Releases the GPU memory of all model parameters and buffers, moving them to host memory.
 
         Each tensor's local storage is swapped in place for a host copy. The parameter/buffer
         objects themselves - including DTensor wrappers - are preserved, so optimizer state keys,
@@ -82,7 +91,6 @@ class TrackedModules(Stateful, Offloadable):
         Raises:
             RuntimeError: If the modules are already offloaded.
         """
-
         if self._offload_mirror is not None:
             raise RuntimeError("TrackedModules is already offloaded.")
 
@@ -95,8 +103,7 @@ class TrackedModules(Stateful, Offloadable):
         self._offload_mirror = mirror
 
     def onload(self, ctx: OnloadContext) -> None:
-        """
-        Restores GPU residency of all model parameters and buffers released by "offload".
+        """Restores GPU residency of all model parameters and buffers released by "offload".
 
         Args:
             ctx: Context for this operation.
@@ -104,7 +111,6 @@ class TrackedModules(Stateful, Offloadable):
         Raises:
             RuntimeError: If the modules are not offloaded.
         """
-
         if self._offload_mirror is None:
             raise RuntimeError("TrackedModules is not offloaded.")
 
@@ -117,7 +123,11 @@ class TrackedModules(Stateful, Offloadable):
         self._offload_mirror = None
 
     def is_offloaded(self) -> bool:
-        """Reports whether the model parameters and buffers are currently on host memory."""
+        """Reports whether the model parameters and buffers are currently on host memory.
+
+        Returns:
+            True if the model is offloaded, False otherwise.
+        """
         return self._offload_mirror is not None
 
     def _whitelisted_params(self, module: nn.Module) -> set[str]:
@@ -133,8 +143,7 @@ class TrackedModules(Stateful, Offloadable):
         return result
 
     def state_dict(self) -> dict[str, Any]:
-        """
-        Generates the state dictionary for all tracked modules.
+        """Generates the state dictionary for all tracked modules.
 
         The keys are namespaced using the current pipeline rank and stage index
         (e.g., `pp_0_stage_0`). Only parameters satisfying the `stateful_predicate`
@@ -143,7 +152,6 @@ class TrackedModules(Stateful, Offloadable):
         Returns:
             A dictionary containing the states of all managed modules.
         """
-
         ret = {
             f"pp_{self._pp_rank}_stage_{i}": self._state_dict_stage(module) for i, module in enumerate(self._modules)
         }
@@ -162,8 +170,7 @@ class TrackedModules(Stateful, Offloadable):
             raise ValueError(f"Extra keys: {extra_keys}")
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        """
-        Loads the state dictionary into the tracked modules.
+        """Loads the state dictionary into the tracked modules.
 
         Args:
             state_dict: The state dictionary to load. Must contain keys corresponding
@@ -173,14 +180,12 @@ class TrackedModules(Stateful, Offloadable):
             ValueError: If required keys are missing or unexpected keys are present
                 based on the allow-list predicate.
         """
-
         for i, module in enumerate(self._modules):
             self._load_state_dict_stage(module, state_dict[f"pp_{self._pp_rank}_stage_{i}"])
 
 
 class ModelStageFactory:
-    """
-    Factory class responsible for creating, initializing, and parallelizing model stages.
+    """Factory class responsible for creating, initializing, and parallelizing model stages.
 
     This class coordinates the `ModelProvider` with the distributed context to:
 
@@ -200,7 +205,6 @@ class ModelStageFactory:
         pipeline_callback: PipelineOutputsProcessor,
     ):
         """Constructs a ModelStageFactory object."""
-
         self._model_provider = model_provider
         self._dist_context = dist_context
         self._config_model = config_model
@@ -251,14 +255,12 @@ class ModelStageFactory:
         return model
 
     def build_pipeline_and_modules(self) -> tuple[PipelineScheduleInfo, TrackedModules]:
-        """
-        Constructs the execution schedule and the model container.
+        """Constructs the execution schedule and the model container.
 
         Returns:
            The pipeline schedule information.
            The `TrackedModules` instance wrapping the created model stage(s).
         """
-
         if self._config_model.checkpoint_only_trainable_parameters:
             stateful_predicate = _stateful_predicate_requires_grad
         else:

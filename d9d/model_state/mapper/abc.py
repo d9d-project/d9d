@@ -6,8 +6,7 @@ import torch
 
 @dataclasses.dataclass(frozen=True)
 class StateGroup:
-    """
-    Represents an atomic unit of dependency in the model state transformation graph.
+    """Represents an atomic unit of dependency in the model state transformation graph.
 
     A `StateGroup` defines a strict contract between a set of input keys (source)
     and a set of output keys (destination).
@@ -22,8 +21,7 @@ class StateGroup:
 
 
 class ModelStateMapper(abc.ABC):
-    """
-    The abstract base class for all model state transformation operations.
+    """The abstract base class for all model state transformation operations.
 
     This class serves as the interface between the definition of a transformation
     topology and the actual execution of tensor operations.
@@ -39,8 +37,7 @@ class ModelStateMapper(abc.ABC):
 
     @abc.abstractmethod
     def state_dependency_groups(self) -> frozenset[StateGroup]:
-        """
-        Calculates and returns the set of independent dependency groups this mapper handles.
+        """Calculates and returns the set of independent dependency groups this mapper handles.
 
         Returns:
             A frozenset of `StateGroup` objects. Each group
@@ -52,8 +49,7 @@ class ModelStateMapper(abc.ABC):
 
     @abc.abstractmethod
     def apply(self, group: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
-        """
-        Executes the transformation logic on a specific dictionary of tensors.
+        """Executes the transformation logic on a specific dictionary of tensors.
 
         The orchestration system guarantees that the `group` dictionary passed here contains
         all keys listed in the `inputs` of the active `StateGroup`.

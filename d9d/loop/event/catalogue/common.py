@@ -12,8 +12,7 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass(kw_only=True)
 class EventStepContext:
-    """
-    Context providing step information during iterative execution.
+    """Context providing step information during iterative execution.
 
     Attributes:
         stepper: Object responsible for tracking current step and total steps.
@@ -24,8 +23,7 @@ class EventStepContext:
 
 @dataclasses.dataclass(kw_only=True)
 class EventConfigurationStartedContext:
-    """
-    Context provided when the loop configuration process originates.
+    """Context provided when the loop configuration process originates.
 
     Attributes:
         dist_context: The initialized distributed execution context.
@@ -36,8 +34,7 @@ class EventConfigurationStartedContext:
 
 @dataclasses.dataclass(kw_only=True)
 class EventDataLoaderReadyContext:
-    """
-    Context provided when the data loader has been fully initialized.
+    """Context provided when the data loader has been fully initialized.
 
     Attributes:
         data_loader: The data loader instance.
@@ -48,8 +45,7 @@ class EventDataLoaderReadyContext:
 
 @dataclasses.dataclass(kw_only=True)
 class EventModelStagesReadyContext:
-    """
-    Context provided when the model stages are initialized and parallelized.
+    """Context provided when the model stages are initialized and parallelized.
 
     Attributes:
         modules: The references to the model stages.

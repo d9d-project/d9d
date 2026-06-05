@@ -23,8 +23,7 @@ def _get_history(factory: SchedulerFactory, num_steps: int, init_lr: float) -> l
 
 
 def visualize_lr_scheduler(factory: SchedulerFactory, num_steps: int, init_lr: float = 1.0):
-    """
-    Visualizes the learning rate schedule using Plotly.
+    """Visualizes the learning rate schedule using Plotly.
 
     This function simulates the training process for `num_steps` to record the LR changes
     and generates an interactive plot.
@@ -37,7 +36,6 @@ def visualize_lr_scheduler(factory: SchedulerFactory, num_steps: int, init_lr: f
     Raises:
         ImportError: If the `plotly` library is not installed.
     """
-
     try:
         import plotly.graph_objects as go  # noqa: PLC0415
     except ImportError as e:

@@ -8,23 +8,20 @@ from .grouped_linear import GroupedLinear
 
 
 class GroupedSwiGLU(nn.Module, ModuleLateInit):
-    """
-    Executes a collection of SwiGLU experts efficiently using Grouped GEMM.
+    """Executes a collection of SwiGLU experts efficiently using Grouped GEMM.
 
     This module implements the architectural pattern: `down_proj(SiLU(gate_proj(x)) * up_proj(x))`.
     It applies this operation across multiple discrete experts in parallel without padding or masking.
     """
 
     def __init__(self, hidden_dim: int, intermediate_dim: int, num_experts: int):
-        """
-        Constructs the GroupedSwiGLU module.
+        """Constructs the GroupedSwiGLU module.
 
         Args:
             hidden_dim: Dimensionality of the input and output hidden states.
             intermediate_dim: Dimensionality of the intermediate projection.
             num_experts: Total number of experts managed by this local instance.
         """
-
         super().__init__()
         self._num_experts = num_experts
 
@@ -38,8 +35,7 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
         permuted_probs: torch.Tensor,
         tokens_per_expert: torch.Tensor,
     ) -> torch.Tensor:
-        """
-        Computes expert outputs for sorted input tokens.
+        """Computes expert outputs for sorted input tokens.
 
         Args:
             permuted_x: Input tokens sorted by their assigned expert.
@@ -53,7 +49,6 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
             The computed and weighted output tokens (still permuted).
             Shape: `(total_tokens, hidden_dim)`.
         """
-
         if permuted_x.numel() == 0:  # handle cases when there are no routed experts to this instance
             return permuted_x
 
@@ -67,7 +62,6 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
 
     def reset_parameters(self):
         """Resets parameters for all internal linear projections."""
-
         self.gate_proj.reset_parameters()
         self.up_proj.reset_parameters()
         self.down_proj.reset_parameters()

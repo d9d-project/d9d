@@ -11,9 +11,7 @@ from d9d.model_state.mapper import ModelStateMapper
 
 
 class _StateLoadingFlow:
-    """
-    Internal orchestration logic for loading and transforming model states in a streamed manner.
-    """
+    """Internal orchestration logic for loading and transforming model states in a streamed manner."""
 
     def __init__(
         self, src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool, position: int | None = None
@@ -94,8 +92,7 @@ class _StateLoadingFlow:
 def read_model_state(
     src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool = True, position: int | None = None
 ) -> Iterable[tuple[str, torch.Tensor]]:
-    """
-    Reads a model checkpoint from disk, transforming it on-the-fly according to the state mapper.
+    """Reads a model checkpoint from disk, transforming it on-the-fly according to the state mapper.
 
     This function uses a streaming approach. It analyzes the mapper to determine which files
     need to be loaded. Tensors are loaded into memory only when needed and evicted immediately
@@ -112,7 +109,6 @@ def read_model_state(
     Yields:
         A tuple containing the transformed parameter name and its tensor value.
     """
-
     yield from _StateLoadingFlow(
         src_dir=src_dir, device=device, mapper=mapper, show_progress=show_progress, position=position
     ).load()

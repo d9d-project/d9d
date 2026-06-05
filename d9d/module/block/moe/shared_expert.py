@@ -7,8 +7,7 @@ from d9d.module.block.ffn import SwiGLU
 
 
 class SharedExpertParameters(BaseModel):
-    """
-    Configuration parameters for a shared expert.
+    """Configuration parameters for a shared expert.
 
     Attributes:
         intermediate_size: Dimensionality of the intermediate projection.
@@ -20,8 +19,7 @@ class SharedExpertParameters(BaseModel):
 
 
 class SharedSwiGLU(nn.Module, ModuleLateInit):
-    """
-    A shared expert module using the SwiGLU activation function with an optional gating mechanism.
+    """A shared expert module using the SwiGLU activation function with an optional gating mechanism.
 
     Attributes:
         expert: The underlying SwiGLU computation module.
@@ -29,14 +27,12 @@ class SharedSwiGLU(nn.Module, ModuleLateInit):
     """
 
     def __init__(self, hidden_size: int, params: SharedExpertParameters):
-        """
-        Constructs the SharedSwiGLU object.
+        """Constructs the SharedSwiGLU object.
 
         Args:
             hidden_size: Dimensionality of the hidden state.
             params: Configuration parameters for the shared expert.
         """
-
         super().__init__()
         self.expert = SwiGLU(hidden_size=hidden_size, intermediate_size=params.intermediate_size)
 
@@ -46,8 +42,7 @@ class SharedSwiGLU(nn.Module, ModuleLateInit):
             self.gate = None
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        """
-        Applies the shared expert computation to the input.
+        """Applies the shared expert computation to the input.
 
         Args:
             hidden_states: Input tensor to process.
@@ -55,7 +50,6 @@ class SharedSwiGLU(nn.Module, ModuleLateInit):
         Returns:
             Output tensor after applying the expert and optional gating.
         """
-
         x = self.expert(hidden_states)
 
         if self.gate is not None:
@@ -64,10 +58,7 @@ class SharedSwiGLU(nn.Module, ModuleLateInit):
         return x
 
     def reset_parameters(self):
-        """
-        Resets module parameters.
-        """
-
+        """Resets module parameters."""
         self.expert.reset_parameters()
 
         if self.gate is not None:

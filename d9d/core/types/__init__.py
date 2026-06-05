@@ -1,6 +1,4 @@
-"""
-Common type definitions used throughout the framework.
-"""
+"""Common type definitions used throughout the framework."""
 
 from .data import CollateFn
 from .pytree import PyTree, ScalarTree, TensorTree

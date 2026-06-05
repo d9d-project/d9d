@@ -15,9 +15,7 @@ from .batch_maths import BatchMaths
 
 
 class DataLoaderKwargs(TypedDict, total=False):
-    """
-    Type definition for arguments accepted by the PyTorch DataLoader.
-    """
+    """Type definition for arguments accepted by the PyTorch DataLoader."""
 
     batch_size: int | None
     shuffle: bool | None
@@ -41,8 +39,7 @@ def _move_to_device(data: PyTree, device: torch.types.Device) -> PyTree:
 
 
 class IteratorBatchGroup(Iterator):
-    """
-    An iterator that groups items from a base iterator into sub-streams.
+    """An iterator that groups items from a base iterator into sub-streams.
 
     This class is utilized for gradient accumulation where
         a single optimizer step consumes multiple micro-batches (the group).
@@ -51,15 +48,13 @@ class IteratorBatchGroup(Iterator):
     """
 
     def __init__(self, base: Iterator, device: torch.types.Device, batch_group_size: int):
-        """
-        Constructs an IteratorBatchGroup object.
+        """Constructs an IteratorBatchGroup object.
 
         Args:
             base: The underlying data iterator (usually from a DataLoader).
             device: The target device to move tensors to.
             batch_group_size: The number of micro-batches to yield within one group.
         """
-
         self._base = base
         self._device = device
 
@@ -68,8 +63,7 @@ class IteratorBatchGroup(Iterator):
         self._is_end = False
 
     def __next__(self) -> PyTree:
-        """
-        Advances the iterator.
+        """Advances the iterator.
 
         Returns:
             A generator that yields `batch_group_size` items (micro-batches),
@@ -78,7 +72,6 @@ class IteratorBatchGroup(Iterator):
         Raises:
             StopIteration: If the underlying iterator is exhausted.
         """
-
         if self._is_end:
             raise StopIteration()
 
@@ -103,13 +96,11 @@ class IteratorBatchGroup(Iterator):
 
     def __iter__(self) -> Self:
         """Returns self."""
-
         return self
 
 
 class StatefulDataLoaderDataParallelAware(StatefulDataLoader):
-    """
-    A stateful data loader that is aware of data parallel ranks.
+    """A stateful data loader that is aware of data parallel ranks.
 
     This loader extends the standard torchdata StatefulDataLoader to ensure
     that checkpoints are saved with rank-specific keys.
@@ -126,8 +117,7 @@ class StatefulDataLoaderDataParallelAware(StatefulDataLoader):
         group_size: int,
         **kwargs: Unpack[DataLoaderKwargs],
     ):
-        """
-        Constructs a StatefulDataLoaderDataParallelAware object.
+        """Constructs a StatefulDataLoaderDataParallelAware object.
 
         Args:
             dataset: The dataset to load from.
@@ -136,7 +126,6 @@ class StatefulDataLoaderDataParallelAware(StatefulDataLoader):
             group_size: The number of batches to group together (e.g., for gradient accumulation).
             **kwargs: Standard arguments passed to the parent DataLoader.
         """
-
         super().__init__(dataset, **kwargs)
         self._dp_rank = dp_rank
         self._device = device
@@ -153,8 +142,7 @@ class StatefulDataLoaderDataParallelAware(StatefulDataLoader):
 
 
 class DataLoaderFactory:
-    """
-    Factory class for creating configured DataLoaders.
+    """Factory class for creating configured DataLoaders.
 
     This class centralizes the creation logic for training and inference
     data loaders, applying configurations.
@@ -167,8 +155,7 @@ class DataLoaderFactory:
         config_data_loading: DataLoadingConfig,
         batch_maths: BatchMaths,
     ):
-        """
-        Constructs a DataLoaderFactory object.
+        """Constructs a DataLoaderFactory object.
 
         Args:
             dist_context: The distributed context containing mesh and rank information.
@@ -176,7 +163,6 @@ class DataLoaderFactory:
             config_data_loading: Specific configuration for data loading.
             batch_maths: BatchMaths object.
         """
-
         self._dist_context = dist_context
         self._provider = provider
 
@@ -208,8 +194,7 @@ class DataLoaderFactory:
         )
 
     def build_dataloader_for_train_job(self) -> StatefulDataLoader:
-        """
-        Builds and returns a StatefulDataLoader configured for training.
+        """Builds and returns a StatefulDataLoader configured for training.
 
         This loader is configured to drop the last incomplete batch and group
         batches according to the gradient accumulation settings defined in
@@ -218,7 +203,6 @@ class DataLoaderFactory:
         Returns:
             A configured StatefulDataLoader instance.
         """
-
         return self._build_dataloader(
             self._provider,
             batch_size=self._batch_maths.data_loader_batch_size,
@@ -227,8 +211,7 @@ class DataLoaderFactory:
         )
 
     def build_dataloader_for_infer_job(self) -> StatefulDataLoader:
-        """
-        Builds and returns a StatefulDataLoader configured for inference.
+        """Builds and returns a StatefulDataLoader configured for inference.
 
         This loader processes batches one by one (group size of 1) and does
         not drop the last batch.
@@ -236,7 +219,6 @@ class DataLoaderFactory:
         Returns:
             A configured StatefulDataLoader instance.
         """
-
         return self._build_dataloader(
             self._provider, batch_size=self._batch_maths.data_loader_batch_size, group_size=1, drop_last=False
         )

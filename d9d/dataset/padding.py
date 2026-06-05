@@ -6,8 +6,7 @@ import torch.nn.functional as F
 
 
 class PaddingSide1D(StrEnum):
-    """
-    Enum specifying the side for padding 1D sequences.
+    """Enum specifying the side for padding 1D sequences.
 
     Attributes:
         left: Pad on the left side.
@@ -34,8 +33,7 @@ def pad_stack_1d(
     padding_side: PaddingSide1D = PaddingSide1D.right,
     pad_to_multiple_of: int | None = None,
 ) -> torch.Tensor:
-    """
-    Stacks 1D tensors into a batch, applying padding.
+    """Stacks 1D tensors into a batch, applying padding.
 
     Calculates the maximum length among the input tensors (optionally aligning to a multiple),
     pads elements to match this length on the specified side, and stacks them.
@@ -53,7 +51,6 @@ def pad_stack_1d(
     Raises:
         ValueError: If no items are provided or if `pad_to_multiple_of` is <= 0.
     """
-
     if not items:
         raise ValueError("Cannot stack 0 items")
     if pad_to_multiple_of is not None and pad_to_multiple_of <= 0:

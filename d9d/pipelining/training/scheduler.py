@@ -6,8 +6,7 @@ from d9d.core.protocol import LRSchedulerProtocol
 
 
 class PipelinedLRScheduler(LRSchedulerProtocol):
-    """
-    Wrapper that manages multiple LR schedulers for a pipeline parallel rank.
+    """Wrapper that manages multiple LR schedulers for a pipeline parallel rank.
 
     Similar to `PipelinedOptimizer`, this aggregates schedulers corresponding to
     multiple model stages hosted on the current rank.

@@ -30,8 +30,7 @@ class _ModulePatch:
 
 
 class ToLocalParallel(ParallelStyle):
-    """
-    Parallel style that distributes parameters and gradients but executes with local tensors.
+    """Parallel style that distributes parameters and gradients but executes with local tensors.
 
     This style wraps standard tensor distribution (via ``DTensor``) but injects
     runtime hooks to temporarily unwrap ``DTensor`` parameters into local ``torch.Tensor``
@@ -43,14 +42,12 @@ class ToLocalParallel(ParallelStyle):
     """
 
     def __init__(self, param_placement: tuple[Placement, ...], grad_placement: tuple[Placement, ...]):
-        """
-        Constructs ToLocalParallel object.
+        """Constructs ToLocalParallel object.
 
         Args:
             param_placement: Tuple of placements defining how parameters are distributed.
             grad_placement: Tuple of placements defining how gradients are synchronized.
         """
-
         self._grad_placement = grad_placement
         self._param_placement = param_placement
 

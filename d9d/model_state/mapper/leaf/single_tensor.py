@@ -4,9 +4,7 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperIdentity(ModelStateMapper):
-    """
-    Passes a single state tensor through unchanged.
-    """
+    """Passes a single state tensor through unchanged."""
 
     def __init__(self, name: str):
         self._name = name
@@ -19,17 +17,14 @@ class ModelStateMapperIdentity(ModelStateMapper):
 
 
 class ModelStateMapperTranspose(ModelStateMapper):
-    """
-    Transposes an input tensor along two specified dimensions.
-    """
+    """Transposes an input tensor along two specified dimensions."""
 
     def __init__(
         self,
         name: str,
         dims: tuple[int, int],
     ) -> None:
-        """
-        Constructs ModelStateMapperTranspose object.
+        """Constructs ModelStateMapperTranspose object.
 
         Args:
             name: Name of the tensor to operate on.
@@ -46,17 +41,14 @@ class ModelStateMapperTranspose(ModelStateMapper):
 
 
 class ModelStateMapperSqueeze(ModelStateMapper):
-    """
-    Squeezes an input tensor along a specified dimension or all dimensions of size 1.
-    """
+    """Squeezes an input tensor along a specified dimension or all dimensions of size 1."""
 
     def __init__(
         self,
         name: str,
         dim: int | None = None,
     ) -> None:
-        """
-        Constructs ModelStateMapperSqueeze object.
+        """Constructs ModelStateMapperSqueeze object.
 
         Args:
             name: Name of the tensor to operate on.
@@ -80,17 +72,14 @@ class ModelStateMapperSqueeze(ModelStateMapper):
 
 
 class ModelStateMapperUnsqueeze(ModelStateMapper):
-    """
-    Unsqueezes an input tensor along a specified dimension.
-    """
+    """Unsqueezes an input tensor along a specified dimension."""
 
     def __init__(
         self,
         name: str,
         dim: int,
     ) -> None:
-        """
-        Constructs ModelStateMapperUnsqueeze object.
+        """Constructs ModelStateMapperUnsqueeze object.
 
         Args:
             name: Name of the tensor to operate on.

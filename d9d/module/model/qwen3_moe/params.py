@@ -2,8 +2,7 @@ from pydantic import BaseModel
 
 
 class Qwen3MoELayerParameters(BaseModel):
-    """
-    Configuration parameters for a single Qwen3 MoE layer.
+    """Configuration parameters for a single Qwen3 MoE layer.
 
     Attributes:
         hidden_size: Dimension of the model's hidden states.
@@ -27,8 +26,7 @@ class Qwen3MoELayerParameters(BaseModel):
 
 
 class Qwen3MoEParameters(BaseModel):
-    """
-    Configuration parameters for the Qwen3 Mixture-of-Experts model backbone.
+    """Configuration parameters for the Qwen3 Mixture-of-Experts model backbone.
 
     Attributes:
         layer: Configuration shared across all transformer layers.
@@ -59,8 +57,7 @@ class Qwen3MoEParameters(BaseModel):
 
 
 class Qwen3MoEForCausalLMParameters(BaseModel):
-    """
-    Configuration parameters for Qwen3 Mixture-of-Experts model with a Causal Language Modeling head.
+    """Configuration parameters for Qwen3 Mixture-of-Experts model with a Causal Language Modeling head.
 
     Attributes:
         model: The configuration for the underlying Qwen3 MoE model.
@@ -70,8 +67,7 @@ class Qwen3MoEForCausalLMParameters(BaseModel):
 
 
 class Qwen3MoEForClassificationParameters(BaseModel):
-    """
-    Configuration parameters for Qwen3 Mixture-of-Experts model with a token/sequnce classification head.
+    """Configuration parameters for Qwen3 Mixture-of-Experts model with a token/sequnce classification head.
 
     Attributes:
         model: The configuration for the underlying Qwen3 MoE model.
@@ -85,8 +81,7 @@ class Qwen3MoEForClassificationParameters(BaseModel):
 
 
 class Qwen3MoEForEmbeddingParameters(BaseModel):
-    """
-    Configuration parameters for Qwen3 Mixture-of-Experts model with an embedding head.
+    """Configuration parameters for Qwen3 Mixture-of-Experts model with an embedding head.
 
     Attributes:
         model: The configuration for the underlying Qwen3 MoE model.

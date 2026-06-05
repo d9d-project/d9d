@@ -65,7 +65,14 @@ def _shard_tensor(
 def _shard_leaf_to_list(
     item: TLeaf, spec: SpecShard | SpecReplicate, num_shards: int, enforce_even_split: bool
 ) -> Sequence[TLeaf]:
-    """Helper to split an item into a list of items for each rank."""
+    """Helper to split an item into a list of items for each rank.
+
+    Returns:
+        A list of items for each rank.
+
+    Raises:
+        TypeError: If the sharding spec or item type is not supported.
+    """
     if isinstance(spec, SpecReplicate):
         # Replicated: strict copy reference for all shards
         return [item] * num_shards
@@ -92,8 +99,7 @@ def _shard_leaf_to_list(
 def shard_tree(
     tree: TSameTree, sharding_spec: ShardingSpec, num_shards: int, enforce_even_split: bool
 ) -> tuple[TSameTree, ...]:
-    """
-    Shards a PyTree into a tuple of PyTrees, one for each shard rank.
+    """Shards a PyTree into a tuple of PyTrees, one for each shard rank.
 
     This function takes a single global data structure and splits it into `num_shards`
     structures.

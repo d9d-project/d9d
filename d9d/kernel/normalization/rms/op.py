@@ -93,7 +93,6 @@ def rms_norm_forward(
             - The final normalized output tensor.
             - The computed inverse RMS tensor (saved for the backward pass).
     """
-
     if not x.is_contiguous():
         x = x.contiguous()
 
@@ -224,7 +223,6 @@ def rms_norm_backward(
             - The gradient with respect to the input tensor.
             - The gradient with respect to the weight tensor.
     """
-
     if not grad_output.is_contiguous():
         grad_output = grad_output.contiguous()
     if not x.is_contiguous():

@@ -14,8 +14,7 @@ TMap = TypeVar("TMap")
 
 
 def _detach_leaf(x: TMap) -> TMap:
-    """
-    Detaches a tensor from the computation graph if the input is a tensor.
+    """Detaches a tensor from the computation graph if the input is a tensor.
 
     Args:
         x: The input object.
@@ -23,21 +22,17 @@ def _detach_leaf(x: TMap) -> TMap:
     Returns:
         The detached tensor or original object.
     """
-
     if isinstance(x, torch.Tensor):
         return cast(TMap, x.detach())
     return x
 
 
 class ShardedState(UserDict):
-    """
-    Container for holding state broken down by shard indices.
-    """
+    """Container for holding state broken down by shard indices."""
 
 
 class PipelineStateStorage:
-    """
-    Low-level storage backend handling sharding and aggregation of state data.
+    """Low-level storage backend handling sharding and aggregation of state data.
 
     This class manages the transition between sharded data
     and global data. It uses sharding specifications to determine
@@ -45,14 +40,12 @@ class PipelineStateStorage:
     """
 
     def __init__(self, sharding_spec: dict[StateKey, ShardingSpecLeaf], num_shards: int):
-        """
-        Constructs a PipelineStateStorage object.
+        """Constructs a PipelineStateStorage object.
 
         Args:
             sharding_spec: Dictionary mapping state keys to their sharding behaviors.
             num_shards: Total number of shards involved in the storage.
         """
-
         self._sharding_spec_orig = copy.deepcopy(sharding_spec)
 
         self._state: dict[StateKey, Any] = {}
@@ -89,8 +82,7 @@ class PipelineStateStorage:
             return SpecReplicate()
 
     def store_global(self, key: StateKey, state: Any):
-        """
-        Stores a value in the global scope.
+        """Stores a value in the global scope.
 
         If the key does not have a sharding spec, one will be inferred. Detaches tensors.
 
@@ -98,7 +90,6 @@ class PipelineStateStorage:
             key: The identifier key.
             state: The unified value to store.
         """
-
         state = pytree.tree_map(_detach_leaf, state)
 
         if key not in self._state_sharding_spec:
@@ -107,8 +98,7 @@ class PipelineStateStorage:
         self._state[key] = state
 
     def store_shard(self, key: StateKey, state: Any, shard_id: int):
-        """
-        Stores a value for a specific shard index.
+        """Stores a value for a specific shard index.
 
         Raises error if attempting to shard an already global key without conversion.
 
@@ -120,7 +110,6 @@ class PipelineStateStorage:
         Raises:
             ValueError: If trying to store sharded state into an unsharded container.
         """
-
         if key not in self._state:
             self._state[key] = ShardedState()
 
@@ -173,8 +162,7 @@ class PipelineStateStorage:
         self._state[key] = sharded_state
 
     def acquire_global(self, key: StateKey) -> Any:
-        """
-        Retrieves data for a key in its global form.
+        """Retrieves data for a key in its global form.
 
         Args:
             key: The state key.
@@ -182,13 +170,11 @@ class PipelineStateStorage:
         Returns:
             The aggregated global data.
         """
-
         self._ensure_global(key)
         return self._state[key]
 
     def acquire_shard(self, key: StateKey, shard: int) -> Any:
-        """
-        Retrieves data for a key specific to a shard index.
+        """Retrieves data for a key specific to a shard index.
 
         Args:
             key: The state key.
@@ -197,7 +183,6 @@ class PipelineStateStorage:
         Returns:
             The data slice corresponding to the shard.
         """
-
         self._ensure_sharded(key)
         state = self._state[key]
 
@@ -207,8 +192,7 @@ class PipelineStateStorage:
             return state
 
     def contains(self, key: StateKey) -> bool:
-        """
-        Checks if a key exists in storage.
+        """Checks if a key exists in storage.
 
         Args:
             key: The state key.
@@ -216,12 +200,8 @@ class PipelineStateStorage:
         Returns:
             True if present.
         """
-
         return key in self._state
 
     def reset(self):
-        """
-        Clears all stored state.
-        """
-
+        """Clears all stored state."""
         self._state.clear()

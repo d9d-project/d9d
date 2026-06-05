@@ -12,19 +12,19 @@ _buffer: Buffer | None = None
 
 
 def get_hidden_state_bytes(x: torch.Tensor) -> int:
-    """
-    Calculates the byte size of a hidden state tensor row.
+    """Calculates the byte size of a hidden state tensor row.
 
     Args:
         x: Input tensor. Shape: `(?, hidden_size)`.
-    """
 
+    Returns:
+        The size of a row in bytes.
+    """
     return x.size(1) * max(x.element_size(), 2)
 
 
 def init_deepep_buffer(group: torch.distributed.ProcessGroup, hidden_bytes: int):
-    """
-    Initializes or expands the global DeepEP communication buffer.
+    """Initializes or expands the global DeepEP communication buffer.
 
     Checks if the existing buffer is sufficient for the required hidden dimension
     and process group size. If not, it allocates a new buffer.
@@ -33,7 +33,6 @@ def init_deepep_buffer(group: torch.distributed.ProcessGroup, hidden_bytes: int)
         group: The process group intended for communication.
         hidden_bytes: Size of a single hidden state vector in bytes.
     """
-
     global _buffer  # noqa: PLW0603
     num_nvl_bytes, num_rdma_bytes = 0, 0
     for config in (
@@ -156,7 +155,6 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
 
     def __init__(self, num_experts: int):
         """Constructs the DeepEpCommunicationHandler."""
-
         self._num_experts = num_experts
         self._num_experts_per_shard = None  # late-initialization
 
@@ -167,15 +165,16 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
         self._unpermute_mapping = None
 
     def setup(self, group: torch.distributed.ProcessGroup, hidden_size: int, hidden_dtype: torch.dtype):
-        """
-        Initializes the backend buffer and calculates expert sharding.
+        """Initializes the backend buffer and calculates expert sharding.
 
         Args:
             group: The process group containing all experts.
             hidden_size: Dimensionality of the hidden states.
             hidden_dtype: Data type of the hidden states.
-        """
 
+        Raises:
+            ValueError: If num_experts is not divisible by the group size.
+        """
         init_deepep_buffer(group, hidden_size * hidden_dtype.itemsize)
 
         if self._num_experts % group.size() != 0:

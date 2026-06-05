@@ -1,6 +1,4 @@
-"""
-Pipelining API that is intended to be accessible by end user.
-"""
+"""Pipelining API that is intended to be accessible by end user."""
 
 from .module import (
     ModuleSupportsPipelining,

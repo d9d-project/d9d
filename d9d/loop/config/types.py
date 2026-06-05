@@ -2,8 +2,7 @@ from enum import StrEnum
 
 
 class StepActionSpecial(StrEnum):
-    """
-    Special flag values for configuring periodic actions.
+    """Special flag values for configuring periodic actions.
 
     Attributes:
         last_step: Indicates the action should occur exactly once at the

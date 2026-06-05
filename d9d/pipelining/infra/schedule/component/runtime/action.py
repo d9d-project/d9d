@@ -13,8 +13,7 @@ from .communications import PipelineCommunicationHandler
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class ActionContext:
-    """
-    Holds the runtime context required to execute a pipeline action.
+    """Holds the runtime context required to execute a pipeline action.
 
     Attributes:
         pipeline_inputs_microbatches: The global inputs sharded by microbatch.
@@ -33,8 +32,7 @@ class ActionContext:
 
 
 class ActionWorkType(StrEnum):
-    """
-    Classifies the type of work performed by an action.
+    """Classifies the type of work performed by an action.
 
     Attributes:
         compute: Indicates the action involves computation components (forward, backward).
@@ -46,8 +44,7 @@ class ActionWorkType(StrEnum):
 
 
 class ActionBase(abc.ABC):
-    """
-    Abstract base class for all pipeline schedule actions.
+    """Abstract base class for all pipeline schedule actions.
 
     An action represents an atomic unit of work in a pipeline schedule,
     such as computing a microbatch or sending/receiving a tensor.
@@ -55,13 +52,11 @@ class ActionBase(abc.ABC):
 
     @abc.abstractmethod
     def apply(self, ctx: ActionContext):
-        """
-        Executes the action logic using the provided context.
+        """Executes the action logic using the provided context.
 
         Args:
             ctx: The runtime context containing stages, data, and communication handlers.
         """
-
         ...
 
     @property
@@ -84,8 +79,7 @@ class ActionBase(abc.ABC):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ForwardSendAction(ActionBase):
-    """
-    Action to schedule a forward pass tensor send operation.
+    """Action to schedule a forward pass tensor send operation.
 
     Attributes:
         stage_idx: The integer index of the pipeline stage initiating the send operation.
@@ -112,8 +106,7 @@ class ForwardSendAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BackwardSendAction(ActionBase):
-    """
-    Action to schedule a backward pass gradient send operation.
+    """Action to schedule a backward pass gradient send operation.
 
     Attributes:
         stage_idx: The integer index of the pipeline stage initiating the send operation.
@@ -140,8 +133,7 @@ class BackwardSendAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ForwardReceiveAction(ActionBase):
-    """
-    Action to schedule a forward pass tensor receive operation.
+    """Action to schedule a forward pass tensor receive operation.
 
     Attributes:
         stage_idx: The integer index of the pipeline stage expecting the receive operation.
@@ -168,8 +160,7 @@ class ForwardReceiveAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BackwardReceiveAction(ActionBase):
-    """
-    Action to schedule a backward pass gradient receive operation.
+    """Action to schedule a backward pass gradient receive operation.
 
     Attributes:
         stage_idx: The integer index of the pipeline stage expecting the receive operation.
@@ -196,8 +187,7 @@ class BackwardReceiveAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ForwardComputeAction(ActionBase):
-    """
-    Action to perform forward computation for a specific microbatch.
+    """Action to perform forward computation for a specific microbatch.
 
     Attributes:
         stage_idx: The integer index of the pipeline stage.
@@ -240,8 +230,7 @@ class ForwardComputeAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BackwardFullInputComputeAction(ActionBase):
-    """
-    Action to perform backward computation with respect to inputs.
+    """Action to perform backward computation with respect to inputs.
 
     Attributes:
         stage_idx: The integer index of the pipeline stage.
@@ -288,8 +277,7 @@ class BackwardFullInputComputeAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BackwardWeightComputeAction(ActionBase):
-    """
-    Action to perform gradient accumulation on weights.
+    """Action to perform gradient accumulation on weights.
 
     Attributes:
         stage_idx: The integer index of the pipeline stage.
@@ -318,8 +306,7 @@ class BackwardWeightComputeAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ComposeAction(ActionBase):
-    """
-    Composite action scheduling multiple sub-actions sequentially.
+    """Composite action scheduling multiple sub-actions sequentially.
 
     Used for forward/backward overlapping.
 

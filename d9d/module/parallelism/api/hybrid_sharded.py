@@ -10,8 +10,7 @@ from .replicate_parallel import parallelize_replicate
 def parallelize_hsdp(
     module: nn.Module, mesh: DeviceMesh, shard_dim: str = "dp_cp_shard", *fsdp_args: Any, **fsdp_kwargs: Any
 ):
-    """
-    Applies Hybrid Sharded Data Parallelism (HSDP) to a module.
+    """Applies Hybrid Sharded Data Parallelism (HSDP) to a module.
 
     This function decomposes the provided device mesh into sharding dimensions
     and replication dimensions. It applies replication parallelism
@@ -30,7 +29,6 @@ def parallelize_hsdp(
     Raises:
         ValueError: If the device mesh does not have named dimensions.
     """
-
     replicate_dims = mesh.mesh_dim_names
 
     if replicate_dims is None:

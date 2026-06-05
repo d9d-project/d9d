@@ -14,8 +14,7 @@ def _build_groups(mapper: ModelStateMapper, source_prefix: str, target_prefix: s
 
 
 class ModelStateMapperPrefixScope(ModelStateMapper):
-    """
-    Encapsulates a child mapper and isolates its execution by applying string prefixes.
+    """Encapsulates a child mapper and isolates its execution by applying string prefixes.
 
     This mapper allows a child mapper designed for a specific submodule
     (e.g., operating on "in_proj") to be seamlessly integrated into a larger
@@ -24,8 +23,7 @@ class ModelStateMapperPrefixScope(ModelStateMapper):
     """
 
     def __init__(self, mapper: ModelStateMapper, source_prefix: str = "", target_prefix: str = "") -> None:
-        """
-        Constructs a ModelStateMapperPrefixScope object.
+        """Constructs a ModelStateMapperPrefixScope object.
 
         Args:
             mapper: The encapsulated child mapper to execute within the scope.

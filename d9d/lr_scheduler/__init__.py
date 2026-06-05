@@ -1,6 +1,4 @@
-"""
-Utilities for learning rate scheduling.
-"""
+"""Utilities for learning rate scheduling."""
 
 from .visualizer import visualize_lr_scheduler
 

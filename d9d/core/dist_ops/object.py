@@ -6,8 +6,7 @@ T = TypeVar("T")
 
 
 def gather_object(obj: T, group: dist.ProcessGroup, group_dst: int) -> list[T] | None:
-    """
-    Gathers picklable objects from the whole process group to a specific destination rank.
+    """Gathers picklable objects from the whole process group to a specific destination rank.
 
     This acts as a wrapper around torch.distributed.gather_object that automatically
     initializes the output buffer list on the destination rank.
@@ -20,7 +19,6 @@ def gather_object(obj: T, group: dist.ProcessGroup, group_dst: int) -> list[T] |
     Returns:
         A list of objects from all ranks on the destination rank; None on other ranks.
     """
-
     if group.rank() == group_dst:
         # We initialize with None, but we cast to list[T] because we know
         # dist.gather_object will populate these slots with actual objects.
@@ -32,8 +30,7 @@ def gather_object(obj: T, group: dist.ProcessGroup, group_dst: int) -> list[T] |
 
 
 def all_gather_object(obj: T, group: dist.ProcessGroup) -> list[T]:
-    """
-    Gathers picklable objects from the whole process group to all ranks.
+    """Gathers picklable objects from the whole process group to all ranks.
 
     This acts as a wrapper around torch.distributed.all_gather_object that automatically
     initializes the output buffer list on all ranks.

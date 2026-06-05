@@ -4,9 +4,7 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperShard(ModelStateMapper):
-    """
-    Wraps another state mapper and restricts its execution to a specific subset (shard)
-    of dependency groups.
+    """Wraps another state mapper and restricts its execution to a specific subset (shard) of dependency groups.
 
     This is primarily used for parallelizing model loading across multiple processes
     or nodes. By assigning a different `current_shard` index to each process,

@@ -12,8 +12,7 @@ from ..component.runtime import (
 
 
 class LoopedBFSPipelineProgramBuilder(PipelineProgramBuilder):
-    """
-    Builder for the Breadth-First Pipeline Parallelism schedule.
+    """Builder for the Breadth-First Pipeline Parallelism schedule.
 
     This schedule runs all available forward microbatches for local stages first.
     If configured for training, it then runs backwards in reverse topological order.
@@ -23,8 +22,7 @@ class LoopedBFSPipelineProgramBuilder(PipelineProgramBuilder):
     """
 
     def __init__(self, num_stages_per_rank: int, inference_mode: bool = False):
-        """
-        Constructs the LoopedBFS builder.
+        """Constructs the LoopedBFS builder.
 
         Args:
             num_stages_per_rank: Number of stages per rank.

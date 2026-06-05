@@ -15,8 +15,7 @@ from d9d.pipelining.api import PipelineStageInfo
 
 @dataclasses.dataclass(kw_only=True)
 class InitializeModelStageContext:
-    """
-    Context data required for initializing a specific model pipeline stage.
+    """Context data required for initializing a specific model pipeline stage.
 
     Attributes:
         dist_context: The distributed execution context.
@@ -32,8 +31,7 @@ TModel = TypeVar("TModel", bound=nn.Module)
 
 @dataclasses.dataclass(kw_only=True)
 class InitializeModelStageResult(Generic[TModel]):
-    """
-    The result of initializing a model stage.
+    """The result of initializing a model stage.
 
     Attributes:
         model: The PyTorch module.
@@ -46,8 +44,7 @@ class InitializeModelStageResult(Generic[TModel]):
 
 @dataclasses.dataclass(kw_only=True)
 class ParallelizeModelStageContext(Generic[TModel]):
-    """
-    Context data required for horizontally parallelizing a model stage.
+    """Context data required for horizontally parallelizing a model stage.
 
     Attributes:
         dist_context: The distributed execution context.
@@ -62,8 +59,7 @@ class ParallelizeModelStageContext(Generic[TModel]):
 
 @dataclasses.dataclass(kw_only=True)
 class PrepareExportModelStageContext(Generic[TModel]):
-    """
-    Context data required for preparing a model stage for export.
+    """Context data required for preparing a model stage for export.
 
     Attributes:
         dist_context: The distributed execution context.
@@ -76,8 +72,7 @@ class PrepareExportModelStageContext(Generic[TModel]):
 
 @dataclasses.dataclass(kw_only=True)
 class PrepareExportModelStageResult:
-    """
-    The result of preparing a model stage for export.
+    """The result of preparing a model stage for export.
 
     Attributes:
         state_mapper: The mapper defining how model parameters map to disk storage.
@@ -88,8 +83,7 @@ class PrepareExportModelStageResult:
 
 @dataclasses.dataclass(kw_only=True)
 class RegisterModelEventsContext:
-    """
-    Context for registering model-specific events.
+    """Context for registering model-specific events.
 
     Attributes:
         dist_context: The distributed execution context.
@@ -101,8 +95,7 @@ class RegisterModelEventsContext:
 
 
 class ModelProvider(abc.ABC, Generic[TModel]):
-    """
-    Abstract interface for defining the lifecycle of a distributed model.
+    """Abstract interface for defining the lifecycle of a distributed model.
 
     This provider handles initialization, parallelization (sharding/replication/etc), and export preparation
     for models within the d9d framework.
@@ -110,8 +103,7 @@ class ModelProvider(abc.ABC, Generic[TModel]):
 
     @abc.abstractmethod
     def initialize_model_stage(self, context: InitializeModelStageContext) -> InitializeModelStageResult[TModel]:
-        """
-        Initializes the model architecture for a specific pipeline stage.
+        """Initializes the model architecture for a specific pipeline stage.
 
         This method is responsible for constructing the `nn.Module` for the requested stage.
 
@@ -128,13 +120,11 @@ class ModelProvider(abc.ABC, Generic[TModel]):
         Returns:
             Result of this operation.
         """
-
         ...
 
     @abc.abstractmethod
     def parallelize_model_stage(self, context: ParallelizeModelStageContext[TModel]):
-        """
-        Converts the model parameters into distributed tensors (DTensors).
+        """Converts the model parameters into distributed tensors (DTensors).
 
         Implementations should modify the model in-place. This involves converting
         standard parameters into DTensors by replicating or sharding them according
@@ -148,8 +138,7 @@ class ModelProvider(abc.ABC, Generic[TModel]):
     def prepare_export_model_stage(
         self, context: PrepareExportModelStageContext[TModel]
     ) -> PrepareExportModelStageResult:
-        """
-        Prepares the state mapper required for saving the model to disk.
+        """Prepares the state mapper required for saving the model to disk.
 
         This methods defines how the current in-memory model structure maps back to the
         serialized checkpoint format.
@@ -162,8 +151,7 @@ class ModelProvider(abc.ABC, Generic[TModel]):
         """
 
     def register_events(self, context: RegisterModelEventsContext) -> None:
-        """
-        Register model-specific event subscriptions.
+        """Register model-specific event subscriptions.
 
         Args:
             context: Context providing access to the distributed environment,
@@ -171,11 +159,9 @@ class ModelProvider(abc.ABC, Generic[TModel]):
         """
 
     def dump_hparams(self) -> ScalarTree:
-        """
-        Exports hyperparameters associated with this model for logging.
+        """Exports hyperparameters associated with this model for logging.
 
         Returns:
             A dictionary of hyperparameter names and values.
         """
-
         return {}

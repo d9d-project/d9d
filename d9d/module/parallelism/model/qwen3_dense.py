@@ -10,8 +10,7 @@ from d9d.pipelining.api import PipelineStageInfo
 
 
 def parallelize_qwen3_dense_model(dist_context: DistributedContext, model: Qwen3DenseModel, stage: PipelineStageInfo):
-    """
-    Parallelizes the base Qwen3 Dense model components.
+    """Parallelizes the base Qwen3 Dense model components.
 
     This function configures the model layers for distributed execution within a pipeline
     stage. It applies Hybrid Sharded Data Parallelism (HSDP) to dense components (embeddings,
@@ -29,7 +28,6 @@ def parallelize_qwen3_dense_model(dist_context: DistributedContext, model: Qwen3
     Raises:
         ValueError: If Tensor Parallel or Context Parallel is enabled in the context.
     """
-
     dims = dist_context.mesh_params
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
@@ -67,8 +65,7 @@ def parallelize_qwen3_dense_model(dist_context: DistributedContext, model: Qwen3
 def parallelize_qwen3_dense_for_causal_lm(
     dist_context: DistributedContext, model: Qwen3DenseForCausalLM, stage: PipelineStageInfo
 ):
-    """
-    Parallelizes the Qwen3 Dense Causal LM model.
+    """Parallelizes the Qwen3 Dense Causal LM model.
 
     This function delegates backbone parallelization to ``parallelize_qwen3_dense_model``
     and additionally configures the language model head with Hybrid Sharded Data
@@ -79,7 +76,6 @@ def parallelize_qwen3_dense_for_causal_lm(
         model: The Qwen3 Dense Causal LM model to parallelize.
         stage: Information about the current pipeline stage.
     """
-
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
     parallelize_qwen3_dense_model(dist_context, model.model, stage)
@@ -94,8 +90,7 @@ def parallelize_qwen3_dense_for_causal_lm(
 def parallelize_qwen3_dense_for_classification(
     dist_context: DistributedContext, model: Qwen3DenseForClassification, stage: PipelineStageInfo
 ):
-    """
-    Parallelizes the Qwen3 Dense classification model.
+    """Parallelizes the Qwen3 Dense classification model.
 
     This function delegates backbone parallelization to ``parallelize_qwen3_dense_model``
     and additionally configures the classification head with Hybrid Sharded Data
@@ -106,7 +101,6 @@ def parallelize_qwen3_dense_for_classification(
         model: The Qwen3 Dense classification model to parallelize.
         stage: Information about the current pipeline stage.
     """
-
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
     parallelize_qwen3_dense_model(dist_context, model.model, stage)
@@ -121,8 +115,7 @@ def parallelize_qwen3_dense_for_classification(
 def parallelize_qwen3_dense_for_embedding(
     dist_context: DistributedContext, model: Qwen3DenseForEmbedding, stage: PipelineStageInfo
 ):
-    """
-    Parallelizes the Qwen3 Dense embedding model.
+    """Parallelizes the Qwen3 Dense embedding model.
 
     This function delegates backbone parallelization to ``parallelize_qwen3_dense_model``
     and additionally configures the embedding head with Hybrid Sharded Data
@@ -133,7 +126,6 @@ def parallelize_qwen3_dense_for_embedding(
         model: The Qwen3 Dense embedding model to parallelize.
         stage: Information about the current pipeline stage.
     """
-
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
 
     parallelize_qwen3_dense_model(dist_context, model.model, stage)

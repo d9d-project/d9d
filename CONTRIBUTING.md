@@ -65,6 +65,22 @@ We provide a `Makefile` to automate common development tasks.
 
 We enforce strict quality standards to keep the codebase maintainable.
 
+### Design Principles
+
+They are not enforced by tooling, but PRs that violate them may be asked to change.
+
+* **Composition over inheritance**: components are small single-responsibility classes wired together (see `d9d/loop/component/`). Avoid "God classes" that accumulate unrelated responsibilities, avoid speculative base classes that exist only to hoard "common" code.
+* **Define contracts structurally.** Use a `typing.Protocol` for a *trait* - a secondary capability bolted onto a type that already has its own base class (e.g. `ModuleLateInit` on an `nn.Module`), where you want duck-typed conformance without forcing inheritance. Use an `abc.ABC` when the interface *is* the object's primary identity and the hierarchy is the "main" type (e.g. `PipelineSchedule`).
+* **No reflection where it can be avoided.** Avoid `getattr` / `hasattr` / `inspect` and string-name dispatch. Prefer an explicit `match`-`case`, a proper interface, or a factory. Reflection is acceptable *only* when introspection is intrinsic to the feature itself - i.e. declarative registration APIs that cannot work without it, such as a `@subscribe`/`@register` decorator wiring handlers by signature.
+* **Inject dependencies; don't reach for them.** Components receive their collaborators as constructor arguments and store them as private fields. Don't pull them from globals/singletons or construct them internally - wiring happens at the edges (`d9d/loop/run/`).
+* **Reuse before reinventing.** If PyTorch or the stdlib already solves it, use it, rather than hand-rolling an equivalent.
+* **No needless indirection.** Don't add a wrapper that only forwards to another function/object without adding meaning. Inline it instead.
+* **Validate eagerly, fail fast.** Validate constructor args up front; raise if a method is called outside its required lifecycle scope rather than silently misbehaving.
+* **Decide behavior from explicit inputs, not inferred state.** Drive branching with an explicit parameter, not by sniffing the shape/dtype/contents of the data. Inferred checks silently encode invariants the caller and the next reader won't know are there - make them part of the signature instead.
+* **Validate at the boundary; trust within it**. Data crossing an untrusted boundary (user config, deserialized state) is validated once at the edge into a model that guarantees its own invariants — that's the validation layer, and we use `pydantic` for it. Pass trusted internal data as plain `dataclasses` and assume it is already valid. Don't re-validate trusted internal data, and don't pass unvalidated raw input deeper than the edge.
+* **Separate configuration from behavior.** Config objects describe; classes behave. Don't merge them into one dataclass that needs `__post_init__` magic.
+* **Polymorphism for configurable objects via discriminated unions.** When a configurable object has selectable behavior, model the choices as a Pydantic discriminated union and resolve them in a `build_*()` factory with an exhaustive `match (case _: raise)`.
+
 ### Linting & Formatting
 We use [Ruff](https://docs.astral.sh/ruff/) for both linting and formatting. 
 Configuration is strict (see `pyproject.toml` for enabled rules).
@@ -83,6 +99,15 @@ We have two tiers of tests:
 2.  **Distributed (`-m distributed`):** Tests that strictly require `torchrun`.
 
 **Requirement:** All PRs must pass `make test`. If you add a feature, you must add corresponding tests.
+
+### Docstrings
+
+We follow the [Google Python style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) for docstrings.
+
+*   **Style:** Use Google-style docstrings (`Args:`, `Returns:`, `Raises:`, etc.).
+*   **No type annotations in docstrings:** Types are already declared in the signature and checked by `ty`. Do not repeat them in the docstring.
+*   **Document `__init__`:** Write a docstring even for `__init__`, but keep it short and to the point, e.g. `"""Constructs the ``Trainer`` object."""`.
+*   **Public API coverage:** Always write docstrings for everything considered public API.
 
 ## Documentation
 

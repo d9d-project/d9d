@@ -55,7 +55,6 @@ class MetricAccumulator(Stateful):
                 This tensor determines the device and dtype of the accumulator.
             reduce_op: The reduction operation to use during updates and synchronization.
         """
-
         self._initial = initial_value.clone()
 
         self._local = initial_value.clone()
@@ -75,7 +74,6 @@ class MetricAccumulator(Stateful):
         Args:
             value: The value to accumulate.
         """
-
         _accumulate_inplace_(self._reduce_op, self._local, value)
 
         self._is_synchronized = False
@@ -86,7 +84,6 @@ class MetricAccumulator(Stateful):
         This method acts as a blocking barrier. It copies the local state to a buffer
         and performs an `all_reduce` collective operation.
         """
-
         self._synchronized.copy_(self._local)
         dist.all_reduce(self._synchronized, op=_torch_reduce_op_for(self._reduce_op))
 
@@ -100,12 +97,10 @@ class MetricAccumulator(Stateful):
             The global synchronized value if `sync()` was called recently,
             otherwise the local accumulated value.
         """
-
         return self._synchronized if self._is_synchronized else self._local
 
     def reset(self):
         """Resets the accumulator to its initial state."""
-
         self._local.copy_(self._initial)
 
         self._is_synchronized = False
@@ -116,7 +111,6 @@ class MetricAccumulator(Stateful):
         Args:
             device: Target device.
         """
-
         self._local = self._local.to(device)
         self._synchronized = self._synchronized.to(device)
 
@@ -126,7 +120,6 @@ class MetricAccumulator(Stateful):
         Returns:
             Dictionary containing local and synchronized tensors and status flags.
         """
-
         return {"local": self._local, "synchronized": self._synchronized, "is_synchronized": self._is_synchronized}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
@@ -135,7 +128,6 @@ class MetricAccumulator(Stateful):
         Args:
             state_dict: Dictionary containing state to load.
         """
-
         self._local = state_dict["local"]
         self._synchronized = state_dict["synchronized"]
         self._is_synchronized = state_dict["is_synchronized"]

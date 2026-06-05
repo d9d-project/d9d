@@ -13,8 +13,7 @@ def set_seeds(
     seed: int,
     distinct_seed_mesh_dim: str = "pp",
 ) -> None:
-    """
-    Sets random seeds for Python, NumPy, and PyTorch.
+    """Sets random seeds for Python, NumPy, and PyTorch.
 
     This function sets seeds deterministically based on the provided base seed and the
     process's rank within a specific mesh dimension.
@@ -30,7 +29,6 @@ def set_seeds(
             be distinct (e.g., 'pp' for pipeline parallelism). Ranks along other dimensions
             will share the seed.
     """
-
     # Mutate seed based on PP rank if distributed
     if dist_context.mesh_params.is_distributed:
         distinct_mesh = dist_context.mesh_for(REGULAR_DOMAIN)[distinct_seed_mesh_dim]

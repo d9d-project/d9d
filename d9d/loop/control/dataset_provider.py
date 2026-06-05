@@ -45,8 +45,7 @@ class DatasetProvider(Protocol):
     """
 
     def __call__(self, context: InitializeDatasetContext) -> InitializeDatasetResult:
-        """
-        Initializes the dataset components.
+        """Initializes the dataset components.
 
         It is important that the user must shard the dataset manually, perhaps using `d9d.dataset.ShardedDataset`.
 
