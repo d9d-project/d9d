@@ -3,8 +3,7 @@ import math
 
 
 class CurveBase(abc.ABC):
-    """Abstract base class for interpolation curves used in scheduling.
-    """
+    """Abstract base class for interpolation curves used in scheduling."""
 
     @abc.abstractmethod
     def compute(self, start: float, end: float, step_p: float) -> float:
@@ -21,16 +20,14 @@ class CurveBase(abc.ABC):
 
 
 class CurveLinear(CurveBase):
-    """Linearly interpolates between start and end values.
-    """
+    """Linearly interpolates between start and end values."""
 
     def compute(self, start: float, end: float, step_p: float) -> float:
         return start + (end - start) * step_p
 
 
 class CurveCosine(CurveBase):
-    """Interpolates using a cosine annealing schedule (half-period cosine).
-    """
+    """Interpolates using a cosine annealing schedule (half-period cosine)."""
 
     def compute(self, start: float, end: float, step_p: float) -> float:
         cos_out = (1 + math.cos(math.pi * step_p)) / 2
@@ -38,8 +35,7 @@ class CurveCosine(CurveBase):
 
 
 class CurvePoly(CurveBase):
-    """Interpolates using a polynomial function.
-    """
+    """Interpolates using a polynomial function."""
 
     def __init__(self, power: float):
         """Constructs a polynomial curve.
@@ -55,8 +51,7 @@ class CurvePoly(CurveBase):
 
 
 class CurveExponential(CurveBase):
-    """Interpolates exponentially between start and end values (log-space linear).
-    """
+    """Interpolates exponentially between start and end values (log-space linear)."""
 
     def compute(self, start: float, end: float, step_p: float) -> float:
         eps = 1e-8

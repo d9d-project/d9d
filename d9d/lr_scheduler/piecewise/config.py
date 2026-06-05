@@ -10,22 +10,19 @@ from .curves import CurveBase, CurveCosine, CurveExponential, CurveLinear, Curve
 
 
 class CurveLinearConfig(BaseModel):
-    """Configuration for linear interpolation.
-    """
+    """Configuration for linear interpolation."""
 
     type: Literal["linear"] = "linear"
 
 
 class CurveCosineConfig(BaseModel):
-    """Configuration for cosine interpolation.
-    """
+    """Configuration for cosine interpolation."""
 
     type: Literal["cosine"] = "cosine"
 
 
 class CurveExponentialConfig(BaseModel):
-    """Configuration for exponential interpolation.
-    """
+    """Configuration for exponential interpolation."""
 
     type: Literal["exponential"] = "exponential"
 

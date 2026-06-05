@@ -18,8 +18,7 @@ from d9d.model_state.mapper import ModelStateMapper
 
 
 class _StateWritingFlowLocal:
-    """Internal orchestration logic for buffering, transforming, and sharding model states during save.
-    """
+    """Internal orchestration logic for buffering, transforming, and sharding model states during save."""
 
     def __init__(
         self,

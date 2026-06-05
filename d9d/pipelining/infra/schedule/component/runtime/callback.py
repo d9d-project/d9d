@@ -4,8 +4,7 @@ from d9d.pipelining.api import PipelineLossFn, PipelineResultFn
 
 
 class PipelineResultHandler:
-    """Wraps a callback function to handle results from pipeline execution.
-    """
+    """Wraps a callback function to handle results from pipeline execution."""
 
     def __init__(self, callback_fn: PipelineResultFn):
         """Constructs PipelineResultHandler object.
@@ -26,8 +25,7 @@ class PipelineResultHandler:
 
 
 class PipelineLossHandler:
-    """Manages loss computation and state caching across forward and backward passes.
-    """
+    """Manages loss computation and state caching across forward and backward passes."""
 
     def __init__(self, loss_fn: PipelineLossFn):
         """Constructs the loss handler.

@@ -25,8 +25,7 @@ TConfig = TypeVar("TConfig", bound=BaseModel)
 
 
 class PeftMethod(abc.ABC, Generic[TConfig]):
-    """Abstract base class for all Parameter-Efficient Fine-Tuning methods.
-    """
+    """Abstract base class for all Parameter-Efficient Fine-Tuning methods."""
 
     @abc.abstractmethod
     def inject(self, module: nn.Module) -> PeftInjectionResult:

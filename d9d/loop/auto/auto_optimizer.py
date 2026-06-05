@@ -13,8 +13,7 @@ from d9d.optim.stochastic import StochasticAdamW
 
 
 class BaseAutoOptimizerConfig(BaseModel, ABC):
-    """Abstract base class for optimizer configurations.
-    """
+    """Abstract base class for optimizer configurations."""
 
     @abc.abstractmethod
     def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
@@ -195,8 +194,7 @@ AutoOptimizerConfig = Annotated[
 
 
 class AutoOptimizerProvider(OptimizerProvider):
-    """OptimizerProvider that builds a PyTorch optimizer based on a configuration object.
-    """
+    """OptimizerProvider that builds a PyTorch optimizer based on a configuration object."""
 
     def __init__(self, config: AutoOptimizerConfig):
         """Constructs the provider with the given configuration."""

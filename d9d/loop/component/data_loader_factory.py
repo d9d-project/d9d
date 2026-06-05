@@ -15,8 +15,7 @@ from .batch_maths import BatchMaths
 
 
 class DataLoaderKwargs(TypedDict, total=False):
-    """Type definition for arguments accepted by the PyTorch DataLoader.
-    """
+    """Type definition for arguments accepted by the PyTorch DataLoader."""
 
     batch_size: int | None
     shuffle: bool | None

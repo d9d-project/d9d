@@ -32,12 +32,12 @@ class PipelineSchedule(abc.ABC):
     def step(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
         """Executes a single pipeline step using the provided inputs.
 
-         This typically involves distributing inputs across microbatches,
-         executing forward and backward passes according to the specific schedule logic,
-         and handling communications between stages.
+        This typically involves distributing inputs across microbatches,
+        executing forward and backward passes according to the specific schedule logic,
+        and handling communications between stages.
 
-         Args:
-             inputs: A dictionary of global input tensors.
-             kwargs: A dictionary of global keyword arguments.
+        Args:
+            inputs: A dictionary of global input tensors.
+            kwargs: A dictionary of global keyword arguments.
         """
         ...

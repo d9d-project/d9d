@@ -20,8 +20,7 @@ from .struct_helper import DictFlattener
 
 @dataclasses.dataclass(slots=True)
 class ForwardCache:
-    """Stores the inputs and outputs of a forward pass to be used later in the backward pass.
-    """
+    """Stores the inputs and outputs of a forward pass to be used later in the backward pass."""
 
     inputs: dict[str, torch.Tensor]
     outputs: dict[str, torch.Tensor]
@@ -98,8 +97,7 @@ class ForwardComputeHandler:
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class BackwardCacheInputForWeight:
-    """State preserved after calculating input gradients, pending weight gradient calculation.
-    """
+    """State preserved after calculating input gradients, pending weight gradient calculation."""
 
     inputs_grad: dict[str, torch.Tensor]
     param_groups: list[ParamGroup]
@@ -115,8 +113,7 @@ class BackwardCacheInputForFull:
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class BackwardCacheFull:
-    """State preserved after calculating weight gradients.
-    """
+    """State preserved after calculating weight gradients."""
 
     inputs_grad: dict[str, torch.Tensor | None]
 

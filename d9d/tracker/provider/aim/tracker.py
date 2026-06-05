@@ -11,8 +11,7 @@ from .config import AimConfig
 
 
 class AimState(TypedDict):
-    """State dictionary format for persisting Aim tracker state.
-    """
+    """State dictionary format for persisting Aim tracker state."""
 
     restart_hash: str | None
 

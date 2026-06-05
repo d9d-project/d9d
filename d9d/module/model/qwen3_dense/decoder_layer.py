@@ -72,8 +72,7 @@ class Qwen3DenseLayer(nn.Module, ModuleLateInit):
         return hidden_states
 
     def reset_parameters(self):
-        """Resets module parameters.
-        """
+        """Resets module parameters."""
         self.self_attn.reset_parameters()
         self.mlp.reset_parameters()
         self.input_layernorm.reset_parameters()

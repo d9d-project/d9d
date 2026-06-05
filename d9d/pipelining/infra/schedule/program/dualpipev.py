@@ -29,8 +29,7 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
     """
 
     def __init__(self):
-        """Constructs the DualPipeV builder.
-        """
+        """Constructs the DualPipeV builder."""
 
     @staticmethod
     def _build_for_rank(  # noqa: C901

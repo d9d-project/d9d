@@ -50,8 +50,7 @@ class Metric(abc.ABC, Stateful, Generic[TComputeResult]):
 
     @abc.abstractmethod
     def reset(self):
-        """Resets the internal state of the metric to the initial values.
-        """
+        """Resets the internal state of the metric to the initial values."""
 
     def to(self, device: str | torch.device | int):
         """Moves a metric state to a specified device.

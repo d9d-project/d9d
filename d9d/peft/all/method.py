@@ -12,8 +12,7 @@ from ..lora.method import LoRA
 
 
 class PeftStack(PeftMethod[PeftStackConfig]):
-    """A composite PEFT method that applies a list of methods sequentially.
-    """
+    """A composite PEFT method that applies a list of methods sequentially."""
 
     def __init__(self, methods: list[PeftMethod]):
         """Constructs a PeftStack object.

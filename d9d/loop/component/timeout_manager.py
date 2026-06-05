@@ -5,8 +5,7 @@ from d9d.loop.config.config import TimeoutConfig
 
 
 class TimeoutState(StrEnum):
-    """Represents the lifecycle states of the timeout manager configuration.
-    """
+    """Represents the lifecycle states of the timeout manager configuration."""
 
     none = "none"
     set_initial = "set_initial"

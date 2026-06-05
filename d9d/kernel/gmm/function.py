@@ -8,8 +8,7 @@ from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 
 
 class GroupedGemm(Function):
-    """Autograd function for Grouped GEMM (Generalized Matrix Multiplication) with explicit gradient control.
-    """
+    """Autograd function for Grouped GEMM (Generalized Matrix Multiplication) with explicit gradient control."""
 
     @staticmethod
     def forward(

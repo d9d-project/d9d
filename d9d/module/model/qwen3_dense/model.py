@@ -297,8 +297,7 @@ class Qwen3DenseForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining)
         return model_outputs
 
     def reset_parameters(self):
-        """Resets module parameters.
-        """
+        """Resets module parameters."""
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:
@@ -400,8 +399,7 @@ class Qwen3DenseForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipel
         return model_outputs
 
     def reset_parameters(self):
-        """Resets module parameters.
-        """
+        """Resets module parameters."""
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:
@@ -503,8 +501,7 @@ class Qwen3DenseForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining
         return model_outputs
 
     def reset_parameters(self):
-        """Resets module parameters.
-        """
+        """Resets module parameters."""
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:

@@ -30,8 +30,7 @@ class EventBus:
     """
 
     def __init__(self) -> None:
-        """Constructs an EventBus object.
-        """
+        """Constructs an EventBus object."""
         self._handlers: dict[Event, list[Callable[[Any], None]]] = defaultdict(list)
 
     def subscribe(self, event: Event[TContext], handler: Callable[[TContext], None]) -> None:

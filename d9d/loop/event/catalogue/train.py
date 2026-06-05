@@ -37,16 +37,14 @@ class EventLRSchedulerReadyContext:
 
 @dataclasses.dataclass(kw_only=True)
 class EventTrainReadyContext:
-    """Context provided when training is fully ready to begin and the checkpoint is loaded.
-    """
+    """Context provided when training is fully ready to begin and the checkpoint is loaded."""
 
     run: BaseTrackerRun
 
 
 @dataclasses.dataclass(kw_only=True)
 class EventTrainFinishedContext:
-    """Context provided when the entire training loop has completed successfully.
-    """
+    """Context provided when the entire training loop has completed successfully."""
 
 
 @dataclasses.dataclass(kw_only=True)

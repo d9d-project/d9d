@@ -10,8 +10,7 @@ from .stepper import Stepper
 
 
 class GradientClipper:
-    """Manages gradient clipping and logging of gradient norms in a distributed execution environment.
-    """
+    """Manages gradient clipping and logging of gradient norms in a distributed execution environment."""
 
     def __init__(
         self,

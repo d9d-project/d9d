@@ -12,7 +12,9 @@ LM_IGNORE_INDEX = -100
 
 
 class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
-    """A segmented language modeling head that computes per-token cross-entropy loss values using a composed weight matrix.
+    """A segmented language modeling head computing per-token cross-entropy loss.
+
+    Computes per-token cross-entropy loss values using a composed weight matrix.
 
     This class maintains separate linear layers for different segments of the vocabulary
     (e.g., regular vs. special tokens). During the forward pass, it concatenates the

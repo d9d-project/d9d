@@ -28,8 +28,7 @@ def _detach_leaf(x: TMap) -> TMap:
 
 
 class ShardedState(UserDict):
-    """Container for holding state broken down by shard indices.
-    """
+    """Container for holding state broken down by shard indices."""
 
 
 class PipelineStateStorage:
@@ -204,6 +203,5 @@ class PipelineStateStorage:
         return key in self._state
 
     def reset(self):
-        """Clears all stored state.
-        """
+        """Clears all stored state."""
         self._state.clear()

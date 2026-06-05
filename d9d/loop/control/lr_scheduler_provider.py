@@ -26,8 +26,7 @@ class InitializeLRSchedulerContext:
 
 @typing.runtime_checkable
 class LRSchedulerProvider(Protocol):
-    """Protocol for defining how Learning Rate schedulers are created.
-    """
+    """Protocol for defining how Learning Rate schedulers are created."""
 
     @abc.abstractmethod
     def __call__(self, context: InitializeLRSchedulerContext) -> LRSchedulerProtocol:

@@ -75,8 +75,7 @@ class LoRALinear(nn.Module):
         return mod
 
     def reset_parameters(self):
-        """Resets LoRA parameters. A is random, B is zeroed.
-        """
+        """Resets LoRA parameters. A is random, B is zeroed."""
         self.lora_A.reset_parameters()
         nn.init.zeros_(self.lora_B.weight)
 
@@ -147,7 +146,6 @@ class LoRAGroupedLinear(nn.Module):
         return mod
 
     def reset_parameters(self):
-        """Resets LoRA parameters. A is random, B is zeroed.
-        """
+        """Resets LoRA parameters. A is random, B is zeroed."""
         self.lora_A.reset_parameters()
         nn.init.zeros_(self.lora_B.weight)

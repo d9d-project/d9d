@@ -11,8 +11,7 @@ from d9d.model_state.mapper import ModelStateMapper
 
 
 class _StateLoadingFlow:
-    """Internal orchestration logic for loading and transforming model states in a streamed manner.
-    """
+    """Internal orchestration logic for loading and transforming model states in a streamed manner."""
 
     def __init__(
         self, src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool, position: int | None = None

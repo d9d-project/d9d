@@ -7,8 +7,7 @@ from .op import silu_mul_backward, silu_mul_forward
 
 
 class SiLUMulFunction(Function):
-    """Autograd function for the fused silu(x)*y operation.
-    """
+    """Autograd function for the fused silu(x)*y operation."""
 
     @staticmethod
     def forward(ctx: Any, x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:

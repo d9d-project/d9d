@@ -272,8 +272,7 @@ class Trainer:
         )
 
     def train(self):
-        """Executes the full training workflow.
-        """
+        """Executes the full training workflow."""
         self._state.dist_context.wait_world()
         self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
         self._state.checkpointer.load_last_checkpoint(self._state)

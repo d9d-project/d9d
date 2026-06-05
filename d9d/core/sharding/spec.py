@@ -5,8 +5,7 @@ from d9d.core.types import PyTree
 
 @dataclasses.dataclass(slots=True, frozen=True)
 class SpecReplicate:
-    """Specifies that a leaf node should be replicated across all shards.
-    """
+    """Specifies that a leaf node should be replicated across all shards."""
 
 
 @dataclasses.dataclass(slots=True, frozen=True)

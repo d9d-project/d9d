@@ -21,7 +21,8 @@ class ReceiveStageInput:
 
 @dataclasses.dataclass
 class StartStageInput:
-    """Instruction indicating that the input for this stage does not come from communication
+    """Instruction indicating that the input for this stage does not come from communication.
+
     (e.g., this is the first stage receiving data loader inputs).
     """
 
@@ -42,7 +43,8 @@ class SendStageOutput:
 
 @dataclasses.dataclass
 class EndStageOutput:
-    """Instruction indicating that the output of this stage is not sent anywhere
+    """Instruction indicating that the output of this stage is not sent anywhere.
+
     (e.g., this is the last stage computing loss).
     """
 
@@ -51,7 +53,7 @@ StageOutput = SendStageOutput | EndStageOutput
 
 
 class StageCommunicationHandler:
-    """Manages Point-to-Point (P2P) communication descriptors for a specific data flow direction within a pipeline stage.
+    """Manages Point-to-Point (P2P) communication descriptors for a data flow direction within a pipeline stage.
 
     This class handles the creation of P2P operations (send/recv) across multiple microbatches,
     managing buffers and mapping logical stage indices to physical ranks.

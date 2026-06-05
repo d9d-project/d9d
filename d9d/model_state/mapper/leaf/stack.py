@@ -4,8 +4,9 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperStackTensors(ModelStateMapper):
-    """Stacks multiple input tensors into a single output tensor producing
-    a new stacking dimension.
+    """Stacks multiple input tensors into a single output tensor.
+
+    A new stacking dimension is produced.
     """
 
     def __init__(
@@ -36,8 +37,9 @@ class ModelStateMapperStackTensors(ModelStateMapper):
 
 
 class ModelStateMapperUnstackTensors(ModelStateMapper):
-    """Unstacks a single input tensor into multiple output tensors along a specified
-    dimension.
+    """Unstacks a single input tensor into multiple output tensors.
+
+    The tensor is unstacked along a specified dimension.
     """
 
     def __init__(
@@ -71,8 +73,7 @@ class ModelStateMapperUnstackTensors(ModelStateMapper):
 
 
 class ModelStateMapperChunkTensors(ModelStateMapper):
-    """Chunks a single input tensor into multiple output tensors along a specified dimension.
-    """
+    """Chunks a single input tensor into multiple output tensors along a specified dimension."""
 
     def __init__(
         self,
@@ -105,8 +106,9 @@ class ModelStateMapperChunkTensors(ModelStateMapper):
 
 
 class ModelStateMapperConcatenateTensors(ModelStateMapper):
-    """Concatenates ('unchunks') multiple input tensors into a single output tensor
-    along a specified dimension.
+    """Concatenates ('unchunks') multiple input tensors into a single output tensor.
+
+    The tensors are concatenated along a specified dimension.
     """
 
     def __init__(

@@ -149,7 +149,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         }
 
     def reset_parameters(self):
-        """Resets module parameters"""
+        """Resets module parameters."""
         if self._stage.is_current_stage_first:
             self.embed_tokens.reset_parameters()
 
@@ -297,8 +297,7 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         return model_outputs
 
     def reset_parameters(self):
-        """Resets module parameters.
-        """
+        """Resets module parameters."""
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:
@@ -400,8 +399,7 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
         return model_outputs
 
     def reset_parameters(self):
-        """Resets module parameters.
-        """
+        """Resets module parameters."""
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:
@@ -503,8 +501,7 @@ class Qwen3MoEForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         return model_outputs
 
     def reset_parameters(self) -> None:
-        """Resets module parameters.
-        """
+        """Resets module parameters."""
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:

@@ -59,7 +59,9 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
         pack_size: int,
         init_seed: int | None = None,
     ):
-        """Args:
+        """Constructs a BufferSortedDataset object.
+
+        Args:
             base_dataset: The underlying dataset.
             buffer_size: The number of items to load into the buffer for sorting.
             pack_size: The size of local groups (batches/micro-batches).

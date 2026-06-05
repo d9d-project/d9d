@@ -92,8 +92,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
         return RoutingResult(selected_expert_indices=selected_experts_indices, selected_probabilities=selected_probs)
 
     def reset_parameters(self) -> None:
-        """Resets module parameters.
-        """
+        """Resets module parameters."""
         if self.expert_bias is not None:
             nn.init.zeros_(self.expert_bias)
 

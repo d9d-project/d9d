@@ -24,8 +24,7 @@ class InitializeOptimizerStageContext:
 
 @typing.runtime_checkable
 class OptimizerProvider(Protocol):
-    """Protocol for defining how optimizers are created for model pipeline stages.
-    """
+    """Protocol for defining how optimizers are created for model pipeline stages."""
 
     @abc.abstractmethod
     def __call__(self, context: InitializeOptimizerStageContext) -> Optimizer:

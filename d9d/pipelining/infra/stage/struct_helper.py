@@ -5,8 +5,7 @@ T = TypeVar("T")
 
 
 class DictFlattener:
-    """Helper class to flatten and unflatten dictionaries into sequences deterministically.
-    """
+    """Helper class to flatten and unflatten dictionaries into sequences deterministically."""
 
     def __init__(self, keys: Iterable[str]):
         """Constructs a DictFlattener object.

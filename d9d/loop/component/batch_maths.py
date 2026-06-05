@@ -49,8 +49,7 @@ class BatchMaths:
 
     @property
     def global_batch_size(self) -> int:
-        """Returns the global batch size across the world.
-        """
+        """Returns the global batch size across the world."""
         return self._config_batching.global_batch_size
 
     @property

@@ -42,8 +42,7 @@ def _vocab_name_for(params: Qwen3DenseParameters) -> str:
 
 
 def mapper_from_huggingface_qwen3_dense(params: Qwen3DenseParameters) -> ModelStateMapper:
-    """Creates a state mapper for a base Qwen3 Dense model that translates the HuggingFace state dictionary keys
-    into the d9d format.
+    """Creates a state mapper translating base Qwen3 Dense HuggingFace keys into the d9d format.
 
     Args:
         params: Base model parameters.
@@ -71,8 +70,7 @@ def mapper_from_huggingface_qwen3_dense(params: Qwen3DenseParameters) -> ModelSt
 
 
 def mapper_from_huggingface_qwen3_dense_for_causal_lm(params: Qwen3DenseForCausalLMParameters) -> ModelStateMapper:
-    """Creates a state mapper for a Qwen3 Dense Causal LM model that translates the HuggingFace state dictionary
-    keys into the d9d format.
+    """Creates a state mapper translating Qwen3 Dense Causal LM HuggingFace keys into the d9d format.
 
     Args:
         params: Causal LM model parameters.
@@ -94,8 +92,7 @@ def mapper_from_huggingface_qwen3_dense_for_causal_lm(params: Qwen3DenseForCausa
 def mapper_from_huggingface_qwen3_dense_for_classification(
     params: Qwen3DenseForClassificationParameters,
 ) -> ModelStateMapper:
-    """Creates a state mapper for a Qwen3 Dense sequence classification model that translates the HuggingFace
-    state dictionary keys into the d9d format.
+    """Creates a state mapper translating Qwen3 Dense classification HuggingFace keys into the d9d format.
 
     Args:
         params: Classification model parameters.
@@ -116,8 +113,7 @@ def mapper_from_huggingface_qwen3_dense_for_classification(
 def mapper_from_huggingface_qwen3_dense_for_embedding(
     params: Qwen3DenseForEmbeddingParameters,
 ) -> ModelStateMapper:
-    """Creates a state mapper for a Qwen3 Dense embedding model that translates the HuggingFace
-    state dictionary keys into the d9d format.
+    """Creates a state mapper translating Qwen3 Dense embedding HuggingFace keys into the d9d format.
 
     Args:
         params: Embedding model parameters.
@@ -150,8 +146,7 @@ def _mapper_to_huggingface_qwen3_dense_layer() -> ModelStateMapper:
 
 
 def mapper_to_huggingface_qwen3_dense(params: Qwen3DenseParameters) -> ModelStateMapper:
-    """Creates a state mapper for a base Qwen3 Dense model that translates the d9d state dictionary keys
-    back into the HuggingFace format.
+    """Creates a state mapper translating base Qwen3 Dense d9d keys back into the HuggingFace format.
 
     Args:
         params: Base model parameters.
@@ -179,8 +174,7 @@ def mapper_to_huggingface_qwen3_dense(params: Qwen3DenseParameters) -> ModelStat
 
 
 def mapper_to_huggingface_qwen3_dense_for_causal_lm(params: Qwen3DenseForCausalLMParameters) -> ModelStateMapper:
-    """Creates a state mapper for a Qwen3 Dense Causal LM model that translates the d9d state dictionary
-    keys back into the HuggingFace format.
+    """Creates a state mapper translating Qwen3 Dense Causal LM d9d keys back into the HuggingFace format.
 
     Args:
         params: Causal LM model parameters.
@@ -202,8 +196,7 @@ def mapper_to_huggingface_qwen3_dense_for_causal_lm(params: Qwen3DenseForCausalL
 def mapper_to_huggingface_qwen3_dense_for_classification(
     params: Qwen3DenseForClassificationParameters,
 ) -> ModelStateMapper:
-    """Creates a state mapper for a Qwen3 Dense sequence classification model that translates the d9d
-    state dictionary keys back into the HuggingFace format.
+    """Creates a state mapper translating Qwen3 Dense classification d9d keys back into the HuggingFace format.
 
     Args:
         params: Classification model parameters.
@@ -224,8 +217,7 @@ def mapper_to_huggingface_qwen3_dense_for_classification(
 def mapper_to_huggingface_qwen3_dense_for_embedding(
     params: Qwen3DenseForEmbeddingParameters,
 ) -> ModelStateMapper:
-    """Creates a state mapper for a Qwen3 Dense embedding model that translates the d9d
-    state dictionary keys back into the HuggingFace format.
+    """Creates a state mapper translating Qwen3 Dense embedding d9d keys back into the HuggingFace format.
 
     Args:
         params: Embedding model parameters.

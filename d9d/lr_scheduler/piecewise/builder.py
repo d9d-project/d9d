@@ -10,8 +10,7 @@ from .engine import PiecewiseScheduleEngine, SchedulePhase
 
 
 class PiecewiseScheduleBuilder:
-    """Builder for constructing multiphase learning rate schedules.
-    """
+    """Builder for constructing multiphase learning rate schedules."""
 
     def __init__(self, initial_multiplier: float, total_steps: int | None):
         """Constructs a new PiecewiseScheduleBuilder.

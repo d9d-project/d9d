@@ -7,8 +7,7 @@ from .storage import PipelineStateStorage
 
 
 class PipelineStateGlobal(PipelineState):
-    """Represents the global (unsharded) view of the pipeline state.
-    """
+    """Represents the global (unsharded) view of the pipeline state."""
 
     def __init__(self, storage: PipelineStateStorage):
         """Constructs a PipelineStateGlobal object.
@@ -29,8 +28,7 @@ class PipelineStateGlobal(PipelineState):
 
 
 class PipelineStateShard(PipelineState):
-    """Represents a sharded view of the pipeline state for a specific shard ID.
-    """
+    """Represents a sharded view of the pipeline state for a specific shard ID."""
 
     def __init__(self, storage: PipelineStateStorage, current_shard: int):
         """Constructs a PipelineStateShard object.
@@ -90,6 +88,5 @@ class PipelineStateHandler:
         return PipelineStateShard(self._storage, shard_id)
 
     def reset(self):
-        """Resets the underlying storage, clearing all state.
-        """
+        """Resets the underlying storage, clearing all state."""
         self._storage.reset()

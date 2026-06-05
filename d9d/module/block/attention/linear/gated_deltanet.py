@@ -16,6 +16,7 @@ from d9d.module.block.normalization import RMSNorm
 
 class CausalShortDepthwiseConv1d(nn.Module, ModuleLateInit):
     """Causal 1D depthwise convolution (short convolution) as used in Mamba/FLA architectures.
+
     Applies a grouped (depthwise) 1D convolution with left-padding to ensure causality,
     followed by an optional activation function.
     """
@@ -66,6 +67,7 @@ class CausalShortDepthwiseConv1d(nn.Module, ModuleLateInit):
 
 class LogSigmoidDecayGate(nn.Module, ModuleLateInit):
     """Decay gate using scaled log-sigmoid.
+
     Used in GLA, original Delta Net, HGRN-2.
     """
 
@@ -100,6 +102,7 @@ class LogSigmoidDecayGate(nn.Module, ModuleLateInit):
 
 class MambaDecayGate(nn.Module, ModuleLateInit):
     """Mamba-style decay gate with learnable A_log and dt_bias.
+
     Used in Mamba, Mamba-2, Qwen3-Next, Qwen3.5.
     """
 

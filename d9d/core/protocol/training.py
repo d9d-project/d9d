@@ -16,12 +16,10 @@ class OptimizerProtocol(Protocol):
         """Sets the gradients of all optimized tensors to zero."""
 
     def state_dict(self) -> dict[str, Any]:
-        """Objects should return their state_dict representation as a dictionary.
-        The output of this function will be checkpointed, and later restored in
-        `load_state_dict()`.
+        """Return the optimizer's state as a serializable dict.
 
         Returns:
-            Dict: The objects state dict
+            A dict containing the optimizer's state, suitable for checkpointing.
         """
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
@@ -45,13 +43,12 @@ class LRSchedulerProtocol(Protocol):
         ...
 
     def state_dict(self) -> dict[str, Any]:
-        """Objects should return their state_dict representation as a dictionary.
-        The output of this function will be checkpointed, and later restored in
-        `load_state_dict()`.
+        """Return the scheduler's state as a serializable dict.
 
         Returns:
-            Dict: The objects state dict
+            A dict containing the scheduler's state, suitable for checkpointing.
         """
+        ...
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         """Restore the object's state from the provided state_dict.

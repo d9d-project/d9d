@@ -9,8 +9,7 @@ from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddi
 
 
 class LowRankProjection(nn.Module):
-    """Implements a low-rank linear projection with an intermediate normalization layer.
-    """
+    """Implements a low-rank linear projection with an intermediate normalization layer."""
 
     def __init__(self, in_features: int, bottleneck: int, out_features: int, norm_eps: float):
         """Constructs the LowRankProjection object.

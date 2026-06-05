@@ -79,8 +79,7 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         return index * self._total_shards + self._current_shard
 
     def _get_base_index_unsafe(self, index: int) -> int:
-        """Calculates the underlying dataset index for a given shard index,
-        without boundary checking.
+        """Calculates the underlying dataset index for a given shard index, without boundary checking.
 
         Returns:
             The index in the underlying dataset.

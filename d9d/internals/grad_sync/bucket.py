@@ -36,18 +36,15 @@ class AbstractGradientBucket(abc.ABC):
 
     @abc.abstractmethod
     def zero_grad(self):
-        """Zeros out the gradients and resets accumulation counters.
-        """
+        """Zeros out the gradients and resets accumulation counters."""
 
     @abc.abstractmethod
     def mark_sync(self):
-        """Marks this bucket as synchronized.
-        """
+        """Marks this bucket as synchronized."""
 
 
 class LocalGradientBucket(AbstractGradientBucket):
-    """A bucket for parameters that do not require distributed synchronization.
-    """
+    """A bucket for parameters that do not require distributed synchronization."""
 
     def __init__(self, params: list[nn.Parameter]):
         """Constructs a LocalGradientBucket.
@@ -58,32 +55,26 @@ class LocalGradientBucket(AbstractGradientBucket):
         self._params = params
 
     def bind(self):
-        """No-op for local buckets as they do not require special buffering.
-        """
+        """No-op for local buckets as they do not require special buffering."""
 
     def unbind(self):
-        """No-op for local buckets.
-        """
+        """No-op for local buckets."""
 
     def wait(self):
-        """No-op as no async communication is performed.
-        """
+        """No-op as no async communication is performed."""
 
     @torch.no_grad()
     def zero_grad(self):
-        """Directly zeros the grad attribute of the parameters.
-        """
+        """Directly zeros the grad attribute of the parameters."""
         for param in self._params:
             param.grad = None
 
     def mark_sync(self):
-        """No-op for local buckets.
-        """
+        """No-op for local buckets."""
 
 
 class AccumulationCounter:
-    """Tracks the number of gradient accumulation steps for a set of parameters.
-    """
+    """Tracks the number of gradient accumulation steps for a set of parameters."""
 
     def __init__(self, require_accumulations: int, parameters: list[nn.Parameter]):
         """Constructs an AccumulationCounter.
@@ -96,8 +87,7 @@ class AccumulationCounter:
         self._param_to_sync_count = {param: 0 for param in parameters}
 
     def reset(self):
-        """Resets all counters to zero.
-        """
+        """Resets all counters to zero."""
         self._param_to_sync_count = {param: 0 for param in self._param_to_sync_count}
 
     def update(self, param: nn.Parameter):
@@ -163,8 +153,7 @@ class SyncGradientBucket(AbstractGradientBucket):
         self._ready_to_sync = False
 
     def _bind_buffer(self):
-        """Allocates the flat buffer and redirects parameter gradients to view into it.
-        """
+        """Allocates the flat buffer and redirects parameter gradients to view into it."""
         buffer_size = sum(cast(DTensor, param.data).to_local().numel() for param in self._params)
 
         self._buffer = torch.zeros((buffer_size,), dtype=self._grad_dtype, device=self._device)
@@ -213,8 +202,7 @@ class SyncGradientBucket(AbstractGradientBucket):
             self._ready_to_sync = True
 
     def _bind_hooks(self):
-        """Registers post-accumulate hooks on all parameters.
-        """
+        """Registers post-accumulate hooks on all parameters."""
         hooks = []
         for param in self._params:
             hooks.append(param.register_post_accumulate_grad_hook(self._post_accumulation_hook))
@@ -222,22 +210,19 @@ class SyncGradientBucket(AbstractGradientBucket):
 
     @torch.no_grad()
     def bind(self):
-        """Allocates the contiguous buffer and registers hooks.
-        """
+        """Allocates the contiguous buffer and registers hooks."""
         self._bind_buffer()
         self._bind_hooks()
 
     def _unbind_buffer(self):
-        """Deallocates the buffer and clears parameter gradients.
-        """
+        """Deallocates the buffer and clears parameter gradients."""
         self._buffer = None
 
         for param in self._params:
             param.grad = None
 
     def _unbind_hooks(self):
-        """Removes all registered hooks.
-        """
+        """Removes all registered hooks."""
         if self._hooks is None:
             return
 
@@ -247,8 +232,7 @@ class SyncGradientBucket(AbstractGradientBucket):
 
     @torch.no_grad()
     def unbind(self):
-        """Cleans up buffer and hooks.
-        """
+        """Cleans up buffer and hooks."""
         self._unbind_buffer()
         self._unbind_hooks()
 

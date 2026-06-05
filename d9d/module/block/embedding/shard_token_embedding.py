@@ -87,7 +87,6 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
         return output_embeds
 
     def reset_parameters(self):
-        """Resets parameters for all registered embedding splits.
-        """
+        """Resets parameters for all registered embedding splits."""
         for layer in self.token_embedding.values():
             layer.reset_parameters()

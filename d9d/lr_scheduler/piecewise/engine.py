@@ -23,8 +23,7 @@ class SchedulePhase:
 
 
 class PiecewiseScheduleEngine:
-    """Runtime engine that calculates multipliers based on a list of defined phases.
-    """
+    """Runtime engine that calculates multipliers based on a list of defined phases."""
 
     def __init__(self, phases: list[SchedulePhase]):
         """Constructs the schedule engine.

@@ -280,8 +280,10 @@ class ConfusionMatrixMetricBuilder:
         return self.with_aggregation(ClassificationAggregationMethod.MACRO)
 
     def weighted(self) -> Self:
-        """Computes the metric for each class independently and finds their average weighted by the true instances
-            (support) for each class.
+        """Computes the per-class metric averaged with weighting by class support.
+
+        The metric is computed for each class independently and averaged, weighted
+        by the number of true instances (support) for each class.
 
         Returns:
             The current builder instance.

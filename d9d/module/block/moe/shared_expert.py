@@ -58,8 +58,7 @@ class SharedSwiGLU(nn.Module, ModuleLateInit):
         return x
 
     def reset_parameters(self):
-        """Resets module parameters.
-        """
+        """Resets module parameters."""
         self.expert.reset_parameters()
 
         if self.gate is not None:

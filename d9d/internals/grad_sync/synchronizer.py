@@ -47,8 +47,7 @@ def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
 
 @dataclasses.dataclass(frozen=True)
 class _ParameterGroupMarker:
-    """Identifier for grouping compatible parameters into buckets.
-    """
+    """Identifier for grouping compatible parameters into buckets."""
 
     group_i: int
     reduce_mesh: DeviceMesh | None
@@ -130,6 +129,7 @@ def _fill_buckets(
         param_groups: Parameters grouped by sync requirements.
         bucket_size_mb: Max size for each bucket in megabytes.
         require_accumulations: Number of gradient accumulations required before syncing gradients.
+        communicate_stream: CUDA stream used for asynchronous gradient communication.
 
     Returns:
         List of configured gradient buckets.
@@ -226,15 +226,13 @@ class GradientSynchronizer:
         self._communicate_stream = None
 
     def wait(self):
-        """Waits for all bucket operations (async reductions) to complete.
-        """
+        """Waits for all bucket operations (async reductions) to complete."""
         torch.cuda.current_stream().wait_stream(self._communicate_stream)
 
         for bucket in self._buckets:
             bucket.mark_sync()
 
     def zero_grad(self):
-        """Resets gradients and accumulation counters for all managed parameters.
-        """
+        """Resets gradients and accumulation counters for all managed parameters."""
         for bucket in self._buckets:
             bucket.zero_grad()
