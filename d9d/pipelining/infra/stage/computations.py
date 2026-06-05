@@ -58,11 +58,9 @@ class ForwardComputeHandler:
             inputs: Dictionary of input tensors.
             kwargs: Additional keyword arguments for the module.
 
-        Returns:
-            The output of the module.
-
         Raises:
             RuntimeError: If the forward pass implementation fails.
+            ValueError: If the module output is not a dictionary.
         """
 
         # Compute forward
@@ -175,6 +173,9 @@ class BackwardComputeHandler:
             inputs: The inputs used in the forward pass.
             outputs: The outputs produced by the forward pass.
             outputs_grad: Gradients of the loss with respect to the outputs.
+
+        Raises:
+            ValueError: If a double backward is attempted for the same microbatch.
         """
 
         if microbatch_index in self._cache:
@@ -211,6 +212,9 @@ class BackwardComputeHandler:
             inputs: The inputs used in the forward pass.
             outputs: The outputs produced by the forward pass.
             outputs_grad: Gradients of the loss with respect to the outputs.
+
+        Raises:
+            ValueError: If a double backward is attempted.
         """
 
         if microbatch_index in self._cache:
@@ -247,6 +251,9 @@ class BackwardComputeHandler:
 
         Args:
             microbatch_index: Identifier for the microbatch.
+
+        Raises:
+            ValueError: If `backward_input` was not called before or if called twice.
         """
 
         if microbatch_index not in self._cache:
@@ -275,6 +282,9 @@ class BackwardComputeHandler:
 
         Returns:
             Dictionary of gradient tensors.
+
+        Raises:
+            ValueError: If the required backward pass was not performed or if gradients are missing.
         """
         cached = self._cache[microbatch_index]
 

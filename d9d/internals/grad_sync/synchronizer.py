@@ -19,6 +19,9 @@ def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
 
     Returns:
         The DeviceMesh subset needed for reduction, or None if no reduction is needed.
+
+    Raises:
+        ValueError: If a tensor placement is unknown.
     """
 
     reduce_dims: set[int] = set()
@@ -98,6 +101,12 @@ def _make_bucket(
 ) -> AbstractGradientBucket:
     """
     Factory function to create the appropriate bucket type.
+
+    Returns:
+        The created bucket.
+
+    Raises:
+        ValueError: If the gradient dtype is None for a sync bucket.
     """
 
     if group_marker.reduce_mesh is None:

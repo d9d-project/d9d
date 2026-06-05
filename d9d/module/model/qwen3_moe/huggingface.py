@@ -402,6 +402,9 @@ def mapper_to_huggingface_qwen3_moe_for_embedding(
 
     Returns:
         A composite state mapper.
+
+    Raises:
+        ValueError: If the model has a trained embedding projection.
     """
 
     if params.embedding_dim is not None:

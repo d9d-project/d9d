@@ -63,6 +63,9 @@ class PipelineStage:
             num_microbatches: Total number of microbatches to process.
             has_backward: Does this pipeline stage should store info for a backward pass
             pipeline_inputs: Pipeline input data.
+
+        Raises:
+            TypeError: If the module does not support pipelining.
         """
 
         self._has_backward = has_backward
@@ -115,6 +118,9 @@ class PipelineStage:
         Sets local forward inputs manually.
 
         Used for the V-shape schedulers.
+
+        Raises:
+            ValueError: If the forward communication handler is not configured.
         """
 
         if self._forward_comm is None:
@@ -128,6 +134,12 @@ class PipelineStage:
     def pop_local_bwd_output(self, microbatch_index: int) -> dict[str, torch.Tensor]:
         """
         Retrieves local backward outputs (gradients).
+
+        Returns:
+            The backward output gradients.
+
+        Raises:
+            ValueError: If the stage is not configured for backward passes.
         """
 
         if not self._has_backward:
@@ -138,6 +150,9 @@ class PipelineStage:
     def set_local_bwd_input(self, inputs: dict[str, torch.Tensor], microbatch_index: int):
         """
         Sets local backward inputs (output gradients) manually.
+
+        Raises:
+            ValueError: If the stage is not configured for backward passes or if buffers are not initialized.
         """
 
         if not self._has_backward:
@@ -149,7 +164,15 @@ class PipelineStage:
         self._backward_comm.set_inputs_local(inputs, microbatch_index)
 
     def get_fwd_recv_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """Returns P2P ops to receive forward inputs for the given microbatch."""
+        """
+        Returns P2P ops to receive forward inputs for the given microbatch.
+
+        Returns:
+            The list of P2P operations.
+
+        Raises:
+            ValueError: If the forward communication handler is not configured.
+        """
 
         if self._forward_comm is None:
             raise ValueError("You must configure stage buffers first")
@@ -157,7 +180,15 @@ class PipelineStage:
         return self._forward_comm.create_receive_ops(microbatch_index)
 
     def get_fwd_send_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """Returns P2P ops to send forward outputs for the given microbatch."""
+        """
+        Returns P2P ops to send forward outputs for the given microbatch.
+
+        Returns:
+            The list of P2P operations.
+
+        Raises:
+            ValueError: If the forward communication handler is not configured.
+        """
 
         if self._forward_comm is None:
             raise ValueError("You must configure stage buffers first")
@@ -166,7 +197,15 @@ class PipelineStage:
         return self._forward_comm.create_send_ops(fwd_result)
 
     def get_bwd_recv_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """Returns P2P ops to receive backward gradients for the given microbatch."""
+        """
+        Returns P2P ops to receive backward gradients for the given microbatch.
+
+        Returns:
+            The list of P2P operations.
+
+        Raises:
+            ValueError: If the backward communication handler is not configured.
+        """
 
         if not self._has_backward:
             return []
@@ -177,7 +216,15 @@ class PipelineStage:
         return self._backward_comm.create_receive_ops(microbatch_index)
 
     def get_bwd_send_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """Returns P2P ops to send backward gradients for the given microbatch."""
+        """
+        Returns P2P ops to send backward gradients for the given microbatch.
+
+        Returns:
+            The list of P2P operations.
+
+        Raises:
+            ValueError: If the backward communication handler is not configured.
+        """
 
         if not self._has_backward:
             return []
@@ -205,8 +252,8 @@ class PipelineStage:
             pipeline_inputs: Inputs provided locally (only used if this is the first stage).
             pipeline_kwargs: Additional arguments for the module.
 
-        Returns:
-            The output tensors of the forward pass.
+        Raises:
+            ValueError: If the forward communication handler is not configured.
         """
 
         if self._forward_comm is None:
@@ -232,6 +279,9 @@ class PipelineStage:
             microbatch_index: The microbatch index.
             loss: The loss tensor (only used if this is the last stage).
             full_backward: If True, computes grads for inputs and weights. If False, only for inputs.
+
+        Raises:
+            ValueError: If the stage is not configured for backward passes or if buffers are not initialized.
         """
 
         if not self._has_backward:
@@ -277,6 +327,9 @@ class PipelineStage:
 
         Args:
             microbatch_index: The microbatch index.
+
+        Raises:
+            ValueError: If the stage is not configured for backward passes.
         """
 
         if not self._has_backward:

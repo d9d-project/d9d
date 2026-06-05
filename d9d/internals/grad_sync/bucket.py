@@ -167,6 +167,9 @@ class SyncGradientBucket(AbstractGradientBucket):
             grad_dtype: Data type for the gradients.
             reduce_mesh: DeviceMesh on which reduction happens.
             communicate_stream: Stream where all the asynchronous communications will be scheduled
+
+        Raises:
+            ValueError: If any parameter does not contain DTensor data.
         """
 
         if not all(isinstance(x.data, DTensor) for x in parameters):
@@ -216,6 +219,9 @@ class SyncGradientBucket(AbstractGradientBucket):
 
         Args:
             param: The parameter that finished backward pass.
+
+        Raises:
+            ValueError: If the bucket is already ready to sync but hasn't been synced yet.
         """
 
         self._accum_counter.update(param)

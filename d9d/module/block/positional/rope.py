@@ -45,6 +45,9 @@ def prepare_rotary_cos_sin_emb(
 
     Returns:
         A tuple containing cosine and sine tensors.
+
+    Raises:
+        ValueError: If an unknown RoPE style is provided.
     """
 
     if rope_scaling is None:
@@ -135,14 +138,22 @@ class RotaryEmbeddingProvider(nn.Module, ModuleLateInit):
 
 
 def _rotate_half(x: torch.Tensor) -> torch.Tensor:
-    """Rotates half-chunked elements."""
+    """Rotates half-chunked elements.
+
+    Returns:
+        The rotated tensor.
+    """
     x1 = x[..., : x.shape[-1] // 2]
     x2 = x[..., x.shape[-1] // 2 :]
     return torch.cat((-x2, x1), dim=-1)
 
 
 def _rotate_every_two(x: torch.Tensor) -> torch.Tensor:
-    """Rotates interleaved complex pairs."""
+    """Rotates interleaved complex pairs.
+
+    Returns:
+        The rotated tensor.
+    """
     x_unflattened = x.view(*x.shape[:-1], -1, 2)
     x1 = x_unflattened[..., 0]
     x2 = x_unflattened[..., 1]
@@ -156,7 +167,14 @@ def _apply_rotary_pos_emb(
     sin: torch.Tensor,
     style: RotaryEmbeddingStyle,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Applies mathematically rotated positional sequences."""
+    """Applies mathematically rotated positional sequences.
+
+    Returns:
+        A tuple of rotated (q, k) tensors.
+
+    Raises:
+        ValueError: If an unknown RoPE style is provided.
+    """
     cos = cos.unsqueeze(2)
     sin = sin.unsqueeze(2)
 

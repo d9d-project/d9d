@@ -49,6 +49,9 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
     ) -> int:
         """
         Calculates the number of warmup steps required before entering steady state.
+
+        Returns:
+            The number of warmup operations.
         """
         warmups_ops_last_stage = (self._num_stages_per_rank - 1) * microbatches_per_round
         warmup_ops = warmups_ops_last_stage + multiply_factor * ((pp_size - 1) - rank)
@@ -65,6 +68,9 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
 
         Returns:
             A dictionary mapping rank indices to their list of sequential actions.
+
+        Raises:
+            ValueError: If num_stages is not divisible by pp_size or microbatches by rounds.
         """
         num_stages = self.num_stages_per_rank * pp_size
 
@@ -118,6 +124,9 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
     ) -> list[ActionBase]:
         """
         Generates the sequential list of compute actions for a specific rank.
+
+        Returns:
+            A list of compute actions.
         """
         rank_actions: list[ActionBase] = []
 
@@ -133,7 +142,11 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         # -- Helpers --
 
         def get_global_stage(local_idx: int) -> int:
-            """Converts a local virtual stage index (0..N) to global stage ID."""
+            """Converts a local virtual stage index (0..N) to global stage ID.
+
+            Returns:
+                The global stage index.
+            """
             return (local_idx * pp_size) + rank
 
         def get_fwd_local_idx(op_idx: int) -> int:

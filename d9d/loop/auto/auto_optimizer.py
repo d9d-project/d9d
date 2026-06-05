@@ -53,7 +53,11 @@ class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
     state_dtype: str
 
     def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """Builds StochasticAdamW with the configured parameters."""
+        """Builds StochasticAdamW with the configured parameters.
+
+        Returns:
+            The constructed StochasticAdamW optimizer.
+        """
         return StochasticAdamW(
             params=params,
             lr=self.lr,
@@ -88,7 +92,11 @@ class AdamWOptimizerConfig(BaseAutoOptimizerConfig):
     maximize: bool = False
 
     def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """Builds fused AdamW with the configured parameters."""
+        """Builds fused AdamW with the configured parameters.
+
+        Returns:
+            The constructed AdamW optimizer.
+        """
         return AdamW(
             params=params,
             lr=self.lr,
@@ -127,7 +135,11 @@ class AdamOptimizerConfig(BaseAutoOptimizerConfig):
     maximize: bool = False
 
     def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """Builds fused Adam with the configured parameters."""
+        """Builds fused Adam with the configured parameters.
+
+        Returns:
+            The constructed Adam optimizer.
+        """
         return Adam(
             params=params,
             lr=self.lr,
@@ -165,7 +177,11 @@ class SGDOptimizerConfig(BaseAutoOptimizerConfig):
     maximize: bool = False
 
     def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """Builds fused SGD with the configured parameters."""
+        """Builds fused SGD with the configured parameters.
+
+        Returns:
+            The constructed SGD optimizer.
+        """
         return SGD(
             params,
             lr=self.lr,

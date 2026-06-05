@@ -315,6 +315,9 @@ def stage_backward_weight(  # noqa: C901
 
     Returns:
         A tuple of gradients corresponding to the provided `weights`.
+
+    Raises:
+        ValueError: If backward weight is attempted without intermediate gradients.
     """
 
     grad_acc_to_weight = {}

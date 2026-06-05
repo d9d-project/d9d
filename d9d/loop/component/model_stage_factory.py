@@ -23,12 +23,20 @@ StatefulPredicate = Callable[[str, torch.Tensor], bool]
 
 
 def _stateful_predicate_requires_grad(key: str, value: torch.Tensor) -> bool:
-    """Predicate that allows saving only tensors that require gradients."""
+    """Predicate that allows saving only tensors that require gradients.
+
+    Returns:
+        True if the tensor requires gradients, False otherwise.
+    """
     return value.requires_grad
 
 
 def _stateful_predicate_always(key: str, value: torch.Tensor) -> bool:
-    """Predicate that always allows saving."""
+    """Predicate that always allows saving.
+
+    Returns:
+        Always returns True.
+    """
     return True
 
 
@@ -62,7 +70,11 @@ class TrackedModules(Stateful, Offloadable):
         return self._modules
 
     def _tensors(self) -> Iterator[torch.Tensor]:
-        """Yields every parameter and buffer (persistent and non-persistent) of all tracked modules."""
+        """Yields every parameter and buffer (persistent and non-persistent) of all tracked modules.
+
+        Returns:
+            An iterator over all tensors in the tracked modules.
+        """
         return itertools.chain.from_iterable(
             itertools.chain(module.parameters(), module.buffers()) for module in self._modules
         )
@@ -117,7 +129,11 @@ class TrackedModules(Stateful, Offloadable):
         self._offload_mirror = None
 
     def is_offloaded(self) -> bool:
-        """Reports whether the model parameters and buffers are currently on host memory."""
+        """Reports whether the model parameters and buffers are currently on host memory.
+
+        Returns:
+            True if the model is offloaded, False otherwise.
+        """
         return self._offload_mirror is not None
 
     def _whitelisted_params(self, module: nn.Module) -> set[str]:

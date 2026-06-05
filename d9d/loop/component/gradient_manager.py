@@ -222,5 +222,9 @@ class GradientManager(Offloadable):
         self._offloaded = False
 
     def is_offloaded(self) -> bool:
-        """Reports whether the gradient state is currently on host memory."""
+        """Reports whether the gradient state is currently on host memory.
+
+        Returns:
+            True if the gradient state is offloaded, False otherwise.
+        """
         return self._offloaded

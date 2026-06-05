@@ -85,7 +85,6 @@ class DeviceMeshParameters(BaseModel):
 
     @model_validator(mode="after")
     def _check_ep_divisibility(self) -> Self:
-        """Validates that DP/CP/TP dimensions can support the requested EP/ETP degrees."""
         dp_cp_tp_degree = (
             self.data_parallel_shard
             * self.data_parallel_replicate

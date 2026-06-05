@@ -65,6 +65,9 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
 
         Returns:
             Tensor of same shape as input_ids plus a last dimension of hidden_size.
+
+        Raises:
+            ValueError: If no splits were configured.
         """
 
         output_embeds: torch.Tensor | None = None

@@ -17,6 +17,9 @@ def get_hidden_state_bytes(x: torch.Tensor) -> int:
 
     Args:
         x: Input tensor. Shape: `(?, hidden_size)`.
+
+    Returns:
+        The size of a row in bytes.
     """
 
     return x.size(1) * max(x.element_size(), 2)
@@ -174,6 +177,9 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
             group: The process group containing all experts.
             hidden_size: Dimensionality of the hidden states.
             hidden_dtype: Data type of the hidden states.
+
+        Raises:
+            ValueError: If num_experts is not divisible by the group size.
         """
 
         init_deepep_buffer(group, hidden_size * hidden_dtype.itemsize)

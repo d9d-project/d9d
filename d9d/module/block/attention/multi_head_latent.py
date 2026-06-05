@@ -93,6 +93,9 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
             qk_down_norm_eps: Epsilon for the RMSNorm applied to the KV and Q latent representations.
             is_causal: Whether to apply a causal mask (auto-regressive).
             rope_style: Rotary embedding layout style alignment.
+
+        Raises:
+            ValueError: If v_head_dim exceeds qk_head_dim.
         """
         super().__init__()
 

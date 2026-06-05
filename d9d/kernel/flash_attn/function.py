@@ -48,6 +48,9 @@ def _compute_dsink(
         dsink_h = -Σ_{b,i} exp(s_h - lse_{b,h,i}) · (dout · out)_{b,i,h}
 
     Handles both batched ``(B, S, H, D)`` and varlen ``(total, H, D)`` layouts.
+
+    Returns:
+        The gradient for ``learnable_sink``.
     """
     # dot product of dout and out per position, summed over head_dim
     dot_do = (dout.float() * out.float()).sum(dim=-1)  # (B, S, H) or (total, H)
@@ -98,6 +101,9 @@ class _FlashAttnFunc(torch.autograd.Function):
         (even if ``q``/``k``/``v`` don't require grad) because the backward
         needs it for the analytic ``dsink`` computation.  Otherwise the
         allocation is left to FA4's internal logic.
+
+        Returns:
+            A tuple containing the output tensor and the log-sum-exp tensor.
         """
         lse_buf = None
         if learnable_sink is not None:
@@ -141,7 +147,11 @@ class _FlashAttnFunc(torch.autograd.Function):
     ) -> tuple[
         torch.Tensor, torch.Tensor, torch.Tensor, None, None, None, torch.Tensor | None, None, None, None, None, None
     ]:
-        """Run FA4 backward for ``dq``/``dk``/``dv``, then compute ``dsink`` analytically."""
+        """Run FA4 backward for ``dq``/``dk``/``dv``, then compute ``dsink`` analytically.
+
+        Returns:
+            A tuple of gradients for q, k, v and potentially learnable_sink.
+        """
         if ctx.has_learnable_sink:
             q, k, v, out, lse, learnable_sink = ctx.saved_tensors
         else:
@@ -208,7 +218,11 @@ class _FlashAttnVarlenFunc(torch.autograd.Function):
         deterministic: bool,
         return_lse: bool,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Run FA4 varlen forward, pre-allocating LSE when sinks are active."""
+        """Run FA4 varlen forward, pre-allocating LSE when sinks are active.
+
+        Returns:
+            A tuple containing the output tensor and the log-sum-exp tensor.
+        """
         lse_buf = None
         if learnable_sink is not None:
             num_heads = q.shape[-2]
@@ -263,7 +277,11 @@ class _FlashAttnVarlenFunc(torch.autograd.Function):
         dout: torch.Tensor,
         dlse: torch.Tensor | None,
     ) -> tuple:
-        """Run FA4 varlen backward for ``dq``/``dk``/``dv``, then compute ``dsink``."""
+        """Run FA4 varlen backward for ``dq``/``dk``/``dv``, then compute ``dsink``.
+
+        Returns:
+            A tuple of gradients.
+        """
         if ctx.has_learnable_sink:
             q, k, v, out, lse, learnable_sink = ctx.saved_tensors
         else:

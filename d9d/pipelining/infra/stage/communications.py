@@ -165,6 +165,9 @@ class StageCommunicationHandler:
         Args:
             inputs: Dictionary of input tensors.
             microbatch_index: The microbatch identifier.
+
+        Raises:
+            RuntimeError: If tried to set a buffer for a no-receive stage input.
         """
 
         for input_name, input_value in inputs.items():
@@ -183,6 +186,9 @@ class StageCommunicationHandler:
 
         Returns:
             Dictionary mapping input names to tensors.
+
+        Raises:
+            RuntimeError: If tried to get a buffer for a no-receive stage input.
         """
         outputs: dict[str, torch.Tensor] = {}
 
@@ -202,6 +208,9 @@ class StageCommunicationHandler:
 
         Returns:
             A list of `dist.P2POp` objects configured for `dist.irecv`.
+
+        Raises:
+            ValueError: If an unknown input handler type is encountered.
         """
 
         ops = []
@@ -231,6 +240,9 @@ class StageCommunicationHandler:
 
         Returns:
             A list of `dist.P2POp` objects configured for `dist.isend`.
+
+        Raises:
+            ValueError: If an unknown output handler type is encountered.
         """
 
         ops = []

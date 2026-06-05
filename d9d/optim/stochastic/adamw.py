@@ -71,6 +71,9 @@ class StochasticAdamW(Optimizer):
             generator: Pseudorandom number generator for stochastic rounding. If None,
                 a new generator is created and seeded from the main PyTorch generator.
             state_dtype: Data Type to use for the optimizer states.
+
+        Raises:
+            ValueError: If any of the provided hyperparameters are invalid.
         """
 
         if lr <= 0:

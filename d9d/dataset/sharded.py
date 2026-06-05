@@ -63,6 +63,9 @@ class ShardedDataset(Dataset[_T_co], Stateful):
             indexing_mode: How indices are assigned to shards (sequential/round-robin or chunked).
             pad_to_equal_size_across_shards: If True, the length of the dataset will be padded
                 so that all shards report the same length. The last standard element is repeated.
+
+        Raises:
+            ValueError: If the dataset does not implement __len__.
         """
 
         if not isinstance(dataset, Sized):
@@ -83,6 +86,12 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         """
         Calculates the underlying dataset index for a given shard index,
         without boundary checking.
+
+        Returns:
+            The index in the underlying dataset.
+
+        Raises:
+            ValueError: If the indexing mode is unknown.
         """
 
         match self._indexing_mode:
@@ -123,6 +132,12 @@ class ShardedDataset(Dataset[_T_co], Stateful):
 
         If `pad_to_equal_size_across_shards` is True, this returns the ceiling
         length (max length across all shards).
+
+        Returns:
+            The number of items in the shard.
+
+        Raises:
+            ValueError: If the indexing mode is unknown.
         """
 
         ceil_len = math.ceil(len(self._dataset) / self._total_shards)

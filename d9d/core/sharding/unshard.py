@@ -33,7 +33,14 @@ def _unshard_tensor(group: list[torch.Tensor], spec: SpecShard) -> torch.Tensor:
 
 
 def _unshard_leaf_from_group(group: Sequence[TLeaf], spec: ShardingSpecLeaf) -> TLeaf:
-    """Helper to merge a group of items from different ranks into one."""
+    """Helper to merge a group of items from different ranks into one.
+
+    Returns:
+        The merged item.
+
+    Raises:
+        TypeError: If the sharding spec or item type is not supported.
+    """
     if isinstance(spec, SpecReplicate):
         return group[0]
 

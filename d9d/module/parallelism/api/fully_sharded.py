@@ -26,6 +26,10 @@ def parallelize_fsdp(module: nn.Module, mesh: DeviceMesh, *args: Any, **kwargs: 
         mesh: The device mesh over which to shard the module.
         *args: Additional positional arguments passed to ``fully_shard``.
         **kwargs: Additional keyword arguments passed to ``fully_shard``.
+
+    Raises:
+        ValueError: If the mesh does not have exactly one dimension.
+        RuntimeError: If the module was not converted to an FSDPModule.
     """
 
     if mesh.ndim != 1:

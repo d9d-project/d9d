@@ -98,5 +98,10 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
         self._offload_mirror = None
 
     def is_offloaded(self) -> bool:
-        """Reports whether the optimizer state is currently on host memory."""
+        """
+        Reports whether the optimizer state is currently on host memory.
+
+        Returns:
+            True if the state is offloaded, False otherwise.
+        """
         return self._offload_mirror is not None

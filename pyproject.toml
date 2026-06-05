@@ -176,7 +176,8 @@ extend-select = [
     "UP",
     "FURB",
     "RUF",
-    "TRY"
+    "TRY",
+    "DOC"
 ]
 fixable = [
     "F401",
@@ -222,7 +223,8 @@ ignore = [
     "TRY003",  # Avoid specifying long messages outside the exception class
     "TC006",  # Add quotes to type expression in typing.cast()
     "TRY004",  # Prefer TypeError exception for invalid type
-    "PGH003"  # Use specific rule codes when ignoring {} issues
+    "PGH003",  # Use specific rule codes when ignoring {} issues
+    "DOC502",  # Raised exception is not explicitly raised: {id}
 ]
 
 [tool.ruff.lint.flake8-annotations]
@@ -234,7 +236,7 @@ suppress-none-returning = true
 ]
 "test/*.py" = [
     "S101", # asserts allowed in tests...
-    "D",  # no docs for tests sorry
+    "D", "DOC",  # no docs for tests sorry
     "ANN",  # no type annotations for tests
     "SLF001",  # private access is ok for tests
     "PLC0415",  # imports outside top level are OK for tests
@@ -253,6 +255,9 @@ extend-ignore-names = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ty.src]
 exclude = [

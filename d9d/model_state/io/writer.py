@@ -284,6 +284,9 @@ def write_model_state_pipeline_parallel(
         show_progress: Whether to show the progress bar.
         position: Row index for the tqdm bar. Pass the process local rank to stack one bar
             per rank without interleaving. ``None`` lets tqdm use its default (single bar).
+
+    Raises:
+        ValueError: If the DeviceMesh has no dimension names or coordinates.
     """
 
     pipeline_rank = device_mesh[pipeline_dim_name].get_rank()

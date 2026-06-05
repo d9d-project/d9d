@@ -91,6 +91,9 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
     def output_dtype(self) -> torch.dtype:
         """
         Returns the data type of the model output hidden states.
+
+        Returns:
+            The output hidden states data type.
         """
         return self.layers[self._layers_iter[0]].input_layernorm.weight.dtype
 
