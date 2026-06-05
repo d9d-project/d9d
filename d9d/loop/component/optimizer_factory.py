@@ -13,8 +13,7 @@ from .stepper import Stepper
 
 
 class OptimizerFactory:
-    """
-    Factory for creating and configuring distributed optimizers and learning rate schedulers.
+    """Factory for creating and configuring distributed optimizers and learning rate schedulers.
 
     This factory handles the orchestration of optimizer creation for models potentially split across
     pipeline stages. It uses the providers to instantiate underlying PyTorch optimizers and schedulers for each
@@ -29,8 +28,7 @@ class OptimizerFactory:
         lr_scheduler_provider: LRSchedulerProvider,
         stepper: Stepper,
     ):
-        """
-        Constructs the OptimizerFactory.
+        """Constructs the OptimizerFactory.
 
         Args:
             dist_context: The distributed context.
@@ -46,8 +44,7 @@ class OptimizerFactory:
         self._stepper = stepper
 
     def build_optimizer_and_scheduler(self) -> tuple[OptimizerProtocol, LRSchedulerProtocol]:
-        """
-        Builds both the optimizer and learning rate scheduler.
+        """Builds both the optimizer and learning rate scheduler.
 
         This method iterates through all local model modules. For each module, it creates an
         optimizer and scheduler using the configured providers. Finally, it aggregates these individual

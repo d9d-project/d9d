@@ -2,8 +2,7 @@ from pydantic import BaseModel
 
 
 class ModelStateIndexMeta(BaseModel):
-    """
-    Metadata for the model state index.
+    """Metadata for the model state index.
 
     Attributes:
         total_size: Total size of the model parameters in bytes.
@@ -13,8 +12,7 @@ class ModelStateIndexMeta(BaseModel):
 
 
 class ModelStateIndex(BaseModel):
-    """
-    Represents the content of the `model.safetensors.index.json` file.
+    """Represents the content of the `model.safetensors.index.json` file.
 
     This index maps every weight name to the specific .safetensors file containing it.
 

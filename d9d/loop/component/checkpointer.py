@@ -25,8 +25,7 @@ def _save_iter_predicate(x: Path) -> int:
 
 
 class StateCheckpointer:
-    """
-    Manages the lifecycle of distributed training checkpoints.
+    """Manages the lifecycle of distributed training checkpoints.
 
     This class handles saving and loading the training state (JobState object)
     using PyTorch Distributed Checkpoint (DCP). It manages checkpoint versioning,
@@ -41,8 +40,7 @@ class StateCheckpointer:
         gc: ManualGarbageCollector,
         run_name: str | None,
     ):
-        """
-        Constructs the StateCheckpoint object.
+        """Constructs the StateCheckpoint object.
 
         Args:
             dist_context: The distributed context.
@@ -113,8 +111,7 @@ class StateCheckpointer:
         self._dist_context.logger.info("Checkpoint successfully saved across the world")
 
     def checkpoint_if_needed(self, state: Stateful):
-        """
-        Checks if a checkpoint is due based on the configuration and saves if necessary.
+        """Checks if a checkpoint is due based on the configuration and saves if necessary.
 
         This checks the stepper to see if the current step matches the configured
         saving period (or if it is the final step).
@@ -153,8 +150,7 @@ class StateCheckpointer:
         self._dist_context.logger.info("Checkpoint successfully loaded across the world")
 
     def load_last_checkpoint(self, state: Stateful):
-        """
-        Attempts to load the most recent checkpoint available in the save directory.
+        """Attempts to load the most recent checkpoint available in the save directory.
 
         If no checkpoint is found, the state remains unchanged (starting from scratch).
 

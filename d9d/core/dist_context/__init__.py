@@ -1,5 +1,4 @@
-"""
-This package configures the distributed environment and device meshes.
+"""This package configures the distributed environment and device meshes.
 """
 
 from .configured import DistributedContext

@@ -12,8 +12,7 @@ LM_IGNORE_INDEX = -100
 
 
 class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
-    """
-    A segmented language modeling head that computes per-token cross-entropy loss values using a composed weight matrix.
+    """A segmented language modeling head that computes per-token cross-entropy loss values using a composed weight matrix.
 
     This class maintains separate linear layers for different segments of the vocabulary
     (e.g., regular vs. special tokens). During the forward pass, it concatenates the
@@ -25,8 +24,7 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
     """
 
     def __init__(self, split_vocab_size: dict[str, int], split_order: Sequence[str], hidden_size: int):
-        """
-        Constructs the SplitLanguageModellingHead object.
+        """Constructs the SplitLanguageModellingHead object.
 
         Args:
             split_vocab_size: A dictionary mapping split names to their output vocabulary sizes.
@@ -48,8 +46,7 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
         self._hidden_size = hidden_size
 
     def forward(self, hidden_states: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
-        """
-        Computes the cross-entropy loss for the given hidden states and labels.
+        """Computes the cross-entropy loss for the given hidden states and labels.
 
         Args:
             hidden_states: Input tensor of shape `(B, S, H)`.

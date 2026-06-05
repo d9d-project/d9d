@@ -24,8 +24,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
         callback: PipelineLossFn | PipelineResultFn,
         program: dict[int, list[ActionBase]],
     ):
-        """
-        Constructs the schedule executor.
+        """Constructs the schedule executor.
 
         Args:
             dist_context: The distributed context.

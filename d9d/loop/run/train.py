@@ -69,8 +69,7 @@ from d9d.metric.impl.container import ComposeMetric
 
 
 class TrainingConfigurator:
-    """
-    Orchestrates the assembly of the distributed training environment.
+    """Orchestrates the assembly of the distributed training environment.
 
     This class binds the infrastructure configuration (DeviceMesh), the training
     parameters (TrainerConfig), and the user-defined logic (Providers) to create
@@ -87,8 +86,7 @@ class TrainingConfigurator:
         optimizer_provider: OptimizerProvider,
         lr_scheduler_provider: LRSchedulerProvider,
     ):
-        """
-        Constructs a configurator capable of building the full training state.
+        """Constructs a configurator capable of building the full training state.
 
         Args:
             mesh: Definition of the distributed device mesh topology.
@@ -236,8 +234,7 @@ class TrainingConfigurator:
         )
 
     def configure(self) -> "Trainer":
-        """
-        Instantiates all training components and returns a configured Trainer.
+        """Instantiates all training components and returns a configured Trainer.
 
         This method triggers the creation of the distributed context, sets seeds,
         builds the model, optimizer, data loaders, and attaches all auxiliary
@@ -252,16 +249,14 @@ class TrainingConfigurator:
 
 
 class Trainer:
-    """
-    The main execution engine for running a distributed training job.
+    """The main execution engine for running a distributed training job.
 
     This class manages the training loop, lifecycle events, distributed synchronization,
     and periodic side-effects (logging, checkpointing).
     """
 
     def __init__(self, state: TrainJobState):
-        """
-        Constructs a Trainer from a pre-built job state.
+        """Constructs a Trainer from a pre-built job state.
 
         Args:
             state: The encapsulated state object containing all initialized
@@ -277,8 +272,7 @@ class Trainer:
         )
 
     def train(self):
-        """
-        Executes the full training workflow.
+        """Executes the full training workflow.
         """
         self._state.dist_context.wait_world()
         self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
@@ -369,8 +363,7 @@ class Trainer:
             self._state.event_bus.trigger(EVENT_TRAIN_FINISHED, EventTrainFinishedContext())
 
     def sleep(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
-        """
-        Releases the GPU-resident training state selected by "tags" to host memory.
+        """Releases the GPU-resident training state selected by "tags" to host memory.
 
         This frees the GPU for a colocated workload, such as a rollout engine in colocated RL.
         The call is collective: every rank must invoke it with identical tags. Requesting a tag
@@ -386,8 +379,7 @@ class Trainer:
         self._sleeper.sleep(tags)
 
     def wake(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
-        """
-        Restores GPU residency of the training state previously released by "sleep".
+        """Restores GPU residency of the training state previously released by "sleep".
 
         The call is collective: every rank must invoke it with identical tags. Requesting a tag
         whose subsystem is not offloaded is a no-op.
@@ -401,8 +393,7 @@ class Trainer:
         self._sleeper.wake(tags)
 
     def is_sleeping(self, tag: SleepTag) -> bool:
-        """
-        Reports whether the subsystem identified by "tag" is currently offloaded.
+        """Reports whether the subsystem identified by "tag" is currently offloaded.
 
         Args:
             tag: The subsystem to query.
@@ -413,8 +404,7 @@ class Trainer:
         return self._sleeper.is_sleeping(tag)
 
     def export(self, export_to: Path, load_checkpoint: bool):
-        """
-        Exports the current model state to the specified directory.
+        """Exports the current model state to the specified directory.
 
         This handles the distributed saving logic, allowing the model to be
         reconstituted later or used for inference.

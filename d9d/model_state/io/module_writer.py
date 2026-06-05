@@ -54,8 +54,7 @@ def _state_generator(models: list[nn.Module]) -> Iterable[tuple[str, torch.Tenso
 def save_model_state(
     dest_dir: Path, mapper: ModelStateMapper, model: nn.Module, shard_size_gb: float = 4.0, show_progress: bool = True
 ):
-    """
-    High-level utility to save a PyTorch model to disk on a **single** process.
+    """High-level utility to save a PyTorch model to disk on a **single** process.
 
     NOTICE: Only states specified in `mapper` will be saved! You can use
     `d9d.model_state.mapper.adapters.identity_mapper_from_module(module)` to create a mapper that will save every
@@ -87,8 +86,7 @@ def save_model_state_pipeline_parallel(
     show_progress: bool = True,
     position: int | None = None,
 ):
-    """
-    High-level utility to save a model in a Distributed Pipeline Parallel environment to disk.
+    """High-level utility to save a model in a Distributed Pipeline Parallel environment to disk.
 
     Features:
 

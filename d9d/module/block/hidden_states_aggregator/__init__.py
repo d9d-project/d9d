@@ -1,5 +1,4 @@
-"""
-Aggregation utilities for model hidden states.
+"""Aggregation utilities for model hidden states.
 """
 
 from .base import BaseHiddenStatesAggregator

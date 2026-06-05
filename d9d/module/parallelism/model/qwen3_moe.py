@@ -10,8 +10,7 @@ from d9d.pipelining.api import PipelineStageInfo
 
 
 def parallelize_qwen3_moe_model(dist_context: DistributedContext, model: Qwen3MoEModel, stage: PipelineStageInfo):
-    """
-    Parallelizes the base Qwen3 MoE model components.
+    """Parallelizes the base Qwen3 MoE model components.
 
     This function configures the model layers for distributed execution within a pipeline
     stage. It applies Hybrid Sharded Data Parallelism (HSDP) to dense components (embeddings,
@@ -67,8 +66,7 @@ def parallelize_qwen3_moe_model(dist_context: DistributedContext, model: Qwen3Mo
 def parallelize_qwen3_moe_for_causal_lm(
     dist_context: DistributedContext, model: Qwen3MoEForCausalLM, stage: PipelineStageInfo
 ):
-    """
-    Parallelizes the Qwen3 MoE Causal LM model.
+    """Parallelizes the Qwen3 MoE Causal LM model.
 
     This function delegates backbone parallelization to ``parallelize_qwen3_moe_model``
     and additionally configures the language model head with Hybrid Sharded Data
@@ -93,8 +91,7 @@ def parallelize_qwen3_moe_for_causal_lm(
 def parallelize_qwen3_moe_for_classification(
     dist_context: DistributedContext, model: Qwen3MoEForClassification, stage: PipelineStageInfo
 ):
-    """
-    Parallelizes the Qwen3 MoE classification model.
+    """Parallelizes the Qwen3 MoE classification model.
 
     This function delegates backbone parallelization to ``parallelize_qwen3_moe_model``
     and additionally configures the classification head with Hybrid Sharded Data
@@ -119,8 +116,7 @@ def parallelize_qwen3_moe_for_classification(
 def parallelize_qwen3_moe_for_embedding(
     dist_context: DistributedContext, model: Qwen3MoEForEmbedding, stage: PipelineStageInfo
 ):
-    """
-    Parallelizes the Qwen3 MoE embedding model.
+    """Parallelizes the Qwen3 MoE embedding model.
 
     This function delegates backbone parallelization to ``parallelize_qwen3_moe_model``
     and additionally configures the embedding head with Hybrid Sharded Data

@@ -6,8 +6,7 @@ import torch.distributed as dist
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class ReceiveStageInput:
-    """
-    Instruction to receive a specific tensor from a previous stage (or next stage during backward).
+    """Instruction to receive a specific tensor from a previous stage (or next stage during backward).
 
     Attributes:
         name: A unique identifier for the communication operation.
@@ -22,8 +21,7 @@ class ReceiveStageInput:
 
 @dataclasses.dataclass
 class StartStageInput:
-    """
-    Instruction indicating that the input for this stage does not come from communication
+    """Instruction indicating that the input for this stage does not come from communication
     (e.g., this is the first stage receiving data loader inputs).
     """
 
@@ -33,8 +31,7 @@ StageInput = ReceiveStageInput | StartStageInput
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class SendStageOutput:
-    """
-    Instruction to send a specific tensor to a next stage (or previous if backward).
+    """Instruction to send a specific tensor to a next stage (or previous if backward).
 
     Attributes:
         to_stage: The stage index receiving the data.
@@ -45,8 +42,7 @@ class SendStageOutput:
 
 @dataclasses.dataclass
 class EndStageOutput:
-    """
-    Instruction indicating that the output of this stage is not sent anywhere
+    """Instruction indicating that the output of this stage is not sent anywhere
     (e.g., this is the last stage computing loss).
     """
 
@@ -55,8 +51,7 @@ StageOutput = SendStageOutput | EndStageOutput
 
 
 class StageCommunicationHandler:
-    """
-    Manages Point-to-Point (P2P) communication descriptors for a specific data flow direction within a pipeline stage.
+    """Manages Point-to-Point (P2P) communication descriptors for a specific data flow direction within a pipeline stage.
 
     This class handles the creation of P2P operations (send/recv) across multiple microbatches,
     managing buffers and mapping logical stage indices to physical ranks.
@@ -74,8 +69,7 @@ class StageCommunicationHandler:
         stage_idx_to_host_rank: dict[int, int],
         group: dist.ProcessGroup,
     ):
-        """
-        Constructs a StageCommunicationHandler object.
+        """Constructs a StageCommunicationHandler object.
 
         Args:
             name: Name prefix for this handler (e.g., 'fwd', 'bwd').
@@ -140,8 +134,7 @@ class StageCommunicationHandler:
         return handlers
 
     def set_input_requires_grad_(self, requires_grad: bool):
-        """
-        Sets the `requires_grad` flag for all internal input buffers.
+        """Sets the `requires_grad` flag for all internal input buffers.
 
         Typically used to enable gradient flow from backward stages to forward stages.
 
@@ -154,8 +147,7 @@ class StageCommunicationHandler:
                     info.buffer.requires_grad_(requires_grad)
 
     def set_inputs_local(self, inputs: dict[str, torch.Tensor], microbatch_index: int):
-        """
-        Manually fills the input buffer for a specific microbatch with local data.
+        """Manually fills the input buffer for a specific microbatch with local data.
 
         This is used when the stage is the first in the pipeline or receives data
         from a dataloader rather than via network communication.
@@ -175,8 +167,7 @@ class StageCommunicationHandler:
             handler.buffer = input_value.detach().requires_grad_(prev_requires_grad)
 
     def get_inputs(self, microbatch_index: int) -> dict[str, torch.Tensor]:
-        """
-        Retrieves the input tensors for a specific microbatch from the internal buffers.
+        """Retrieves the input tensors for a specific microbatch from the internal buffers.
 
         Args:
             microbatch_index: The microbatch identifier.
@@ -197,8 +188,7 @@ class StageCommunicationHandler:
         return outputs
 
     def create_receive_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """
-        Generates the PyTorch P2P receive operations for a specific microbatch.
+        """Generates the PyTorch P2P receive operations for a specific microbatch.
 
         Args:
             microbatch_index: The microbatch identifier.
@@ -228,8 +218,7 @@ class StageCommunicationHandler:
         return ops
 
     def create_send_ops(self, send_contents: dict[str, torch.Tensor]) -> list[dist.P2POp]:
-        """
-        Generates the PyTorch P2P send operations for the provided tensors.
+        """Generates the PyTorch P2P send operations for the provided tensors.
 
         Args:
             send_contents: Dictionary of tensors to send.

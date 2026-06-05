@@ -10,8 +10,7 @@ def parallelize_replicate(
     module: nn.Module,
     mesh: DeviceMesh,
 ):
-    """
-    Applies replicated parallelism to the module.
+    """Applies replicated parallelism to the module.
 
     This function configures the provided module to be fully replicated across the
     given device mesh. It utilizes the ``ToLocalParallel`` style, which manages

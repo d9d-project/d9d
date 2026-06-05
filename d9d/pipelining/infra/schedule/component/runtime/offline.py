@@ -7,8 +7,7 @@ from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedul
 
 
 class OfflinePipelineExecutor(PipelineSchedule):
-    """
-    Executes the model immediately without pipeline parallelism.
+    """Executes the model immediately without pipeline parallelism.
 
     This schedule treats the execution as a single stage with a single microbatch,
     running the forward and optionally backward pass directly. This is primarily
@@ -16,8 +15,7 @@ class OfflinePipelineExecutor(PipelineSchedule):
     """
 
     def __init__(self, model: nn.Module, callback: PipelineLossFn | PipelineResultFn, do_backward: bool):
-        """
-        Constructs the offline pipeline executor.
+        """Constructs the offline pipeline executor.
 
         Args:
             model: The PyTorch module to execute.

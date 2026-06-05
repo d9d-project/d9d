@@ -6,8 +6,7 @@ from torch.distributed.tensor import DTensor
 
 @dataclasses.dataclass(slots=True, frozen=True)
 class OffloadedTensor:
-    """
-    Handle to a tensor whose local storage has been swapped to host memory.
+    """Handle to a tensor whose local storage has been swapped to host memory.
 
     Produced by "offload_tensor" and consumed by "onload_tensor". Subsystems hold these as
     opaque handles between an offload and the matching onload.
@@ -25,8 +24,7 @@ def _local_storage_holder(tensor: torch.Tensor) -> torch.Tensor:
 
 
 def offload_tensor(tensor: torch.Tensor, *, pin_memory: bool) -> OffloadedTensor:
-    """
-    Swaps "tensor"'s local storage for a host-memory mirror, in place.
+    """Swaps "tensor"'s local storage for a host-memory mirror, in place.
 
     For a DTensor, the wrapper instance is preserved across the swap - only the local shard's
     underlying storage is rebound, via "_local_tensor.data". "device_mesh", "placements",
@@ -49,8 +47,7 @@ def offload_tensor(tensor: torch.Tensor, *, pin_memory: bool) -> OffloadedTensor
 
 
 def onload_tensor(tensor: torch.Tensor, offloaded: OffloadedTensor, *, device: torch.device) -> None:
-    """
-    Restores "tensor"'s local storage to "device", in place, from a host buffer.
+    """Restores "tensor"'s local storage to "device", in place, from a host buffer.
 
     The tensor object (and, for a DTensor, its wrapper) is the same instance as before the
     offload; only the underlying device storage is freshly allocated.

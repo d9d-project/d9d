@@ -8,8 +8,7 @@ if TYPE_CHECKING:
 
 
 class DeviceMeshDomain(abc.ABC):
-    """
-    Abstract base class for a Device Mesh provider.
+    """Abstract base class for a Device Mesh provider.
 
     A Domain defines a specific strategy for organizing available GPUs into a
     multidimensional grid (Mesh) to support specific parallelism techniques.
@@ -23,8 +22,7 @@ class DeviceMeshDomain(abc.ABC):
 
     @abc.abstractmethod
     def build_mesh(self, params: "DeviceMeshParameters") -> DeviceMesh:
-        """
-        Constructs the device mesh configuration.
+        """Constructs the device mesh configuration.
 
         Args:
             params: Global configuration parameters for the distributed environment.

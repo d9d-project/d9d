@@ -11,16 +11,14 @@ from .params import Qwen3MoELayerParameters
 
 
 class Qwen3MoELayer(nn.Module, ModuleLateInit):
-    """
-    Implements a single Qwen3 Mixture-of-Experts (MoE) transformer layer.
+    """Implements a single Qwen3 Mixture-of-Experts (MoE) transformer layer.
 
     This layer consists of a Grouped Query Attention mechanism followed by an MoE
     MLP block, with pre-RMSNorm applied before each sub-layer.
     """
 
     def __init__(self, params: Qwen3MoELayerParameters):
-        """
-        Constructs a Qwen3MoELayer object.
+        """Constructs a Qwen3MoELayer object.
 
         Args:
             params: Configuration parameters for the layer.
@@ -51,8 +49,7 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
     def forward(
         self, hidden_states: torch.Tensor, position_embeddings: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
-        """
-        Performs the forward pass of the MoE layer.
+        """Performs the forward pass of the MoE layer.
 
         Args:
             hidden_states: Input tensor of shape `(batch, seq_len, hidden_dim)`.
@@ -81,8 +78,7 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         return hidden_states
 
     def reset_parameters(self):
-        """
-        Resets module parameters.
+        """Resets module parameters.
         """
         self.self_attn.reset_parameters()
         self.mlp.reset_parameters()

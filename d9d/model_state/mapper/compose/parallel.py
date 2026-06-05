@@ -7,8 +7,7 @@ from d9d.model_state.mapper.compose.helper import filter_empty_mappers
 
 
 class ModelStateMapperParallel(ModelStateMapper):
-    """
-    Executes a list of states mappers independently alongside each other.
+    """Executes a list of states mappers independently alongside each other.
 
     This class aggregates multiple mappers into a single logical unit.
     It enforces strict isolation between the mappers: no two mappers can

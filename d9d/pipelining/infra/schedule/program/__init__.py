@@ -1,5 +1,4 @@
-"""
-Pipeline Schedule Implementations
+"""Pipeline Schedule Implementations
 """
 
 from .bfs import LoopedBFSPipelineProgramBuilder

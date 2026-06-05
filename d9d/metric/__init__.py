@@ -1,5 +1,4 @@
-"""
-Distributed metric abstractions and implementations.
+"""Distributed metric abstractions and implementations.
 """
 
 from .abc import Metric

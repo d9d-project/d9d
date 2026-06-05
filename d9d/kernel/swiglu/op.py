@@ -52,8 +52,7 @@ def _silu_mul_kernel(
 
 
 def silu_mul_forward(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-    """
-    Computes the forward pass of silu(x)*y using Triton.
+    """Computes the forward pass of silu(x)*y using Triton.
 
     Args:
         x: Input tensor x.
@@ -136,8 +135,7 @@ def _silu_mul_backward_kernel(
 
 
 def silu_mul_backward(grad_output: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    """
-    Computes the backward pass of silu(x)*y using Triton.
+    """Computes the backward pass of silu(x)*y using Triton.
 
     Args:
         grad_output: Gradient of the loss with respect to the output.

@@ -99,8 +99,7 @@ def _shard_leaf_to_list(
 def shard_tree(
     tree: TSameTree, sharding_spec: ShardingSpec, num_shards: int, enforce_even_split: bool
 ) -> tuple[TSameTree, ...]:
-    """
-    Shards a PyTree into a tuple of PyTrees, one for each shard rank.
+    """Shards a PyTree into a tuple of PyTrees, one for each shard rank.
 
     This function takes a single global data structure and splits it into `num_shards`
     structures.

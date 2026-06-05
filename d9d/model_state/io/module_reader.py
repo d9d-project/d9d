@@ -46,8 +46,7 @@ def load_model_state(
     show_progress: bool = True,
     position: int | None = None,
 ):
-    """
-    High-level utility to stream a checkpoint directly into a PyTorch module.
+    """High-level utility to stream a checkpoint directly into a PyTorch module.
 
     This function orchestrates the full loading lifecycle:
 

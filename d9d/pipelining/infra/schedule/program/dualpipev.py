@@ -16,8 +16,7 @@ from ..component.runtime import (
 
 
 class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
-    """
-    Builder for the DualPipeV Pipeline Parallelism schedule.
+    """Builder for the DualPipeV Pipeline Parallelism schedule.
 
     DualPipeV is a specialized bi-directional pipeline schedule designed for high
     throughput training. It requires exactly 2 stages per pipeline rank (V-shape)
@@ -30,8 +29,7 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
     """
 
     def __init__(self):
-        """
-        Constructs the DualPipeV builder.
+        """Constructs the DualPipeV builder.
         """
 
     @staticmethod

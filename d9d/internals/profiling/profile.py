@@ -9,8 +9,7 @@ from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
 
 
 class Profiler:
-    """
-    Manages distributed performance profiling using PyTorch Profiler.
+    """Manages distributed performance profiling using PyTorch Profiler.
 
     This class wraps `torch.profiler` to provide automatic trace exporting,
     compression, and file naming consistent with the distributed DeviceMesh
@@ -21,8 +20,7 @@ class Profiler:
     def __init__(
         self, save_dir: Path, period_steps: int, warmup_steps: int, active_steps: int, dist_context: DistributedContext
     ):
-        """
-        Constructs a Profiler object.
+        """Constructs a Profiler object.
 
         Args:
             save_dir: Directory where trace files will be saved.
@@ -67,8 +65,7 @@ class Profiler:
 
     @contextmanager
     def open(self, start_step: int):
-        """
-        Opens a context manager for profiling execution.
+        """Opens a context manager for profiling execution.
 
         This sets up the `torch.profiler.profile` with a schedule derived from
         the initialization parameters. It captures both CPU and CUDA activities,

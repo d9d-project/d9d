@@ -13,14 +13,12 @@ from d9d.optim.stochastic import StochasticAdamW
 
 
 class BaseAutoOptimizerConfig(BaseModel, ABC):
-    """
-    Abstract base class for optimizer configurations.
+    """Abstract base class for optimizer configurations.
     """
 
     @abc.abstractmethod
     def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """
-        Creates the PyTorch optimizer instance.
+        """Creates the PyTorch optimizer instance.
 
         Args:
             params: An iterable of model parameters to optimize.
@@ -32,8 +30,7 @@ class BaseAutoOptimizerConfig(BaseModel, ABC):
 
 
 class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
-    """
-    Configuration for the Stochastic AdamW optimizer.
+    """Configuration for the Stochastic AdamW optimizer.
 
     Attributes:
         name: Discriminator tag.
@@ -69,8 +66,7 @@ class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
 
 
 class AdamWOptimizerConfig(BaseAutoOptimizerConfig):
-    """
-    Configuration for the PyTorch AdamW optimizer.
+    """Configuration for the PyTorch AdamW optimizer.
 
     Attributes:
         name: Discriminator tag.
@@ -110,8 +106,7 @@ class AdamWOptimizerConfig(BaseAutoOptimizerConfig):
 
 
 class AdamOptimizerConfig(BaseAutoOptimizerConfig):
-    """
-    Configuration for the PyTorch Adam optimizer.
+    """Configuration for the PyTorch Adam optimizer.
 
     Attributes:
         name: Discriminator tag.
@@ -154,8 +149,7 @@ class AdamOptimizerConfig(BaseAutoOptimizerConfig):
 
 
 class SGDOptimizerConfig(BaseAutoOptimizerConfig):
-    """
-    Configuration for the PyTorch SGD optimizer.
+    """Configuration for the PyTorch SGD optimizer.
 
     Attributes:
         name: Discriminator tag.
@@ -201,8 +195,7 @@ AutoOptimizerConfig = Annotated[
 
 
 class AutoOptimizerProvider(OptimizerProvider):
-    """
-    OptimizerProvider that builds a PyTorch optimizer based on a configuration object.
+    """OptimizerProvider that builds a PyTorch optimizer based on a configuration object.
     """
 
     def __init__(self, config: AutoOptimizerConfig):

@@ -50,8 +50,7 @@ def _check_action_communication_dependencies_fulfilled(
 def check_action_communication_dependencies_fulfilled(
     action: ActionBase, rank_events: set[ActionBase], num_stages: int
 ) -> bool:
-    """
-    Checks if data dependencies (Receive or Local Compute) are met for an action.
+    """Checks if data dependencies (Receive or Local Compute) are met for an action.
 
     This function determines if a compute action is allowed to run based on
     whether its inputs are available in `rank_events`. Inputs are available
@@ -120,8 +119,7 @@ def add_communication_ops(
     stage_to_rank: dict[int, int],
     num_stages: int,
 ) -> dict[int, list[ActionBase]]:
-    """
-    Injects communication actions into a computation-only schedule.
+    """Injects communication actions into a computation-only schedule.
 
     This function iterates through the provided compute schedule and simulates execution.
     When a compute action produces a result needed by a different rank, it injects

@@ -11,8 +11,7 @@ from .computations import BackwardComputeHandler, ForwardComputeHandler
 
 
 class PipelineStage:
-    """
-    Represents a single structural stage in a Pipelined Model.
+    """Represents a single structural stage in a Pipelined Model.
 
     This class acts as an orchestrator that combines `StageCommunicationHandler` (for I/O)
     and `Forward/BackwardComputeHandler` (for execution). It abstracts away the complexity
@@ -26,8 +25,7 @@ class PipelineStage:
         group: dist.ProcessGroup,
         stage_to_host_topology: dict[int, int],
     ):
-        """
-        Constructs a PipelineStage object.
+        """Constructs a PipelineStage object.
 
         Args:
             info: Metadata about the stage (index, total stages).
@@ -53,8 +51,7 @@ class PipelineStage:
         return self._info
 
     def configure_buffers(self, num_microbatches: int, has_backward: bool, pipeline_inputs: dict[str, torch.Tensor]):
-        """
-        Initializes the communication handlers and buffers for the stage.
+        """Initializes the communication handlers and buffers for the stage.
 
         This must be called before execution to establish P2P buffer sizes and directions.
 
@@ -112,8 +109,7 @@ class PipelineStage:
             self._backward_comm = None
 
     def set_local_fwd_input(self, inputs: dict[str, torch.Tensor], microbatch_index: int):
-        """
-        Sets local forward inputs manually.
+        """Sets local forward inputs manually.
 
         Used for the V-shape schedulers.
 
@@ -129,8 +125,7 @@ class PipelineStage:
         return self._forward_comp.get_outputs(microbatch_index)
 
     def pop_local_bwd_output(self, microbatch_index: int) -> dict[str, torch.Tensor]:
-        """
-        Retrieves local backward outputs (gradients).
+        """Retrieves local backward outputs (gradients).
 
         Returns:
             The backward output gradients.
@@ -144,8 +139,7 @@ class PipelineStage:
         return self._backward_comp.pop_for_sending(microbatch_index)
 
     def set_local_bwd_input(self, inputs: dict[str, torch.Tensor], microbatch_index: int):
-        """
-        Sets local backward inputs (output gradients) manually.
+        """Sets local backward inputs (output gradients) manually.
 
         Raises:
             ValueError: If the stage is not configured for backward passes or if buffers are not initialized.
@@ -159,8 +153,7 @@ class PipelineStage:
         self._backward_comm.set_inputs_local(inputs, microbatch_index)
 
     def get_fwd_recv_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """
-        Returns P2P ops to receive forward inputs for the given microbatch.
+        """Returns P2P ops to receive forward inputs for the given microbatch.
 
         Returns:
             The list of P2P operations.
@@ -174,8 +167,7 @@ class PipelineStage:
         return self._forward_comm.create_receive_ops(microbatch_index)
 
     def get_fwd_send_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """
-        Returns P2P ops to send forward outputs for the given microbatch.
+        """Returns P2P ops to send forward outputs for the given microbatch.
 
         Returns:
             The list of P2P operations.
@@ -190,8 +182,7 @@ class PipelineStage:
         return self._forward_comm.create_send_ops(fwd_result)
 
     def get_bwd_recv_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """
-        Returns P2P ops to receive backward gradients for the given microbatch.
+        """Returns P2P ops to receive backward gradients for the given microbatch.
 
         Returns:
             The list of P2P operations.
@@ -208,8 +199,7 @@ class PipelineStage:
         return self._backward_comm.create_receive_ops(microbatch_index)
 
     def get_bwd_send_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """
-        Returns P2P ops to send backward gradients for the given microbatch.
+        """Returns P2P ops to send backward gradients for the given microbatch.
 
         Returns:
             The list of P2P operations.
@@ -232,8 +222,7 @@ class PipelineStage:
         pipeline_inputs: dict[str, torch.Tensor],
         pipeline_kwargs: dict[str, Any] | None = None,
     ):
-        """
-        Executes a forward pass for a single microbatch chunk.
+        """Executes a forward pass for a single microbatch chunk.
 
         Fetches inputs from the communication buffer (or `pipeline_inputs` if first stage),
         runs the computation, and caches the result.
@@ -259,8 +248,7 @@ class PipelineStage:
         self._forward_comp.run(microbatch_index=microbatch_index, inputs=inputs, kwargs=kwargs)
 
     def backward_one_chunk(self, microbatch_index: int, loss: torch.Tensor | None = None, full_backward: bool = True):
-        """
-        Executes a backward pass for a single microbatch chunk.
+        """Executes a backward pass for a single microbatch chunk.
 
         Can perform either a full backward or just the input gradients (if `full_backward=False`).
         It fetches required data from forward cache and communication buffers.
@@ -308,8 +296,7 @@ class PipelineStage:
                     t.detach_()
 
     def backward_weight_one_chunk(self, microbatch_index: int):
-        """
-        Executes the weight gradient accumulation part of the backward pass.
+        """Executes the weight gradient accumulation part of the backward pass.
 
         This assumes `backward_one_chunk(..., full_backward=False)` was already called
         for this microbatch.

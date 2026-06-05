@@ -1,5 +1,4 @@
-"""
-Gradient synchronization utilities.
+"""Gradient synchronization utilities.
 
 This package provides the infrastructure for manual gradient bucketing and
 asynchronous reduction, similar to DistributedDataParallel but exposed

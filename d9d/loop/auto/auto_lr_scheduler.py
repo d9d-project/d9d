@@ -8,8 +8,7 @@ from d9d.lr_scheduler.piecewise import PiecewiseSchedulerConfig, piecewise_sched
 
 
 class PiecewiseConfig(BaseModel):
-    """
-    Configuration for the piecewise learning rate scheduler.
+    """Configuration for the piecewise learning rate scheduler.
 
     Attributes:
         name: Discriminator tag, must be "piecewise".
@@ -25,8 +24,7 @@ AutoLRSchedulerConfig = Annotated[PiecewiseConfig, Field(discriminator="name")]
 
 
 class AutoLRSchedulerProvider(LRSchedulerProvider):
-    """
-    LRSchedulerProvider that builds a learning rate scheduler based on a configuration object.
+    """LRSchedulerProvider that builds a learning rate scheduler based on a configuration object.
     """
 
     def __init__(self, config: AutoLRSchedulerConfig):

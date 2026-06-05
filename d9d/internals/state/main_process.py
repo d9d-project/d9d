@@ -6,8 +6,7 @@ from d9d.core.dist_context import DistributedContext
 
 
 def state_dict_main_process(dist_context: DistributedContext, obj: Stateful) -> dict[str, Any]:
-    """
-    Retrieves the state dictionary of an object only on the main process.
+    """Retrieves the state dictionary of an object only on the main process.
 
     This is useful for checkpointing components that track global state primarily
     managed by the driver/main rank, ensuring that non-main ranks return an empty
@@ -28,8 +27,7 @@ def state_dict_main_process(dist_context: DistributedContext, obj: Stateful) -> 
 
 
 def load_state_dict_main_process(dist_context: DistributedContext, obj: Stateful, state_dict: dict[str, Any]):
-    """
-    Restores the state dictionary of an object only on the main process.
+    """Restores the state dictionary of an object only on the main process.
 
     Args:
         dist_context: The distributed context to check for main process status.

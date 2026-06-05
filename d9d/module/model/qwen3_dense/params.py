@@ -2,8 +2,7 @@ from pydantic import BaseModel
 
 
 class Qwen3DenseLayerParameters(BaseModel):
-    """
-    Configuration parameters for a single Qwen3 Dense layer.
+    """Configuration parameters for a single Qwen3 Dense layer.
 
     Attributes:
         hidden_size: Dimension of the model's hidden states.
@@ -23,8 +22,7 @@ class Qwen3DenseLayerParameters(BaseModel):
 
 
 class Qwen3DenseParameters(BaseModel):
-    """
-    Configuration parameters for the Qwen3 Dense model backbone.
+    """Configuration parameters for the Qwen3 Dense model backbone.
 
     Attributes:
         layer: Configuration shared across all transformer layers.
@@ -55,8 +53,7 @@ class Qwen3DenseParameters(BaseModel):
 
 
 class Qwen3DenseForCausalLMParameters(BaseModel):
-    """
-    Configuration parameters for Qwen3 Dense model with a Causal Language Modeling head.
+    """Configuration parameters for Qwen3 Dense model with a Causal Language Modeling head.
 
     Attributes:
         model: The configuration for the underlying Qwen3 Dense model.
@@ -66,8 +63,7 @@ class Qwen3DenseForCausalLMParameters(BaseModel):
 
 
 class Qwen3DenseForClassificationParameters(BaseModel):
-    """
-    Configuration parameters for Qwen3 Dense model with a token/sequence classification head.
+    """Configuration parameters for Qwen3 Dense model with a token/sequence classification head.
 
     Attributes:
         model: The configuration for the underlying Qwen3 Dense model.
@@ -81,8 +77,7 @@ class Qwen3DenseForClassificationParameters(BaseModel):
 
 
 class Qwen3DenseForEmbeddingParameters(BaseModel):
-    """
-    Configuration parameters for Qwen3 Dense model with an embedding head.
+    """Configuration parameters for Qwen3 Dense model with an embedding head.
 
     Attributes:
         model: The configuration for the underlying Qwen3 Dense model.

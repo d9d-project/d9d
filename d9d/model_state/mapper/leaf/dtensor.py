@@ -9,8 +9,7 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperDistribute(ModelStateMapper):
-    """
-    Converts a single local Tensor object into a DTensor object with specified
+    """Converts a single local Tensor object into a DTensor object with specified
     `device_mesh` and `placements`.
     """
 
@@ -35,8 +34,7 @@ class ModelStateMapperDistribute(ModelStateMapper):
 
 
 class ModelStateMapperGatherFullTensor(ModelStateMapper):
-    """
-    Gathers a single DTensor object into a full Tensor object.
+    """Gathers a single DTensor object into a full Tensor object.
     """
 
     def __init__(self, name: str):

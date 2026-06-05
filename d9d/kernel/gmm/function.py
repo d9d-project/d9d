@@ -8,8 +8,7 @@ from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 
 
 class GroupedGemm(Function):
-    """
-    Autograd function for Grouped GEMM (Generalized Matrix Multiplication) with explicit gradient control.
+    """Autograd function for Grouped GEMM (Generalized Matrix Multiplication) with explicit gradient control.
     """
 
     @staticmethod
@@ -58,8 +57,7 @@ def gmm(
     b_grad_direction: GradDirection | None,
     trans_b: bool = False,
 ) -> torch.Tensor:
-    """
-    The Grouped GEMM (Generalized Matrix Multiplication) function with explicit gradient control.
+    """The Grouped GEMM (Generalized Matrix Multiplication) function with explicit gradient control.
 
     Args:
         a: Left-hand side tensor.

@@ -107,8 +107,7 @@ def adamw_stochastic_bf16_(  # noqa: C901
     step: int,
     generator: torch.Generator | None = None,
 ) -> None:
-    """
-    Performs a single in-place AdamW optimization step.
+    """Performs a single in-place AdamW optimization step.
 
     It is specifically designed for scenarios where parameters are stored in BFloat16.
 

@@ -12,13 +12,11 @@ from ..lora.method import LoRA
 
 
 class PeftStack(PeftMethod[PeftStackConfig]):
-    """
-    A composite PEFT method that applies a list of methods sequentially.
+    """A composite PEFT method that applies a list of methods sequentially.
     """
 
     def __init__(self, methods: list[PeftMethod]):
-        """
-        Constructs a PeftStack object.
+        """Constructs a PeftStack object.
 
         Args:
             methods: A list of instantiated PEFT methods to apply in order.
@@ -58,8 +56,7 @@ _PEFT_CONFIG_MAP: dict[type[BaseModel], type[PeftMethod]] = {
 
 
 def peft_method_from_config(config: TConfig) -> PeftMethod[TConfig]:
-    """
-    Factory function to instantiate the correct PeftMethod based on the configuration type.
+    """Factory function to instantiate the correct PeftMethod based on the configuration type.
 
     Args:
         config: A specific PEFT configuration object (e.g., LoRAConfig).

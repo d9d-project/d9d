@@ -32,8 +32,7 @@ def _build_mesh_domains(params: "DeviceMeshParameters") -> dict[str, DeviceMesh]
 
 
 class DistributedContext:
-    """
-    Acts as the single source of truth for the distributed execution environment.
+    """Acts as the single source of truth for the distributed execution environment.
 
     It acts as the central repository for the distributed configuration, managing the creation
     and synchronization of PyTorch DeviceMeshes for different domains (Regular domain, Expert Parallel domain, ...).
@@ -81,8 +80,7 @@ class DistributedContext:
         return self._logger
 
     def mesh_for(self, domain: str) -> DeviceMesh:
-        """
-        Returns the device mesh view associated with a specific logical domain.
+        """Returns the device mesh view associated with a specific logical domain.
 
         Available Domains and Dimensions:
             *   `regular` (`REGULAR_DOMAIN`): The most granular mesh for fully decomposed parallelism.
@@ -126,8 +124,7 @@ class DistributedContext:
         torch.cuda.synchronize()
 
     def set_timeout(self, timeout_seconds: float):
-        """
-        Updates the NCCL/process group timeout for all underlying meshes.
+        """Updates the NCCL/process group timeout for all underlying meshes.
 
         Args:
             timeout_seconds: New timeout duration in seconds.
@@ -148,8 +145,7 @@ class DistributedContext:
 
     @contextmanager
     def local_main_process_first(self):
-        """
-        Context manager that executes the block on the local main process first.
+        """Context manager that executes the block on the local main process first.
 
         Other local ranks wait at the entrance. The local main process waits at the
         exit to synchronize before continuing.
@@ -164,8 +160,7 @@ class DistributedContext:
 
     @contextmanager
     def main_process_first(self):
-        """
-        Context manager that executes the block on the global main process first.
+        """Context manager that executes the block on the global main process first.
 
         All other ranks wait at the entrance. The global main process waits at the
         exit to synchronize before continuing.

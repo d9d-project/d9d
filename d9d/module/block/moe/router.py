@@ -9,8 +9,7 @@ from d9d.module.base import ModuleLateInit
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class RoutingResult:
-    """
-    Represents the result of a routing operation to select experts.
+    """Represents the result of a routing operation to select experts.
 
     Attributes:
         selected_expert_indices: Indices of the chosen experts per token.
@@ -22,8 +21,7 @@ class RoutingResult:
 
 
 class TopKRouter(nn.Module, ModuleLateInit):
-    """
-    Selects the top-K experts based on a learned gating mechanism.
+    """Selects the top-K experts based on a learned gating mechanism.
 
     This router:
 
@@ -36,8 +34,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
     def __init__(
         self, dim: int, num_experts: int, top_k: int, renormalize_probabilities: bool, enable_expert_bias: bool = False
     ) -> None:
-        """
-        Constructs the TopKRouter.
+        """Constructs the TopKRouter.
 
         Args:
             dim: Input feature dimensionality.
@@ -64,8 +61,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
         self._renormalize_probabilities = renormalize_probabilities
 
     def forward(self, hidden_states: torch.Tensor) -> RoutingResult:
-        """
-        Calculates routing decisions for the input tokens.
+        """Calculates routing decisions for the input tokens.
 
         Args:
             hidden_states: Input tokens. Shape: `(num_tokens, dim)`.
@@ -96,8 +92,7 @@ class TopKRouter(nn.Module, ModuleLateInit):
         return RoutingResult(selected_expert_indices=selected_experts_indices, selected_probabilities=selected_probs)
 
     def reset_parameters(self) -> None:
-        """
-        Resets module parameters.
+        """Resets module parameters.
         """
         if self.expert_bias is not None:
             nn.init.zeros_(self.expert_bias)

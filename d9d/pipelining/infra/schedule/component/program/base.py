@@ -9,8 +9,7 @@ class PipelineProgramBuilder(abc.ABC):
 
     @abc.abstractmethod
     def compose(self, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:
-        """
-        Generates the execution program for all ranks in the pipeline.
+        """Generates the execution program for all ranks in the pipeline.
 
         Args:
             num_microbatches: Number of microbatches per step.

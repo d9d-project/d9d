@@ -12,8 +12,7 @@ _buffer: Buffer | None = None
 
 
 def get_hidden_state_bytes(x: torch.Tensor) -> int:
-    """
-    Calculates the byte size of a hidden state tensor row.
+    """Calculates the byte size of a hidden state tensor row.
 
     Args:
         x: Input tensor. Shape: `(?, hidden_size)`.
@@ -25,8 +24,7 @@ def get_hidden_state_bytes(x: torch.Tensor) -> int:
 
 
 def init_deepep_buffer(group: torch.distributed.ProcessGroup, hidden_bytes: int):
-    """
-    Initializes or expands the global DeepEP communication buffer.
+    """Initializes or expands the global DeepEP communication buffer.
 
     Checks if the existing buffer is sufficient for the required hidden dimension
     and process group size. If not, it allocates a new buffer.
@@ -167,8 +165,7 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
         self._unpermute_mapping = None
 
     def setup(self, group: torch.distributed.ProcessGroup, hidden_size: int, hidden_dtype: torch.dtype):
-        """
-        Initializes the backend buffer and calculates expert sharding.
+        """Initializes the backend buffer and calculates expert sharding.
 
         Args:
             group: The process group containing all experts.

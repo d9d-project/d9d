@@ -9,8 +9,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 
 
 class BaseTrackerRun(abc.ABC):
-    """
-    Abstract base class representing an active tracking session (run).
+    """Abstract base class representing an active tracking session (run).
 
     This object is responsible for the actual logging of metrics, parameters,
     during train or inference run.
@@ -18,8 +17,7 @@ class BaseTrackerRun(abc.ABC):
 
     @abc.abstractmethod
     def set_step(self, step: int):
-        """
-        Updates the global step counter for subsequent logs.
+        """Updates the global step counter for subsequent logs.
 
         Args:
             step: The current step index (e.g., iteration number).
@@ -28,8 +26,7 @@ class BaseTrackerRun(abc.ABC):
 
     @abc.abstractmethod
     def set_context(self, context: dict[str, str]):
-        """
-        Sets a persistent context dictionary for subsequent logs.
+        """Sets a persistent context dictionary for subsequent logs.
 
         These context values (tags) will be attached to every metric logged
         until changed.
@@ -41,8 +38,7 @@ class BaseTrackerRun(abc.ABC):
 
     @abc.abstractmethod
     def scalar(self, name: str, value: float, context: dict[str, str] | None = None):
-        """
-        Logs a scalar value.
+        """Logs a scalar value.
 
         Args:
             name: The name of the metric.
@@ -54,8 +50,7 @@ class BaseTrackerRun(abc.ABC):
 
     @abc.abstractmethod
     def bins(self, name: str, values: torch.Tensor, context: dict[str, str] | None = None):
-        """
-        Logs a distribution/histogram of values.
+        """Logs a distribution/histogram of values.
 
         Args:
             name: The name of the metric.
@@ -67,8 +62,7 @@ class BaseTrackerRun(abc.ABC):
 
 
 class RunConfig(BaseModel):
-    """
-    Configuration for initializing a specific logged run.
+    """Configuration for initializing a specific logged run.
 
     Attributes:
         name: The display name of the experiment.
@@ -85,8 +79,7 @@ TConfig = TypeVar("TConfig", bound=BaseModel)
 
 
 class BaseTracker(abc.ABC, Stateful, Generic[TConfig]):
-    """
-    Abstract base class for a tracker backend factory.
+    """Abstract base class for a tracker backend factory.
 
     This class manages the lifecycle of runs and integration with the
     distributed checkpointing system to ensure experiment continuity
@@ -96,8 +89,7 @@ class BaseTracker(abc.ABC, Stateful, Generic[TConfig]):
     @contextmanager
     @abc.abstractmethod
     def open(self, properties: RunConfig) -> Generator[BaseTrackerRun, None, None]:
-        """
-        Context manager that initiates and manages an experiment run.
+        """Context manager that initiates and manages an experiment run.
 
         Args:
             properties: Configuration metadata for the run.
@@ -110,8 +102,7 @@ class BaseTracker(abc.ABC, Stateful, Generic[TConfig]):
     @classmethod
     @abc.abstractmethod
     def from_config(cls, config: TConfig) -> Self:
-        """
-        Factory method to create a tracker instance from a configuration object.
+        """Factory method to create a tracker instance from a configuration object.
 
         Args:
             config: The backend-specific configuration object.

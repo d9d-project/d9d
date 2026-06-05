@@ -43,8 +43,7 @@ class FlashSdpa(nn.Module):
         is_causal: bool,
         scale: float,
     ) -> torch.Tensor:
-        """
-        Computes Scaled Dot-Product Attention.
+        """Computes Scaled Dot-Product Attention.
 
         Args:
             query_states: Query tensor. Shape: ``(batch, seq_len, n_q_heads, head_dim)``.

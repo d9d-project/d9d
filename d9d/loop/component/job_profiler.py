@@ -11,16 +11,14 @@ from .stepper import Stepper
 
 
 class JobProfiler:
-    """
-    Manages profiling sessions during a job loop.
+    """Manages profiling sessions during a job loop.
 
     This class coordinates the initialization and activation of the internal
     profiler based on the current step count provided by the stepper.
     """
 
     def __init__(self, dist_context: DistributedContext, config: ProfilingConfig | None, stepper: Stepper):
-        """
-        Constructs JobProfiler object.
+        """Constructs JobProfiler object.
 
         Args:
             dist_context: The distributed context.
@@ -42,8 +40,7 @@ class JobProfiler:
 
     @contextmanager
     def open(self) -> Generator[torch.profiler.profile | None]:
-        """
-        Context manager to activate profiling for the job loop.
+        """Context manager to activate profiling for the job loop.
 
         Yields:
             The active Profiler instance if profiling is enabled, otherwise None.

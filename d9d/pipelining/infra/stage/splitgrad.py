@@ -13,8 +13,7 @@ from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 def stage_backward_full(
     outputs: list[torch.Tensor], output_grads: list[torch.Tensor] | None, inputs: list[torch.Tensor]
 ) -> list[torch.Tensor | None]:
-    """
-    Performs a standard, full backward pass for a pipeline stage.
+    """Performs a standard, full backward pass for a pipeline stage.
 
     This function computes gradients for the inputs based on the gradients
     received for the outputs.
@@ -41,8 +40,7 @@ def stage_backward_full(
 
 @dataclass
 class ParamGroup:
-    """
-    Represents a group of parameters and their dependency intermediates in the autograd graph.
+    """Represents a group of parameters and their dependency intermediates in the autograd graph.
 
     This structure is used to manage the split backward pass, identifying which
     intermediate nodes in the graph allow gradients to flow to specific sets of parameters.
@@ -72,8 +70,7 @@ def _get_grad_fn_or_grad_acc(t: torch.Tensor) -> Node | None:
 
 
 def _construct_reverse_graph(roots: list[Node]) -> dict[Node, list[Node]]:
-    """
-    Builds a reverse adjacency list (Input -> Output) via BFS from the roots.
+    """Builds a reverse adjacency list (Input -> Output) via BFS from the roots.
 
     Standard autograd graphs point from Output -> Input (next_functions).
     This helper provides the reverse mapping to assist in dependency analysis.
@@ -105,8 +102,7 @@ def _construct_reverse_graph(roots: list[Node]) -> dict[Node, list[Node]]:
 def _reverse_closure(
     roots: list[Node], target_nodes: set[Node], reverse_edges_dict: dict[Node, list[Node]]
 ) -> tuple[set[Node], set[Node]]:
-    """
-    Computes a closure of nodes reachable from roots in the reverse graph.
+    """Computes a closure of nodes reachable from roots in the reverse graph.
 
     Args:
         roots: Starting nodes.
@@ -143,8 +139,7 @@ def _reverse_closure(
 def _get_param_groups(
     inputs: list[Node], params: list[Node], reverse_edges_dict: dict[Node, list[Node]]
 ) -> list[ParamGroup]:
-    """
-    Clusters parameters based on their dependencies on inputs.
+    """Clusters parameters based on their dependencies on inputs.
 
     This function identifies how gradients propagate from inputs through intermediates
     to parameters, grouping them to facilitate split backward execution.
@@ -207,8 +202,7 @@ def _make_capture_hook(group: ParamGroup, idx: int) -> Callable[[torch.Tensor], 
 
 @dataclass
 class BackwardInputResult:
-    """
-    Container for the results of the input backward phase.
+    """Container for the results of the input backward phase.
 
     Attributes:
         input_grads: The gradients computed for the input tensors.
@@ -229,8 +223,7 @@ def stage_backward_input(
     inputs: list[torch.Tensor],
     weights: Iterator[nn.Parameter],
 ) -> BackwardInputResult:
-    """
-    Performs the first phase of a split backward pass: Input Gradients.
+    """Performs the first phase of a split backward pass: Input Gradients.
 
     This function computes the gradients with respect to `inputs` while postponing
     the computation of gradients with respect to `weights`. It analyzes the
@@ -297,8 +290,7 @@ def stage_backward_input(
 def stage_backward_weight(  # noqa: C901
     weights: Iterator[nn.Parameter], param_groups: list[ParamGroup], retain_graph: bool = False
 ) -> tuple[torch.Tensor | None, ...]:
-    """
-    Performs the second phase of a split backward pass: Weight Gradients.
+    """Performs the second phase of a split backward pass: Weight Gradients.
 
     This function consumes the gradients captured in the `ParamGroup`s during
     `stage_backward_input` to compute the final gradients for the model weights.

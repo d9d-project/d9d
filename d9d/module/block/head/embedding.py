@@ -6,8 +6,7 @@ from d9d.module.base import ModuleLateInit
 
 
 class EmbeddingHead(nn.Module, ModuleLateInit):
-    """
-    A head module for extracting dense representations from hidden states.
+    """A head module for extracting dense representations from hidden states.
 
     It optionally applies a linear projection and L2 normalization to produce
     embeddings for contrastive learning or retrieval tasks. It supports boolean
@@ -15,8 +14,7 @@ class EmbeddingHead(nn.Module, ModuleLateInit):
     """
 
     def __init__(self, hidden_size: int, embedding_dim: int | None, normalize: bool):
-        """
-        Constructs the EmbeddingHead object.
+        """Constructs the EmbeddingHead object.
 
         Args:
             hidden_size: The input dimensionality (hidden state size).
@@ -34,8 +32,7 @@ class EmbeddingHead(nn.Module, ModuleLateInit):
             self.projection = None
 
     def forward(self, hidden_states: torch.Tensor, pooling_mask: torch.Tensor | None = None) -> torch.Tensor:
-        """
-        Computes dense embeddings from hidden states.
+        """Computes dense embeddings from hidden states.
 
         Args:
             hidden_states: Input tensor of hidden states.

@@ -18,8 +18,7 @@ _LORA_MODULES = (LoRALinear, LoRAGroupedLinear)
 def named_modules_without_lora(
     module: nn.Module, memo: set[nn.Module] | None = None, prefix: str = "", remove_duplicate: bool = True
 ):
-    """
-    Yields named modules, skipping submodules that are already LoRA layers.
+    """Yields named modules, skipping submodules that are already LoRA layers.
 
     This prevents recursively re-injecting LoRA into an already wrapped layer during
     traversal.
@@ -55,8 +54,7 @@ def named_modules_without_lora(
 
 
 class LoRA(PeftMethod[LoRAConfig]):
-    """
-    Implements the Low-Rank Adaptation (LoRA) injection strategy.
+    """Implements the Low-Rank Adaptation (LoRA) injection strategy.
 
     It scans the module structure for `nn.Linear` or `GroupedLinear` layers matching
     the configured name pattern. Matched layers are replaced with LoRA wrappers.
@@ -67,8 +65,7 @@ class LoRA(PeftMethod[LoRAConfig]):
     """
 
     def __init__(self, config: LoRAConfig):
-        """
-        Constructs a LoRA method.
+        """Constructs a LoRA method.
 
         Args:
             config: LoRA configuration containing patterns and hyperparameters.

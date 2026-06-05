@@ -9,8 +9,7 @@ _T_co = TypeVar("_T_co", covariant=True)
 
 
 class DatasetImplementingSortKeyProtocol(Protocol[_T_co]):
-    """
-    Protocol for datasets that support retrieval of a specific key for sorting purposes.
+    """Protocol for datasets that support retrieval of a specific key for sorting purposes.
 
     This is typically used for length-based bucketing/sorting where the dataset
     needs to expose the length of an item without loading the full item.
@@ -21,8 +20,7 @@ class DatasetImplementingSortKeyProtocol(Protocol[_T_co]):
         ...
 
     def sort_key(self, index: int) -> Any:
-        """
-        Returns a value used for sorting the dataset at the given index.
+        """Returns a value used for sorting the dataset at the given index.
 
         Args:
             index: The index of the item.
@@ -38,8 +36,7 @@ class DatasetImplementingSortKeyProtocol(Protocol[_T_co]):
 
 
 class BufferSortedDataset(Dataset[_T_co], Stateful):
-    """
-    A dataset wrapper that groups items into buffers, sorts them, and yields them with local shuffling.
+    """A dataset wrapper that groups items into buffers, sorts them, and yields them with local shuffling.
 
     This prevents extreme padding in variable-length training (by grouping similar lengths)
     while maintaining enough randomness to ensure statistical variance in updates.
@@ -62,8 +59,7 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
         pack_size: int,
         init_seed: int | None = None,
     ):
-        """
-        Args:
+        """Args:
             base_dataset: The underlying dataset.
             buffer_size: The number of items to load into the buffer for sorting.
             pack_size: The size of local groups (batches/micro-batches).

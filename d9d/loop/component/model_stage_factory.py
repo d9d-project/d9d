@@ -41,8 +41,7 @@ def _stateful_predicate_always(key: str, value: torch.Tensor) -> bool:
 
 
 class TrackedModules(Stateful, Offloadable):
-    """
-    Wraps a list of model stages and manages their state for distributed checkpointing.
+    """Wraps a list of model stages and manages their state for distributed checkpointing.
 
     This class implements the PyTorch Distributed `Stateful` protocol, aggregating
     the state dictionaries of multiple pipeline stages assigned to the current rank.
@@ -79,8 +78,7 @@ class TrackedModules(Stateful, Offloadable):
         )
 
     def offload(self, ctx: OffloadContext) -> None:
-        """
-        Releases the GPU memory of all model parameters and buffers, moving them to host memory.
+        """Releases the GPU memory of all model parameters and buffers, moving them to host memory.
 
         Each tensor's local storage is swapped in place for a host copy. The parameter/buffer
         objects themselves - including DTensor wrappers - are preserved, so optimizer state keys,
@@ -105,8 +103,7 @@ class TrackedModules(Stateful, Offloadable):
         self._offload_mirror = mirror
 
     def onload(self, ctx: OnloadContext) -> None:
-        """
-        Restores GPU residency of all model parameters and buffers released by "offload".
+        """Restores GPU residency of all model parameters and buffers released by "offload".
 
         Args:
             ctx: Context for this operation.
@@ -146,8 +143,7 @@ class TrackedModules(Stateful, Offloadable):
         return result
 
     def state_dict(self) -> dict[str, Any]:
-        """
-        Generates the state dictionary for all tracked modules.
+        """Generates the state dictionary for all tracked modules.
 
         The keys are namespaced using the current pipeline rank and stage index
         (e.g., `pp_0_stage_0`). Only parameters satisfying the `stateful_predicate`
@@ -174,8 +170,7 @@ class TrackedModules(Stateful, Offloadable):
             raise ValueError(f"Extra keys: {extra_keys}")
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        """
-        Loads the state dictionary into the tracked modules.
+        """Loads the state dictionary into the tracked modules.
 
         Args:
             state_dict: The state dictionary to load. Must contain keys corresponding
@@ -190,8 +185,7 @@ class TrackedModules(Stateful, Offloadable):
 
 
 class ModelStageFactory:
-    """
-    Factory class responsible for creating, initializing, and parallelizing model stages.
+    """Factory class responsible for creating, initializing, and parallelizing model stages.
 
     This class coordinates the `ModelProvider` with the distributed context to:
 
@@ -261,8 +255,7 @@ class ModelStageFactory:
         return model
 
     def build_pipeline_and_modules(self) -> tuple[PipelineScheduleInfo, TrackedModules]:
-        """
-        Constructs the execution schedule and the model container.
+        """Constructs the execution schedule and the model container.
 
         Returns:
            The pipeline schedule information.

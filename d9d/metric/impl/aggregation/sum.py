@@ -8,8 +8,7 @@ from d9d.metric.component import MetricAccumulator
 
 
 class SumMetric(Metric[torch.Tensor]):
-    """
-    Computes the sum of input values.
+    """Computes the sum of input values.
     """
 
     def __init__(self):
@@ -17,8 +16,7 @@ class SumMetric(Metric[torch.Tensor]):
         self._accumulator = MetricAccumulator(torch.scalar_tensor(0, dtype=torch.float32))
 
     def update(self, value: torch.Tensor):
-        """
-        Updates the metric state by adding the sum of the input value.
+        """Updates the metric state by adding the sum of the input value.
 
         Args:
             value: A tensor whose sum will be added to the accumulator.

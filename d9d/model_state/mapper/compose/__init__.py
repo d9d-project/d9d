@@ -1,5 +1,4 @@
-"""
-Complex state mappers are built using composition. This package provides ModelStateMapper implementations that
+"""Complex state mappers are built using composition. This package provides ModelStateMapper implementations that
 are composed of other mappers.
 """
 

@@ -8,16 +8,14 @@ from .grouped_linear import GroupedLinear
 
 
 class GroupedSwiGLU(nn.Module, ModuleLateInit):
-    """
-    Executes a collection of SwiGLU experts efficiently using Grouped GEMM.
+    """Executes a collection of SwiGLU experts efficiently using Grouped GEMM.
 
     This module implements the architectural pattern: `down_proj(SiLU(gate_proj(x)) * up_proj(x))`.
     It applies this operation across multiple discrete experts in parallel without padding or masking.
     """
 
     def __init__(self, hidden_dim: int, intermediate_dim: int, num_experts: int):
-        """
-        Constructs the GroupedSwiGLU module.
+        """Constructs the GroupedSwiGLU module.
 
         Args:
             hidden_dim: Dimensionality of the input and output hidden states.
@@ -37,8 +35,7 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
         permuted_probs: torch.Tensor,
         tokens_per_expert: torch.Tensor,
     ) -> torch.Tensor:
-        """
-        Computes expert outputs for sorted input tokens.
+        """Computes expert outputs for sorted input tokens.
 
         Args:
             permuted_x: Input tokens sorted by their assigned expert.

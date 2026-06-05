@@ -1,5 +1,4 @@
-"""
-This package provides utilities and torch.utils.data.Dataset implementations.
+"""This package provides utilities and torch.utils.data.Dataset implementations.
 """
 
 from .buffer_sorted import BufferSortedDataset, DatasetImplementingSortKeyProtocol

@@ -1,5 +1,4 @@
-"""
-Package for composing multiple PEFT methods into a stack.
+"""Package for composing multiple PEFT methods into a stack.
 """
 
 from .config import PeftStackConfig

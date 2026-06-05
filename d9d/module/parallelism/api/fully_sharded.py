@@ -12,8 +12,7 @@ def _force_fsdp_grad_reduction_policy(module: FSDPModule):
 
 
 def parallelize_fsdp(module: nn.Module, mesh: DeviceMesh, *args: Any, **kwargs: Any):
-    """
-    Applies Fully Sharded Data Parallel (FSDP) with forced gradient summation.
+    """Applies Fully Sharded Data Parallel (FSDP) with forced gradient summation.
 
     This function wraps the provided module with PyTorch's ``fully_shard`` API using
     the specified device mesh. Unlike standard FSDP usage, this function explicitly

@@ -7,13 +7,11 @@ from .storage import PipelineStateStorage
 
 
 class PipelineStateGlobal(PipelineState):
-    """
-    Represents the global (unsharded) view of the pipeline state.
+    """Represents the global (unsharded) view of the pipeline state.
     """
 
     def __init__(self, storage: PipelineStateStorage):
-        """
-        Constructs a PipelineStateGlobal object.
+        """Constructs a PipelineStateGlobal object.
 
         Args:
             storage: The underlying storage backend.
@@ -31,13 +29,11 @@ class PipelineStateGlobal(PipelineState):
 
 
 class PipelineStateShard(PipelineState):
-    """
-    Represents a sharded view of the pipeline state for a specific shard ID.
+    """Represents a sharded view of the pipeline state for a specific shard ID.
     """
 
     def __init__(self, storage: PipelineStateStorage, current_shard: int):
-        """
-        Constructs a PipelineStateShard object.
+        """Constructs a PipelineStateShard object.
 
         Args:
             storage: The underlying storage backend.
@@ -57,16 +53,14 @@ class PipelineStateShard(PipelineState):
 
 
 class PipelineStateHandler:
-    """
-    Manages the lifecycle and access patterns of pipeline states.
+    """Manages the lifecycle and access patterns of pipeline states.
 
     This handler initializes the underlying storage and provides specific views
     (global or sharded) into that storage.
     """
 
     def __init__(self, sharding_spec: dict[str, ShardingSpecLeaf], num_shards: int):
-        """
-        Constructs a PipelineStateHandler object.
+        """Constructs a PipelineStateHandler object.
 
         Args:
             sharding_spec: A definition of how specific keys should be sharded.
@@ -77,8 +71,7 @@ class PipelineStateHandler:
         )
 
     def global_state(self) -> PipelineState:
-        """
-        Returns a view interface for accessing global state.
+        """Returns a view interface for accessing global state.
 
         Returns:
             A PipelineState interface that accesses the full, aggregated data.
@@ -86,8 +79,7 @@ class PipelineStateHandler:
         return PipelineStateGlobal(self._storage)
 
     def sharded_state(self, shard_id: int) -> PipelineState:
-        """
-        Returns a view interface for accessing state specific to a shard ID.
+        """Returns a view interface for accessing state specific to a shard ID.
 
         Args:
             shard_id: The index of the shard to access.
@@ -98,7 +90,6 @@ class PipelineStateHandler:
         return PipelineStateShard(self._storage, shard_id)
 
     def reset(self):
-        """
-        Resets the underlying storage, clearing all state.
+        """Resets the underlying storage, clearing all state.
         """
         self._storage.reset()

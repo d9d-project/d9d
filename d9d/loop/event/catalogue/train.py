@@ -15,8 +15,7 @@ from .common import (
 
 @dataclasses.dataclass(kw_only=True)
 class EventOptimizerReadyContext:
-    """
-    Context provided when the optimizer has been instantiated.
+    """Context provided when the optimizer has been instantiated.
 
     Attributes:
         optimizer: The optimizer instance wrapping the model parameters.
@@ -27,8 +26,7 @@ class EventOptimizerReadyContext:
 
 @dataclasses.dataclass(kw_only=True)
 class EventLRSchedulerReadyContext:
-    """
-    Context provided when the learning rate scheduler has been instantiated.
+    """Context provided when the learning rate scheduler has been instantiated.
 
     Attributes:
         lr_scheduler: The learning rate scheduler instance.
@@ -39,8 +37,7 @@ class EventLRSchedulerReadyContext:
 
 @dataclasses.dataclass(kw_only=True)
 class EventTrainReadyContext:
-    """
-    Context provided when training is fully ready to begin and the checkpoint is loaded.
+    """Context provided when training is fully ready to begin and the checkpoint is loaded.
     """
 
     run: BaseTrackerRun
@@ -48,15 +45,13 @@ class EventTrainReadyContext:
 
 @dataclasses.dataclass(kw_only=True)
 class EventTrainFinishedContext:
-    """
-    Context provided when the entire training loop has completed successfully.
+    """Context provided when the entire training loop has completed successfully.
     """
 
 
 @dataclasses.dataclass(kw_only=True)
 class EventSleepContext:
-    """
-    Context provided for a sleep or wake lifecycle transition.
+    """Context provided for a sleep or wake lifecycle transition.
 
     Attributes:
         tags: The set of subsystem tags involved in this transition.

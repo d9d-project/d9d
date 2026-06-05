@@ -8,8 +8,7 @@ import torch.distributed as dist
 def gather(
     tensor: torch.Tensor, group: dist.ProcessGroup, group_dst: int, async_op: bool = False
 ) -> list[torch.Tensor] | tuple[list[torch.Tensor] | None, dist.Work] | None:
-    """
-    Gathers tensors from the process group to a specific destination rank.
+    """Gathers tensors from the process group to a specific destination rank.
 
     This function assumes that tensors on all ranks have the same shape and dtype
     as the tensor on the current rank. It automatically allocates the output
@@ -41,8 +40,7 @@ def gather(
 def all_gather(
     tensor: torch.Tensor, group: dist.ProcessGroup, async_op: bool = False
 ) -> list[torch.Tensor] | tuple[list[torch.Tensor], dist.Work]:
-    """
-    Gathers tensors from the whole process group to all ranks.
+    """Gathers tensors from the whole process group to all ranks.
 
     This function assumes that tensors on all ranks have the same shape and dtype
     as the tensor on the current rank. It automatically allocates the output
@@ -87,8 +85,7 @@ def _all_gather_shapes(
 def all_gather_variadic_shape(
     tensor: torch.Tensor, group: dist.ProcessGroup, async_op: bool = False
 ) -> list[torch.Tensor] | tuple[list[torch.Tensor], dist.Work]:
-    """
-    Gathers tensors of different shapes from the whole process group to all ranks.
+    """Gathers tensors of different shapes from the whole process group to all ranks.
 
     Unlike standard all_gather, this function first communicates the shape of the
     tensor on every rank allowing for dynamic sizing.
@@ -114,8 +111,7 @@ def all_gather_variadic_shape(
 
 
 def gather_variadic_shape(tensor: torch.Tensor, group: dist.ProcessGroup, group_dst: int) -> list[torch.Tensor] | None:
-    """
-    Gathers tensors of different shapes from the process group to a specific rank.
+    """Gathers tensors of different shapes from the process group to a specific rank.
 
     This function coordinates shape exchange and uses point-to-point communication
     (isend/irecv) to gather tensors that may differ in shape across ranks.

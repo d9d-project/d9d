@@ -11,8 +11,7 @@ from .stepper import Stepper
 
 
 class ManualGarbageCollector(AbstractContextManager):
-    """
-    Manages efficient Python garbage collection during the training loop.
+    """Manages efficient Python garbage collection during the training loop.
 
     This context manager disables automatic garbage collection upon entry to prevent
     unpredictable latency spikes during training steps. It allows performing
@@ -20,8 +19,7 @@ class ManualGarbageCollector(AbstractContextManager):
     """
 
     def __init__(self, dist_ctx: DistributedContext, config: GarbageCollectionConfig, step: Stepper):
-        """
-        Constructs the garbage collector manager.
+        """Constructs the garbage collector manager.
 
         Args:
             dist_ctx: The distributed context.
@@ -33,8 +31,7 @@ class ManualGarbageCollector(AbstractContextManager):
         self._step = step
 
     def __enter__(self) -> Self:
-        """
-        Disables automatic garbage collection and performs an initial full collection.
+        """Disables automatic garbage collection and performs an initial full collection.
 
         Returns:
             The calling instance.
@@ -47,8 +44,7 @@ class ManualGarbageCollector(AbstractContextManager):
     def __exit__(
         self, exc_type: type[BaseException] | None, exc_value: BaseException | None, traceback: TracebackType | None, /
     ) -> None:
-        """
-        Re-enables automatic garbage collection and performs a final full collection.
+        """Re-enables automatic garbage collection and performs a final full collection.
 
         Args:
             exc_type: The type of the exception raised (if any).
@@ -59,8 +55,7 @@ class ManualGarbageCollector(AbstractContextManager):
         self._collect(generation=2)
 
     def collect_periodic(self):
-        """
-        Triggers garbage collection if the current step matches the configured period.
+        """Triggers garbage collection if the current step matches the configured period.
 
         This typically performs a faster (generation 1) collection rather than a full sweep.
         """
@@ -68,8 +63,7 @@ class ManualGarbageCollector(AbstractContextManager):
             self._collect(generation=1)
 
     def collect_forced(self):
-        """
-        Forces a full garbage collection run regardless of the step count.
+        """Forces a full garbage collection run regardless of the step count.
 
         This performs a generation 2 collection.
         """

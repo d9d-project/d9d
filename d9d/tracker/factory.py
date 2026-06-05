@@ -29,8 +29,7 @@ except ImportError as e:
 
 
 def tracker_from_config(config: AnyTrackerConfig) -> BaseTracker:
-    """
-    Instantiates a specific tracker implementation based on the configuration.
+    """Instantiates a specific tracker implementation based on the configuration.
 
     Based on the 'provider' field in the config, this function selects the
     appropriate backend (e.g., Aim, Null). It handles checking for missing

@@ -7,8 +7,7 @@ from .configured import DistributedContext
 
 
 class DeviceMeshParameters(BaseModel):
-    """
-    Configuration parameters for initializing Distributed Device Meshes.
+    """Configuration parameters for initializing Distributed Device Meshes.
 
     Attributes:
         pipeline_parallel: Degree of pipeline parallelism (PP).
@@ -98,8 +97,7 @@ class DeviceMeshParameters(BaseModel):
         return self
 
     def build(self, log_level: int = logging.INFO) -> "DistributedContext":
-        """
-        Initializes the DistributedContext using these parameters.
+        """Initializes the DistributedContext using these parameters.
 
         Returns:
             A new DistributedContext instance containing the initialized device meshes.

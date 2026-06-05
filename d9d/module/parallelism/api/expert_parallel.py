@@ -7,8 +7,7 @@ from d9d.module.parallelism.style import ShardMoESparseExpertsParallel, ToLocalP
 
 
 def parallelize_expert_parallel(module: MoELayer, mesh_experts: DeviceMesh, expert_shard_dim: str = "ep_shard"):
-    """
-    Applies Expert Parallelism to a MoE layer.
+    """Applies Expert Parallelism to a MoE layer.
 
     This function configures the provided Mixture of Experts layer for distributed
     execution.

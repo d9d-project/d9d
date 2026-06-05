@@ -27,8 +27,7 @@ from .params import (
 
 
 class Qwen3DenseModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
-    """
-    The Qwen3 Dense Transformer Decoder backbone.
+    """The Qwen3 Dense Transformer Decoder backbone.
 
     It is designed to be split across multiple pipeline stages.
     """
@@ -40,8 +39,7 @@ class Qwen3DenseModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         hidden_states_snapshot_mode: HiddenStatesAggregationMode,
         enable_checkpointing: bool,
     ):
-        """
-        Constructs the Qwen3DenseModel object.
+        """Constructs the Qwen3DenseModel object.
 
         Args:
             params: Configuration parameters for the full model.
@@ -90,8 +88,7 @@ class Qwen3DenseModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         self._enable_checkpointing = enable_checkpointing
 
     def output_dtype(self) -> torch.dtype:
-        """
-        Returns the data type of the model output hidden states.
+        """Returns the data type of the model output hidden states.
 
         Returns:
             The output hidden states data type.
@@ -106,8 +103,7 @@ class Qwen3DenseModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         hidden_states_snapshot: torch.Tensor | None = None,
         hidden_states_agg_mask: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor | None]:
-        """
-        Executes the forward pass for the current pipeline stage.
+        """Executes the forward pass for the current pipeline stage.
 
         Args:
             input_ids: Indices of input sequence tokens. Required if this is the
@@ -223,8 +219,7 @@ class Qwen3DenseModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
 
 
 class Qwen3DenseForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
-    """
-    A Qwen3 Dense model wrapped with a Causal Language Modeling head.
+    """A Qwen3 Dense model wrapped with a Causal Language Modeling head.
 
     It is designed to be split across multiple pipeline stages.
     """
@@ -236,8 +231,7 @@ class Qwen3DenseForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining)
         hidden_states_snapshot_mode: HiddenStatesAggregationMode,
         enable_checkpointing: bool,
     ):
-        """
-        Constructs the Qwen3DenseForCausalLM object.
+        """Constructs the Qwen3DenseForCausalLM object.
 
         Args:
             params: Full model configuration parameters.
@@ -273,8 +267,7 @@ class Qwen3DenseForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining)
         hidden_states_agg_mask: torch.Tensor | None = None,
         labels: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
-        """
-        Executes the model forward pass.
+        """Executes the model forward pass.
 
         If this is the last stage, it expects `labels` to be provided and computes
         the cross-entropy loss (returned as 'logps' typically representing per-token loss).
@@ -304,8 +297,7 @@ class Qwen3DenseForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining)
         return model_outputs
 
     def reset_parameters(self):
-        """
-        Resets module parameters.
+        """Resets module parameters.
         """
         self.model.reset_parameters()
 
@@ -329,8 +321,7 @@ class Qwen3DenseForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining)
 
 
 class Qwen3DenseForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
-    """
-    A Qwen3 Dense model wrapped with a Sequence/Token Classification head.
+    """A Qwen3 Dense model wrapped with a Sequence/Token Classification head.
 
     It is designed to be split across multiple pipeline stages.
     """
@@ -342,8 +333,7 @@ class Qwen3DenseForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipel
         hidden_states_snapshot_mode: HiddenStatesAggregationMode,
         enable_checkpointing: bool,
     ):
-        """
-        Constructs the Qwen3DenseForClassification object.
+        """Constructs the Qwen3DenseForClassification object.
 
         Args:
             params: Full model configuration parameters.
@@ -380,8 +370,7 @@ class Qwen3DenseForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipel
         hidden_states_agg_mask: torch.Tensor | None = None,
         pooling_mask: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
-        """
-        Executes the classification model forward pass.
+        """Executes the classification model forward pass.
 
         Args:
             input_ids: Input token IDS (for Stage 0).
@@ -411,8 +400,7 @@ class Qwen3DenseForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipel
         return model_outputs
 
     def reset_parameters(self):
-        """
-        Resets module parameters.
+        """Resets module parameters.
         """
         self.model.reset_parameters()
 
@@ -437,8 +425,7 @@ class Qwen3DenseForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipel
 
 
 class Qwen3DenseForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
-    """
-    A Qwen3 Dense model wrapped with an Embedding head.
+    """A Qwen3 Dense model wrapped with an Embedding head.
 
     It is designed to be split across multiple pipeline stages.
     """
@@ -450,8 +437,7 @@ class Qwen3DenseForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining
         hidden_states_snapshot_mode: HiddenStatesAggregationMode,
         enable_checkpointing: bool,
     ):
-        """
-        Constructs the Qwen3DenseForEmbedding object.
+        """Constructs the Qwen3DenseForEmbedding object.
 
         Args:
             params: Full model configuration parameters.
@@ -489,8 +475,7 @@ class Qwen3DenseForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining
         hidden_states_agg_mask: torch.Tensor | None = None,
         pooling_mask: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
-        """
-        Executes the embedding model forward pass.
+        """Executes the embedding model forward pass.
 
         Args:
             input_ids: Input token IDS (for Stage 0).
@@ -518,8 +503,7 @@ class Qwen3DenseForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining
         return model_outputs
 
     def reset_parameters(self):
-        """
-        Resets module parameters.
+        """Resets module parameters.
         """
         self.model.reset_parameters()
 

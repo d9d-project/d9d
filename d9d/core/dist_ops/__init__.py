@@ -1,5 +1,4 @@
-"""
-This module provides high-level wrappers around `torch.distributed` collective operations.
+"""This module provides high-level wrappers around `torch.distributed` collective operations.
 """
 
 from .object import all_gather_object, gather_object

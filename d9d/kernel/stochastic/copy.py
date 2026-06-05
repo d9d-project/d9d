@@ -34,8 +34,7 @@ def _copy_fp32_to_bf16_kernel(
 def copy_fp32_to_bf16_stochastic_(
     target: torch.Tensor, source: torch.Tensor, generator: torch.Generator | None = None
 ) -> torch.Tensor:
-    """
-    Copies elements from a Float32 tensor to a BFloat16 tensor using stochastic rounding.
+    """Copies elements from a Float32 tensor to a BFloat16 tensor using stochastic rounding.
 
     Unlike standard round-to-nearest casting, stochastic rounding probabilistically rounds
     numbers up or down based on the value of the bits being truncated. This preserves the

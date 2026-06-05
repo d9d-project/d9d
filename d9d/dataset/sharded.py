@@ -10,8 +10,7 @@ from d9d.core.dist_context import BATCH_DOMAIN, DistributedContext
 
 
 class ShardIndexingMode(StrEnum):
-    """
-    Defines how the dataset is split across shards.
+    """Defines how the dataset is split across shards.
 
     Modes:
         sequential: Round-robin distribution.
@@ -37,8 +36,7 @@ _T_co = TypeVar("_T_co", covariant=True)
 
 
 class ShardedDataset(Dataset[_T_co], Stateful):
-    """
-    A dataset wrapper that acts as a view onto a specific shard of the underlying dataset.
+    """A dataset wrapper that acts as a view onto a specific shard of the underlying dataset.
 
     This is useful for Data Parallel training where each process should only see
     a subset of the data. It supports different indexing modes and optional padding
@@ -53,8 +51,7 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         indexing_mode: ShardIndexingMode,
         pad_to_equal_size_across_shards: bool,
     ):
-        """
-        Constructs a ShardedDataset object.
+        """Constructs a ShardedDataset object.
 
         Args:
             dataset: The underlying dataset to shard.
@@ -82,8 +79,7 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         return index * self._total_shards + self._current_shard
 
     def _get_base_index_unsafe(self, index: int) -> int:
-        """
-        Calculates the underlying dataset index for a given shard index,
+        """Calculates the underlying dataset index for a given shard index,
         without boundary checking.
 
         Returns:
@@ -106,8 +102,7 @@ class ShardedDataset(Dataset[_T_co], Stateful):
                 raise ValueError(f"Unknown shard indexing mode: {self._indexing_mode}")
 
     def __getitem__(self, index: int) -> _T_co:
-        """
-        Retrieves an item from the underlying dataset mapping logic shard index to physical index.
+        """Retrieves an item from the underlying dataset mapping logic shard index to physical index.
 
         If padding is enabled and the index exceeds the valid data for this shard,
         the last item in the dataset is returned.
@@ -124,8 +119,7 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         return self._dataset[base_index]
 
     def __len__(self) -> int:
-        """
-        Returns the number of items in this specific shard.
+        """Returns the number of items in this specific shard.
 
         If `pad_to_equal_size_across_shards` is True, this returns the ceiling
         length (max length across all shards).
@@ -179,8 +173,7 @@ def shard_dataset_data_parallel(
     indexing_mode: ShardIndexingMode = ShardIndexingMode.sequential,
     pad_to_equal_size_across_shards: bool = True,
 ) -> Dataset[_T_co]:
-    """
-    Wraps a dataset into a ShardedDataset based on the Data Parallel dimension of the distributed context.
+    """Wraps a dataset into a ShardedDataset based on the Data Parallel dimension of the distributed context.
 
     This is a helper function to automatically determine the correct rank and world size
     from the 'dp' (Data Parallel) mesh dimension within the batch domain DeviceMesh.

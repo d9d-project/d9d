@@ -7,8 +7,7 @@ from .config import LoRAParameters
 
 
 class LoRALinear(nn.Module):
-    """
-    A LoRA wrapper around a standard PyTorch Linear layer.
+    """A LoRA wrapper around a standard PyTorch Linear layer.
 
     Wraps a base linear layer and adds low-rank adaptation matrices A and B.
 
@@ -20,8 +19,7 @@ class LoRALinear(nn.Module):
     """
 
     def __init__(self, base_layer: nn.Linear, params: LoRAParameters):
-        """
-        Constructs a LoRALinear layer.
+        """Constructs a LoRALinear layer.
 
         Args:
             base_layer: The original Linear layer to wrap.
@@ -53,8 +51,7 @@ class LoRALinear(nn.Module):
         self.reset_parameters()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Takes input tensor, computes base output and LoRA adaptation, and returns the sum.
+        """Takes input tensor, computes base output and LoRA adaptation, and returns the sum.
 
         Args:
             x: Input tensor.
@@ -68,8 +65,7 @@ class LoRALinear(nn.Module):
 
     @torch.no_grad()
     def merge_with_base_(self) -> nn.Linear:
-        """
-        Collapse the LoRA weights into the base linear layer.
+        """Collapse the LoRA weights into the base linear layer.
 
         Returns:
             The modified base linear layer with updated weights.
@@ -79,16 +75,14 @@ class LoRALinear(nn.Module):
         return mod
 
     def reset_parameters(self):
-        """
-        Resets LoRA parameters. A is random, B is zeroed.
+        """Resets LoRA parameters. A is random, B is zeroed.
         """
         self.lora_A.reset_parameters()
         nn.init.zeros_(self.lora_B.weight)
 
 
 class LoRAGroupedLinear(nn.Module):
-    """
-    A LoRA wrapper around a GroupedLinear layer (commonly used in MoE or grouped query attention).
+    """A LoRA wrapper around a GroupedLinear layer (commonly used in MoE or grouped query attention).
 
     Attributes:
         lora_A: The A matrix (grouped linear).
@@ -98,8 +92,7 @@ class LoRAGroupedLinear(nn.Module):
     """
 
     def __init__(self, base_layer: GroupedLinear, params: LoRAParameters):
-        """
-        Constructs a LoRAGroupedLinear layer.
+        """Constructs a LoRAGroupedLinear layer.
 
         Args:
             base_layer: The original GroupedLinear layer to wrap.
@@ -129,8 +122,7 @@ class LoRAGroupedLinear(nn.Module):
         self.reset_parameters()
 
     def forward(self, x: torch.Tensor, x_groups: torch.Tensor) -> torch.Tensor:
-        """
-        Computes forward pass for grouped inputs.
+        """Computes forward pass for grouped inputs.
 
         Args:
             x: Input tensor.
@@ -145,8 +137,7 @@ class LoRAGroupedLinear(nn.Module):
 
     @torch.no_grad()
     def merge_with_base_(self) -> GroupedLinear:
-        """
-        Collapse the LoRA weights into the base GroupedLinear layer.
+        """Collapse the LoRA weights into the base GroupedLinear layer.
 
         Returns:
             The modified GroupedLinear layer.
@@ -156,8 +147,7 @@ class LoRAGroupedLinear(nn.Module):
         return mod
 
     def reset_parameters(self):
-        """
-        Resets LoRA parameters. A is random, B is zeroed.
+        """Resets LoRA parameters. A is random, B is zeroed.
         """
         self.lora_A.reset_parameters()
         nn.init.zeros_(self.lora_B.weight)

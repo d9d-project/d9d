@@ -13,8 +13,7 @@ def set_seeds(
     seed: int,
     distinct_seed_mesh_dim: str = "pp",
 ) -> None:
-    """
-    Sets random seeds for Python, NumPy, and PyTorch.
+    """Sets random seeds for Python, NumPy, and PyTorch.
 
     This function sets seeds deterministically based on the provided base seed and the
     process's rank within a specific mesh dimension.

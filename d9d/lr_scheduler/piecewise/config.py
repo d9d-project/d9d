@@ -10,32 +10,28 @@ from .curves import CurveBase, CurveCosine, CurveExponential, CurveLinear, Curve
 
 
 class CurveLinearConfig(BaseModel):
-    """
-    Configuration for linear interpolation.
+    """Configuration for linear interpolation.
     """
 
     type: Literal["linear"] = "linear"
 
 
 class CurveCosineConfig(BaseModel):
-    """
-    Configuration for cosine interpolation.
+    """Configuration for cosine interpolation.
     """
 
     type: Literal["cosine"] = "cosine"
 
 
 class CurveExponentialConfig(BaseModel):
-    """
-    Configuration for exponential interpolation.
+    """Configuration for exponential interpolation.
     """
 
     type: Literal["exponential"] = "exponential"
 
 
 class CurvePolyConfig(BaseModel):
-    """
-    Configuration for polynomial interpolation.
+    """Configuration for polynomial interpolation.
 
     Attributes:
         power: The exponent of the polynomial function.
@@ -51,8 +47,7 @@ AnyCurveConfig = Annotated[
 
 
 def curve_from_config(config: AnyCurveConfig) -> CurveBase:
-    """
-    Instantiates a concrete curve object from its configuration.
+    """Instantiates a concrete curve object from its configuration.
 
     Args:
         config: The configuration object.
@@ -72,8 +67,7 @@ def curve_from_config(config: AnyCurveConfig) -> CurveBase:
 
 
 class StepPhaseConfig(BaseModel):
-    """
-    Configuration for a phase defined by a fixed number of steps.
+    """Configuration for a phase defined by a fixed number of steps.
 
     Attributes:
         mode: Discriminator field, must be "steps".
@@ -90,8 +84,7 @@ class StepPhaseConfig(BaseModel):
 
 
 class PercentagePhaseConfig(BaseModel):
-    """
-    Configuration for a phase that lasts until a specific percentage of training is complete.
+    """Configuration for a phase that lasts until a specific percentage of training is complete.
 
     Attributes:
         mode: Discriminator field, must be "percentage".
@@ -108,8 +101,7 @@ class PercentagePhaseConfig(BaseModel):
 
 
 class RestPhaseConfig(BaseModel):
-    """
-    Configuration for a phase that fills the remainder of the training duration.
+    """Configuration for a phase that fills the remainder of the training duration.
 
     Attributes:
         mode: Discriminator field, must be "rest".
@@ -127,8 +119,7 @@ PhaseConfig = Annotated[StepPhaseConfig | PercentagePhaseConfig | RestPhaseConfi
 
 
 class PiecewiseSchedulerConfig(BaseModel):
-    """
-    Declarative configuration for a piecewise learning rate scheduler.
+    """Declarative configuration for a piecewise learning rate scheduler.
 
     Attributes:
         initial_multiplier: The starting learning rate multiplier.
@@ -142,8 +133,7 @@ class PiecewiseSchedulerConfig(BaseModel):
 def piecewise_scheduler_from_config(
     config: PiecewiseSchedulerConfig, optimizer: Optimizer, total_steps: int | None
 ) -> LRSchedulerProtocol:
-    """
-    Constructs a PyTorch scheduler from the provided configuration.
+    """Constructs a PyTorch scheduler from the provided configuration.
 
     Args:
         config: The scheduler configuration.

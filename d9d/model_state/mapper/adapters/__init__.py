@@ -1,5 +1,4 @@
-"""
-This package provides utility functions that are used to create simple ModelStateMapper instances from objects
+"""This package provides utility functions that are used to create simple ModelStateMapper instances from objects
 such as PyTorch modules or other StateMappers
 """
 

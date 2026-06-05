@@ -14,8 +14,7 @@ from .model_stage_factory import TrackedModules
 
 
 class GradientManager(Offloadable):
-    """
-    Manages the lifecycle of gradients during the training loop.
+    """Manages the lifecycle of gradients during the training loop.
 
     This class handles gradient synchronization across ranks,
     gradient data type configuration, and loss scaling based on accumulated weights.
@@ -30,8 +29,7 @@ class GradientManager(Offloadable):
         batch_maths: BatchMaths,
         config: GradientManagerConfig,
     ):
-        """
-        Constructs the GradientManager and initializes the internal synchronizer.
+        """Constructs the GradientManager and initializes the internal synchronizer.
 
         Args:
             dist_context: The distributed context.
@@ -100,8 +98,7 @@ class GradientManager(Offloadable):
 
     @contextmanager
     def install(self):
-        """
-        Context manager to activate gradient handling for a forward/backward pass.
+        """Context manager to activate gradient handling for a forward/backward pass.
 
         This sets up gradient dtypes, install backward hooks for synchronization via
         the `GradientSynchronizer`, and binds gradients for later scaling. It acts
@@ -114,8 +111,7 @@ class GradientManager(Offloadable):
         self._unbind()
 
     def add_loss_with_weight(self, loss: torch.Tensor, loss_weight: torch.Tensor):
-        """
-        Accumulates a loss value and its corresponding weight into the internal metric.
+        """Accumulates a loss value and its corresponding weight into the internal metric.
 
         Args:
             loss: The computed loss scalar.
@@ -125,8 +121,7 @@ class GradientManager(Offloadable):
         self._in_flight_count += 1
 
     def sync_and_scale(self):
-        """
-        Finalizes gradients to be ready for the optimizer step.
+        """Finalizes gradients to be ready for the optimizer step.
 
         This method performs the following operations:
 
@@ -142,8 +137,7 @@ class GradientManager(Offloadable):
         self._scale_grads()
 
     def compute_global_loss(self) -> torch.Tensor:
-        """
-        Calculates the final weighted mean loss.
+        """Calculates the final weighted mean loss.
 
         Returns:
             The averaged loss scalar across all accumulation steps and ranks.
@@ -151,8 +145,7 @@ class GradientManager(Offloadable):
         return self._loss.compute()
 
     def zero_grad(self):
-        """
-        Resets the internal state for the next training step.
+        """Resets the internal state for the next training step.
 
         This clears the accumulated gradients in the synchronizer and resets the
         loss metrics.
@@ -163,8 +156,7 @@ class GradientManager(Offloadable):
 
     @property
     def has_in_flight_gradients(self) -> bool:
-        """
-        Checks whether a gradient accumulation is currently in flight.
+        """Checks whether a gradient accumulation is currently in flight.
 
         The counter is raised by "add_loss_with_weight" and reset by "zero_grad". While it is
         non-zero, partial accumulation state lives in the synchronizer buckets, so offloading
@@ -173,8 +165,7 @@ class GradientManager(Offloadable):
         return self._in_flight_count > 0
 
     def offload(self, ctx: OffloadContext) -> None:
-        """
-        Releases the GPU memory of the gradient state to host memory.
+        """Releases the GPU memory of the gradient state to host memory.
 
         The synchronizer bucket buffers are released and the residual loss accumulator is reset.
 
@@ -195,8 +186,7 @@ class GradientManager(Offloadable):
         self._offloaded = True
 
     def onload(self, ctx: OnloadContext) -> None:
-        """
-        Restores GPU residency of the gradient state released by "offload".
+        """Restores GPU residency of the gradient state released by "offload".
 
         Args:
             ctx: Context for this operation.

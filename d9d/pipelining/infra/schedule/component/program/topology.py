@@ -3,8 +3,7 @@ from enum import StrEnum
 
 
 class ScheduleStyle(StrEnum):
-    """
-    Defines the strategy for mapping logical stages to physical ranks.
+    """Defines the strategy for mapping logical stages to physical ranks.
 
     Attributes:
         loop: Assigns stages in a round-robin circular fashion (mod pp_size).
@@ -16,8 +15,7 @@ class ScheduleStyle(StrEnum):
 
 
 def build_stage_to_host_rank_topology(pp_size: int, num_stages: int, style: ScheduleStyle) -> dict[int, int]:
-    """
-    Constructs the mapping from stage index to rank index.
+    """Constructs the mapping from stage index to rank index.
 
     Args:
         pp_size: Number of pipeline parallel ranks.
@@ -56,8 +54,7 @@ def build_stage_to_host_rank_topology(pp_size: int, num_stages: int, style: Sche
 
 
 def invert_stage_to_host_rank_topology(stage_to_host: dict[int, int]) -> dict[int, list[int]]:
-    """
-    Inverts the topology mapping to list execution stages per rank.
+    """Inverts the topology mapping to list execution stages per rank.
 
     Args:
         stage_to_host: Mapping from stage index to rank index.

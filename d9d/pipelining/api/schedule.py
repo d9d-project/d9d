@@ -15,8 +15,7 @@ class PipelineSchedule(abc.ABC):
     def configure_buffers(
         self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any], sharding_spec: PipelineShardingSpec | None
     ):
-        """
-        Configures internal state and buffers based on input shapes.
+        """Configures internal state and buffers based on input shapes.
 
         This method allows the schedule to pre-allocate memory or setup sharding
         specifications based on the structure of the input data before execution begins.
@@ -31,8 +30,7 @@ class PipelineSchedule(abc.ABC):
 
     @abc.abstractmethod
     def step(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
-        """
-        Executes a single pipeline step using the provided inputs.
+        """Executes a single pipeline step using the provided inputs.
 
          This typically involves distributing inputs across microbatches,
          executing forward and backward passes according to the specific schedule logic,

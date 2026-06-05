@@ -11,16 +11,14 @@ from .params import Qwen3DenseLayerParameters
 
 
 class Qwen3DenseLayer(nn.Module, ModuleLateInit):
-    """
-    Implements a single Qwen3 Dense transformer layer.
+    """Implements a single Qwen3 Dense transformer layer.
 
     This layer consists of a Grouped Query Attention mechanism followed by a
     SwiGLU MLP block, with pre-RMSNorm applied before each sub-layer.
     """
 
     def __init__(self, params: Qwen3DenseLayerParameters):
-        """
-        Constructs a Qwen3DenseLayer object.
+        """Constructs a Qwen3DenseLayer object.
 
         Args:
             params: Configuration parameters for the layer.
@@ -45,8 +43,7 @@ class Qwen3DenseLayer(nn.Module, ModuleLateInit):
     def forward(
         self, hidden_states: torch.Tensor, position_embeddings: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
-        """
-        Performs the forward pass of the dense layer.
+        """Performs the forward pass of the dense layer.
 
         Args:
             hidden_states: Input tensor of shape `(batch, seq_len, hidden_dim)`.
@@ -75,8 +72,7 @@ class Qwen3DenseLayer(nn.Module, ModuleLateInit):
         return hidden_states
 
     def reset_parameters(self):
-        """
-        Resets module parameters.
+        """Resets module parameters.
         """
         self.self_attn.reset_parameters()
         self.mlp.reset_parameters()

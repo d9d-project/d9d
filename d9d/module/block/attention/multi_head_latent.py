@@ -9,13 +9,11 @@ from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddi
 
 
 class LowRankProjection(nn.Module):
-    """
-    Implements a low-rank linear projection with an intermediate normalization layer.
+    """Implements a low-rank linear projection with an intermediate normalization layer.
     """
 
     def __init__(self, in_features: int, bottleneck: int, out_features: int, norm_eps: float):
-        """
-        Constructs the LowRankProjection object.
+        """Constructs the LowRankProjection object.
 
         Args:
             in_features: Input dimensionality.
@@ -29,8 +27,7 @@ class LowRankProjection(nn.Module):
         self.up_proj = nn.Linear(bottleneck, out_features, bias=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Applies the low-rank projection to the inputs.
+        """Applies the low-rank projection to the inputs.
 
         Args:
             x: Input tensor.
@@ -48,8 +45,7 @@ class LowRankProjection(nn.Module):
 
 
 class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
-    """
-    Implements Multi-Head Latent Attention (MLA) from DeepSeek-V2.
+    """Implements Multi-Head Latent Attention (MLA) from DeepSeek-V2.
 
     This module performs the full attention mechanism pipeline:
 
@@ -76,8 +72,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         is_causal: bool,
         rope_style: RotaryEmbeddingStyle,
     ):
-        """
-        Constructs the MultiHeadLatentAttention layer.
+        """Constructs the MultiHeadLatentAttention layer.
 
         Args:
             hidden_size: Model hidden dimension.
@@ -152,8 +147,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         attention_mask: torch.Tensor | None,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
     ) -> torch.Tensor:
-        """
-        Computes Multi-Head Latent Attention.
+        """Computes Multi-Head Latent Attention.
 
         Args:
             hidden_states: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.

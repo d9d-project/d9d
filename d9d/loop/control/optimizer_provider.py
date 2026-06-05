@@ -11,8 +11,7 @@ from d9d.core.dist_context import DistributedContext
 
 @dataclasses.dataclass(kw_only=True)
 class InitializeOptimizerStageContext:
-    """
-    Context data required to initialize an optimizer.
+    """Context data required to initialize an optimizer.
 
     Attributes:
         dist_context: The distributed context.
@@ -25,14 +24,12 @@ class InitializeOptimizerStageContext:
 
 @typing.runtime_checkable
 class OptimizerProvider(Protocol):
-    """
-    Protocol for defining how optimizers are created for model pipeline stages.
+    """Protocol for defining how optimizers are created for model pipeline stages.
     """
 
     @abc.abstractmethod
     def __call__(self, context: InitializeOptimizerStageContext) -> Optimizer:
-        """
-        Initializes the optimizer for a specific training stage.
+        """Initializes the optimizer for a specific training stage.
 
         Args:
             context: Context for this operation.

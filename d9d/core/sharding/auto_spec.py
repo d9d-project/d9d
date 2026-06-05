@@ -24,8 +24,7 @@ def _tree_item_to_shard(item: Any, shard_on_dim: int) -> ShardingSpecLeaf:
 
 
 def shard_spec_on_dim(tree: PyTree[Any], dim: int) -> ShardingSpec:
-    """
-    Creates a sharding specification to split all tensors in the tree on a specific dimension.
+    """Creates a sharding specification to split all tensors in the tree on a specific dimension.
 
     Iterates over the input tree:
     *   If a leaf is a Tensor with enough dimensions, it is mapped to a SpecShard(dim) object.
@@ -48,8 +47,7 @@ def shard_spec_on_dim(tree: PyTree[Any], dim: int) -> ShardingSpec:
 
 
 def shard_spec_nothing(tree: PyTree[Any]) -> ShardingSpec:
-    """
-    Creates a sharding specification where no sharding is performed.
+    """Creates a sharding specification where no sharding is performed.
 
     This effectively clones the tree structure but replaces every leaf with SpecReplicate.
 

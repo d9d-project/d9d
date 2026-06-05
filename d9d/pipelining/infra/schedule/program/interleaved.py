@@ -15,8 +15,7 @@ from ..component.runtime import (
 
 
 class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
-    """
-    Builder for Interleaved Pipeline Parallelism schedules.
+    """Builder for Interleaved Pipeline Parallelism schedules.
 
     This builder supports:
 
@@ -28,8 +27,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
     """
 
     def __init__(self, num_stages_per_rank: int, enable_zero_bubble: bool = False):
-        """
-        Constructs the Interleaved 1F1B builder.
+        """Constructs the Interleaved 1F1B builder.
 
         Args:
             num_stages_per_rank: Number of stages per rank.
@@ -47,8 +45,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         n_microbatches: int,
         multiply_factor: int,
     ) -> int:
-        """
-        Calculates the number of warmup steps required before entering steady state.
+        """Calculates the number of warmup steps required before entering steady state.
 
         Returns:
             The number of warmup operations.
@@ -58,8 +55,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         return min(warmup_ops, n_microbatches * self._num_stages_per_rank)
 
     def compose(self, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:
-        """
-        Generates the execution program for all ranks.
+        """Generates the execution program for all ranks.
 
         Args:
             num_microbatches: Total microbatches. Must be divisible by the derived
@@ -122,8 +118,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         microbatches_per_round: int,
         multiply_factor: int,
     ) -> list[ActionBase]:
-        """
-        Generates the sequential list of compute actions for a specific rank.
+        """Generates the sequential list of compute actions for a specific rank.
 
         Returns:
             A list of compute actions.

@@ -7,8 +7,7 @@ from .op import silu_mul_backward, silu_mul_forward
 
 
 class SiLUMulFunction(Function):
-    """
-    Autograd function for the fused silu(x)*y operation.
+    """Autograd function for the fused silu(x)*y operation.
     """
 
     @staticmethod
@@ -23,8 +22,7 @@ class SiLUMulFunction(Function):
 
 
 def silu_mul(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-    """
-    Applies the SiLU multiplication operation: SiLU(x) * y.
+    """Applies the SiLU multiplication operation: SiLU(x) * y.
 
     Args:
         x: Input tensor x.

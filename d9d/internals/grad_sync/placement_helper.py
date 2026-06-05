@@ -3,8 +3,7 @@ from torch.distributed.tensor import DTensor
 
 
 def dist_grad_from_local(data: DTensor, local_grad: Tensor) -> DTensor:
-    """
-    Constructs a DTensor gradient from a local tensor using data placement info.
+    """Constructs a DTensor gradient from a local tensor using data placement info.
 
     Args:
         data: The original parameter DTensor (source of metadata).

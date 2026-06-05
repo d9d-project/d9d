@@ -7,8 +7,7 @@ from .base import PeftMethod
 
 
 def inject_peft_and_freeze(method: PeftMethod, module: nn.Module) -> ModelStateMapper:
-    """
-    Applies a PEFT method to a module, freezes non-trained parameters, and prepares state mapping.
+    """Applies a PEFT method to a module, freezes non-trained parameters, and prepares state mapping.
 
     This function performs three main steps:
 
@@ -35,8 +34,7 @@ def inject_peft_and_freeze(method: PeftMethod, module: nn.Module) -> ModelStateM
 
 
 def merge_peft(method: PeftMethod, module: nn.Module):
-    """
-    Merges PEFT adaptations back into the base model weights.
+    """Merges PEFT adaptations back into the base model weights.
 
     Args:
         method: The PEFT method strategy originally applied.

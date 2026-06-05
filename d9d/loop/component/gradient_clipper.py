@@ -10,8 +10,7 @@ from .stepper import Stepper
 
 
 class GradientClipper:
-    """
-    Manages gradient clipping and logging of gradient norms in a distributed execution environment.
+    """Manages gradient clipping and logging of gradient norms in a distributed execution environment.
     """
 
     def __init__(
@@ -21,8 +20,7 @@ class GradientClipper:
         config: GradientClippingConfig,
         stepper: Stepper,
     ):
-        """
-        Constructs the gradient clipper.
+        """Constructs the gradient clipper.
 
         Args:
             dist_context: The distributed context.
@@ -43,8 +41,7 @@ class GradientClipper:
 
     @contextmanager
     def install(self):
-        """
-        Context manager that prepares and groups parameters for efficient norm calculation.
+        """Context manager that prepares and groups parameters for efficient norm calculation.
 
         It calculates necessary metadata (such as segregating shared parameters) to ensure
         correct global norm calculation across the pipeline parallel mesh.
@@ -54,8 +51,7 @@ class GradientClipper:
         self._parameter_groups = None
 
     def clip_and_log(self, run: BaseTrackerRun):
-        """
-        Clips gradients to the configured maximum norm and logs the total L2 norm.
+        """Clips gradients to the configured maximum norm and logs the total L2 norm.
 
         This method performs an in-place modification of parameter gradients if a
         maximum norm is configured. It calculates the global gradient norm across
