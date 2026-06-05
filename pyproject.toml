@@ -177,7 +177,8 @@ extend-select = [
     "FURB",
     "RUF",
     "TRY",
-    "DOC"
+    "DOC",
+    "D"
 ]
 fixable = [
     "F401",
@@ -189,7 +190,9 @@ fixable = [
     "RUF022",
     "W292",
     "W293",
-    "W391"
+    "W391",
+    "D202",
+    "D212",
 ]
 ignore = [
     "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed in {name}
@@ -225,6 +228,14 @@ ignore = [
     "TRY004",  # Prefer TypeError exception for invalid type
     "PGH003",  # Use specific rule codes when ignoring {} issues
     "DOC502",  # Raised exception is not explicitly raised: {id}
+    "D100",  # Missing docstring for public APIs (D100..D107)
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D105",
+    "D106",
+    "D107",
 ]
 
 [tool.ruff.lint.flake8-annotations]
