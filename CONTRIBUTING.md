@@ -105,6 +105,7 @@ conforming code without memorizing rule codes.
 
 #### Boundaries
 *   Every package needs `__init__.py` (`INP`); `/example/` is exempt.
+*   `__init__.py` files expose the package's public surface via an explicit `__all__` re-export list.
 
 #### Tests
 *   Use idiomatic `pytest` (`PT`): `pytest.raises`, fixtures, parametrization.
