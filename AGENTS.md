@@ -4,7 +4,7 @@ Guidance for AI agents working in the **d9d** repository.
 
 ## Read these first
 
-Most conventions are already documented:
+Most conventions are already documented. Always read relevant files (especially `CONTRIBUTING.md` before solving any task).
 
 - `README.md` - project purpose, philosophy, and what d9d is/isn't.
 - `CONTRIBUTING.md` - the canonical reference. It covers:
