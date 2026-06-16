@@ -1,3 +1,4 @@
+import importlib.util
 import os
 
 from pydantic import TypeAdapter
@@ -14,19 +15,25 @@ from .protocol import SdpaBackend
 _ENV_VAR = "D9D_BACKEND_AUTO_SDPA"
 
 
-def _auto_detect_sdpa_backend() -> AnySdpaBackendConfig:
-    """Detects the appropriate SDPA backend, preferring the environment variable override.
-
-    Returns:
-        The detected SDPA backend configuration.
-    """
+def _auto_detect_sdpa_backend(params: SdpaParameters) -> AnySdpaBackendConfig:
     forced = os.environ.get(_ENV_VAR)
 
     if forced is not None:
         return TypeAdapter(AnySdpaBackendConfig).validate_json(forced)
 
-    # Programmatic default: Currently we default to FlashAttention4
-    return FlashAttention4SdpaBackendConfig()
+    has_sinks = params.num_sinks is not None
+    has_window = params.window_size[0] is not None or params.window_size[1] is not None
+
+    if importlib.util.find_spec("flash_attn.cute") is not None:
+        return FlashAttention4SdpaBackendConfig()
+
+    if not has_sinks and importlib.util.find_spec("flash_attn") is not None:
+        return FlashAttention2SdpaBackendConfig()
+
+    if not has_sinks and not has_window:
+        return TorchSdpaBackendConfig()
+
+    raise ValueError("Cannot auto-detect SDPA backend.")
 
 
 def build_sdpa_backend(
@@ -51,7 +58,7 @@ def build_sdpa_backend(
     Raises:
         ValueError: If an unknown backend configuration type is encountered.
     """
-    resolved = backend_config if backend_config is not None else _auto_detect_sdpa_backend()
+    resolved = backend_config if backend_config is not None else _auto_detect_sdpa_backend(params)
 
     match resolved:
         case FlashAttention4SdpaBackendConfig():
