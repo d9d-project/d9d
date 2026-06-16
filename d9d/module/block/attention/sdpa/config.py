@@ -85,4 +85,4 @@ class SdpaParameters:
 
     num_sinks: int | None
     window_size: tuple[int | None, int | None] = (None, None)
-    needs_attention_mask: bool
+    needs_attention_mask: bool = False
