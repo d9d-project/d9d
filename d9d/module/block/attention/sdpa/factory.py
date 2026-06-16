@@ -24,11 +24,12 @@ def _auto_detect_sdpa_backend(params: SdpaParameters) -> AnySdpaBackendConfig:
 
     has_sinks = params.num_sinks is not None
     has_window = params.window_size[0] is not None or params.window_size[1] is not None
+    needs_mask = params.needs_attention_mask
 
-    if importlib.util.find_spec("flash_attn.cute") is not None:
+    if not needs_mask and importlib.util.find_spec("flash_attn.cute") is not None:
         return FlashAttention4SdpaBackendConfig()
 
-    if not has_sinks and importlib.util.find_spec("flash_attn") is not None:
+    if not needs_mask and not has_sinks and importlib.util.find_spec("flash_attn") is not None:
         return FlashAttention2SdpaBackendConfig()
 
     if not has_sinks and not has_window:
@@ -50,7 +51,7 @@ def build_sdpa_backend(
     structural layer parameters.
 
     Args:
-        params: Structural layer requirements (e.g. sinks, window size) needed by the backend.
+        params: Structural layer requirements needed by the backend.
         backend_config: Explicit SDPA backend configuration, or ``None`` to auto-detect.
 
     Returns:

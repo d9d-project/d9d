@@ -78,7 +78,11 @@ class SdpaParameters:
             ``None`` disables sinks and gives plain attention.
         window_size: Sliding-window size for local attention as a tuple `(left, right)`.
             ``(None, None)`` disables the window and uses full attention.
+        needs_attention_mask: Whether the layer will pass an explicit attention
+            mask tensor to the backend at runtime. When ``True``, auto-detection
+            excludes backends that cannot accept explicit masks.
     """
 
     num_sinks: int | None
     window_size: tuple[int | None, int | None] = (None, None)
+    needs_attention_mask: bool

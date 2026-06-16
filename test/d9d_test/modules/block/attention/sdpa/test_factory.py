@@ -81,25 +81,40 @@ def test_env_var_override(monkeypatch: pytest.MonkeyPatch, payload: str, expecte
 
 @pytest.mark.local
 @pytest.mark.parametrize(
-    ("available", "num_sinks", "window_size", "expected_cls"),
+    ("available", "num_sinks", "window_size", "needs_attention_mask", "expected_cls"),
     [
         # Flash 4 wins whenever its kernel is present.
-        ({"flash_attn", "flash_attn.cute"}, 4, (8, 0), _flash4_cls),
+        ({"flash_attn", "flash_attn.cute"}, 4, (8, 0), False, _flash4_cls),
         # Flash 2 handles windows but not sinks.
-        ({"flash_attn"}, None, (8, 0), _flash2_cls),
+        ({"flash_attn"}, None, (8, 0), False, _flash2_cls),
         # Plain torch when nothing special is requested and no flash is present.
-        (set(), None, (None, None), _torch_cls),
+        (set(), None, (None, None), False, _torch_cls),
         # Eager fallback: sinks requested but only flash 2 (no sink support) is present.
-        ({"flash_attn"}, 4, (None, None), _eager_cls),
+        ({"flash_attn"}, 4, (None, None), False, _eager_cls),
         # Eager fallback: window requested with no flash kernel at all.
-        (set(), None, (8, 0), _eager_cls),
+        (set(), None, (8, 0), False, _eager_cls),
+        # Explicit masks disqualify Flash 4/2 even when their kernels exist: torch wins.
+        ({"flash_attn", "flash_attn.cute"}, None, (None, None), True, _torch_cls),
+        # Explicit masks + sinks: only eager can satisfy both.
+        ({"flash_attn", "flash_attn.cute"}, 4, (None, None), True, _eager_cls),
+        # Explicit masks + window: torch cannot do windows, so eager is the fallback.
+        ({"flash_attn", "flash_attn.cute"}, None, (8, 0), True, _eager_cls),
     ],
 )
-def test_auto_detect_priority(monkeypatch: pytest.MonkeyPatch, available, num_sinks, window_size, expected_cls) -> None:
+def test_auto_detect_priority(
+    monkeypatch: pytest.MonkeyPatch, available, num_sinks, window_size, needs_attention_mask, expected_cls
+) -> None:
     # Auto-detection only probes flash module availability, which we fake here;
     # the chosen backend is then built through the public factory.
     monkeypatch.delenv(_ENV_VAR, raising=False)
     expected = expected_cls()
     _patch_specs(monkeypatch, available)
-    backend = build_sdpa_backend(SdpaParameters(num_sinks=num_sinks, window_size=window_size), backend_config=None)
+    backend = build_sdpa_backend(
+        SdpaParameters(
+            num_sinks=num_sinks,
+            window_size=window_size,
+            needs_attention_mask=needs_attention_mask,
+        ),
+        backend_config=None,
+    )
     assert isinstance(backend, expected)

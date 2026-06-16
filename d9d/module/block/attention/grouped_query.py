@@ -83,7 +83,8 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
 
         self.rope = RotaryEmbeddingApplicator(style=rope_style)
         self.kernel: SdpaBackend = build_sdpa_backend(
-            params=SdpaParameters(num_sinks=None, window_size=(None, None)), backend_config=sdpa_backend
+            params=SdpaParameters(num_sinks=None, window_size=(None, None), needs_attention_mask=False),
+            backend_config=sdpa_backend,
         )
         self._is_causal = is_causal
 

@@ -44,7 +44,7 @@ pluggable backend. Available backends are:
 
 The backend is chosen via `build_sdpa_backend()`. When no explicit configuration
 is given, it is auto-detected based on installed kernels and the structural
-requirements (sinks/windows) of the layer.
+requirements (sinks, windows, explicit attention masks) of the layer.
 The auto-detected choice can be overridden through the
 `D9D_BACKEND_AUTO_SDPA` environment variable (a JSON backend configuration).
 
