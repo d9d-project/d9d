@@ -111,9 +111,9 @@ class _FlashAttnFunc(torch.autograd.Function):
             lse_buf = torch.empty(batch_size, num_heads, seqlen, dtype=torch.float32, device=q.device)
 
         out, lse = _flash_attn_fwd(
-            q,
-            k,
-            v,
+            q=q,
+            k=k,
+            v=v,
             softmax_scale=softmax_scale,
             causal=causal,
             window_size_left=window_size[0],
@@ -164,15 +164,15 @@ class _FlashAttnFunc(torch.autograd.Function):
             dout = torch.zeros_like(out)
 
         dq, dk, dv = _flash_attn_bwd(
-            q,
-            k,
-            v,
-            out,
-            dout,
-            lse,
-            ctx.softmax_scale,
-            ctx.causal,
-            ctx.softcap,
+            q=q,
+            k=k,
+            v=v,
+            out=out,
+            dout=dout,
+            lse=lse,
+            softmax_scale=ctx.softmax_scale,
+            causal=ctx.causal,
+            softcap=ctx.softcap,
             window_size_left=ctx.window_size[0],
             window_size_right=ctx.window_size[1],
             deterministic=ctx.deterministic,
@@ -230,13 +230,13 @@ class _FlashAttnVarlenFunc(torch.autograd.Function):
             lse_buf = torch.empty(num_heads, total_q, dtype=torch.float32, device=q.device)
 
         out, lse = _flash_attn_fwd(
-            q,
-            k,
-            v,
-            cu_seqlens_q,
-            cu_seqlens_k,
-            seqused_q,
-            seqused_k,
+            q=q,
+            k=k,
+            v=v,
+            cu_seqlens_q=cu_seqlens_q,
+            cu_seqlens_k=cu_seqlens_k,
+            seqused_q=seqused_q,
+            seqused_k=seqused_k,
             max_seqlen_q=max_seqlen_q,
             max_seqlen_k=max_seqlen_k,
             page_table=page_table,
@@ -294,15 +294,15 @@ class _FlashAttnVarlenFunc(torch.autograd.Function):
             dout = torch.zeros_like(out)
 
         dq, dk, dv = _flash_attn_bwd(
-            q,
-            k,
-            v,
-            out,
-            dout,
-            lse,
-            ctx.softmax_scale,
-            ctx.causal,
-            ctx.softcap,
+            q=q,
+            k=k,
+            v=v,
+            out=out,
+            dout=dout,
+            lse=lse,
+            softmax_scale=ctx.softmax_scale,
+            causal=ctx.causal,
+            softcap=ctx.softcap,
             window_size_left=ctx.window_size[0],
             window_size_right=ctx.window_size[1],
             cu_seqlens_q=ctx.cu_seqlens_q,

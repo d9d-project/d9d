@@ -425,7 +425,7 @@ description = "tvm ffi"
 optional = true
 python-versions = ">=3.8"
 groups = ["main"]
-markers = "extra == \"flash-attention\""
+markers = "extra == \"backend-sdpa-flash-attention-4\""
 files = [
     {file = "apache_tvm_ffi-0.1.10-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:ef1059d8f8ae6e497440b94805b30f9ff5db21cd0b1745c8520b2874d3eb9efb"},
     {file = "apache_tvm_ffi-0.1.10-cp310-cp310-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:b4a3381f6e93f675217bf5421bd21a1ee1f3841c522a588d42dc37d9c9148108"},
@@ -1150,7 +1150,7 @@ files = [
     {file = "cuda_bindings-12.9.4-cp39-cp39-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:9866ceec83e39337d1a1d64837864c964ad902992478caa288a0bc1be95f21aa"},
     {file = "cuda_bindings-12.9.4-cp39-cp39-win_amd64.whl", hash = "sha256:37744e721a18a514423e81863f52a4f7f46f5a6f9cccd569f2735f8067f4d8c2"},
 ]
-markers = {main = "platform_system == \"Linux\" and platform_machine == \"x86_64\" or extra == \"flash-attention\"", compat-local-overrides = "platform_system == \"Linux\" and platform_machine == \"x86_64\"", test = "platform_system == \"Linux\" and platform_machine == \"x86_64\""}
+markers = {main = "platform_system == \"Linux\" and platform_machine == \"x86_64\" or extra == \"backend-sdpa-flash-attention-4\"", compat-local-overrides = "platform_system == \"Linux\" and platform_machine == \"x86_64\"", test = "platform_system == \"Linux\" and platform_machine == \"x86_64\""}
 
 [package.dependencies]
 cuda-pathfinder = ">=1.1,<2.0"
@@ -1169,7 +1169,7 @@ groups = ["main", "compat-local-overrides", "test"]
 files = [
     {file = "cuda_pathfinder-1.3.3-py3-none-any.whl", hash = "sha256:9984b664e404f7c134954a771be8775dfd6180ea1e1aef4a5a37d4be05d9bbb1"},
 ]
-markers = {main = "platform_system == \"Linux\" and platform_machine == \"x86_64\" or extra == \"flash-attention\"", compat-local-overrides = "platform_system == \"Linux\" and platform_machine == \"x86_64\"", test = "platform_system == \"Linux\" and platform_machine == \"x86_64\""}
+markers = {main = "platform_system == \"Linux\" and platform_machine == \"x86_64\" or extra == \"backend-sdpa-flash-attention-4\"", compat-local-overrides = "platform_system == \"Linux\" and platform_machine == \"x86_64\"", test = "platform_system == \"Linux\" and platform_machine == \"x86_64\""}
 
 [[package]]
 name = "cuda-python"
@@ -1178,7 +1178,7 @@ description = "CUDA Python: Performance meets Productivity"
 optional = true
 python-versions = "*"
 groups = ["main"]
-markers = "extra == \"flash-attention\""
+markers = "extra == \"backend-sdpa-flash-attention-4\""
 files = [
     {file = "cuda_python-12.9.4-py3-none-any.whl", hash = "sha256:d2cacea882a69863f1e7d27ee71d75f0684f4c76910aff839067e4f89c902279"},
 ]
@@ -1366,10 +1366,9 @@ files = [
 name = "einops"
 version = "0.8.2"
 description = "A new flavour of deep learning operations"
-optional = true
+optional = false
 python-versions = ">=3.9"
-groups = ["main"]
-markers = "extra == \"linear-attention\" or extra == \"flash-attention\""
+groups = ["main", "compat-local-overrides"]
 files = [
     {file = "einops-0.8.2-py3-none-any.whl", hash = "sha256:54058201ac7087911181bfec4af6091bb59380360f069276601256a76af08193"},
     {file = "einops-0.8.2.tar.gz", hash = "sha256:609da665570e5e265e27283aab09e7f279ade90c4f01bcfca111f3d3e13f2827"},
@@ -1429,29 +1428,48 @@ einops = "*"
 torch = "*"
 
 [[package]]
+name = "flash-attn"
+version = "2.8.3"
+description = "Flash Attention: Fast and Memory-Efficient Exact Attention"
+optional = false
+python-versions = ">=3.9"
+groups = ["main", "compat-local-overrides"]
+files = [
+    {file = "flash_attn-2.8.3-cp311-cp311-linux_x86_64.whl", hash = "sha256:501c137e0fadc5989af99c364055225dd7c2184f3c1f2613ea4280e556f6685b"},
+]
+
+[package.dependencies]
+einops = "*"
+torch = "*"
+
+[package.source]
+type = "file"
+url = "packages/flash_attn-2.8.3-cp311-cp311-linux_x86_64.whl"
+
+[[package]]
 name = "flash-attn-4"
-version = "4.0.0b8"
+version = "4.0.0b16"
 description = "Flash Attention CUTE (CUDA Template Engine) implementation"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"flash-attention\""
+markers = "extra == \"backend-sdpa-flash-attention-4\""
 files = [
-    {file = "flash_attn_4-4.0.0b8-py3-none-any.whl", hash = "sha256:bae222f60169fb411ce1fdd0d2e0f43f313d25f9f370c40a8b0edaf2743b3b62"},
-    {file = "flash_attn_4-4.0.0b8.tar.gz", hash = "sha256:c1007ded9bfdb214715c56cdb35cf3eee096a7ec877f4963f00f1244c98d35ff"},
+    {file = "flash_attn_4-4.0.0b16-py3-none-any.whl", hash = "sha256:857bd84cd5884d41b7096826b31c16c281ddde269760bbd5dfafe19a4639b250"},
+    {file = "flash_attn_4-4.0.0b16.tar.gz", hash = "sha256:84af5e19acf2875cafb77dcd02a582e2f70b603d1749118f4a8d65822b45a544"},
 ]
 
 [package.dependencies]
 apache-tvm-ffi = ">=0.1.5,<0.2"
 einops = "*"
-nvidia-cutlass-dsl = ">=4.4.2"
-quack-kernels = ">=0.3.3"
+nvidia-cutlass-dsl = ">=4.5.2"
+quack-kernels = ">=0.5.0"
 torch = "*"
 torch-c-dlpack-ext = "*"
 typing_extensions = "*"
 
 [package.extras]
-cu13 = ["nvidia-cutlass-dsl[cu13] (>=4.4.2)"]
+cu13 = ["nvidia-cutlass-dsl[cu13] (>=4.5.2)"]
 dev = ["pytest", "pytest-xdist", "ruff"]
 
 [[package]]
@@ -3148,41 +3166,43 @@ files = [
 
 [[package]]
 name = "nvidia-cutlass-dsl"
-version = "4.4.2"
+version = "4.5.2"
 description = "NVIDIA CUTLASS Python DSL"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"flash-attention\""
+markers = "extra == \"backend-sdpa-flash-attention-4\""
 files = [
-    {file = "nvidia_cutlass_dsl-4.4.2-py3-none-any.whl", hash = "sha256:7cfb9ef19062b055b9372c7a627004724e2755e4c8b16c3cc88807d64501a4ae"},
+    {file = "nvidia_cutlass_dsl-4.5.2-py3-none-any.whl", hash = "sha256:68ed1b63ca74aae87955012da9dfd7fdaae471329d0028b229b841c7192ccf52"},
 ]
 
 [package.dependencies]
-nvidia-cutlass-dsl-libs-base = "4.4.2"
+nvidia-cutlass-dsl-libs-base = "4.5.2"
 
 [package.extras]
-cu13 = ["nvidia-cutlass-dsl-libs-cu13 (==4.4.2)"]
+cu13 = ["nvidia-cutlass-dsl-libs-cu13 (==4.5.2)"]
 
 [[package]]
 name = "nvidia-cutlass-dsl-libs-base"
-version = "4.4.2"
+version = "4.5.2"
 description = "NVIDIA CUTLASS Python DSL"
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"flash-attention\""
+markers = "extra == \"backend-sdpa-flash-attention-4\""
 files = [
-    {file = "nvidia_cutlass_dsl_libs_base-4.4.2-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:06acb3acff3dcf4bf6630476efac7de94de30b988ded4fa00b647bbcec4224ff"},
-    {file = "nvidia_cutlass_dsl_libs_base-4.4.2-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:916bf612fba5fbc5162e300fe18196e960dac2328c1c1360c0939d3be05c7c71"},
-    {file = "nvidia_cutlass_dsl_libs_base-4.4.2-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:261832dafe7579dc83cd3816ab9ea845e3de3737d876c215f01fb4edff1f4473"},
-    {file = "nvidia_cutlass_dsl_libs_base-4.4.2-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:40c2352b2fcc80789a216cbeb9b2ee10c85c15de839cda8f5c1d18166b8249df"},
-    {file = "nvidia_cutlass_dsl_libs_base-4.4.2-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:2ec8812eeadcbb6fe20bda2e295ed9c00653f8253b78e33cf0ab65a47b829e73"},
-    {file = "nvidia_cutlass_dsl_libs_base-4.4.2-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:22e37b58f7a6f2f43bba533c4df8a088012122e0b4e9a632eca23937adeafb39"},
-    {file = "nvidia_cutlass_dsl_libs_base-4.4.2-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:b59a052cbfb9a25747d1b6d413615456bea38d1f377da085af07c0d86a4c8b39"},
-    {file = "nvidia_cutlass_dsl_libs_base-4.4.2-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:8e3324a33afa7424e93beae7e54a311e80db82b9e4ed4bba2aeeda1d6c888cd9"},
-    {file = "nvidia_cutlass_dsl_libs_base-4.4.2-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:af96c1170569138b3cb965202907fbf5ab95d7c1dcc210952d00cdf9ab7b859a"},
-    {file = "nvidia_cutlass_dsl_libs_base-4.4.2-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:95db0c8d1d56992e2f5c2dcd5b3baab0297bedc0cbcefc1e70b57acd934e7b23"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp310-cp310-manylinux_2_28_aarch64.whl", hash = "sha256:b62807bc5ea13bbdef648212893fac407ed943f940cece56b880d44af243e075"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:386e832427e3670479049a1560e4d8d2e565d8c0f37a6852c6d7043d046548f1"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:cbb555a95c7011e4b3ca328be407299c77d289660adbea22ed515d4406e6949c"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:9117900cba53d3c21a8dacba6bbf3d6e5f269e427a526c320fb44707a0d57363"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp312-cp312-manylinux_2_28_aarch64.whl", hash = "sha256:d2a3c412287e356fbe48fe9f845d6d33cd35dea5e20d7e4f628c20957967cacd"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:15ef6a59193667e663934ef4873f8ccad37455e9b7c3c419c3072113b8aedf61"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp313-cp313-manylinux_2_28_aarch64.whl", hash = "sha256:395bd77cf642aeef311313453e6582f11c9357a4b81fe620ea3daccd1fccab9b"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:e59da7d89e5e4f8514c6530843f910f9d8734d8042dcaa079c9d9c5063eb3514"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp314-cp314-manylinux_2_28_aarch64.whl", hash = "sha256:216eee6aa8107d35569f9451b66b03a3c53167841d1af9b630b966ef8d966e19"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:12c29f7c1f1f82851092ba3869264dafafb035228c0d9827a8db08b884fb80ca"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp314-cp314t-manylinux_2_28_aarch64.whl", hash = "sha256:5aca392063ffbc7da30442a267928b22d4a2d37f9ea1db32e4487aa31b0fcc33"},
+    {file = "nvidia_cutlass_dsl_libs_base-4.5.2-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:abab8a0d2f3f5661533c366df78f973052b86a3b52b868d997a95dce5aa8f17b"},
 ]
 
 [package.dependencies]
@@ -4221,27 +4241,30 @@ pyyaml = "*"
 
 [[package]]
 name = "quack-kernels"
-version = "0.3.10"
+version = "0.5.0"
 description = ""
 optional = true
 python-versions = ">=3.10"
 groups = ["main"]
-markers = "extra == \"flash-attention\""
+markers = "extra == \"backend-sdpa-flash-attention-4\""
 files = [
-    {file = "quack_kernels-0.3.10-py3-none-any.whl", hash = "sha256:529f4d56fcaabd457041800b3237c833d445c46ff60f3a7721a16f9a42e049fb"},
-    {file = "quack_kernels-0.3.10.tar.gz", hash = "sha256:c51c3909bf15983d9288c8e6fbeb894b050faf443c7b84b44df28de1bbb10a43"},
+    {file = "quack_kernels-0.5.0-py3-none-any.whl", hash = "sha256:08821ebfb8e638cc20308d5c59410c6dbb3b637ccc7b07bd57c7a9261a06af74"},
+    {file = "quack_kernels-0.5.0.tar.gz", hash = "sha256:c7c7338b67243397b6ca166e648bba161076e99f3858b532e1c877dcc6eaa03d"},
 ]
 
 [package.dependencies]
 apache-tvm-ffi = ">=0.1.6,<0.2"
-nvidia-cutlass-dsl = ">=4.4.2"
+einops = "*"
+nvidia-cutlass-dsl = ">=4.5.2"
 torch = "*"
 torch-c-dlpack-ext = "*"
 
 [package.extras]
-cu13 = ["nvidia-cutlass-dsl[cu13] (>=4.4.2)"]
+bench = ["pandas"]
+cu13 = ["nvidia-cutlass-dsl[cu13] (>=4.5.2)"]
 dev = ["pre-commit", "pytest", "pytest-xdist", "ruff"]
 heuristics = ["nvidia-matmul-heuristics"]
+jax = ["jax", "jax-tvm-ffi"]
 
 [[package]]
 name = "regex"
@@ -5031,7 +5054,7 @@ description = "torch c dlpack ext"
 optional = true
 python-versions = ">=3.9"
 groups = ["main"]
-markers = "extra == \"flash-attention\""
+markers = "extra == \"backend-sdpa-flash-attention-4\""
 files = [
     {file = "torch_c_dlpack_ext-0.1.5-cp310-cp310-macosx_14_0_arm64.whl", hash = "sha256:e0f6c197d5293884898b9ebf13d07501de39cb94799b374ed43f91731087d557"},
     {file = "torch_c_dlpack_ext-0.1.5-cp310-cp310-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:ba3d88f0f7d5e1d9c3d4a3179037fc8e261c3b77ac1fad23edc0d3a9214ef193"},
@@ -5860,8 +5883,9 @@ pyyaml = ">=6.0.2"
 
 [extras]
 aim = ["aim", "setuptools"]
+backend-sdpa-flash-attention-2 = ["flash-attn"]
+backend-sdpa-flash-attention-4 = ["flash-attn-4"]
 cce = ["cut-cross-entropy"]
-flash-attention = ["flash-attn-4"]
 linear-attention = ["fla-core"]
 moe = ["deep-ep", "nv-grouped-gemm"]
 visualization = ["plotly"]
@@ -5869,4 +5893,4 @@ visualization = ["plotly"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.11,<3.15"
-content-hash = "3937597ca258ff102e9571356949d9b119d1a2850ce09dfd1f55bd73b6b6fa26"
+content-hash = "af1abfe390d23b6c27d7094808709a42929cd67e078721ae40fb9ff40f56dbfa"

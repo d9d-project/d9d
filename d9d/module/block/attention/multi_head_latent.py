@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from d9d.module.base import ModuleLateInit
-from d9d.module.block.attention.sdpa import FlashSdpa
+from d9d.module.block.attention.sdpa import AnySdpaBackendConfig, SdpaBackend, SdpaParameters, build_sdpa_backend
 from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddingStyle
 
@@ -70,6 +70,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         qk_down_norm_eps: float,
         is_causal: bool,
         rope_style: RotaryEmbeddingStyle,
+        sdpa_backend: AnySdpaBackendConfig | None = None,
     ):
         """Constructs the MultiHeadLatentAttention layer.
 
@@ -84,6 +85,8 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
             qk_down_norm_eps: Epsilon for the RMSNorm applied to the KV and Q latent representations.
             is_causal: Whether to apply a causal mask (auto-regressive).
             rope_style: Rotary embedding layout style alignment.
+            sdpa_backend: Configuration for the Scaled Dot-Product Attention backend. If ``None``,
+                the backend will be auto-detected via `build_sdpa_backend()`.
 
         Raises:
             ValueError: If v_head_dim exceeds qk_head_dim.
@@ -133,7 +136,14 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         self.o_proj = nn.Linear(num_attention_heads * v_head_dim, hidden_size, bias=False)
 
         self.rope = RotaryEmbeddingApplicator(style=rope_style)
-        self.kernel = FlashSdpa()
+        self.kernel: SdpaBackend = build_sdpa_backend(
+            SdpaParameters(
+                num_sinks=None,
+                window_size=(None, None),
+                needs_attention_mask=False,
+            ),
+            backend_config=sdpa_backend,
+        )
 
     @property
     def q_lora_rank(self) -> int | None:

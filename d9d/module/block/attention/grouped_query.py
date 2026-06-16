@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from d9d.module.base import ModuleLateInit
-from d9d.module.block.attention.sdpa import FlashSdpa
+from d9d.module.block.attention.sdpa import AnySdpaBackendConfig, SdpaBackend, SdpaParameters, build_sdpa_backend
 from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddingStyle
 
@@ -31,6 +31,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         rope_dim: int | None = None,
         enable_output_gate: bool = False,
         qk_norm_zero_centered: bool = False,
+        sdpa_backend: AnySdpaBackendConfig | None = None,
     ) -> None:
         """Constructs the GroupedQueryAttention layer.
 
@@ -45,7 +46,9 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             rope_dim: Dimension of the RoPE sub-vector. If ``None``, RoPE is applied to the full ``head_dim``.
             enable_output_gate: If True, enables sigmoid output gating (Qwen 3.5 style).
             qk_norm_zero_centered: If True, utilizes zero-centered scaling weights for the optional Q and K
-                normalization layers.
+                RMSNorm layers (DeepSeek V3 style).
+            sdpa_backend: Configuration for the Scaled Dot-Product Attention backend. If ``None``,
+                the backend will be auto-detected via `build_sdpa_backend()`.
         """
         super().__init__()
 
@@ -79,7 +82,10 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             self.k_norm = None
 
         self.rope = RotaryEmbeddingApplicator(style=rope_style)
-        self.kernel = FlashSdpa()
+        self.kernel: SdpaBackend = build_sdpa_backend(
+            params=SdpaParameters(num_sinks=None, window_size=(None, None), needs_attention_mask=False),
+            backend_config=sdpa_backend,
+        )
         self._is_causal = is_causal
 
     def _apply_rope(
