@@ -1,5 +1,6 @@
 from .config import (
     AnySdpaBackendConfig,
+    EagerSdpaBackendConfig,
     FlashAttention2SdpaBackendConfig,
     FlashAttention4SdpaBackendConfig,
     SdpaParameters,
@@ -11,6 +12,7 @@ from .protocol import SdpaBackend
 
 __all__ = [
     "AnySdpaBackendConfig",
+    "EagerSdpaBackendConfig",
     "FlashAttention2SdpaBackendConfig",
     "FlashAttention4SdpaBackendConfig",
     "SdpaBackend",

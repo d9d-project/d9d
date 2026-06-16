@@ -5,6 +5,7 @@ from pydantic import TypeAdapter
 
 from .config import (
     AnySdpaBackendConfig,
+    EagerSdpaBackendConfig,
     FlashAttention2SdpaBackendConfig,
     FlashAttention4SdpaBackendConfig,
     SdpaParameters,
@@ -33,7 +34,7 @@ def _auto_detect_sdpa_backend(params: SdpaParameters) -> AnySdpaBackendConfig:
     if not has_sinks and not has_window:
         return TorchSdpaBackendConfig()
 
-    raise ValueError("Cannot auto-detect SDPA backend.")
+    return EagerSdpaBackendConfig()
 
 
 def build_sdpa_backend(
@@ -73,5 +74,9 @@ def build_sdpa_backend(
             from .impl.torch_sdpa import TorchSdpa  # noqa: PLC0415
 
             return TorchSdpa(resolved, params)
+        case EagerSdpaBackendConfig():
+            from .impl.eager import EagerSdpa  # noqa: PLC0415
+
+            return EagerSdpa(resolved, params)
         case _:
             raise ValueError(f"Unknown SDPA backend: {resolved}")

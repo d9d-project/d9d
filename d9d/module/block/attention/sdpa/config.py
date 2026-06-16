@@ -5,6 +5,18 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, Field
 
 
+class EagerSdpaBackendConfig(BaseModel):
+    """Configuration for the eager (pure-PyTorch) backend.
+
+    The eager backend implements attention with explicit PyTorch ops.
+
+    Attributes:
+        kind: Discriminator field. Always "eager".
+    """
+
+    kind: Literal["eager"] = "eager"
+
+
 class FlashAttention4SdpaBackendConfig(BaseModel):
     """Configuration for the Flash Attention 4 backend.
 
@@ -49,7 +61,10 @@ class TorchSdpaBackendConfig(BaseModel):
 
 
 AnySdpaBackendConfig = Annotated[
-    FlashAttention4SdpaBackendConfig | FlashAttention2SdpaBackendConfig | TorchSdpaBackendConfig,
+    FlashAttention4SdpaBackendConfig
+    | FlashAttention2SdpaBackendConfig
+    | TorchSdpaBackendConfig
+    | EagerSdpaBackendConfig,
     Field(discriminator="kind"),
 ]
 
