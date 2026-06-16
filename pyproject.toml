@@ -57,7 +57,8 @@ cut-cross-entropy = { version = ">=25.9.3", optional = true }  # For efficient C
 
 fla-core = { version = ">=0.4.2", optional = true} # For efficient linear attention, https://github.com/fla-org/flash-linear-attention
 
-flash-attn-4 = { version = ">=4.0.0b8", optional = true } # For Flash Attention 4, https://github.com/Dao-AILab/flash-attention
+flash-attn = { version = ">=2.0.0", optional = true } # SDPA Backend, https://github.com/Dao-AILab/flash-attention
+flash-attn-4 = {version = "^4.0.0b16", optional = true} # SDPA Backend, https://github.com/Dao-AILab/flash-attention
 
 [tool.poetry.extras]
 aim = ["aim", "setuptools"]
@@ -65,7 +66,9 @@ visualization = ["plotly"]
 moe = ["nv-grouped-gemm", "deep-ep"]
 cce = ["cut-cross-entropy"]
 linear-attention = ["fla-core"]
-flash-attention = ["flash-attn-4"]
+
+backend-sdpa-flash-attention-2 = ["flash-attn"]
+backend-sdpa-flash-attention-4 = ["flash-attn-4"]
 
 
 [tool.poetry.group.dev.dependencies]
@@ -95,6 +98,7 @@ mkdocstrings-python = "^2.0.3"
 cut-cross-entropy = {path = "packages/cut_cross_entropy-25.9.3-py3-none-any.whl"}
 deep-ep = {path = "packages/deep_ep-1.2.1+9af0e0d-cp311-cp311-linux_x86_64.whl"}
 nv-grouped-gemm = {path = "packages/nv_grouped_gemm-1.1.4.post8-cp311-cp311-linux_x86_64.whl"}
+flash-attn = {path = "packages/flash_attn-2.8.3-cp311-cp311-linux_x86_64.whl"}
 
 
 [tool.poetry.group.examples.dependencies]
