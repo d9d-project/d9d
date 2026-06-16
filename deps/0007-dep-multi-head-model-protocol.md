@@ -11,166 +11,165 @@ Created: 2026-06-04
 
 ## Abstract
 
-Every model architecture in `d9d` currently ships three near-identical task wrappers — `*ForCausalLM`, `*ForClassification`, `*ForEmbedding` — that share a backbone and differ only in their head. The wrappers are copy-pasted across architectures, so the duplication scales as `3 × N` for `N` families.
+Every architecture in `d9d` ships three near-identical task wrappers — `*ForCausalLM`, `*ForClassification`,
+`*ForEmbedding` — that share a backbone and differ only in their head. They are copy-pasted across families, so the
+duplication scales as `3 × N`. Each wrapper also hard-binds *exactly one* head, so a model with two heads (multi-task,
+or a reward head beside an LM head) cannot be expressed at all.
 
-This proposal introduces a **multi-head model protocol**: a `DecoderBackbone` structural protocol describing the contract a decoder backbone already fulfils, plus three generic, backbone-agnostic task models (`CausalLMModel`, `ClassificationModel`, `EmbeddingModel`) that compose any conforming backbone with a head. The task models are written *once* under `d9d/module/model/task/`. Each concrete model (`Qwen3MoEForCausalLM`, …) becomes a thin subclass that constructs its backbone and forwards head configuration.
-
-Existing backbones (`Qwen3MoEModel`, `Qwen3DenseModel`) satisfy the protocol structurally with zero changes. Public class names, constructor signatures, and — critically — parameter fully-qualified names stay byte-stable, so HuggingFace mappers, `parallelize_*` functions, checkpoints, and tests are unaffected. Adding a new architecture drops from three hand-written wrappers (~330 lines) to three ~6-line subclasses.
+This proposal replaces the wrappers with one composition primitive: a `DecoderBackbone` protocol, a `TaskHead` contract,
+and a single generic `DecoderModel` that composes one backbone with a *mapping* of named heads built from a closed,
+discriminated union of head configs. A new architecture writes its backbone once and is usable with any head, or several.
+Because we are pre-1.0, this **intentionally breaks** parameter FQNs and the `*For*` class names.
 
 ## Motivation
 
-The duplication has **two axes**.
+The duplication has **two axes**, plus a structural ceiling.
 
-**Across heads.** Within `d9d/module/model/qwen3_moe/model.py`, `Qwen3MoEForCausalLM`, `Qwen3MoEForClassification`, and `Qwen3MoEForEmbedding` are ~110 lines each and ~90% identical. The only per-head differences are:
+**Across heads.** In `qwen3_moe/model.py` the three wrappers are ~110 lines each and ~90% identical. The only per-head
+differences are:
 
 | Concern | CausalLM | Classification | Embedding |
 |---|---|---|---|
 | head submodule (attr) | `lm_head` | `cls_head` | `embedding_head` |
-| extra `forward` kwarg | `labels` | `pooling_mask` | `pooling_mask` |
+| extra `forward` input | `labels` | `pooling_mask` | `pooling_mask` |
 | output key | `logps` | `scores` | `embeddings` |
 | inferred output shape | `input_ids.shape` | `(B, num_labels)` | `(B, embedding_dim)` |
 
-Everything else — `self.model = …Model(...)`, the backbone forward call, `reset_parameters` delegation, and the byte-for-byte identical `infer_stage_inputs_from_pipeline_inputs` — is mechanical glue unrelated to the head.
+Everything else is mechanical glue.
 
-**Across families.** `d9d/module/model/qwen3_dense/model.py` repeats the same three wrappers verbatim. Every new architecture re-copies all three, and any change to the wrapper contract (a new pipelining method, a new head kwarg) must be applied `3 × N` times.
+**Across families.** `qwen3_dense/model.py` repeats all three verbatim, and any change to the wrapper contract must be
+applied `3 × N` times.
+
+**The ceiling.** Each wrapper is a model *for one task*; several heads on one backbone cannot be expressed. Making the
+copies cheaper leaves both the grid and the ceiling in place — removing the wrappers is what lifts them.
 
 ## Design Proposal
 
-### The `DecoderBackbone` protocol
+### Contracts
 
-A backbone is any module that maps stage inputs to `{"hidden_states", "hidden_states_snapshot"}` and supports late init and pipelining metadata. This is exactly the surface the task wrappers already call on `self.model`, so the protocol composes the two existing protocols plus the forward contract:
+A **backbone** maps stage inputs to hidden states, reports its `hidden_size`, and supports late init and pipelining —
+exactly the surface the wrappers already call on `self.model`:
 
 ```python
 @typing.runtime_checkable
 class DecoderBackbone(ModuleLateInit, ModuleSupportsPipelining, Protocol):
-    """A pipelinable decoder backbone emitting hidden states for a task head."""
-
-    def forward(
-        self,
-        input_ids: torch.Tensor | None = None,
-        hidden_states: torch.Tensor | None = None,
-        position_ids: torch.Tensor | None = None,
-        hidden_states_snapshot: torch.Tensor | None = None,
-        hidden_states_agg_mask: torch.Tensor | None = None,
-    ) -> dict[str, torch.Tensor | None]: ...
-```
-
-`Qwen3MoEModel` and `Qwen3DenseModel` already conform — no edits to either backbone.
-
-### Generic task models
-
-Three classes, written once, generic over the concrete backbone type so that downstream code (e.g. `parallelize_*`) keeps the precise `model.model` type:
-
-```python
-TBackbone = TypeVar("TBackbone", bound=DecoderBackbone)
-
-class CausalLMModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining, Generic[TBackbone]):
-    """Composes a decoder backbone with a split language-modelling head."""
-
-    def __init__(
-        self,
-        backbone: TBackbone,
-        stage: PipelineStageInfo,
-        *,
-        split_vocab_size: dict[str, int],
-        split_order: Sequence[str],
-        hidden_size: int,
-    ):
-        super().__init__()
-        self.model: TBackbone = backbone
+    hidden_size: int
 
     def forward(self, input_ids=None, hidden_states=None, position_ids=None,
-                hidden_states_snapshot=None, hidden_states_agg_mask=None, labels=None):
-        ...
-
-    def reset_parameters(self):
-        ...
-
-    def infer_stage_inputs_from_pipeline_inputs(self, inputs, n_microbatches):
-        ...
-
-    def infer_stage_outputs_from_pipeline_inputs(self, inputs, n_microbatches):
-        ...
+                hidden_states_snapshot=None, hidden_states_agg_mask=None) -> dict[str, torch.Tensor | None]: ...
 ```
 
-`ClassificationModel` and `EmbeddingModel` follow the same shape, differing only in the four cells of the table above (head class + attr, the `pooling_mask` kwarg, the output key, and the inferred shape). The `infer_stage_inputs_from_pipeline_inputs` delegation and the backbone storage/forward/reset wiring are identical across all three.
+`Qwen3MoEModel` and `Qwen3DenseModel` conform by exposing `hidden_size` (a one-line addition; both already receive it
+via params).
 
-### Concrete models become thin subclasses
+A **head** turns hidden states into named outputs. It is an `abc.ABC` and declares the keys it writes, so collisions are caught at build time:
 
 ```python
-# d9d/module/model/qwen3_moe/model.py
+class TaskHead(nn.Module, ModuleLateInit, abc.ABC):
+    output_keys: frozenset[str]
 
-class Qwen3MoEForCausalLM(CausalLMModel[Qwen3MoEModel]):
-    def __init__(self, params, stage, hidden_states_snapshot_mode, enable_checkpointing):
-        backbone = Qwen3MoEModel(params.model, stage, hidden_states_snapshot_mode, enable_checkpointing)
-        super().__init__(
-            backbone, stage,
-            split_vocab_size=params.model.split_vocab_size,
-            split_order=params.model.split_vocab_order,
-            hidden_size=params.model.layer.hidden_size,
-        )
+    @abc.abstractmethod
+    def forward(self, hidden_states: torch.Tensor, inputs: Mapping[str, torch.Tensor | None]) -> dict[str, torch.Tensor]: ...
+
+    @abc.abstractmethod
+    def infer_output_shapes(self, pipeline_inputs: dict[str, torch.Tensor], n_microbatches: int) -> dict[str, torch.Tensor]: ...
 ```
 
-The backbone classes (`Qwen3MoEModel`, `Qwen3DenseModel`) are kept verbatim. The three wrappers per family collapse to three subclasses of this form.
+The three existing heads in `d9d/module/block/head/` implement this directly — no parallel hierarchy.
+
+### Head configuration
+
+Heads are selected by a closed, discriminated union resolved by a free `build_head(config, *, backbone, stage) ->
+TaskHead` with an exhaustive `match` — the `AnyDecayGateParameters` / `_build_decay_gate` pattern. A config carries only
+*task-specific* fields; backbone-shared dimensions (`hidden_size`, the LM split-vocab layout) are derived from the
+backbone, so configs stay small and nothing is specified twice.
+
+```python
+class ClassificationHeadConfig(BaseModel):
+    kind: Literal["classification"] = "classification"
+    num_labels: int
+    dropout: float
+    output_key: str = "scores"
+
+AnyHeadConfig = Annotated[
+    CausalLMHeadConfig | ClassificationHeadConfig | EmbeddingHeadConfig, Field(discriminator="kind"),
+]
+```
+
+A bespoke head a user writes for their own model is a `TaskHead` instance passed directly to `DecoderModel`, bypassing
+the union entirely.
+
+### The model
+
+One generic class composes a backbone with a mapping of named heads, generic over the backbone type so `parallelize_*`
+keeps the precise `model.model` type:
+
+```python
+class DecoderModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining, Generic[TBackbone]):
+    def __init__(self, backbone: TBackbone, heads: Mapping[str, TaskHead], stage: PipelineStageInfo): ...
+
+    @classmethod
+    def from_configs(cls, backbone: TBackbone, head_configs: Mapping[str, AnyHeadConfig],
+                     stage: PipelineStageInfo) -> "DecoderModel[TBackbone]": ...
+```
+
+The backbone is stored at `self.model` (FQN `model.*`); on the last stage the heads live in an `nn.ModuleDict` (FQN
+`heads.<name>.*`). `forward` runs the backbone, then each head over the hidden states and merges their outputs;
+`infer_stage_outputs` unions the heads' declared shapes; `infer_stage_inputs` delegates to the backbone. `from_configs`
+is the common path; the bare constructor is the seam for pre-built or custom heads.
+
+### Multi-head semantics
+
+Supporting more than one head follows from the flat `dict[str, torch.Tensor]` the pipeline already passes to the task:
+
+* **Output keys are flat and disjoint.** Each head declares `output_keys`; construction rejects any overlap (between
+  heads, or with `hidden_states`) with a `ValueError`, instead of silently overwriting. Two heads of the same type stay
+  distinct via each config's `output_key`. The FQN namespace (`heads.<name>.*`) is independent of the output-key one.
+* **Loss combination is the task's job.** The model only emits per-head tensors; `BaseTask.compute_loss` — which already
+  reads `pipeline_results["logps"]` — reads the keys it wants and combines them. The model holds no loss policy.
+* **No "primary" output.** The pipeline contract is the whole dict; the task selects keys.
+* **Head inputs are routed, not enumerated.** Backbone inputs stay typed kwargs; head-specific tensors (`labels`,
+  `pooling_mask`) arrive via `**head_inputs`, and each head reads what it needs. An open set of heads cannot be named
+  kwargs — this mapping is the irreducible cost of genuine multi-head, and it documents each input on its consumer.
 
 ## Usage
 
-A new architecture writes its backbone once, then derives the three task models — no per-head pipelining or inference logic:
+A provider builds the backbone, then composes heads from config:
 
 ```python
-from d9d.module.model.task import CausalLMModel, ClassificationModel, EmbeddingModel
-
-
-class MyModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
-    # ... emits {"hidden_states", "hidden_states_snapshot"}; conforms to DecoderBackbone structurally
-    ...
-
-
-class MyModelForCausalLM(CausalLMModel[MyModel]):
-    def __init__(self, params, stage, hidden_states_snapshot_mode, enable_checkpointing):
-        backbone = MyModel(params.model, stage, hidden_states_snapshot_mode, enable_checkpointing)
-        super().__init__(
-            backbone, stage,
-            split_vocab_size=params.model.split_vocab_size,
-            split_order=params.model.split_vocab_order,
-            hidden_size=params.model.layer.hidden_size,
-        )
-
-
-class MyModelForClassification(ClassificationModel[MyModel]):
-    def __init__(self, params, stage, hidden_states_snapshot_mode, enable_checkpointing):
-        backbone = MyModel(params.model, stage, hidden_states_snapshot_mode, enable_checkpointing)
-        super().__init__(
-            backbone, stage,
-            num_labels=params.num_labels,
-            dropout=params.classifier_dropout,
-            hidden_size=params.model.layer.hidden_size,
-        )
+backbone = Qwen3MoEModel(cfg.model, stage, hidden_states_snapshot_mode=..., enable_checkpointing=...)
+model = DecoderModel.from_configs(backbone, head_configs={"lm": CausalLMHeadConfig()}, stage=stage)
 ```
 
-End-user training scripts are unchanged — they keep constructing `Qwen3MoEForCausalLM(params=..., stage=..., hidden_states_snapshot_mode=..., enable_checkpointing=...)` exactly as before.
+A second head is a one-line change; the task then reads both keys:
+
+```python
+head_configs={"lm": CausalLMHeadConfig(), "cls": ClassificationHeadConfig(num_labels=3)}
+# loss = lm_loss(out["logps"]) + alpha * cls_loss(out["scores"])
+```
 
 ## Backward Compatibility
 
-**Fully backward compatible.** The migration preserves every observable contract:
+A deliberate, pre-1.0 break; every cost is one-time and mechanical:
 
-- **Class names and constructor signatures** are unchanged; `Qwen3MoEForCausalLM` etc. remain importable and subclassing keeps `isinstance` semantics.
-- **Parameter FQNs** stay `model.*`, `lm_head.*`, `cls_head.*`, `embedding_head.*`. The head submodule attribute names are written literally in the generic classes, so existing checkpoints load, and the HuggingFace mappers in `huggingface.py` (e.g. `ModelStateMapperRename("score.weight", "cls_head.score.weight")`) need no changes.
-- **`parallelize_*` functions** keep reaching into `model.model`, `model.lm_head`, … — and because the task models are `Generic[TBackbone]`, `model.model` retains its concrete type for the type checker.
-- **`forward` signatures** keep their typed, documented per-head kwargs (`labels` / `pooling_mask`).
-
-No user migration is required.
+- **Classes.** The `*For*` models and their `*For*Parameters` are removed; providers call `DecoderModel.from_configs`.
+  Backbone params are unchanged; head-specific fields move onto the head configs.
+- **Parameter FQNs.** Heads move `lm_head.* → heads.lm.*` (etc.); the backbone stays `model.*`. Existing checkpoints
+  need a one-pass key remap; the HuggingFace renames in `huggingface.py` update accordingly.
+- **`parallelize_*`.** Reaches `model.heads["lm"]` instead of `model.lm_head`; `model.model` is unchanged.
+- **Tests.** The suites under `test/d9d_test/modules/model/sequence/` (HF parity + state-dict round-trip across both
+  families × all heads) update to the new construction and are the regression gate.
 
 ## Alternatives Considered
 
-### Single wrapper + injected head-strategy object
+**Per-family thin wrappers (the earlier draft of this DEP).** Keep one wrapper per task per family, factoring shared glue
+into three generic base classes each subclassed in ~6 lines. *Rejected:* cheaper copies, but the `3 × N` grid remains and
+a multi-head model still cannot be expressed. Its byte-stable-FQN requirement is what forced the per-family subclass;
+lifting it (pre-1.0) is what unlocks composition.
 
-A single `DecoderForTask` parameterized by a `HeadAdapter` object encapsulating head construction, forward invocation, and output inference. **Rejected.** It collapses the three typed `forward`s into `**kwargs` (losing `labels` / `pooling_mask` from the signature and docstrings), and must register the head under a dynamic attribute name via `add_module` to preserve FQNs. More indirection, weaker typing, and at odds with the codebase's typed-signature conventions — for no extra leverage over three explicit classes.
+**Single wrapper + injected head, FQNs preserved.** The adopted design, but constrained to keep `lm_head` / `cls_head`
+names — forcing dynamic `add_module` registration and untyped `**kwargs`. *Rejected in that form:* with a sanctioned FQN
+change an `nn.ModuleDict` gives clean static names and generalizes to many heads.
 
-### Dynamic class factory
-
-A `make_causal_lm_class(backbone_cls, params_cls) -> type` generating each wrapper at import time. **Rejected.** Metaprogramming defeats `ty`, erases docstrings and IDE navigation, and obscures the public classes that users import and `isinstance`-check.
-
-### Plain helper extraction
-
-Keep the three hand-written wrappers per family but pull the identical `infer_stage_inputs` delegation into a shared function. **Rejected.** It only dents the across-heads axis; a new architecture still hand-writes three full wrappers, leaving the across-families duplication — the dominant cost — untouched.
+**Dynamic class factory.** Generating each wrapper at import time. *Rejected:* metaprogramming defeats `ty`, erases
+docstrings and IDE navigation, and removes no duplication that composition does not.
