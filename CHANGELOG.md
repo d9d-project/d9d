@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v0.16.0 (2026-06-16)
+
+### Documentation
+
+- Add DEP-0008 for backend selection mechanism ([#34](https://github.com/d9d-project/d9d/pull/34),
+  [`57055fa`](https://github.com/d9d-project/d9d/commit/57055fa23b34e99fc542b8d2bf540dd924b02939))
+
+### Features
+
+- Implement FA4/FA2/TorchSDPA/Eager attention backends with programmatic auto-selection
+  ([#35](https://github.com/d9d-project/d9d/pull/35),
+  [`e6374be`](https://github.com/d9d-project/d9d/commit/e6374beb7e7d9ce827745ec467cb5766e3a7b34f))
+
+
 ## v0.15.0 (2026-06-04)
 
 ### Features
