@@ -33,6 +33,24 @@ def build_sdpa_backend(
     params: SdpaParameters,
     backend_config: AnySdpaBackendConfig | None,
 ) -> SdpaBackend:
+    """Builds the selected SDPA backend module based on the provided configuration.
+
+    If no explicit configuration is provided, it falls back to auto-detection (either from
+    the `D9D_BACKEND_AUTO_SDPA` environment variable or programmatic defaults).
+
+    The factory resolves the appropriate module implementation, passing along the backend configuration and
+    structural layer parameters.
+
+    Args:
+        params: Structural layer requirements (e.g. sinks, window size) needed by the backend.
+        backend_config: Explicit SDPA backend configuration, or ``None`` to auto-detect.
+
+    Returns:
+        An instantiated SDPA module implementing the SdpaBackend protocol.
+
+    Raises:
+        ValueError: If an unknown backend configuration type is encountered.
+    """
     resolved = backend_config if backend_config is not None else _auto_detect_sdpa_backend()
 
     match resolved:
