@@ -48,14 +48,15 @@ flowchart LR
         direction LR
         bDS["DatasetProvider<br/>(dataset + collator)"] --> bBM["BatchMaths<br/>(batch size, GA factor)"]
         bBM --> bDL["DataLoaderFactory<br/>(StatefulDataLoader + GA tiers)"]
-        bDL -->|"global batch"| bEX["Executor<br/>(shard_tree → microbatches)"]
+        bDL -->|"global batches (but local DP rank)"| bGA["GA loop<br/>(trainer iterates tiers)"]
+        bGA -->|"global batch (but local DP rank)"| bEX["Executor<br/>(shard_tree → microbatches)"]
         bDL -.->|"len(data_loader)"| bST["Stepper.total_steps"]
     end
 
     subgraph after["After"]
         direction LR
         aBP["BatchProvider<br/>(factory)"] -->|builds| aBI["BatchIterator<br/>(Stateful, optionally Sized)"]
-        aBI -->|"pack = list[microbatch]"| aEX["Executor<br/>(runs program for len(pack))"]
+        aBI -->|"microbatches"| aEX["Executor<br/>(one program over len(pack); GA folded in)"]
         aBI -.->|"len(iterator) if Sized"| aJS["JobSchedule.total_steps"]
         aCFG["ScheduleConfig.total_steps"] -.-> aJS
     end
