@@ -18,12 +18,12 @@ mappers. Each wrapper also hard-binds *exactly one* head, so a model with two he
 an LM head) cannot be expressed at all.
 
 This proposal replaces the wrappers with one composition primitive: a `DecoderBackbone` protocol, a `TaskHead` contract
-that owns everything head-specific — compute, parallelization, and checkpoint mapping — and a single generic
-`DecoderWithHeads` that composes one backbone with a *mapping* of prebuilt named heads. Heads come from a closed,
-discriminated union via a free `build_head` factory, or are passed in directly. Because a head is self-contained, all
-three `3 × N` grids collapse to `N` backbones plus one implementation per head type. A new architecture writes its
-backbone once and is usable with any head, or several. Because we are pre-1.0, this **intentionally breaks** parameter
-FQNs and the `*For*` class names.
+confined to head *compute* — parallelization and checkpoint mapping live elsewhere, as separate concerns — and a single
+generic `DecoderWithHeads` that composes one backbone with a *mapping* of prebuilt named heads. Heads come from a closed,
+discriminated union via a free `build_head` factory, or are passed in directly. All three `3 × N` grids — model wrappers,
+`parallelize_*`, and HF mappers — then collapse to `N` backbones plus head-specific work in each layer. A new
+architecture writes its backbone once and is usable with any head, or several. Because we are pre-1.0, this
+**intentionally breaks** parameter FQNs and the `*For*` class names.
 
 ## Motivation
 
@@ -46,7 +46,8 @@ applied `3 × N` times.
 
 **Three times over.** The same grid is duplicated in three places: the model wrappers, the `parallelize_*_for_*`
 functions (each a per-family backbone routine plus a thin per-head variant that differs only by which head it shards),
-and the HF state-dict mappers (a shared backbone mapper plus a one-line per-head rename, per direction).
+and the HF state-dict mappers (a shared backbone mapper plus a one-line per-head rename, per direction). Fixing only the
+model classes leaves two-thirds of the duplication standing.
 
 **The ceiling.** Each wrapper is a model *for one task*; several heads on one backbone cannot be expressed. Making the
 copies cheaper leaves the grids and the ceiling in place — removing the wrappers is what lifts them.
@@ -70,8 +71,8 @@ class DecoderBackbone(ModuleLateInit, ModuleSupportsPipelining, Protocol):
 `Qwen3MoEModel` and `Qwen3DenseModel` conform by exposing `hidden_size` (a one-line addition; both already receive it
 via params).
 
-A **head** owns everything head-specific: it turns hidden states into named outputs, parallelizes its own parameters,
-and provides its own checkpoint mapping. It is an `abc.ABC`, so adding a head touches nothing per-family:
+A **head** turns hidden states into named outputs. The module is confined to *compute* — its parallelization and
+checkpoint mapping are deliberately kept out of it (separate concerns, handled below). It is an `abc.ABC`:
 
 ```python
 class TaskHead(nn.Module, ModuleLateInit, abc.ABC):
@@ -80,12 +81,6 @@ class TaskHead(nn.Module, ModuleLateInit, abc.ABC):
 
     @abc.abstractmethod
     def infer_output_shapes(self, pipeline_inputs: dict[str, torch.Tensor], n_microbatches: int) -> dict[str, torch.Tensor]: ...
-
-    @abc.abstractmethod
-    def parallelize(self, dist_context: DistributedContext) -> None: ...
-
-    @abc.abstractmethod
-    def huggingface_mapper(self, prefix: str) -> ModelStateMapper: ...
 ```
 
 The three existing heads in `d9d/module/block/head/` implement this directly — no parallel hierarchy.
@@ -128,7 +123,9 @@ its mapping key; `infer_stage_outputs` unions the heads' declared shapes; `infer
 
 ### Multi-head semantics
 
-Supporting more than one head follows from the flat `dict[str, torch.Tensor]` the pipeline already passes to the task:
+Supporting more than one head follows from the flat `dict[str, torch.Tensor]` the pipeline passes to the task. That flat
+dict — with `"<head>/<key>"` keys *simulating* hierarchy — is what the current pipeline-parallel engine expects;
+migrating model outputs to a properly nested structure is deferred to a future change. Given that constraint:
 
 * **Outputs are namespaced by head.** Each head's outputs are merged under its mapping key — `out["lm/logps"]`,
   `out["cls/scores"]`. The key is unique by construction, so two heads of the same type just take different keys
@@ -143,12 +140,22 @@ Supporting more than one head follows from the flat `dict[str, torch.Tensor]` th
 
 ### Parallelization & checkpoint mapping
 
-The `parallelize_*_for_*` functions and the HF mappers carry the same `3 × N` as the wrappers: today the three
-`parallelize_<family>_for_*` differ only by which head attribute they shard, and the HF `mapper_..._for_*` are a shared
-backbone mapper plus a one-line per-head rename. Because a `TaskHead` owns `parallelize` and `huggingface_mapper`, both
-collapse the same way the model class does: the per-family backbone routine is unchanged (each architecture shards and
-maps differently), and `DecoderWithHeads` applies it, then iterates `heads` for the head-specific part. All three axes —
-compute, sharding, mapping — drop from `3 × N` to `N` backbones plus one implementation per head type.
+`parallelize_*_for_*` and the HF mappers carry the same `3 × N`. Both are concerns *separate* from compute, so both move into their own layer — each a single function over a head, beside the unchanged per-family
+backbone routine:
+
+```python
+# d9d/module/parallelism/...
+def parallelize_task_head(head: TaskHead, dist_context: DistributedContext) -> None: ...
+# d9d/module/model/.../huggingface.py
+def task_head_hf_mapper(head: TaskHead, prefix: str) -> ModelStateMapper: ...
+```
+
+They differ only in how much they vary. Head **sharding is uniform** — every head is HSDP on the dense mesh, so
+`parallelize_task_head` is one implementation for all heads (a head needing different sharding is the point to branch —
+not before). The HF **rename is per-head-type** (`score.weight ↔ heads.cls.score.weight`, the vocab-aware LM rename, …)
+but family-independent, so `task_head_hf_mapper` has one arm per head type. The composed model applies the per-family
+backbone routine, then iterates `heads` through these two. Both grids drop to `N` backbone routines plus per-head
+work — shared across heads for sharding, per-type for mapping.
 
 ## Usage
 
@@ -175,10 +182,11 @@ heads = {
 A deliberate, pre-1.0 break; every cost is one-time and mechanical:
 
 - **Classes & functions.** The `*For*` models and their `*For*Parameters` are removed, along with the per-head
-  `parallelize_*_for_*` and `mapper_*_for_*` functions; providers compose `DecoderWithHeads` and the per-head logic moves
-  onto the heads. Backbone params and the per-family backbone `parallelize`/`mapper` routines are unchanged.
+  `parallelize_*_for_*` and `mapper_*_for_*` functions; providers compose `DecoderWithHeads`, and head sharding and
+  renames move to `parallelize_task_head` / `task_head_hf_mapper`. Backbone params and the per-family backbone
+  `parallelize`/`mapper` routines are unchanged.
 - **Parameter FQNs.** Heads move `lm_head.* → heads.lm.*` (etc.); the backbone stays `model.*`. Existing checkpoints
-  need a one-pass key remap; the HuggingFace renames update accordingly (now emitted by each head's `huggingface_mapper`).
+  need a one-pass key remap; the HuggingFace renames update accordingly (now emitted by the per-head-type mapper).
 - **Output keys.** Head outputs are now namespaced (`out["lm/logps"]` instead of `out["logps"]`); code reading pipeline
   results updates to the namespaced keys.
 - **Tests.** The suites under `test/d9d_test/modules/model/sequence/` (HF parity + state-dict round-trip across both
