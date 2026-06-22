@@ -40,6 +40,29 @@ This produces three concrete problems:
 
 The design has two independent owners — `JobSchedule` for *duration*, the `BatchProvider` / `BatchIterator` pair for *data* — plus the executor and trainer changes that follow from packs replacing global batches.
 
+The data path before and after, and where the two lengths go:
+
+```mermaid
+flowchart LR
+    subgraph before["Before"]
+        direction LR
+        bDS["DatasetProvider<br/>(dataset + collator)"] --> bBM["BatchMaths<br/>(batch size, GA factor)"]
+        bBM --> bDL["DataLoaderFactory<br/>(StatefulDataLoader + GA tiers)"]
+        bDL -->|"global batch"| bEX["Executor<br/>(shard_tree → microbatches)"]
+        bDL -.->|"len(data_loader)"| bST["Stepper.total_steps"]
+    end
+
+    subgraph after["After"]
+        direction LR
+        aBP["BatchProvider<br/>(factory)"] -->|builds| aBI["BatchIterator<br/>(Stateful, optionally Sized)"]
+        aBI -->|"pack = list[microbatch]"| aEX["Executor<br/>(runs program for len(pack))"]
+        aBI -.->|"len(iterator) if Sized"| aJS["JobSchedule.total_steps"]
+        aCFG["ScheduleConfig.total_steps"] -.-> aJS
+    end
+
+    before ~~~ after
+```
+
 ### `JobSchedule`
 
 `JobSchedule` keeps everything `Stepper` did — `current_step` and `total_steps` tracking, the `step()` increment, `Stateful` save/load of progress, and the `should_do_action(...)` periodic-cadence helpers — but changes **where `total_steps` comes from**. It is resolved once at construction from two inputs: an optional explicit config value, and the `BatchIterator` (consulted only if it is `Sized`).
