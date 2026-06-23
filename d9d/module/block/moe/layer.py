@@ -71,24 +71,21 @@ class MoELayer(nn.Module, ModuleLateInit):
 
         self.tokens_per_expert = nn.Buffer(torch.empty((num_grouped_experts,), dtype=torch.int64), persistent=False)
 
-        # Set by a RouterReplayRecorder while it is installed; used to capture this layer's expert selection.
+        # Set by a RouterReplayRecorder while it is installed; used to capture this layer's expert selection. The
+        # layer holds only an opaque reference and does not know its identity within the recorder.
         self._replay_recorder: RouterReplayRecorder | None = None
-        self._replay_layer_id: int | None = None
 
-    def bind_replay_recorder(self, recorder: RouterReplayRecorder, layer_id: int) -> None:
+    def bind_replay_recorder(self, recorder: RouterReplayRecorder) -> None:
         """Attaches a routing recorder to this layer so non-replay forwards capture their expert selection.
 
         Args:
             recorder: The recorder that will receive this layer's selection.
-            layer_id: Stable identifier of this layer within the recorded model.
         """
         self._replay_recorder = recorder
-        self._replay_layer_id = layer_id
 
     def unbind_replay_recorder(self) -> None:
         """Detaches any routing recorder previously attached via `bind_replay_recorder`."""
         self._replay_recorder = None
-        self._replay_layer_id = None
 
     def enable_distributed_communicator(self, group: ProcessGroup):
         """Switches from local no-op communication to distributed DeepEP communication.
@@ -145,8 +142,7 @@ class MoELayer(nn.Module, ModuleLateInit):
         self._update_tokens_per_expert(expert_indices)
 
         if self._replay_recorder is not None and replay_indices is None:
-            assert self._replay_layer_id is not None  # noqa: S101 -- always set together with the recorder
-            self._replay_recorder.capture(self._replay_layer_id, expert_indices.reshape(*old_shape[:-1], -1))
+            self._replay_recorder.capture(self, expert_indices.reshape(*old_shape[:-1], -1))
         hidden_states, expert_scores, expert_count = self._communicator.dispatch(
             hidden_states, expert_indices, expert_scores
         )

@@ -100,7 +100,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         position_ids: torch.Tensor | None = None,
         hidden_states_snapshot: torch.Tensor | None = None,
         hidden_states_agg_mask: torch.Tensor | None = None,
-        replay_indices: torch.Tensor | None = None,
+        replay_indices: Mapping[str, torch.Tensor] | None = None,
     ) -> dict[str, torch.Tensor | None]:
         """Executes the forward pass for the current pipeline stage.
 
@@ -115,9 +115,9 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
                 from previous stages. Used if snapshotting is enabled.
             hidden_states_agg_mask: Mask used to aggregate hidden states for
                 snapshots.
-            replay_indices: Optional recorded expert indices to replay in every MoE layer (Expert Replay), indexed by
-                global layer index. Shape: `(batch, num_hidden_layers, seq_len, top_k)`. Present on every pipeline
-                stage, each stage slices the layers it owns.
+            replay_indices: Optional recorded expert indices to replay (Expert Replay), keyed by each MoE layer's
+                module name (e.g. "layers.5.mlp"), each of shape (batch, seq_len, top_k). The mapping may carry
+                every layer in the model, each pipeline stage looks up only the layers it owns and ignores the rest.
 
         Returns:
             A dictionary containing:
@@ -137,7 +137,9 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         for decoder_layer_name in self._layers_iter:
             decoder_layer = self.layers[decoder_layer_name]
 
-            layer_replay_indices = replay_indices[:, int(decoder_layer_name)] if replay_indices is not None else None
+            layer_replay_indices = (
+                replay_indices.get(f"layers.{decoder_layer_name}.mlp") if replay_indices is not None else None
+            )
 
             if self._enable_checkpointing:
                 last_hidden_states = checkpoint(

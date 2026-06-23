@@ -47,8 +47,9 @@ class _StackedMoE(nn.Module):
         )
 
     def forward(self, hidden_states, replay_indices=None):
+        # replay_indices is a mapping keyed by each MoE layer's module name (here "layers.<i>").
         for i, layer in enumerate(self.layers):
-            layer_replay = replay_indices[:, i] if replay_indices is not None else None
+            layer_replay = replay_indices.get(f"layers.{i}") if replay_indices is not None else None
             hidden_states = layer(hidden_states, replay_indices=layer_replay)
         return hidden_states
 
@@ -58,36 +59,52 @@ class _StackedMoE(nn.Module):
 
 
 @pytest.mark.local
-def test_install_enumerates_and_assigns_layer_ids():
+def test_install_binds_and_unbinds_every_layer():
     model = _StackedMoE(num_layers=3, hidden_dim=8, num_experts=4, top_k=2)
     recorder = RouterReplayRecorder()
 
     with recorder.install(model):
-        for expected_id, layer in enumerate(model.layers):
+        for layer in model.layers:
             assert layer._replay_recorder is recorder
-            assert layer._replay_layer_id == expected_id
 
     # context exit unbinds every layer
     for layer in model.layers:
         assert layer._replay_recorder is None
-        assert layer._replay_layer_id is None
 
 
 @pytest.mark.local
-def test_tape_assembles_in_layer_order():
+def test_tape_is_keyed_by_module_name():
     model = _StackedMoE(num_layers=3, hidden_dim=8, num_experts=4, top_k=2)
     batch, seq, top_k = 2, 5, 2
 
     with RouterReplayRecorder().install(model) as rec:
-        captures = [torch.randint(0, 4, (batch, seq, top_k)) for _ in model.layers]
-        # capture out of order to prove tape() restores layer order
-        for layer_id in reversed(range(len(captures))):
-            rec.capture(layer_id, captures[layer_id])
+        captures = {layer: torch.randint(0, 4, (batch, seq, top_k)) for layer in model.layers}
+        # capture out of order to prove the tape keys come from the module name, not call order
+        for layer in reversed(list(model.layers)):
+            rec.capture(layer, captures[layer])
         tape = rec.tape()
 
-    assert tape.shape == (batch, 3, seq, top_k)
-    for layer_id, indices in enumerate(captures):
-        assert torch.equal(tape[:, layer_id], indices)
+    assert set(tape) == {"layers.0", "layers.1", "layers.2"}
+    for i, layer in enumerate(model.layers):
+        assert tape[f"layers.{i}"].shape == (batch, seq, top_k)
+        assert torch.equal(tape[f"layers.{i}"], captures[layer])
+
+
+@pytest.mark.local
+def test_tape_concatenates_repeated_captures():
+    # A layer called multiple times before tape() is read (e.g. gradient accumulation / micro-batching) must have
+    # its captures concatenated along the batch dimension in call order, not overwritten.
+    model = _StackedMoE(num_layers=1, hidden_dim=8, num_experts=4, top_k=2)
+
+    with RouterReplayRecorder().install(model) as rec:
+        chunk_a = torch.randint(0, 4, (2, 3, 2))
+        chunk_b = torch.randint(0, 4, (2, 3, 2))
+        rec.capture(model.layers[0], chunk_a)
+        rec.capture(model.layers[0], chunk_b)
+        tape = rec.tape()
+
+    assert tape["layers.0"].shape == (4, 3, 2)
+    assert torch.equal(tape["layers.0"], torch.cat([chunk_a, chunk_b], dim=0))
 
 
 @pytest.mark.local
@@ -98,8 +115,8 @@ def test_tape_requires_full_recording():
         with pytest.raises(RuntimeError, match="No routing was recorded"):
             rec.tape()
 
-        rec.capture(0, torch.randint(0, 4, (1, 3, 2)))
-        with pytest.raises(RuntimeError, match="Expected 2 layers to record"):
+        rec.capture(model.layers[0], torch.randint(0, 4, (1, 3, 2)))
+        with pytest.raises(RuntimeError, match="Expected all 2 bound layers to record"):
             rec.tape()
 
 
@@ -119,13 +136,13 @@ def test_recorder_is_reusable_after_context_exit():
     recorder = RouterReplayRecorder()
 
     with recorder.install(model) as rec:
-        rec.capture(0, torch.randint(0, 4, (1, 2, 2)))
+        rec.capture(model.layers[0], torch.randint(0, 4, (1, 2, 2)))
         rec.tape()
 
     # a second installation starts from a clean slate
     with recorder.install(model) as rec:
-        rec.capture(0, torch.zeros(1, 2, 2, dtype=torch.long))
-        assert torch.equal(rec.tape()[:, 0], torch.zeros(1, 2, 2, dtype=torch.long))
+        rec.capture(model.layers[0], torch.zeros(1, 2, 2, dtype=torch.long))
+        assert torch.equal(rec.tape()["layers.0"], torch.zeros(1, 2, 2, dtype=torch.long))
 
 
 @pytest.mark.local
@@ -141,7 +158,7 @@ def test_record_then_replay_reproduces_routing():
 
     replayed_out = model(hidden_states, replay_indices=tape)
 
-    assert tape.shape == (2, 2, 16, 2)
+    assert set(tape) == {"layers.0", "layers.1"}
     # replaying the recorded selection on identical weights/inputs must reproduce the forward exactly
     torch.testing.assert_close(replayed_out, recorded_out)
 
@@ -158,7 +175,7 @@ def test_replay_overrides_routing_and_changes_output():
         own_tape = rec.tape()
 
     # force a different (rotated) expert selection and confirm the output actually changes
-    forced_tape = (own_tape + 1) % 8
+    forced_tape = {name: (indices + 1) % 8 for name, indices in own_tape.items()}
     forced_out = model(hidden_states, replay_indices=forced_tape)
 
     assert not torch.allclose(forced_out, own_out)
@@ -179,9 +196,8 @@ def test_recorded_routing_replays_under_expert_parallel(dtype: torch.dtype, dist
         out_local_record = local(local_hidden)
         tape = recorder.tape()
 
-    assert tape.shape[1] == 1  # a single MoE layer
-    replay = tape[:, 0]
-
+    # the recorder is installed directly on the MoELayer, so its module name is the root ("")
+    replay = tape[""]
     out_local_replay = local(local_hidden, replay_indices=replay)
     torch.testing.assert_close(out_local_replay, out_local_record, atol=2e-3, rtol=1e-2)
 
