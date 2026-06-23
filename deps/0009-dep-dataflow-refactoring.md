@@ -148,19 +148,15 @@ Once the iterator emits a pack of microbatches, the trainer no longer loops over
 
 #### Per-step reconfiguration
 
-Because pack length varies, some things that are fixed at construction today become per-step. The fan-out lives **inline in the task operator**, which is the single existing seam between the data path and the executor — no new coordinator object:
+Because pack length varies, the two things fixed at construction today become per-step. The fan-out lives **inline in the task operator**, which is the single existing seam between the data path and the executor — no new coordinator object:
 
 ```python
 def forward_backward(self, pack: Pack) -> ForwardResult | None:
     n = len(pack)
-    self._pipeline.schedule.configure(pack)
-    self._pipeline_state.set_num_shards(n)
-    self._grad_manager.set_required_accumulations(n)
-    try:
-        self._pipeline.schedule.step(pack)
-        ...
-    finally:
-        self._pipeline_state.reset()
+    self._pipeline.schedule.configure(pack) # recompile program + buffers for n microbatches
+    self._grad_manager.set_required_accumulations(n)  # backward fires n times this step
+    self._pipeline.schedule.step(pack)
+    ...
 ```
 
 #### Killing input-sharding in the pipeline API
@@ -168,6 +164,14 @@ def forward_backward(self, pack: Pack) -> ForwardResult | None:
 With the iterator emitting ready microbatches, the executor never splits inputs. All the API related to sharding is removed from the pipelining API.
 
 Task's `build_forward_inputs` survives but changes granularity: it maps **one microbatch** of raw data into model-stage inputs, and returns only `inputs` / `kwargs` (no sharding spec). The task operator calls it per microbatch in the pack.
+
+#### `PipelineState` loses its two views
+
+`PipelineState` does two jobs today. It **carries side-data** from `build_forward_inputs` to `compute_loss` for the same microbatch — labels, masks, anything the model's forward does not return but the loss needs. And it **bridges two views** of that data: a **global** view (written once against the whole batch) and a **sharded** view (read per microbatch), via `shard_tree`/`unshard_tree`.
+
+The carry-data job stays; the dual view goes. With per-microbatch execution, `build_forward_inputs(microbatch_i)` and `compute_loss` for microbatch `i` operate on the same unit, so the state is just a plain per-microbatch scratchpad — write it while building inputs, read it at loss time, one entry per microbatch in the pack. There is no global batch to write and no sharding to undo, so the `shard_tree`/`unshard_tree` machinery (the same even-dim-0 split this DEP removes from the executor, with the same inability to handle uneven or opaque microbatches) is deleted, along with `PipelineStateHandler`'s construction-time `num_shards`.
+
+Aggregation no longer flows through the state either: the per-microbatch callback hands the task each microbatch's outputs as produced, and the task accumulates directly into objects that already do so — loss/weight into the `GradientManager` (`add_loss_with_weight`, a running `WeightedMeanMetric`), metrics into their own `Stateful` accumulators — so no global tensor is ever materialized.
 
 #### `ModuleSupportsPipelining` resignature
 
