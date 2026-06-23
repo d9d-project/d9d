@@ -8,8 +8,8 @@ from d9d.loop.control import (
 )
 from d9d.pipelining.training import PipelinedLRScheduler, PipelinedOptimizer
 
+from .job_schedule import JobSchedule
 from .model_stage_factory import TrackedModules
-from .stepper import Stepper
 
 
 class OptimizerFactory:
@@ -26,7 +26,7 @@ class OptimizerFactory:
         tracked_modules: TrackedModules,
         optimizer_provider: OptimizerProvider,
         lr_scheduler_provider: LRSchedulerProvider,
-        stepper: Stepper,
+        schedule: JobSchedule,
     ):
         """Constructs the OptimizerFactory.
 
@@ -35,13 +35,13 @@ class OptimizerFactory:
             tracked_modules: A container of model modules owned by the current rank.
             optimizer_provider: A callable responsible for creating optimizer instances for a given model.
             lr_scheduler_provider: A callable responsible for creating LR scheduler instances.
-            stepper: The training stepper providing information about total training steps.
+            schedule: The job schedule providing information about total training steps.
         """
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
         self._optimizer_provider = optimizer_provider
         self._lr_scheduler_provider = lr_scheduler_provider
-        self._stepper = stepper
+        self._schedule = schedule
 
     def build_optimizer_and_scheduler(self) -> tuple[OptimizerProtocol, LRSchedulerProtocol]:
         """Builds both the optimizer and learning rate scheduler.
@@ -64,7 +64,7 @@ class OptimizerFactory:
 
             scheduler = self._lr_scheduler_provider(
                 InitializeLRSchedulerContext(
-                    dist_context=self._dist_context, total_steps=self._stepper.total_steps, optimizer=optimizer
+                    dist_context=self._dist_context, total_steps=self._schedule.total_steps, optimizer=optimizer
                 )
             )
             lr_schedulers.append(scheduler)

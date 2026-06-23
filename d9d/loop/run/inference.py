@@ -10,10 +10,10 @@ from d9d.loop.component import (
     InferenceProcessor,
     InferenceTaskOperator,
     JobProfiler,
+    JobSchedule,
     ManualGarbageCollector,
     ModelStageFactory,
     StateCheckpointer,
-    Stepper,
     TimeoutManager,
 )
 from d9d.loop.config import InferenceConfig, PipeliningConfig
@@ -114,7 +114,10 @@ class InferenceConfigurator:
         data_loader_infer = data_loader_factory.build_dataloader_for_infer_job()
         event_bus.trigger(EVENT_INFERENCE_DATA_LOADER_READY, EventDataLoaderReadyContext(data_loader=data_loader_infer))
 
-        stepper = Stepper(initial_step=0, total_steps=len(data_loader_infer))
+        schedule = JobSchedule(
+            config=self._parameters.schedule,
+            data_iterator=data_loader_infer,
+        )
 
         pipeline_state_handler = PipelineStateHandler(
             sharding_spec={}, num_shards=batch_maths.num_microbatches_pipelining
@@ -122,7 +125,7 @@ class InferenceConfigurator:
 
         processor = InferenceProcessor(state=pipeline_state_handler, task=task)
 
-        schedule, modules = ModelStageFactory(
+        pipeline_schedule, modules = ModelStageFactory(
             model_provider=self._model_provider,
             dist_context=dist_context,
             config_model=self._parameters.model_stage_factory,
@@ -133,21 +136,21 @@ class InferenceConfigurator:
         event_bus.trigger(EVENT_INFERENCE_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
 
         task_operator = InferenceTaskOperator(
-            dist_context=dist_context, task=task, pipeline=schedule, pipeline_state=pipeline_state_handler
+            dist_context=dist_context, task=task, pipeline=pipeline_schedule, pipeline_state=pipeline_state_handler
         )
 
-        gc = ManualGarbageCollector(dist_ctx=dist_context, config=self._parameters.gc, step=stepper)
+        gc = ManualGarbageCollector(dist_ctx=dist_context, config=self._parameters.gc, schedule=schedule)
 
         checkpointer = StateCheckpointer(
-            dist_context=dist_context, stepper=stepper, config=self._parameters.checkpointing, gc=gc, run_name=None
+            dist_context=dist_context, schedule=schedule, config=self._parameters.checkpointing, gc=gc, run_name=None
         )
 
-        profiler = JobProfiler(dist_context=dist_context, stepper=stepper, config=self._parameters.profiling)
+        profiler = JobProfiler(dist_context=dist_context, schedule=schedule, config=self._parameters.profiling)
 
         return InferenceJobState(
             dist_context=dist_context,
             data_loader=data_loader_infer,
-            stepper=stepper,
+            schedule=schedule,
             tracked_modules=modules,
             garbage_collector=gc,
             batch_maths=batch_maths,
@@ -212,20 +215,20 @@ class Inference:
             self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
             self._state.checkpointer.load_last_checkpoint(self._state)
 
-            if self._state.stepper.current_step >= self._state.stepper.total_steps:
+            if self._state.schedule.current_step >= self._state.schedule.total_steps:
                 self._state.dist_context.logger.info("Already ran, will do nothing")
                 return
 
             self._state.dist_context.wait_world()
 
-            step_ctx = EventStepContext(stepper=self._state.stepper)
+            step_ctx = EventStepContext(schedule=self._state.schedule)
 
             with (
                 tqdm(
                     desc="Inference",
-                    total=self._state.stepper.total_steps,
+                    total=self._state.schedule.total_steps,
                     disable=not self._state.dist_context.is_local_main_process,
-                    initial=self._state.stepper.current_step,
+                    initial=self._state.schedule.current_step,
                 ) as bar,
                 self._state.garbage_collector as gc,
                 self._state.profiler.open() as profiler,
@@ -249,7 +252,7 @@ class Inference:
                     self._state.timeout_manager.set_periodic()
 
                     self._state.event_bus.trigger(EVENT_INFERENCE_STEP_POST, step_ctx)
-                    self._state.stepper.step()
+                    self._state.schedule.step()
 
                     # checkpoint at the end of the step
                     self._state.checkpointer.checkpoint_if_needed(self._state)

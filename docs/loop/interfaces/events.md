@@ -52,7 +52,7 @@ class CustomTrainTask(TrainTask):
     @subscribe(EVENT_TRAIN_STEP_POST)
     def _on_step_post(self, ctx: EventStepContext) -> None:
         for module in self._modules:
-            print(f"Step {ctx.stepper.current_step} completed; MoE routing stats: {module.moe_stats}.")
+            print(f"Step {ctx.schedule.current_step} completed; MoE routing stats: {module.moe_stats}.")
 
     def compute_loss(self, ctx):
         ... # Task math overrides

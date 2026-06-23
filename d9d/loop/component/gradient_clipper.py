@@ -5,8 +5,8 @@ from d9d.internals.grad_norm import ParametersForNorm, clip_grad_norm_distribute
 from d9d.loop.config import GradientClippingConfig
 from d9d.tracker import BaseTrackerRun
 
+from .job_schedule import JobSchedule
 from .model_stage_factory import TrackedModules
-from .stepper import Stepper
 
 
 class GradientClipper:
@@ -17,7 +17,7 @@ class GradientClipper:
         dist_context: DistributedContext,
         tracked_modules: TrackedModules,
         config: GradientClippingConfig,
-        stepper: Stepper,
+        schedule: JobSchedule,
     ):
         """Constructs the gradient clipper.
 
@@ -25,12 +25,12 @@ class GradientClipper:
             dist_context: The distributed context.
             tracked_modules: Container of model modules whose parameters need clipping.
             config: Configuration defining max norm and logging frequency.
-            stepper: Stepper instance used to track the current training step.
+            schedule: JobSchedule instance used to track the current training step.
         """
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
         self._config = config
-        self._stepper = stepper
+        self._schedule = schedule
 
         self._parameter_groups: ParametersForNorm | None = None
 
@@ -62,7 +62,7 @@ class GradientClipper:
         Raises:
             ValueError: If called outside the ``install`` context manager scope.
         """
-        should_log = self._stepper.should_do_action(self._config.log_total_steps)
+        should_log = self._schedule.should_do_action(self._config.log_total_steps)
 
         if not self._config.max_norm and not should_log:
             return

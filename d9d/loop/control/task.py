@@ -14,7 +14,7 @@ from d9d.pipelining.api import PipelineShardingSpec
 
 if typing.TYPE_CHECKING:
     from d9d.internals.pipeline_state import PipelineState
-    from d9d.loop.component import Stepper
+    from d9d.loop.component import JobSchedule
     from d9d.metric import Metric
 
 
@@ -126,12 +126,12 @@ class ComputeLossContext:
         pipeline_results: The outputs returned by the model's forward pass.
         state: The current state of the pipeline. You can assign any data to this state object, and it will be
             accessible during this pipeline step (e.g. when calculating metrics)
-        stepper: Component tracking the current step.
+        schedule: Component tracking the current step.
     """
 
     pipeline_results: Mapping[str, torch.Tensor]
     state: "PipelineState"
-    stepper: "Stepper"
+    schedule: "JobSchedule"
 
 
 @dataclasses.dataclass(kw_only=True)

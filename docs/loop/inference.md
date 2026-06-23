@@ -85,7 +85,7 @@ Before the loop starts:
     *   Sets all model modules to `.eval()` mode (affecting Dropout, BatchNorm, etc.).
 2.  **State Loading**:
     *   The `StateCheckpointer` loads the model weights from the specified checkpoint.
-    *   If the job was interrupted previously, it also restores the `Stepper` and `DataLoader` state to resume exactly where it left off.
+    *   If the job was interrupted previously, it also restores the `JobSchedule` and `DataLoader` state to resume exactly where it left off.
 3.  **Context Entry**:
     *   Enters UI, Garbage Collector, and Profiler contexts.
 4.  **Ready Hook Trigger**: `EVENT_INFERENCE_READY` is fired to mark initialization completion.
@@ -106,7 +106,7 @@ For every step:
 3. **Maintenance**:
     *   **GC**: `ManualGarbageCollector` runs periodically to ensure peak memory usage is controlled.
     *   **Event-Based Logic**: Triggers `EVENT_INFERENCE_STEP_POST` event.
-    *   **Advance**: The `Stepper` increments.
+    *   **Advance**: The `JobSchedule` increments.
 
 4. **Checkpointing**:
     *   If configured, the system saves the *progress* of the inference job. This allows restarting a long-running generation job on a massive dataset without re-processing the first half.

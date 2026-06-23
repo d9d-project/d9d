@@ -52,6 +52,10 @@ The `d9d.loop.config` package defines the structure for configuring the training
     options:
       heading_level: 3
 
+::: d9d.loop.config.JobScheduleConfig
+    options:
+      heading_level: 3
+
 ::: d9d.loop.config.DataLoadingConfig
     options:
       heading_level: 3

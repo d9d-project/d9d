@@ -14,13 +14,13 @@ from d9d.loop.component import (
     GradientManager,
     JobLogger,
     JobProfiler,
+    JobSchedule,
     LossComputer,
     ManualGarbageCollector,
     ModelStageExporter,
     ModelStageFactory,
     OptimizerFactory,
     StateCheckpointer,
-    Stepper,
     TimeoutManager,
     TrainSleeper,
     TrainTaskOperator,
@@ -136,15 +136,18 @@ class TrainingConfigurator:
         data_loader_train = data_loader_factory.build_dataloader_for_train_job()
         event_bus.trigger(EVENT_TRAIN_DATA_LOADER_READY, EventDataLoaderReadyContext(data_loader=data_loader_train))
 
-        stepper = Stepper(initial_step=0, total_steps=len(data_loader_train))
+        schedule = JobSchedule(
+            config=self._parameters.schedule,
+            data_iterator=data_loader_train,
+        )
 
         pipeline_state_handler = PipelineStateHandler(
             sharding_spec={}, num_shards=batch_maths.num_microbatches_pipelining
         )
 
-        loss_computer = LossComputer(state=pipeline_state_handler, task=task, stepper=stepper)
+        loss_computer = LossComputer(state=pipeline_state_handler, task=task, schedule=schedule)
 
-        schedule, modules = ModelStageFactory(
+        pipeline_schedule, modules = ModelStageFactory(
             model_provider=self._model_provider,
             dist_context=dist_context,
             config_model=self._parameters.model_stage_factory,
@@ -159,7 +162,7 @@ class TrainingConfigurator:
         task_operator = TrainTaskOperator(
             dist_context=dist_context,
             task=task,
-            pipeline=schedule,
+            pipeline=pipeline_schedule,
             pipeline_state=pipeline_state_handler,
             metrics=metrics,
         )
@@ -168,30 +171,30 @@ class TrainingConfigurator:
             dist_context=dist_context,
             tracked_modules=modules,
             config=self._parameters.gradient_clipping,
-            stepper=stepper,
+            schedule=schedule,
         )
 
         optimizer, scheduler = OptimizerFactory(
             dist_context=dist_context,
             tracked_modules=modules,
             optimizer_provider=self._optimizer_provider,
-            stepper=stepper,
+            schedule=schedule,
             lr_scheduler_provider=self._lr_scheduler_provider,
         ).build_optimizer_and_scheduler()
         event_bus.trigger(EVENT_TRAIN_OPTIMIZER_READY, EventOptimizerReadyContext(optimizer=optimizer))
         event_bus.trigger(EVENT_TRAIN_LR_SCHEDULER_READY, EventLRSchedulerReadyContext(lr_scheduler=scheduler))
 
-        gc = ManualGarbageCollector(dist_ctx=dist_context, config=self._parameters.gc, step=stepper)
+        gc = ManualGarbageCollector(dist_ctx=dist_context, config=self._parameters.gc, schedule=schedule)
 
         checkpointer = StateCheckpointer(
             dist_context=dist_context,
-            stepper=stepper,
+            schedule=schedule,
             config=self._parameters.checkpointing,
             gc=gc,
             run_name=self._parameters.run.name,
         )
 
-        profiler = JobProfiler(dist_context=dist_context, stepper=stepper, config=self._parameters.profiling)
+        profiler = JobProfiler(dist_context=dist_context, schedule=schedule, config=self._parameters.profiling)
 
         exporter = ModelStageExporter(model_provider=self._model_provider, dist_context=dist_context, modules=modules)
 
@@ -206,7 +209,7 @@ class TrainingConfigurator:
             dist_context=dist_context,
             config=self._parameters.logging,
             metrics=metrics,
-            stepper=stepper,
+            schedule=schedule,
             run_config=self._parameters.run,
             additional_hparams={"task": task.dump_hparams(), "model": self._model_provider.dump_hparams()},
         )
@@ -214,7 +217,7 @@ class TrainingConfigurator:
         return TrainJobState(
             dist_context=dist_context,
             data_loader=data_loader_train,
-            stepper=stepper,
+            schedule=schedule,
             tracked_modules=modules,
             garbage_collector=gc,
             batch_maths=batch_maths,
@@ -277,20 +280,20 @@ class Trainer:
         self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
         self._state.checkpointer.load_last_checkpoint(self._state)
 
-        if self._state.stepper.current_step >= self._state.stepper.total_steps:
+        if self._state.schedule.current_step >= self._state.schedule.total_steps:
             self._state.dist_context.logger.info("Already trained fully, will do nothing")
             return
 
         self._state.dist_context.wait_world()
 
-        step_ctx = EventStepContext(stepper=self._state.stepper)
+        step_ctx = EventStepContext(schedule=self._state.schedule)
 
         with (
             tqdm(
                 desc="Training",
-                total=self._state.stepper.total_steps,
+                total=self._state.schedule.total_steps,
                 disable=not self._state.dist_context.is_local_main_process,
-                initial=self._state.stepper.current_step,
+                initial=self._state.schedule.current_step,
             ) as bar,
             self._state.logger.new_run() as run,
             self._state.garbage_collector as gc,
@@ -303,7 +306,7 @@ class Trainer:
             self._state.event_bus.trigger(EVENT_TRAIN_READY, EventTrainReadyContext(run=run))
 
             for batch_group in self._state.data_loader:
-                run.set_step(self._state.stepper.current_step)
+                run.set_step(self._state.schedule.current_step)
                 self._state.event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
 
                 with self._state.event_bus.bounded(
@@ -351,7 +354,7 @@ class Trainer:
                 self._state.timeout_manager.set_periodic()
 
                 self._state.event_bus.trigger(EVENT_TRAIN_STEP_POST, step_ctx)
-                self._state.stepper.step()
+                self._state.schedule.step()
 
                 # checkpoint at the end of the step
                 self._state.checkpointer.checkpoint_if_needed(self._state)

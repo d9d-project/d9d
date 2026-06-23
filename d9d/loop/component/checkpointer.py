@@ -10,7 +10,7 @@ from d9d.core.dist_context import DistributedContext
 from d9d.loop.config import CheckpointingConfig
 
 from .garbage_collector import ManualGarbageCollector
-from .stepper import Stepper
+from .job_schedule import JobSchedule
 
 # TODO feat(max): async checkpointing may break everything up, but I guess we still have to support it
 
@@ -35,7 +35,7 @@ class StateCheckpointer:
     def __init__(
         self,
         dist_context: DistributedContext,
-        stepper: Stepper,
+        schedule: JobSchedule,
         config: CheckpointingConfig,
         gc: ManualGarbageCollector,
         run_name: str | None,
@@ -44,13 +44,13 @@ class StateCheckpointer:
 
         Args:
             dist_context: The distributed context.
-            stepper: The training stepper tracking the current iteration/step.
+            schedule: The job schedule tracking the current iteration/step.
             config: Configuration object containing checkpointing parameters.
             gc: Garbage collector for manual memory management during IO.
             run_name: Optional specific run name to append to the save directory.
         """
         self._dist_context = dist_context
-        self._stepper = stepper
+        self._schedule = schedule
         self._gc = gc
 
         if run_name:
@@ -76,7 +76,7 @@ class StateCheckpointer:
         return checkpoint_dirs
 
     def _next_checkpoint_id(self) -> Path:
-        next_name = f"save-{self._stepper.current_step}"
+        next_name = f"save-{self._schedule.current_step}"
         return self._save_dir / next_name
 
     def _purge_old_checkpoints(self):
@@ -113,13 +113,13 @@ class StateCheckpointer:
     def checkpoint_if_needed(self, state: Stateful):
         """Checks if a checkpoint is due based on the configuration and saves if necessary.
 
-        This checks the stepper to see if the current step matches the configured
+        This checks the schedule to see if the current step matches the configured
         saving period (or if it is the final step).
 
         Args:
             state: The Stateful object to save.
         """
-        if self._stepper.should_do_action(
+        if self._schedule.should_do_action(
             self._config.period_steps, enable_on_last_step_if_periodic=True, is_post_step_action=True
         ):
             self._checkpoint(state)

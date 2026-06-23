@@ -7,7 +7,7 @@ from typing import Self
 from d9d.core.dist_context import DistributedContext
 from d9d.loop.config import GarbageCollectionConfig
 
-from .stepper import Stepper
+from .job_schedule import JobSchedule
 
 
 class ManualGarbageCollector(AbstractContextManager):
@@ -18,17 +18,17 @@ class ManualGarbageCollector(AbstractContextManager):
     manual collection at specific intervals (periodic) or specific points (forced).
     """
 
-    def __init__(self, dist_ctx: DistributedContext, config: GarbageCollectionConfig, step: Stepper):
+    def __init__(self, dist_ctx: DistributedContext, config: GarbageCollectionConfig, schedule: JobSchedule):
         """Constructs the garbage collector manager.
 
         Args:
             dist_ctx: The distributed context.
             config: Configuration determining how often GC should run.
-            step: Stepper instance used to track the current training step.
+            schedule: JobSchedule instance used to track the current training step.
         """
         self._dist_ctx = dist_ctx
         self._config = config
-        self._step = step
+        self._schedule = schedule
 
     def __enter__(self) -> Self:
         """Disables automatic garbage collection and performs an initial full collection.
@@ -59,7 +59,7 @@ class ManualGarbageCollector(AbstractContextManager):
 
         This typically performs a faster (generation 1) collection rather than a full sweep.
         """
-        if self._step.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=False):
+        if self._schedule.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=False):
             self._collect(generation=1)
 
     def collect_forced(self):

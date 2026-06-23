@@ -60,6 +60,9 @@
       "global_batch_size": 128,
       "microbatch_size": 8
     },
+    "schedule": {
+      "total_steps": null
+    },
     "data_loading": {
       "num_workers": 4,
       "pin_memory": true,

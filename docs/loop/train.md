@@ -153,7 +153,7 @@ For every global step (`step`), the trainer performs the following actions in st
     *   **Log**: Metrics are finalized and written to the tracker.
     *   **GC**: `ManualGarbageCollector` runs if the current step matches the GC period.
     *   **Event-Based Logic**: Triggers `EVENT_TRAIN_STEP_POST` event.
-    *   **Advance**: The `Stepper` increments the step count.
+    *   **Advance**: The `JobSchedule` increments the step count.
 
 8. **Checkpointing**
     *   If the current step matches `checkpointing.period_steps`, checkpointing is triggered. This acts as a global barrier.

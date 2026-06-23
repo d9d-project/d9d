@@ -1,26 +1,49 @@
+from collections.abc import Sized
 from typing import Any
 
 from torch.distributed.checkpoint.stateful import Stateful
+from torch.utils.data import DataLoader
 
-from d9d.loop.config import StepActionPeriod, StepActionSpecial
+from d9d.loop.config import JobScheduleConfig, StepActionPeriod, StepActionSpecial
 
 
-class Stepper(Stateful):
-    """Manages the current step and total steps for a loop.
+def _resolve_total_steps(config: JobScheduleConfig, data_iterator: DataLoader) -> int:
+    data_steps = len(data_iterator) if isinstance(data_iterator, Sized) else None
 
-    This class implements the `Stateful` protocol to allow saving and
-    loading its state during checkpointing operations.
-    """
+    config_steps = config.total_steps
 
-    def __init__(self, initial_step: int, total_steps: int):
-        """Constructs a Stepper object.
+    if config_steps is not None:
+        if data_steps is not None and config_steps > data_steps:
+            raise ValueError(
+                f"Configured total_steps ({config_steps}) exceeds the number of steps "
+                f"available from the data ({data_steps})."
+            )
+        return config_steps
+
+    if data_steps is not None:
+        return data_steps
+
+    raise ValueError(
+        "Cannot resolve total_steps: the schedule config does not specify total_steps and "
+        "the batch iterator is not sized. Please set `total_steps` in the schedule config."
+    )
+
+
+class JobSchedule(Stateful):
+    """Tracks the progress and resolves the duration of a job loop."""
+
+    def __init__(self, config: JobScheduleConfig, data_iterator: DataLoader):
+        """Constructs a JobSchedule object.
 
         Args:
-            initial_step: The starting step number.
-            total_steps: The total number of steps in the training loop.
+            config: The schedule configuration carrying the optional explicit step budget.
+            data_iterator: The data iterator driving the loop, consulted for its length when sized.
+
+        Raises:
+            ValueError: If "total_steps" cannot be resolved from the config and the data iterator.
         """
-        self._current_step = initial_step
-        self._total_steps = total_steps
+        self._current_step = 0
+        self._total_steps = _resolve_total_steps(config, data_iterator)
 
     def step(self):
         """Increments the current step counter by one."""
@@ -33,33 +56,26 @@ class Stepper(Stateful):
 
     @property
     def total_steps(self) -> int:
-        """The total number of steps configured for the loop."""
+        """The total number of steps resolved for the loop."""
         return self._total_steps
 
     def state_dict(self) -> dict[str, Any]:
-        """Retrieves the current state of the stepper.
+        """Retrieves the current progress of the schedule.
 
         Returns:
-            A dictionary containing the current step and total steps.
+            A dictionary containing the current step.
         """
-        return {"current_step": self._current_step, "total_steps": self._total_steps}
+        return {"current_step": self._current_step}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        """Restores the stepper state from a state dictionary.
+        """Restores the schedule progress from a state dictionary.
+
+        Only the current step is restored; "total_steps" is always taken from the resolution at
+        construction time, so the configured budget may change across resumes.
 
         Args:
             state_dict: The state dictionary to load from.
-
-        Raises:
-            ValueError: If the total steps in the state dictionary do not match
-                the total steps configured in this stepper.
         """
-        if state_dict["total_steps"] != self._total_steps:
-            raise ValueError(
-                f"Step count differs: saved {state_dict['total_steps']}, "
-                f"current {self._total_steps}. Perhaps project configuration changed?"
-            )
-
         self._current_step = state_dict["current_step"]
 
     def should_do_action(

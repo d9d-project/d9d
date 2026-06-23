@@ -7,23 +7,23 @@ from d9d.core.dist_context import DistributedContext
 from d9d.internals.profiling import Profiler
 from d9d.loop.config import ProfilingConfig
 
-from .stepper import Stepper
+from .job_schedule import JobSchedule
 
 
 class JobProfiler:
     """Manages profiling sessions during a job loop.
 
     This class coordinates the initialization and activation of the internal
-    profiler based on the current step count provided by the stepper.
+    profiler based on the current step count provided by the schedule.
     """
 
-    def __init__(self, dist_context: DistributedContext, config: ProfilingConfig | None, stepper: Stepper):
+    def __init__(self, dist_context: DistributedContext, config: ProfilingConfig | None, schedule: JobSchedule):
         """Constructs JobProfiler object.
 
         Args:
             dist_context: The distributed context.
             config: Configuration settings for profiling.
-            stepper: Object tracking the current global step of the training loop.
+            schedule: Object tracking the current global step of the training loop.
         """
         self._config = config
         if config is None or not config.enabled:
@@ -36,7 +36,7 @@ class JobProfiler:
                 period_steps=config.period_steps,
                 dist_context=dist_context,
             )
-        self._stepper = stepper
+        self._schedule = schedule
 
     @contextmanager
     def open(self) -> Generator[torch.profiler.profile | None]:
@@ -48,5 +48,5 @@ class JobProfiler:
         if self._profiler is None:
             yield None
         else:
-            with self._profiler.open(self._stepper.current_step) as prof:
+            with self._profiler.open(self._schedule.current_step) as prof:
                 yield prof

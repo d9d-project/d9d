@@ -15,7 +15,7 @@ from d9d.metric.impl.container import ComposeMetric
 from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig, tracker_from_config
 from d9d.tracker.provider.null import NullTrackerConfig
 
-from .stepper import Stepper
+from .job_schedule import JobSchedule
 
 
 def _flatten_pytree_for_metrics(tree: PyTree[float]) -> dict[str, float]:
@@ -54,7 +54,7 @@ class JobLogger(Stateful):
         dist_context: DistributedContext,
         config: JobLoggerConfig,
         metrics: ComposeMetric,
-        stepper: Stepper,
+        schedule: JobSchedule,
         run_config: RunConfig,
         additional_hparams: ScalarTree,
     ):
@@ -64,13 +64,13 @@ class JobLogger(Stateful):
             dist_context: The distributed context.
             config: Configuration settings.
             metrics: The composite metric collection to be computed and logged.
-            stepper: Object tracking the current global step.
+            schedule: Object tracking the current global step.
             run_config: Run configuration.
             additional_hparams: Supplemental hyperparameters to log for this run.
         """
         self._dist_context = dist_context
         self._config = config
-        self._stepper = stepper
+        self._schedule = schedule
         self._run_config = run_config.model_copy(
             deep=True, update={"hparams": {"run": run_config.hparams, "params": additional_hparams}}
         )
@@ -113,7 +113,7 @@ class JobLogger(Stateful):
         across ranks. This allows communication to overlap with other operations
         before `log` is called.
         """
-        if not self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
+        if not self._schedule.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
             return
 
         self._metric_collector.schedule_collection(self._dist_context)
@@ -122,7 +122,7 @@ class JobLogger(Stateful):
         """Logs the current loss and conditional metric results.
 
         This method always logs the provided loss value. Periodically (determined
-        by the stepper configuration), it retrieves the asynchronous results from
+        by the schedule configuration), it retrieves the asynchronous results from
         the metric collector (initiated by `trigger_sync`), flattens the result
         structure, and logs them to the tracker.
 
@@ -132,7 +132,7 @@ class JobLogger(Stateful):
         """
         run.scalar("loss", loss_value.item())
 
-        if not self._stepper.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
+        if not self._schedule.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
             return
 
         results_tree = self._metric_collector.collect_results()

@@ -22,6 +22,17 @@ class BatchingConfig(BaseModel):
     microbatch_size: int
 
 
+class JobScheduleConfig(BaseModel):
+    """Configuration for the job's duration.
+
+    Attributes:
+        total_steps: The total number of steps the job should run for. If None, the duration is derived
+            from the length of the batch iterator.
+    """
+
+    total_steps: int | None
+
+
 class DeterminismConfig(BaseModel):
     """Configuration for reproducibility and random number generation.
 
@@ -172,6 +183,7 @@ class TrainerConfig(BaseModel):
     Attributes:
         run: Meta-information about the run (name, ID, tags).
         batching: Batch sizing strategy.
+        schedule: Job duration settings.
         data_loading: DataLoader settings.
         logging: Experiment tracking settings.
         pipelining: Pipeline Parallelism schedule and settings. If None,
@@ -188,6 +200,7 @@ class TrainerConfig(BaseModel):
 
     run: RunConfig
     batching: BatchingConfig
+    schedule: JobScheduleConfig
     data_loading: DataLoadingConfig
     logging: JobLoggerConfig
     pipelining: PipeliningConfig
@@ -206,6 +219,7 @@ class InferenceConfig(BaseModel):
 
     Attributes:
         batching: Batch sizing strategy.
+        schedule: Job duration settings.
         data_loading: DataLoader settings.
         model_stage_factory: Model initialization logic.
         determinism: Random seed settings.
@@ -216,6 +230,7 @@ class InferenceConfig(BaseModel):
     """
 
     batching: BatchingConfig
+    schedule: JobScheduleConfig
     data_loading: DataLoadingConfig
     model_stage_factory: ModelStageFactoryConfig
     determinism: DeterminismConfig

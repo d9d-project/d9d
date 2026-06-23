@@ -6,7 +6,7 @@ import torch
 from d9d.internals.pipeline_state import PipelineStateHandler
 from d9d.loop.control import ComputeLossContext, InferenceTask, ProcessOutputsContext, TrainTask
 
-from .stepper import Stepper
+from .job_schedule import JobSchedule
 
 STATE_LOSS = "__internal_loss"
 STATE_LOSS_WEIGHT = "__internal_loss_weight"
@@ -29,17 +29,17 @@ class LossComputer(PipelineOutputsProcessor[torch.Tensor]):
     metrics into the state for logging, and returns the loss*weight term for backpropagation.
     """
 
-    def __init__(self, state: PipelineStateHandler, task: TrainTask, stepper: Stepper):
+    def __init__(self, state: PipelineStateHandler, task: TrainTask, schedule: JobSchedule):
         """Constructs a new LossComputer.
 
         Args:
             state: Handler for managing global and sharded pipeline states.
             task: The user-defined training task containing loss computation logic.
-            stepper: Component tracking current step and progress.
+            schedule: Component tracking current step and progress.
         """
         self._state = state
         self._task = task
-        self._stepper = stepper
+        self._schedule = schedule
 
     def __call__(self, pipeline_outputs: dict[str, torch.Tensor], microbatch_idx: int) -> torch.Tensor:
         """Computes the weighted loss for a specific sharded microbatch or the full microbatch.
@@ -61,7 +61,7 @@ class LossComputer(PipelineOutputsProcessor[torch.Tensor]):
         state = self._state.sharded_state(shard_id=microbatch_idx)
 
         computation = self._task.compute_loss(
-            ComputeLossContext(pipeline_results=pipeline_outputs, state=state, stepper=self._stepper)
+            ComputeLossContext(pipeline_results=pipeline_outputs, state=state, schedule=self._schedule)
         )
 
         loss = computation.loss
