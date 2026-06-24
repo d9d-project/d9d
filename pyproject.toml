@@ -212,6 +212,7 @@ ignore = [
     "RET505",  # Unnecessary {branch} after return statement
     "SIM103",  # Return the condition {condition} directly
     "SIM108",  # Use ternary operator {contents} instead of if-else-bloc
+    "TC003",  # Move standard library import `collections.abc.Iterator` into a type-checking block
     "TC002",  # Move third-party import {} into a type-checking block
     "TC001",  # Move own import into a type-checking block
     "PLR2004",  # Magic value used in comparison, consider replacing {value} with a constant variable
