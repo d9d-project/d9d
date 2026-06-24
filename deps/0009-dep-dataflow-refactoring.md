@@ -148,12 +148,12 @@ Once the iterator emits a pack of microbatches, the trainer no longer loops over
 
 #### Per-step reconfiguration
 
-Because pack length varies, the two things fixed at construction today become per-step. The fan-out lives **inline in the task operator**, which is the single existing seam between the data path and the executor — no new coordinator object:
+Because pack length varies — and microbatch shapes may vary *within* a pack — the two things fixed at construction today become per-step. `configure(pack)` recompiles the program for `len(pack)` microbatches and sizes each microbatch's P2P buffer from that microbatch (not from a single representative one), so a pack of differently-shaped microbatches is allocated correctly. The fan-out lives **inline in the task operator**, which is the single existing seam between the data path and the executor — no new coordinator object:
 
 ```python
 def forward_backward(self, pack: Pack) -> ForwardResult | None:
     n = len(pack)
-    self._pipeline.schedule.configure(pack) # recompile program + buffers for n microbatches
+    self._pipeline.schedule.configure(pack) # recompile program + per-microbatch buffers
     self._grad_manager.set_required_accumulations(n)  # backward fires n times this step
     self._pipeline.schedule.step(pack)
     ...
@@ -175,7 +175,18 @@ Aggregation no longer flows through the state either: the per-microbatch callbac
 
 #### `ModuleSupportsPipelining` resignature
 
-Stage buffer allocation infers shapes from the inputs. Today `infer_stage_inputs_from_pipeline_inputs(inputs, n_microbatches)` is handed the **global** batch and divides by `n_microbatches`. Under packs there is no global batch; the stage is handed a **representative microbatch** (`pack[0]`) and `n_microbatches=len(pack)`. The protocol methods are re-documented (and the parameter renamed from `inputs` to `microbatch_inputs`) to reflect that they now receive a single microbatch, not a global batch to be divided.
+Stage buffer allocation infers shapes from the inputs. Today `infer_stage_inputs_from_pipeline_inputs(inputs, n_microbatches)` is handed the **global** batch and divides by `n_microbatches`, which forces every microbatch to the same shape. Under packs there is no global batch, and microbatches within a pack may legitimately differ in shape (token packing, dynamic budgets). So shape inference goes **per microbatch**: the method receives a *single* microbatch's inputs and returns that microbatch's stage inputs/outputs, with no `n_microbatches` parameter. The executor calls it once for **each** microbatch in the pack and sizes that microbatch's P2P buffer independently.
+
+```python
+def infer_stage_inputs_from_microbatch(
+    self, microbatch_inputs: dict[str, torch.Tensor]
+) -> dict[str, torch.Tensor]: ...
+def infer_stage_outputs_from_microbatch(
+    self, microbatch_inputs: dict[str, torch.Tensor]
+) -> dict[str, torch.Tensor]: ...
+```
+
+The protocol methods are renamed and re-documented (the parameter renamed from `inputs` to `microbatch_inputs`) to reflect that they receive one microbatch — not a global batch to be divided, and not a representative microbatch to be replicated.
 
 ## Usage
 
@@ -199,7 +210,7 @@ This is a **breaking** change. Breaking surfaces for the user API:
 - **`Stepper` → `JobSchedule`.** Logic is the same, but there are changes in names.
 - **`DatasetProvider` → `BatchProvider`.** The factory now returns a `BatchIterator` instead of a dataset + collator; user code migrates from "return dataset + collator" to "compose a `BatchIterator` from the shipped pieces" (the default stack reproduces current behavior verbatim).
 - **`PipelineSchedule` API changes** (`configure`/`step(pack)`); `PipelineShardingSpec` and `BuildForwardInputsResult.pipeline_sharding_spec` are removed.
-- **`ModuleSupportsPipelining`** inference methods receive a representative microbatch.
+- **`ModuleSupportsPipelining`** inference methods are called per microbatch so shapes may vary within a pack.
 
 ## Alternatives Considered
 
