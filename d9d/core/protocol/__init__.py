@@ -1,10 +1,11 @@
 """Package providing protocol definitions for standard PyTorch objects."""
 
-from .data import BatchIterator
+from .data import DataLoaderProtocol, MicrobatchPackIterator
 from .training import LRSchedulerProtocol, OptimizerProtocol
 
 __all__ = [
-    "BatchIterator",
+    "DataLoaderProtocol",
     "LRSchedulerProtocol",
+    "MicrobatchPackIterator",
     "OptimizerProtocol",
 ]

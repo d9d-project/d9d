@@ -12,5 +12,5 @@ The function receives a sequence of individual data point structures (PyTrees)
 and is responsible for stacking or merging them into a single batched structure.
 """
 
-Microbatches: TypeAlias = Sequence[TDataTree]
-"""Type alias for one step's worth of data: a list of microbatches."""
+MicrobatchPack: TypeAlias = Sequence[TDataTree]
+"""Type alias for one step's worth of data: a sequence of microbatches."""
