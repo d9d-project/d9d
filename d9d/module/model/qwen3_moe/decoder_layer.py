@@ -47,13 +47,18 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         self.post_attention_layernorm = RMSNorm(params.hidden_size, eps=params.rms_norm_eps)
 
     def forward(
-        self, hidden_states: torch.Tensor, position_embeddings: tuple[torch.Tensor, torch.Tensor]
+        self,
+        hidden_states: torch.Tensor,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        mlp_replay_indices: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Performs the forward pass of the MoE layer.
 
         Args:
             hidden_states: Input tensor of shape `(batch, seq_len, hidden_dim)`.
             position_embeddings: Tuple containing RoPE precomputed embeddings (cos, sin).
+            mlp_replay_indices: Optional recorded expert indices replayed by the MoE block (Expert Replay).
+                Shape: `(batch, seq_len, top_k)`.
 
         Returns:
             Output tensor after attention and MoE blocks, shape `(batch, seq_len, hidden_dim)`.
@@ -71,7 +76,7 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
 
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states)
+        hidden_states = self.mlp(hidden_states, replay_indices=mlp_replay_indices)
 
         hidden_states = residual + hidden_states
 

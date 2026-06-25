@@ -100,6 +100,7 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         position_ids: torch.Tensor | None = None,
         hidden_states_snapshot: torch.Tensor | None = None,
         hidden_states_agg_mask: torch.Tensor | None = None,
+        replay_indices: Mapping[str, torch.Tensor] | None = None,
     ) -> dict[str, torch.Tensor | None]:
         """Executes the forward pass for the current pipeline stage.
 
@@ -114,6 +115,9 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
                 from previous stages. Used if snapshotting is enabled.
             hidden_states_agg_mask: Mask used to aggregate hidden states for
                 snapshots.
+            replay_indices: Optional recorded expert indices to replay (Expert Replay), keyed by each MoE layer's
+                module name (e.g. "layers.5.mlp"), each of shape (batch, seq_len, top_k). The mapping may carry
+                every layer in the model, each pipeline stage looks up only the layers it owns and ignores the rest.
 
         Returns:
             A dictionary containing:
@@ -133,10 +137,16 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         for decoder_layer_name in self._layers_iter:
             decoder_layer = self.layers[decoder_layer_name]
 
+            layer_replay_indices = (
+                replay_indices.get(f"layers.{decoder_layer_name}.mlp") if replay_indices is not None else None
+            )
+
             if self._enable_checkpointing:
-                last_hidden_states = checkpoint(decoder_layer, last_hidden_states, rope_params, use_reentrant=False)
+                last_hidden_states = checkpoint(
+                    decoder_layer, last_hidden_states, rope_params, layer_replay_indices, use_reentrant=False
+                )
             else:
-                last_hidden_states = decoder_layer(last_hidden_states, rope_params)
+                last_hidden_states = decoder_layer(last_hidden_states, rope_params, layer_replay_indices)
 
             state_aggregator.add_hidden_states(last_hidden_states)
 
@@ -266,6 +276,7 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         hidden_states_snapshot: torch.Tensor | None = None,
         hidden_states_agg_mask: torch.Tensor | None = None,
         labels: torch.Tensor | None = None,
+        replay_indices: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         """Executes the model forward pass.
 
@@ -279,6 +290,8 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             hidden_states_snapshot: Intermediate state collector.
             hidden_states_agg_mask: Mask for state aggregation.
             labels: Target tokens for loss computation (Last Stage).
+            replay_indices: Optional recorded expert indices to replay in every MoE layer (Expert Replay).
+                Shape: `(batch, num_hidden_layers, seq_len, top_k)`.
 
         Returns:
             Dictionary containing 'hidden_states', optionally 'hidden_states_snapshot',
@@ -290,6 +303,7 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             position_ids=position_ids,
             hidden_states_snapshot=hidden_states_snapshot,
             hidden_states_agg_mask=hidden_states_agg_mask,
+            replay_indices=replay_indices,
         )
         if self._stage.is_current_stage_last:
             lm_out = self.lm_head(hidden_states=model_outputs["hidden_states"], labels=labels)
@@ -368,6 +382,7 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
         hidden_states_snapshot: torch.Tensor | None = None,
         hidden_states_agg_mask: torch.Tensor | None = None,
         pooling_mask: torch.Tensor | None = None,
+        replay_indices: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         """Executes the classification model forward pass.
 
@@ -380,6 +395,8 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
             pooling_mask: Binary mask indicating which token(s) to pool for classification.
                 Note: you can use `d9d.dataset.token_pooling_mask_from_attention_mask`
                 in your Dataset to preallocate the pooling mask from attention mask.
+            replay_indices: Optional recorded expert indices to replay in every MoE layer (Expert Replay).
+                Shape: `(batch, num_hidden_layers, seq_len, top_k)`.
 
         Returns:
             Dictionary containing 'hidden_states', optionally 'hidden_states_snapshot'.
@@ -391,6 +408,7 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
             position_ids=position_ids,
             hidden_states_snapshot=hidden_states_snapshot,
             hidden_states_agg_mask=hidden_states_agg_mask,
+            replay_indices=replay_indices,
         )
         if self._stage.is_current_stage_last:
             model_outputs["scores"] = self.cls_head(
@@ -472,6 +490,7 @@ class Qwen3MoEForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         hidden_states_snapshot: torch.Tensor | None = None,
         hidden_states_agg_mask: torch.Tensor | None = None,
         pooling_mask: torch.Tensor | None = None,
+        replay_indices: torch.Tensor | None = None,
     ) -> dict[str, torch.Tensor]:
         """Executes the embedding model forward pass.
 
@@ -482,6 +501,8 @@ class Qwen3MoEForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             hidden_states_snapshot: Intermediate state collector.
             hidden_states_agg_mask: Mask for state aggregation.
             pooling_mask: Binary mask indicating which token(s) to pool for embedding extraction.
+            replay_indices: Optional recorded expert indices to replay in every MoE layer (Expert Replay).
+                Shape: `(batch, num_hidden_layers, seq_len, top_k)`.
 
         Returns:
             Dictionary containing 'hidden_states', optionally 'hidden_states_snapshot'.
@@ -493,6 +514,7 @@ class Qwen3MoEForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             position_ids=position_ids,
             hidden_states_snapshot=hidden_states_snapshot,
             hidden_states_agg_mask=hidden_states_agg_mask,
+            replay_indices=replay_indices,
         )
         if self._stage.is_current_stage_last:
             model_outputs["embeddings"] = self.embedding_head(
