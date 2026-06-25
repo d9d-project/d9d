@@ -73,7 +73,7 @@ def test_install_binds_and_unbinds_every_layer():
 
 
 @pytest.mark.local
-def test_tape_is_keyed_by_module_name():
+def test_tape_is_one_mapping_per_microbatch_keyed_by_name():
     model = _StackedMoE(num_layers=3, hidden_dim=8, num_experts=4, top_k=2)
     batch, seq, top_k = 2, 5, 2
 
@@ -84,27 +84,45 @@ def test_tape_is_keyed_by_module_name():
             rec.capture(layer, captures[layer])
         tape = rec.tape()
 
-    assert set(tape) == {"layers.0", "layers.1", "layers.2"}
-    for i, layer in enumerate(model.layers):
-        assert tape[f"layers.{i}"].shape == (batch, seq, top_k)
-        assert torch.equal(tape[f"layers.{i}"], captures[layer])
+        # a single micro-batch -> a list with one mapping
+        assert len(tape) == 1
+        assert set(tape[0]) == {"layers.0", "layers.1", "layers.2"}
+        for i, layer in enumerate(model.layers):
+            assert tape[0][f"layers.{i}"].shape == (batch, seq, top_k)
+            assert torch.equal(tape[0][f"layers.{i}"], captures[layer])
 
 
 @pytest.mark.local
-def test_tape_concatenates_repeated_captures():
-    # A layer called multiple times before tape() is read (e.g. gradient accumulation / micro-batching) must have
-    # its captures concatenated along the batch dimension in call order, not overwritten.
+def test_tape_keeps_microbatches_separate_with_different_seqlens():
+    # A layer called once per micro-batch must yield one tape entry per micro-batch, NOT a single concatenated
+    # tensor -- micro-batches may have different sequence lengths (sequence packing / dynamic token budgets), which
+    # cannot be merged into one tensor.
     model = _StackedMoE(num_layers=1, hidden_dim=8, num_experts=4, top_k=2)
 
     with RouterReplayRecorder().install(model) as rec:
-        chunk_a = torch.randint(0, 4, (2, 3, 2))
-        chunk_b = torch.randint(0, 4, (2, 3, 2))
-        rec.capture(model.layers[0], chunk_a)
-        rec.capture(model.layers[0], chunk_b)
+        microbatch_0 = torch.randint(0, 4, (2, 100, 2))  # seq_len 100
+        microbatch_1 = torch.randint(0, 4, (2, 137, 2))  # seq_len 137
+        rec.capture(model.layers[0], microbatch_0)
+        rec.capture(model.layers[0], microbatch_1)
         tape = rec.tape()
 
-    assert tape["layers.0"].shape == (4, 3, 2)
-    assert torch.equal(tape["layers.0"], torch.cat([chunk_a, chunk_b], dim=0))
+    assert len(tape) == 2
+    assert torch.equal(tape[0]["layers.0"], microbatch_0)
+    assert torch.equal(tape[1]["layers.0"], microbatch_1)
+
+
+@pytest.mark.local
+def test_tape_rejects_unequal_microbatch_counts():
+    # Every MoE layer must run once per micro-batch; if layers disagree on how many micro-batches ran, the tape
+    # cannot be aligned and must raise rather than silently mis-pair selections.
+    model = _StackedMoE(num_layers=2, hidden_dim=8, num_experts=4, top_k=2)
+
+    with RouterReplayRecorder().install(model) as rec:
+        rec.capture(model.layers[0], torch.randint(0, 4, (1, 3, 2)))
+        rec.capture(model.layers[0], torch.randint(0, 4, (1, 3, 2)))
+        rec.capture(model.layers[1], torch.randint(0, 4, (1, 3, 2)))
+        with pytest.raises(RuntimeError, match="different number of micro-batches"):
+            rec.tape()
 
 
 @pytest.mark.local
@@ -142,7 +160,7 @@ def test_recorder_is_reusable_after_context_exit():
     # a second installation starts from a clean slate
     with recorder.install(model) as rec:
         rec.capture(model.layers[0], torch.zeros(1, 2, 2, dtype=torch.long))
-        assert torch.equal(rec.tape()["layers.0"], torch.zeros(1, 2, 2, dtype=torch.long))
+        assert torch.equal(rec.tape()[0]["layers.0"], torch.zeros(1, 2, 2, dtype=torch.long))
 
 
 @pytest.mark.local
@@ -156,9 +174,12 @@ def test_record_then_replay_reproduces_routing():
         recorded_out = model(hidden_states)
         tape = rec.tape()
 
-    replayed_out = model(hidden_states, replay_indices=tape)
+    # one forward over one micro-batch -> a single-entry tape
+    assert len(tape) == 1
+    assert set(tape[0]) == {"layers.0", "layers.1"}
 
-    assert set(tape) == {"layers.0", "layers.1"}
+    replayed_out = model(hidden_states, replay_indices=tape[0])
+
     # replaying the recorded selection on identical weights/inputs must reproduce the forward exactly
     torch.testing.assert_close(replayed_out, recorded_out)
 
@@ -172,7 +193,7 @@ def test_replay_overrides_routing_and_changes_output():
 
     with RouterReplayRecorder().install(model) as rec:
         own_out = model(hidden_states)
-        own_tape = rec.tape()
+        own_tape = rec.tape()[0]
 
     # force a different (rotated) expert selection and confirm the output actually changes
     forced_tape = {name: (indices + 1) % 8 for name, indices in own_tape.items()}
@@ -196,8 +217,9 @@ def test_recorded_routing_replays_under_expert_parallel(dtype: torch.dtype, dist
         out_local_record = local(local_hidden)
         tape = recorder.tape()
 
-    # the recorder is installed directly on the MoELayer, so its module name is the root ("")
-    replay = tape[""]
+    # one forward over one micro-batch -> a single-entry tape; the recorder is installed directly on the MoELayer,
+    # so its module name is the root ("")
+    replay = tape[0][""]
     out_local_replay = local(local_hidden, replay_indices=replay)
     torch.testing.assert_close(out_local_replay, out_local_record, atol=2e-3, rtol=1e-2)
 

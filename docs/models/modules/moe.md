@@ -53,7 +53,7 @@ return BuildForwardInputsResult(
 )
 ```
 
-When d9d itself samples the rollout, `RouterReplayRecorder` captures the selection of every MoE layer during a forward pass and assembles it into the `replay_indices` mapping.
+When d9d itself samples the rollout, `RouterReplayRecorder` captures the selection of every MoE layer during a forward pass. Install it on the module whose `forward` will consume the tape (for the Qwen3-MoE wrappers, that is the backbone `model.model`, so the recorded names line up with the keys the backbone looks up). `tape()` returns **one mapping per micro-batch** (a list parallel to the data pack), so micro-batches with different sequence lengths — sequence packing, dynamic token budgets — are kept separate:
 
 ```python
 from d9d.module.block.moe import RouterReplayRecorder
@@ -61,10 +61,10 @@ from d9d.module.block.moe import RouterReplayRecorder
 backbone = model.model
 with RouterReplayRecorder().install(backbone) as recorder, torch.no_grad():
     model(input_ids=ids, position_ids=pos)
-    tape = recorder.tape()  # {"layers.0.mlp": ..., "layers.1.mlp": ..., ...}
+    tape = recorder.tape()  # [{"layers.0.mlp": ..., "layers.1.mlp": ...}, ...]  (one entry per micro-batch)
 
-# replay the recorded routing in the subsequent training forward
-model(input_ids=ids, position_ids=pos, labels=labels, replay_indices=tape)
+# a single recorded forward is one micro-batch -> replay its mapping
+model(input_ids=ids, position_ids=pos, labels=labels, replay_indices=tape[0])
 ```
 
 ::: d9d.module.block.moe

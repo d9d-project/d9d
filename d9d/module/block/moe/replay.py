@@ -13,13 +13,16 @@ class RouterReplayRecorder:
 
     Installing the recorder onto a model binds every `MoELayer` to this recorder. While installed, each MoE
     layer that runs a non-replay forward hands its selected expert indices to this recorder, which keys them by the
-    layer's fully-qualified module name. After the forward pass, `tape` returns a mapping from module name to the
-    recorded selection, which can be fed back as the ``replay_indices`` model input to reproduce the exact same routing
-    during training.
+    layer's fully-qualified module name. After the forward pass, `tape` returns the recorded selection, which
+    can be fed back as the ``replay_indices`` model input to reproduce the exact same routing during training.
 
-    The recorder owns the layer-to-name mapping; layers stay unaware of their identity within it. Layers may be called
-    multiple times before `tape` is read (gradient accumulation, micro-batching): every call is appended and the
-    captures of a layer are concatenated along the batch dimension in call order.
+    The recorder owns the layer-to-name mapping; layers stay unaware of their identity within it.
+
+    Each forward over a micro-batch is recorded as one entry of the tape. A step that runs several micro-batches
+    (gradient accumulation, sequence packing, dynamic token budgets) therefore produces a list of per-micro-batch
+    mappings, one per micro-batch, in call order. The micro-batches are deliberately NOT merged into a single tensor,
+    as their sequence lengths may differ. ``tape()[i]`` is the replay mapping for the i-th micro-batch and is
+    fed to that micro-batch's forward.
 
     This supports the case where d9d itself samples a rollout: the recorded routing is replayed in the subsequent
     training forward so the policy gradient is computed against the experts that actually generated the trajectory.
@@ -74,17 +77,19 @@ class RouterReplayRecorder:
         """
         self._captures.setdefault(layer, []).append(expert_indices.detach().clone())
 
-    def tape(self) -> dict[str, torch.Tensor]:
-        """Assembles the recorded selections into a mapping from module name to replay indices.
+    def tape(self) -> list[dict[str, torch.Tensor]]:
+        """Assembles the recorded selections into one replay mapping per micro-batch.
 
         Returns:
-            A mapping from each MoE layer's module name to its recorded expert indices, with shape
-            `(batch_size, seq_len, top_k)` (the per-call captures concatenated along the batch dimension). The mapping
-            is ready to be passed back as the ``replay_indices`` model input.
+            A list with one entry per recorded micro-batch, in call order. Each entry maps a MoE layer's module name
+            to that micro-batch's recorded expert indices, of shape `(batch_size, seq_len, top_k)`. Entry ``i`` is the
+            ``replay_indices`` mapping for the i-th micro-batch. Micro-batches are kept separate (not concatenated), so
+            their sequence lengths may differ.
 
         Raises:
-            RuntimeError: If no routing has been recorded, or if some bound layers did not record (e.g. the forward
-                pass supplied ``replay_indices`` and therefore skipped recording).
+            RuntimeError: If no routing has been recorded; if some bound layers did not record at all (e.g. the
+                forward pass supplied ``replay_indices`` and therefore skipped recording); or if the bound layers
+                recorded a different number of micro-batches (each MoE layer must run exactly once per micro-batch).
         """
         if not self._captures:
             raise RuntimeError("No routing was recorded; run a forward pass while the recorder is installed.")
@@ -93,4 +98,16 @@ class RouterReplayRecorder:
                 f"Expected all {len(self._names)} bound layers to record, but {len(self._captures)} did. "
                 "Did the forward pass supply replay_indices (which skips recording)?"
             )
-        return {self._names[layer]: torch.cat(chunks, dim=0) for layer, chunks in self._captures.items()}
+
+        microbatch_counts = {len(chunks) for chunks in self._captures.values()}
+        if len(microbatch_counts) != 1:
+            raise RuntimeError(
+                f"MoE layers recorded a different number of micro-batches ({sorted(microbatch_counts)}); "
+                "each layer must run exactly once per micro-batch."
+            )
+        num_microbatches = microbatch_counts.pop()
+
+        return [
+            {self._names[layer]: chunks[microbatch] for layer, chunks in self._captures.items()}
+            for microbatch in range(num_microbatches)
+        ]
