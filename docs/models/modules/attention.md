@@ -27,11 +27,14 @@ Due to its abstract nature it is also can be used as a Multi-Head Attention and 
 
 ### DeepSeek Sparse Attention
 
-`DeepSeekSparseAttention` implements DeepSeek Sparse Attention (DSA) introduced in [DeepSeek-V3.2](https://arxiv.org/abs/2512.02556).
+`GroupedQuerySparseAttention` and `MultiHeadLatentSparseAttention` implement DeepSeek Sparse Attention (DSA) introduced in [DeepSeek-V3.2](https://arxiv.org/abs/2512.02556).
 
 A lightweight `LightningIndexer` scores every preceding token for each query as a gated sum of ReLU dot-products; only the top-k highest-scoring tokens are attended to and the rest are masked out before the softmax. This keeps dense-attention quality in long-context settings while restricting each query to `k` (`<< L`) tokens.
 
-* The selection is expressed as an additive mask, so the core attention is delegated to `GroupedQueryAttention`, with causality folded into the mask (the inner attention is non-causal). Any mask-capable [SDPA backend](#scaled-dot-product-attention-backends) (`torch`/`eager`) can therefore be used.
+* The selection is expressed as an additive mask (via `build_sparse_selection_mask`), so the core attention is delegated to a standard backend with causality folded into the mask (the inner attention is non-causal). Any mask-capable [SDPA backend](#scaled-dot-product-attention-backends) (`torch`/`eager`) can therefore be used.
+* Two instantiations are provided, differing only in the core attention they wrap:
+    * `GroupedQuerySparseAttention` composes the selection over `GroupedQueryAttention`.
+    * `MultiHeadLatentSparseAttention` composes it over `MultiHeadLatentAttention`, matching the MLA instantiation used by DeepSeek-V3.2 (a single latent key-value entry shared across all query heads).
 * `LightningIndexer` is a reusable scorer; its continuous `index_scores` feed the indexer's auxiliary objective, while the hard top-k selection consumed by attention is non-differentiable. As in DeepSeek-V3.2, the indexer is optimized separately from the main model.
 
 ### Scaled Dot-Product Attention Backends

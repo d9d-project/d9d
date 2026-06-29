@@ -2,27 +2,13 @@ import torch
 from torch import nn
 
 from d9d.module.base import ModuleLateInit
-from d9d.module.block.attention.dsa.lightning_indexer import LightningIndexer
+from d9d.module.block.attention.dsa.lightning_indexer import LightningIndexer, build_sparse_selection_mask
 from d9d.module.block.attention.grouped_query import GroupedQueryAttention
 from d9d.module.block.attention.sdpa import AnySdpaBackendConfig, TorchSdpaBackendConfig
 from d9d.module.block.positional import RotaryEmbeddingStyle
 
 
-def _build_causal_bias(seq_len: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
-    """Builds an additive causal bias of shape ``(seq_len, seq_len)``.
-
-    Entry ``(q, k)`` is ``0`` when key ``k`` may be attended by query ``q`` (``k <= q``)
-    and ``-inf`` otherwise.
-
-    Returns:
-        The additive causal bias tensor.
-    """
-    positions = torch.arange(seq_len, device=device)
-    disallowed = positions.unsqueeze(0) > positions.unsqueeze(1)
-    return torch.zeros(seq_len, seq_len, device=device, dtype=dtype).masked_fill_(disallowed, float("-inf"))
-
-
-class DeepSeekSparseAttention(nn.Module, ModuleLateInit):
+class GroupedQuerySparseAttention(nn.Module, ModuleLateInit):
     """Implements DeepSeek Sparse Attention (DSA).
 
     DSA augments ordinary causal attention with a fine-grained token selection
@@ -118,17 +104,7 @@ class DeepSeekSparseAttention(nn.Module, ModuleLateInit):
         Returns:
             The attention output tensor. Shape: ``(batch, seq_len, hidden_size)``.
         """
-        seq_len = hidden_states.shape[1]
-        causal_bias = _build_causal_bias(seq_len, hidden_states.device, hidden_states.dtype)
-
-        # Rank tokens with the causal bias so future positions are never preferred, then enforce
-        # causality in the final mask as well (top-k may still include future slots when k > t).
-        selection_mask = self.indexer(hidden_states, attention_bias=causal_bias)
-        sparse_mask = (selection_mask + causal_bias).unsqueeze(1)
-
-        if attention_mask is not None:
-            sparse_mask = sparse_mask + attention_mask
-
+        sparse_mask = build_sparse_selection_mask(self.indexer, hidden_states, attention_mask)
         return self.attention(
             hidden_states=hidden_states,
             attention_mask=sparse_mask,

@@ -123,3 +123,48 @@ class LightningIndexer(nn.Module, ModuleLateInit):
         self.q_proj.reset_parameters()
         self.k_proj.reset_parameters()
         self.weights_proj.reset_parameters()
+
+
+def _build_causal_bias(seq_len: int, device: torch.device, dtype: torch.dtype) -> torch.Tensor:
+    """Builds an additive causal bias of shape ``(seq_len, seq_len)``.
+
+    Entry ``(q, k)`` is ``0`` when key ``k`` may be attended by query ``q`` (``k <= q``)
+    and ``-inf`` otherwise.
+
+    Returns:
+        The additive causal bias tensor.
+    """
+    positions = torch.arange(seq_len, device=device)
+    disallowed = positions.unsqueeze(0) > positions.unsqueeze(1)
+    return torch.zeros(seq_len, seq_len, device=device, dtype=dtype).masked_fill_(disallowed, float("-inf"))
+
+
+def build_sparse_selection_mask(
+    indexer: LightningIndexer,
+    hidden_states: torch.Tensor,
+    attention_mask: torch.Tensor | None,
+) -> torch.Tensor:
+    """Builds the additive causal + top-k selection mask for sparse causal attention.
+
+    Tokens are ranked under a causal bias (so future positions are never preferred); only
+    the indexer's top-k per query survive, and causality is enforced again on the returned
+    mask (top-k may still include future slots when ``k`` exceeds the causal context). The
+    result is added to the attention logits before the softmax, which is what realises the
+    fine-grained token selection of DSA on top of a dense attention backend.
+
+    Args:
+        indexer: The lightning indexer producing the per-query token selection.
+        hidden_states: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.
+        attention_mask: Optional additive mask (e.g. padding) added on top of the causal and
+            selection masks. Broadcastable to ``(batch, 1, seq_len, seq_len)``.
+
+    Returns:
+        Additive attention mask. Shape: ``(batch, 1, seq_len, seq_len)``.
+    """
+    seq_len = hidden_states.shape[1]
+    causal_bias = _build_causal_bias(seq_len, hidden_states.device, hidden_states.dtype)
+    selection_mask = indexer(hidden_states, attention_bias=causal_bias)
+    sparse_mask = (selection_mask + causal_bias).unsqueeze(1)
+    if attention_mask is not None:
+        sparse_mask = sparse_mask + attention_mask
+    return sparse_mask

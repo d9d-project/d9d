@@ -3,7 +3,7 @@ import dataclasses
 import pytest
 import torch
 from d9d.core.dist_context import BATCH_DOMAIN, DENSE_DOMAIN, DeviceMeshParameters
-from d9d.module.block.attention import DeepSeekSparseAttention, GroupedQueryAttention
+from d9d.module.block.attention import GroupedQueryAttention, GroupedQuerySparseAttention
 from d9d.module.block.attention.sdpa import EagerSdpaBackendConfig
 from d9d.module.block.positional import RotaryEmbeddingStyle
 from d9d.module.block.positional.rope import prepare_rotary_cos_sin_emb
@@ -42,9 +42,9 @@ def _position_embeddings() -> tuple[torch.Tensor, torch.Tensor]:
     return cos.unsqueeze(0).expand(_BATCH, -1, -1), sin.unsqueeze(0).expand(_BATCH, -1, -1)
 
 
-def _build_dsa(top_k: int, num_key_value_heads: int = _HEADS) -> DeepSeekSparseAttention:
+def _build_dsa(top_k: int, num_key_value_heads: int = _HEADS) -> GroupedQuerySparseAttention:
     torch.manual_seed(42)
-    module = DeepSeekSparseAttention(
+    module = GroupedQuerySparseAttention(
         hidden_size=_HIDDEN,
         num_attention_heads=_HEADS,
         num_key_value_heads=num_key_value_heads,
@@ -155,7 +155,7 @@ def test_index_scores_are_differentiable() -> None:
 
 
 def _manual_dsa_reference(
-    module: DeepSeekSparseAttention, x: torch.Tensor, position_embeddings: tuple[torch.Tensor, torch.Tensor]
+    module: GroupedQuerySparseAttention, x: torch.Tensor, position_embeddings: tuple[torch.Tensor, torch.Tensor]
 ) -> torch.Tensor:
     """Independent DSA forward: indexer top-k selection + masked grouped-query attention."""
     attn = module.attention
@@ -214,7 +214,7 @@ def test_default_backend_matches_eager() -> None:
 
     eager = _build_dsa(top_k=5)
     torch.manual_seed(42)
-    default = DeepSeekSparseAttention(
+    default = GroupedQuerySparseAttention(
         hidden_size=_HIDDEN,
         num_attention_heads=_HEADS,
         num_key_value_heads=_HEADS,
@@ -284,10 +284,10 @@ def _materialize_dist_inputs(init: _DistInputsInit) -> _DistInputs:
     )
 
 
-def _build_dist_dsa(dtype: torch.dtype, num_key_value_heads: int) -> DeepSeekSparseAttention:
+def _build_dist_dsa(dtype: torch.dtype, num_key_value_heads: int) -> GroupedQuerySparseAttention:
     with torch_seed(42):
         module = (
-            DeepSeekSparseAttention(
+            GroupedQuerySparseAttention(
                 hidden_size=_DIST_HIDDEN,
                 num_attention_heads=_DIST_HEADS,
                 num_key_value_heads=num_key_value_heads,
@@ -315,7 +315,7 @@ class _DsaWithAux(nn.Module):
     gradients are reduced correctly and can be compared against the local reference.
     """
 
-    def __init__(self, attention: DeepSeekSparseAttention) -> None:
+    def __init__(self, attention: GroupedQuerySparseAttention) -> None:
         super().__init__()
         self.dsa = attention
 
