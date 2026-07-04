@@ -3,7 +3,7 @@ import typing
 from typing import Protocol
 
 from d9d.core.dist_context import DistributedContext
-from d9d.core.protocol import MicrobatchPackIterator
+from d9d.core.protocol import MicrobatchPackStream
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -23,19 +23,19 @@ class DataProvider(Protocol):
 
     A ``DataProvider`` is the factory the user supplies to the train/eval loop, exactly like
     ``ModelProvider`` or ``OptimizerProvider``. Given the run context, it composes and returns a
-    ``MicrobatchPackIterator``.
+    ``MicrobatchPackStream``.
 
     The user is responsible for sharding the dataset across data-parallel ranks (e.g. with
     ``d9d.dataset.shard_dataset_data_parallel``) inside the provider.
     """
 
-    def __call__(self, context: InitializeDataProviderContext) -> MicrobatchPackIterator:
-        """Builds the microbatch pack iterator for the job.
+    def __call__(self, context: InitializeDataProviderContext) -> MicrobatchPackStream:
+        """Builds the microbatch pack stream for the job.
 
         Args:
             context: Context for this operation.
 
         Returns:
-            The microbatch pack iterator the loop will drive.
+            The microbatch pack stream the loop will drive.
         """
         ...

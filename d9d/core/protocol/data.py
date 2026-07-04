@@ -34,31 +34,20 @@ class DataLoaderProtocol(Stateful, Protocol):
 
 
 @runtime_checkable
-class MicrobatchPackIterator(Stateful, Protocol):
-    """Protocol defining an interface for a stateful iterator over microbatch packs that the loop drives.
+class MicrobatchPackStream(Stateful, Protocol):
+    """Protocol defining an interface for a stateful, iterable stream of microbatch packs that the loop drives.
 
-    This protocol ensures that the iterator yields packs - one pack is exactly one step's worth of
-    microbatches - and supports state checkpointing via the Stateful interface, acting as the single
-    checkpoint boundary for the data stream. It may optionally also be Sized, reporting the number of
-    steps it will yield. It yields CPU (optionally memory-pinned) tensors; moving each pack to the
-    device is the loop's responsibility.
+    This protocol ensures that iterating the stream yields packs - one pack is exactly one step's
+    worth of microbatches - and that it supports state checkpointing via the Stateful interface,
+    acting as the single checkpoint boundary for the data stream. It may optionally also be Sized,
+    reporting the number of steps it will yield. It yields CPU (optionally memory-pinned) tensors;
+    moving each pack to the device is the loop's responsibility.
     """
 
-    def __iter__(self) -> "MicrobatchPackIterator":
-        """Returns the iterator itself.
+    def __iter__(self) -> Iterator[MicrobatchPack]:
+        """Returns an iterator over microbatch packs.
 
         Returns:
-            This iterator.
-        """
-        ...
-
-    def __next__(self) -> MicrobatchPack:
-        """Advances to the next pack.
-
-        Returns:
-            The next microbatch pack (one step's worth of microbatches).
-
-        Raises:
-            StopIteration: If the underlying data stream is exhausted.
+            An iterator yielding one microbatch pack (one step's worth of microbatches) at a time.
         """
         ...
