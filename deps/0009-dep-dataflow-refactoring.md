@@ -11,7 +11,7 @@ Created: 2026-06-22
 
 ## Abstract
 
-The current data path conflates two unrelated concerns: how long a job runs and what one step feeds the model. This proposal splits them into two owners. **`JobSchedule`** replaces `Stepper` and resolves the job's duration. **`DataProvider`** replaces `DatasetProvider`, `DataLoaderFactory`, and `BatchMaths` as the data entry point — a factory that builds a **`MicrobatchPackStream`**: a `Stateful`, optionally `Sized` iterable yielding **microbatch packs**, a pack being exactly one step's worth of microbatches ready for the engine. Gradient accumulation stops being a loop in the trainer and becomes just a pipeline program over the pack; the executor no longer shards inputs but consumes the microbatches the stream produced, recompiling its program every step so pack length — and hence batch size — may vary. This breaks the data and pipelining public APIs and therefore requires this DEP.
+The current data path conflates two unrelated concerns: how long a job runs and what one step feeds the model. This proposal splits them into two owners. **`JobSchedule`** replaces `Stepper` and resolves the job's duration. **`DataProvider`** replaces `DatasetProvider`, `DataLoaderFactory`, and `BatchMaths` as the data entry point — a factory that builds a **`MicrobatchPackStream`**: a `Stateful`, optionally `Sized` iterable yielding **microbatch packs**, a pack being exactly one step's worth of microbatches ready for the engine. Gradient accumulation stops being a loop in the trainer and becomes just a pipeline program over the pack; the executor no longer shards inputs but consumes the microbatches the stream produced, recompiling its program (and reallocating buffers) whenever pack length or microbatch shapes change — so pack length, and hence batch size, may vary step to step. This breaks the data and pipelining public APIs and therefore requires this DEP.
 
 ## Motivation
 
@@ -139,7 +139,7 @@ The arithmetic that `BatchMaths` performed — `global_batch_size / (dp_size × 
 
 #### The `AutoDataProvider` convenience
 
-Mirroring `AutoOptimizerProvider` / `AutoLRSchedulerProvider`, we ship an `AutoDataProvider` (in `d9d.loop.auto`) that wires the default stack for the common case. It takes a `dataset_factory` and a `collator` (the non-serializable pieces) plus an `AutoDataConfig` (the serializable knobs: `global_batch_size`, `microbatch_size`, sharding `indexing_mode`, `drop_last`, and the serializable `DataLoader` settings such as `shuffle` / `num_workers` / `pin_memory` / `prefetch_factor`). It shards, builds the loader, derives the accumulation factor, and returns a `FixedCountMicrobatchPacker`. Jobs needing non-serializable loader arguments (`worker_init_fn`, custom samplers, …) write their own `DataProvider`.
+Mirroring `AutoOptimizerProvider` / `AutoLRSchedulerProvider`, we ship an `AutoDataProvider` (in `d9d.loop.auto`) that wires the default stack for the common case. It takes a `dataset_factory` and a `collator` (the non-serializable pieces) plus an `AutoDataConfig` (the serializable knobs: `global_batch_size`, `microbatch_size`, `shard_indexing_mode`, `drop_last`, and the serializable `DataLoader` settings such as `shuffle` / `num_workers` / `pin_memory` / `prefetch_factor`). It shards, builds the loader, derives the accumulation factor, and returns a `FixedCountMicrobatchPacker`. Jobs needing non-serializable loader arguments (`worker_init_fn`, custom samplers, …) write their own `DataProvider`.
 
 ### Changes to the execution engine
 
@@ -152,16 +152,16 @@ Once the stream emits a pack of microbatches, the trainer no longer loops over g
 
 #### Per-step reconfiguration
 
-Because pack length varies, the two things fixed at construction today become per-step. The fan-out lives **inline in the task operator**, which is the single existing seam between the data path and the executor — no new coordinator object:
+Because pack length varies, the two things fixed at construction today become per-step. The fan-out lives **inline in the task operator**, which is the single existing seam between the data path and the executor — no new coordinator object. The operator builds the per-microbatch inputs (calling `build_forward_inputs` once per microbatch), tells the gradient manager how many backward passes this step performs, and drives the schedule:
 
 ```python
-def forward_backward(self, pack: MicrobatchPack) -> ForwardResult | None:
-    n = len(pack)
-    self._pipeline.schedule.configure(pack) # recompile program + buffers for n microbatches
-    self._grad_manager.set_required_accumulations(n)  # backward fires n times this step
-    self._pipeline.schedule.step(pack)
-    ...
+def forward_backward(self, pack: MicrobatchPack) -> None:
+    inputs_microbatches, kwargs_microbatches = self._build_microbatch_inputs(pack)  # one build per microbatch
+    self._grad_manager.set_required_accumulations(len(pack))  # backward fires len(pack) times this step
+    self._pipeline.schedule.step(inputs_microbatches, kwargs_microbatches)
 ```
+
+`configure` and `step` are a single call: the schedule receives the already-built per-microbatch inputs and lazily (re)compiles its program and (re)allocates buffers inside `step`, guarded by caches keyed on the microbatch count and the representative microbatch's shapes/dtypes — so the common constant-shape run compiles and allocates exactly once. The operator returns nothing; loss/weight and metrics are accumulated per microbatch through the loss callback (see below).
 
 #### Killing input-sharding in the pipeline API
 
@@ -173,13 +173,15 @@ Task's `build_forward_inputs` survives but changes granularity: it maps **one mi
 
 `PipelineState` does two jobs today. It **carries side-data** from `build_forward_inputs` to `compute_loss` for the same microbatch — labels, masks, anything the model's forward does not return but the loss needs. And it **bridges two views** of that data: a **global** view (written once against the whole batch) and a **sharded** view (read per microbatch), via `shard_tree`/`unshard_tree`.
 
-The carry-data job stays; the dual view goes. With per-microbatch execution, `build_forward_inputs(microbatch_i)` and `compute_loss` for microbatch `i` operate on the same unit, so the state is just a plain per-microbatch scratchpad — write it while building inputs, read it at loss time, one entry per microbatch in the pack. There is no global batch to write and no sharding to undo, so the `shard_tree`/`unshard_tree` machinery (the same even-dim-0 split this DEP removes from the executor, with the same inability to handle uneven or opaque microbatches) is deleted, along with `PipelineStateHandler`'s construction-time `num_shards`.
+The carry-data job stays; the dual view goes. With per-microbatch execution, `build_forward_inputs(microbatch_i)` and `compute_loss` for microbatch `i` operate on the same unit, so the state is just a plain per-microbatch scratchpad — write it while building inputs, read it at loss time, one entry per microbatch in the pack. There is no global batch to write and no sharding to undo, so the `shard_tree`/`unshard_tree` machinery (the same even-dim-0 split this DEP removes from the executor, with the same inability to handle uneven or opaque microbatches) is deleted, along with `PipelineStateHandler`'s construction-time `num_shards`. Once the executor (input sharding) and the pipeline state (dual view) stop using it, nothing in the library or examples consumes `d9d.core.sharding` at all, so the whole package (`shard_tree`, `unshard_tree`, `ShardingSpec` and the spec helpers) is removed.
 
-Aggregation no longer flows through the state either: the per-microbatch callback hands the task each microbatch's outputs as produced, and the task accumulates directly into objects that already do so — loss/weight into the `GradientManager` (`add_loss_with_weight`, a running `WeightedMeanMetric`), metrics into their own `Stateful` accumulators — so no global tensor is ever materialized.
+Aggregation no longer flows through the state either: the per-microbatch callback hands the task each microbatch's outputs as produced, and the task accumulates directly into objects that already do so — loss/weight into the `GradientManager` (`add_loss_with_weight`, a running `WeightedMeanMetric`), metrics into their own `Stateful` accumulators — so no global tensor is ever materialized. The loss callback (`LossComputer`) is the model stages' callback, yet it now needs the `GradientManager`, which is itself built from those stages; this cycle is broken by a two-phase init — the callback is constructed with the task and schedule, then `bind(gradient_manager, metrics)` attaches the accumulation sinks once the stages exist.
 
 #### `ModuleSupportsPipelining` resignature
 
-Stage buffer allocation infers shapes from the inputs. Today `infer_stage_inputs_from_pipeline_inputs(inputs, n_microbatches)` is handed the **global** batch and divides by `n_microbatches`. Under packs there is no global batch; the stage is handed a **representative microbatch** (`pack[0]`) and `n_microbatches=len(pack)`. The protocol methods are re-documented (and the parameter renamed from `inputs` to `microbatch_inputs`) to reflect that they now receive a single microbatch, not a global batch to be divided.
+Stage buffer allocation infers shapes from the inputs. Today `infer_stage_inputs_from_pipeline_inputs(inputs, n_microbatches)` is handed the **global** batch and divides by `n_microbatches`. Under packs there is no global batch; the stage is handed a **representative microbatch** (`pack[0]`). The `n_microbatches` parameter is dropped entirely (nothing consumed it once the division was gone), and the parameter is renamed from `inputs` to `microbatch_inputs` to reflect that it is a single microbatch, not a global batch to be divided.
+
+The methods also stop returning `torch.Tensor` and instead return **`TensorSpec`** (a small frozen `shape` / `dtype` / `layout` descriptor). The framework never read the tensor *data* — the stage communication handler only reads shape/dtype/layout to size its P2P buffers — so returning real tensors was a lie that only worked because the framework silently wrapped the call in `torch.device("meta")`. Returning specs makes the "no allocation" contract structural rather than positional, and lets the `meta`-device wrapper be removed from the stage.
 
 ## Usage
 
@@ -212,8 +214,9 @@ This is a **breaking** change. Breaking surfaces for the user API:
 
 - **`Stepper` → `JobSchedule`.** Logic is the same, but there are changes in names, and the persisted state now holds only `current_step` (checkpoints from before this DEP will not restore the step counter).
 - **`DatasetProvider` → `DataProvider`.** The factory now returns a `MicrobatchPackStream` instead of a dataset + collator; user code migrates from "return dataset + collator" to "compose a `MicrobatchPackStream` from the shipped pieces" (the default stack, or `AutoDataProvider`, reproduces current behavior verbatim).
-- **`PipelineSchedule` API changes** (`configure`/`step(pack)`); `PipelineShardingSpec` and `BuildForwardInputsResult.pipeline_sharding_spec` are removed.
-- **`ModuleSupportsPipelining`** inference methods receive a representative microbatch.
+- **`PipelineSchedule` API changes**: `configure_buffers` + `step` collapse into a single `step(inputs_microbatches, kwargs_microbatches)`; `PipelineShardingSpec` and `BuildForwardInputsResult.pipeline_sharding_spec` are removed.
+- **`d9d.core.sharding` is removed** (`shard_tree`, `unshard_tree`, `ShardingSpec`, `shard_spec_*`), as nothing consumes it once input sharding leaves the pipeline.
+- **`ModuleSupportsPipelining`** inference methods receive a representative microbatch (the `n_microbatches` parameter is removed) and return `dict[str, TensorSpec]` instead of `dict[str, torch.Tensor]`.
 
 ## Alternatives Considered
 
