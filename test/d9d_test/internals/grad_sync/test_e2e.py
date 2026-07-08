@@ -58,9 +58,10 @@ def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype):
         )
         for spec in tensor_specs
     ]
-    sync = GradientSynchronizer(param_groups=[params], bucket_size_mb=2, require_accumulations=2)
+    sync = GradientSynchronizer(param_groups=[params], bucket_size_mb=2)
 
     sync.bind()
+    sync.set_required_accumulations(2)
 
     # perform multiple steps
     for _ in range(5):
@@ -120,9 +121,10 @@ def test_e2e_local():
     for p in params:
         p.grad_dtype = torch.float32
 
-    sync = GradientSynchronizer(param_groups=[params], bucket_size_mb=1, require_accumulations=2)
+    sync = GradientSynchronizer(param_groups=[params], bucket_size_mb=1)
 
     sync.bind()
+    sync.set_required_accumulations(2)
 
     # Iteration 1
     loss = sum(p.sum() for p in params)
