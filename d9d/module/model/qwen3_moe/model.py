@@ -5,6 +5,7 @@ import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 
+from d9d.core.types import TensorSpec
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.embedding import SplitTokenEmbeddings
 from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead
@@ -163,44 +164,36 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             self.norm.reset_parameters()
 
     def infer_stage_inputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        input_ids = inputs["input_ids"]
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        input_ids = microbatch_inputs["input_ids"]
 
         pp_inputs = {}
 
         # for calculation - input ids or prev hidden state
         if self._stage.is_current_stage_first:
-            pp_inputs["input_ids"] = torch.empty(
-                (input_ids.shape[0] // n_microbatches, input_ids.shape[1]), dtype=torch.long, device=input_ids.device
-            )
+            pp_inputs["input_ids"] = TensorSpec(shape=(input_ids.shape[0], input_ids.shape[1]), dtype=torch.long)
         else:
-            pp_inputs["hidden_states"] = torch.empty(
-                (input_ids.shape[0] // n_microbatches, input_ids.shape[1], self._hidden_size),
-                dtype=self.output_dtype(),
-                device=input_ids.device,
+            pp_inputs["hidden_states"] = TensorSpec(
+                shape=(input_ids.shape[0], input_ids.shape[1], self._hidden_size), dtype=self.output_dtype()
             )
             if self._hidden_states_snapshot_mode != HiddenStatesAggregationMode.no:
                 num_layers_before = self._num_layers_before + 1  # 1 for embedding
-                pp_inputs["hidden_states_snapshot"] = torch.empty(
-                    (num_layers_before, input_ids.shape[0] // n_microbatches, self._hidden_size),
-                    dtype=self.output_dtype(),
-                    device=input_ids.device,
+                pp_inputs["hidden_states_snapshot"] = TensorSpec(
+                    shape=(num_layers_before, input_ids.shape[0], self._hidden_size), dtype=self.output_dtype()
                 )
 
         return pp_inputs
 
     def infer_stage_outputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        input_ids = inputs["input_ids"]
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        input_ids = microbatch_inputs["input_ids"]
 
         # for calculation - last hidden state
         pp_outputs = {
-            "hidden_states": torch.empty(
-                (input_ids.shape[0] // n_microbatches, input_ids.shape[1], self._hidden_size),
-                dtype=self.output_dtype(),
-                device=input_ids.device,
+            "hidden_states": TensorSpec(
+                shape=(input_ids.shape[0], input_ids.shape[1], self._hidden_size), dtype=self.output_dtype()
             )
         }
 
@@ -209,10 +202,8 @@ class Qwen3MoEModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             num_layers_before = self._num_layers_before + 1
             num_layers_current = len(self.layers)
             num_layers_after = num_layers_before + num_layers_current
-            pp_outputs["hidden_states_snapshot"] = torch.empty(
-                (num_layers_after, input_ids.shape[0] // n_microbatches, self._hidden_size),
-                dtype=self.output_dtype(),
-                device=input_ids.device,
+            pp_outputs["hidden_states_snapshot"] = TensorSpec(
+                shape=(num_layers_after, input_ids.shape[0], self._hidden_size), dtype=self.output_dtype()
             )
 
         return pp_outputs
@@ -304,17 +295,17 @@ class Qwen3MoEForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             self.lm_head.reset_parameters()
 
     def infer_stage_inputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        return self.model.infer_stage_inputs_from_pipeline_inputs(inputs, n_microbatches)
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        return self.model.infer_stage_inputs_from_pipeline_inputs(microbatch_inputs)
 
     def infer_stage_outputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(inputs, n_microbatches)
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(microbatch_inputs)
 
         if self._stage.is_current_stage_last:
-            pp_outputs["logps"] = torch.empty(inputs["input_ids"].shape, dtype=torch.float32)
+            pp_outputs["logps"] = TensorSpec(shape=tuple(microbatch_inputs["input_ids"].shape), dtype=torch.float32)
 
         return pp_outputs
 
@@ -406,18 +397,18 @@ class Qwen3MoEForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelin
             self.cls_head.reset_parameters()
 
     def infer_stage_inputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        return self.model.infer_stage_inputs_from_pipeline_inputs(inputs, n_microbatches)
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        return self.model.infer_stage_inputs_from_pipeline_inputs(microbatch_inputs)
 
     def infer_stage_outputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(inputs, n_microbatches)
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(microbatch_inputs)
 
         if self._stage.is_current_stage_last:
-            batch_size = inputs["input_ids"].shape[0] // n_microbatches
-            pp_outputs["scores"] = torch.empty((batch_size, self._num_labels), dtype=torch.float32)
+            batch_size = microbatch_inputs["input_ids"].shape[0]
+            pp_outputs["scores"] = TensorSpec(shape=(batch_size, self._num_labels), dtype=torch.float32)
 
         return pp_outputs
 
@@ -508,17 +499,17 @@ class Qwen3MoEForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
             self.embedding_head.reset_parameters()
 
     def infer_stage_inputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        return self.model.infer_stage_inputs_from_pipeline_inputs(inputs, n_microbatches)
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        return self.model.infer_stage_inputs_from_pipeline_inputs(microbatch_inputs)
 
     def infer_stage_outputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(inputs, n_microbatches)
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(microbatch_inputs)
 
         if self._stage.is_current_stage_last:
-            batch_size = inputs["input_ids"].shape[0] // n_microbatches
-            pp_outputs["embeddings"] = torch.empty((batch_size, self._embedding_dim), dtype=torch.float32)
+            batch_size = microbatch_inputs["input_ids"].shape[0]
+            pp_outputs["embeddings"] = TensorSpec(shape=(batch_size, self._embedding_dim), dtype=torch.float32)
 
         return pp_outputs
