@@ -17,7 +17,6 @@ nav = [
     { "Core" = [
         "core/dist_context.md",
         "core/dist_ops.md",
-        "core/sharding.md",
         "core/types.md",
         "core/offload.md",
         "core/autograd_extensions.md"
