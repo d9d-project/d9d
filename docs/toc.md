@@ -66,6 +66,5 @@ Deep dive into the engine room.
 *   **[Gradient Sync](./internals/grad_sync.md)**: Custom backward hooks for overlapping comms.
 *   **[Gradient Norm & Clipping](./internals/grad_norm.md)**: Correct global norm calculation across hybrid meshes.
 *   **[Metric Collection](./internals/metric_collector.md)**: Custom overlapped metric synchronization & computation.
-*   **[Pipeline State](./internals/pipeline_state.md)**: Context switching between Global and Microbatch scopes.
 *   **[Determinism](./internals/determinism.md)**.
 *   **[Profiling](./internals/profiling.md)**.

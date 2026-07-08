@@ -39,45 +39,49 @@ It is designed to handle the **forward-only** flow, processing the raw tensors s
 
 **Events Registration**: `register_events(...)` allows hooking into the [Event Bus](./events.md) alongside regular execution.
 
-## Pipeline State
+## Task State
 
-You may note that `batch` is only accessible in `build_forward_inputs(...)` method, but not in others. Don't worry!
+You may note that `batch` is only accessible in `build_forward_inputs(...)`, but not in the later stages. Don't worry!
 
-There is an object for transferring any state between the **Task Lifecycle** stages, - it is called `PipelineState`.
+Each task declares a **state** type (`TState`, the second type parameter of `TrainTask` / `InferenceTask`) — a PyTree, typically a `TypedDict`, carrying any side-data from `build_forward_inputs` to the later stages of the **same microbatch** (labels, masks, token counts, …). `build_forward_inputs` returns it; `compute_loss` / `process_outputs` / `update_metrics` read it back, fully typed. Tasks that carry nothing use `None`.
 
 ```python
-ctx.state["target"] = torch.tensor([1, 0, 1, 0], device="cuda")
+class MyState(TypedDict):
+    target: torch.Tensor
 
-# ...
+# in build_forward_inputs:
+return BuildForwardInputsResult(inputs=..., kwargs=..., state=MyState(target=ctx.batch["target"]))
 
-metrics["accuracy"].update(ctx.state["target"])
+# later, in update_metrics / compute_loss:
+metrics["accuracy"].update(ctx.state["target"])  # ctx.state is typed as MyState
 ```
 
-The pipeline state will automatically shard and unshard data if needed.
-
-You may read an [additional documentation](../internals/pipeline_state.md) for its internal behaviour.
+Tensors stored in the state are detached from the autograd graph automatically, so caching them across the pipeline never keeps the graph alive.
 
 ## Example Implementation
 
 ```python
 import torch
+from typing import TypedDict
 
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import ScalarTree
 from d9d.module.block.head import LM_IGNORE_INDEX
 from d9d.loop.control import *
 
-class SFTTask(TrainTask[dict[str, torch.Tensor]]):
+
+class SFTState(TypedDict):
+    labels: torch.Tensor
+
+
+class SFTTask(TrainTask[dict[str, torch.Tensor], SFTState]):
     def __init__(self, dist_ctx: DistributedContext):
         self._dist_ctx = dist_ctx
 
-    def build_forward_inputs(self, ctx: BuildForwardInputsContext) -> BuildForwardInputsResult:
+    def build_forward_inputs(self, ctx: BuildForwardInputsContext) -> BuildForwardInputsResult[SFTState]:
         # ctx.batch contains the output of the Collator.
 
-        # Save labels in state for access during loss computation later
-        ctx.state["labels"] = ctx.batch["labels"]
-
-        # Return inputs for model.forward()
+        # Return inputs for model.forward() plus the typed side-data for later stages.
         # inputs are only for the first pipeline stage
         # kwargs are the same for all the pipeline stages
         return BuildForwardInputsResult(
@@ -87,13 +91,14 @@ class SFTTask(TrainTask[dict[str, torch.Tensor]]):
             kwargs={
                 "labels": ctx.batch["labels"],
                 "position_ids": ctx.batch["position_ids"]
-            }
+            },
+            state=SFTState(labels=ctx.batch["labels"]),
         )
 
     def dump_hparams(self) -> ScalarTree:
         return super().dump_hparams()
 
-    def compute_loss(self, ctx: ComputeLossContext) -> ComputeLossResult:
+    def compute_loss(self, ctx: ComputeLossContext[SFTState]) -> ComputeLossResult:
         # Retrieve log_probs calculated by the model pipeline
         logps = ctx.pipeline_results["logps"]
 
