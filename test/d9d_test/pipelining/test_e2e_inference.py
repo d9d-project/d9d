@@ -51,15 +51,15 @@ def test_inference_e2e(dist_ctx_factory, n_microbatches: int):
 
     schedule_info, _ = build_schedule(
         dist_context=dist_ctx,
-        n_microbatches=n_microbatches,
         schedule_config=PipelineScheduleInferenceConfig(),
         model_provider=_model_provider,
         callback=_result_fn,
     )
 
-    schedule_info.schedule.configure_buffers(inputs={"x": x}, kwargs={"y": y}, sharding_spec=None)
+    inputs_microbatches = tuple({"x": x_mb} for x_mb in torch.tensor_split(x, n_microbatches, dim=0))
+    kwargs_microbatches = tuple({"y": y_mb} for y_mb in torch.tensor_split(y, n_microbatches, dim=0))
 
-    schedule_info.schedule.step(inputs={"x": x}, kwargs={"y": y})
+    schedule_info.schedule.step(inputs_microbatches=inputs_microbatches, kwargs_microbatches=kwargs_microbatches)
 
     if pp_mesh.get_local_rank() == pp_mesh.size() - 1:
         assert len(collected_results) == n_microbatches
@@ -97,7 +97,6 @@ def test_inference_e2e_local(dist_ctx_factory):
 
     schedule_info, _ = build_schedule(
         dist_context=dist_ctx,
-        n_microbatches=4,  # Ignored by offline executor strategies usually, but passed for API
         schedule_config=PipelineScheduleInferenceConfig(),
         model_provider=_model_provider,
         callback=_result_fn,
@@ -105,9 +104,7 @@ def test_inference_e2e_local(dist_ctx_factory):
 
     assert isinstance(schedule_info.schedule, OfflinePipelineExecutor)
 
-    schedule_info.schedule.configure_buffers(inputs={"x": x}, kwargs={"y": y}, sharding_spec=None)
-
-    schedule_info.schedule.step(inputs={"x": x}, kwargs={"y": y})
+    schedule_info.schedule.step(inputs_microbatches=({"x": x},), kwargs_microbatches=({"y": y},))
 
     # trace should have exactly one result at index 0 because OfflineExecutor does not shard
     assert len(collected_results) == 1

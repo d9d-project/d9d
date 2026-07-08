@@ -1,6 +1,6 @@
 import torch
 from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
-from d9d.pipelining.api import ModuleSupportsPipelining
+from d9d.pipelining.api import ModuleSupportsPipelining, TensorSpec
 from torch import nn
 
 
@@ -46,14 +46,14 @@ class PipelineModel(nn.Module, ModuleSupportsPipelining):
         return {"x": r}
 
     def infer_stage_inputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        return {"x": torch.empty((inputs["x"].shape[0] // n_microbatches, 8))}
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        return {"x": TensorSpec(shape=(microbatch_inputs["x"].shape[0], 8), dtype=torch.float32)}
 
     def infer_stage_outputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        return {"x": torch.empty((inputs["x"].shape[0] // n_microbatches, 8))}
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        return {"x": TensorSpec(shape=(microbatch_inputs["x"].shape[0], 8), dtype=torch.float32)}
 
 
 def register_pp_hooks(model: PipelineModel) -> dict[str, int]:
