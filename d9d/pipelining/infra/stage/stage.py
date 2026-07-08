@@ -68,15 +68,10 @@ class PipelineStage:
         prev_stage_idx = None if self._info.is_current_stage_first else self._info.current_stage - 1
         next_stage_idx = None if self._info.is_current_stage_last else self._info.current_stage + 1
 
-        with torch.device("meta"):
-            if not isinstance(self._module, ModuleSupportsPipelining):
-                raise TypeError("Module does not implement ModuleSupportsPipelining protocol")
-            inputs_meta = self._module.infer_stage_inputs_from_pipeline_inputs(
-                inputs=pipeline_inputs, n_microbatches=num_microbatches
-            )
-            outputs_meta = self._module.infer_stage_outputs_from_pipeline_inputs(
-                inputs=pipeline_inputs, n_microbatches=num_microbatches
-            )
+        if not isinstance(self._module, ModuleSupportsPipelining):
+            raise TypeError("Module does not implement ModuleSupportsPipelining protocol")
+        inputs_meta = self._module.infer_stage_inputs_from_pipeline_inputs(microbatch_inputs=pipeline_inputs)
+        outputs_meta = self._module.infer_stage_outputs_from_pipeline_inputs(microbatch_inputs=pipeline_inputs)
 
         self._forward_comm = StageCommunicationHandler(
             name="fwd",

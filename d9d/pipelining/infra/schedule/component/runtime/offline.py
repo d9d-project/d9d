@@ -3,15 +3,15 @@ from typing import Any
 import torch
 from torch import nn
 
-from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedule, PipelineShardingSpec
+from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedule
 
 
 class OfflinePipelineExecutor(PipelineSchedule):
     """Executes the model immediately without pipeline parallelism.
 
-    This schedule treats the execution as a single stage with a single microbatch,
-    running the forward and optionally backward pass directly. This is primarily
-    used for single-device execution within the pipeline abstraction.
+    This schedule treats the execution as a single stage, running the forward and optionally backward
+    pass directly for every microbatch in the pack. This is primarily used for single-device execution
+    within the pipeline abstraction.
     """
 
     def __init__(self, model: nn.Module, callback: PipelineLossFn | PipelineResultFn, do_backward: bool):
@@ -26,26 +26,26 @@ class OfflinePipelineExecutor(PipelineSchedule):
         self._callback = callback
         self._do_backward = do_backward
 
-    def configure_buffers(
-        self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any], sharding_spec: PipelineShardingSpec | None
+    def step(
+        self,
+        inputs_microbatches: tuple[dict[str, torch.Tensor], ...],
+        kwargs_microbatches: tuple[dict[str, Any], ...],
     ):
-        pass
+        num_microbatches = len(inputs_microbatches)
+        if num_microbatches == 0:
+            raise ValueError("Cannot run a pipeline step over an empty pack")
+        if len(kwargs_microbatches) != num_microbatches:
+            raise ValueError("inputs_microbatches and kwargs_microbatches must have the same length")
 
-    def _forward_only(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
-        result = self._model(**inputs, **kwargs)
-        self._callback(result, 0)  # microbatch=0
+        for microbatch_idx in range(num_microbatches):
+            inputs = inputs_microbatches[microbatch_idx]
+            kwargs = kwargs_microbatches[microbatch_idx]
 
-    def _forward_backward(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
-        result = self._model(**inputs, **kwargs)
-        loss = self._callback(result, 0)  # microbatch=0
-        del result  # do not peak memory
-        loss.backward()
+            result = self._model(**inputs, **kwargs)
+            processing_result = self._callback(result, microbatch_idx)
 
-    def step(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
-        result = self._model(**inputs, **kwargs)
-        processing_result = self._callback(result, 0)
-        if self._do_backward:
-            if not isinstance(processing_result, torch.Tensor):
-                raise ValueError("Loss should be torch.Tensor")
-            del result  # do not peak memory
-            processing_result.backward()
+            if self._do_backward:
+                if not isinstance(processing_result, torch.Tensor):
+                    raise ValueError("Loss should be torch.Tensor")
+                del result  # do not peak memory
+                processing_result.backward()

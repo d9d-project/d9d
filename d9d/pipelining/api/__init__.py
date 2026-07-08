@@ -3,10 +3,10 @@
 from .module import (
     ModuleSupportsPipelining,
     PipelineStageInfo,
+    TensorSpec,
     distribute_layers_for_pipeline_stage,
 )
 from .schedule import PipelineSchedule
-from .sharding import PipelineShardingSpec
 from .types import PipelineLossFn, PipelineResultFn
 
 __all__ = [
@@ -14,7 +14,7 @@ __all__ = [
     "PipelineLossFn",
     "PipelineResultFn",
     "PipelineSchedule",
-    "PipelineShardingSpec",
     "PipelineStageInfo",
+    "TensorSpec",
     "distribute_layers_for_pipeline_stage",
 ]

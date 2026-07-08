@@ -3,6 +3,8 @@ import typing
 
 import torch
 
+from d9d.core.types import TensorSpec
+
 
 @dataclasses.dataclass
 class PipelineStageInfo:
@@ -108,29 +110,29 @@ class ModuleSupportsPipelining(typing.Protocol):
     """
 
     def infer_stage_inputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        """Infers the input tensors metadata for the current pipeline stage based on global batch inputs.
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        """Infers the input tensor specs for the current pipeline stage from a single microbatch.
 
         Args:
-            inputs: Global inputs for the pipeline.
-            n_microbatches: Number of microbatches the global batch is split into.
+            microbatch_inputs: A representative single microbatch of pipeline inputs. Shapes are taken
+                as-is; there is no global batch to divide.
 
         Returns:
-            Dictionary of input tensors expected by this specific stage locally.
+            Dictionary of input tensor specs expected by this specific stage locally.
         """
         ...
 
     def infer_stage_outputs_from_pipeline_inputs(
-        self, inputs: dict[str, torch.Tensor], n_microbatches: int
-    ) -> dict[str, torch.Tensor]:
-        """Infers the output tensors metadata for the current pipeline stage based on global batch inputs.
+        self, microbatch_inputs: dict[str, torch.Tensor]
+    ) -> dict[str, TensorSpec]:
+        """Infers the output tensor specs for the current pipeline stage from a single microbatch.
 
         Args:
-            inputs: Global inputs for the pipeline (typically a batch).
-            n_microbatches: Number of microbatches the global batch is split into.
+            microbatch_inputs: A representative single microbatch of pipeline inputs. Shapes are taken
+                as-is; there is no global batch to divide.
 
         Returns:
-            Dictionary of output tensors produced by this specific stage locally.
+            Dictionary of output tensor specs produced by this specific stage locally.
         """
         ...

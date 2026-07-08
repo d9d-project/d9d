@@ -16,8 +16,8 @@ class ActionContext:
     """Holds the runtime context required to execute a pipeline action.
 
     Attributes:
-        pipeline_inputs_microbatches: The global inputs sharded by microbatch.
-        pipeline_kwargs_microbatches: The global keyword arguments sharded by microbatch.
+        pipeline_inputs_microbatches: Per-microbatch input tensors, indexed by microbatch.
+        pipeline_kwargs_microbatches: Per-microbatch keyword arguments, indexed by microbatch.
         stages: A mapping of stage indices to their active PipelineStage instances.
         communications: The handler for P2P communications.
         callback: The handler for either loss computation or result processing.

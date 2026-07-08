@@ -3,6 +3,8 @@ import dataclasses
 import torch
 import torch.distributed as dist
 
+from d9d.core.types import TensorSpec
+
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class ReceiveStageInput:
@@ -65,9 +67,9 @@ class StageCommunicationHandler:
         stage_index: int,
         num_microbatches: int,
         input_stage_index: int | None,
-        input_args: dict[str, torch.Tensor],
+        input_args: dict[str, TensorSpec],
         output_stage_index: int | None,
-        output_args: dict[str, torch.Tensor],
+        output_args: dict[str, TensorSpec],
         stage_idx_to_host_rank: dict[int, int],
         group: dist.ProcessGroup,
     ):
@@ -78,9 +80,9 @@ class StageCommunicationHandler:
             stage_index: The logical index of the current stage.
             num_microbatches: Total number of microbatches ("chunks") to schedule.
             input_stage_index: The logical index of the stage providing inputs, or None if inputs are local.
-            input_args: Metadata (shapes/dtypes) for input tensors.
+            input_args: Specs (shape/dtype/layout) for input tensors.
             output_stage_index: The logical index of the stage consuming outputs, or None if outputs are terminal.
-            output_args: Metadata (shapes/dtypes) for output tensors.
+            output_args: Specs (shape/dtype/layout) for output tensors.
             stage_idx_to_host_rank: Mapping from logical stage indices to physical world ranks.
             group: The process group strictly for pipeline communication.
         """
@@ -102,13 +104,13 @@ class StageCommunicationHandler:
         stage_index: int,
         num_microbatches: int,
         input_stage_index: int | None,
-        input_args: dict[str, torch.Tensor],
+        input_args: dict[str, TensorSpec],
     ) -> dict[int, dict[str, StageInput]]:
         handlers: dict[int, dict[str, StageInput]] = {}
 
         for chunk_id in range(num_microbatches):
             handlers[chunk_id] = {}
-            for input_name, input_tensor_meta in input_args.items():
+            for input_name, input_spec in input_args.items():
                 if input_stage_index is None:
                     handlers[chunk_id][input_name] = StartStageInput()
                 else:
@@ -116,16 +118,16 @@ class StageCommunicationHandler:
                         name=f"{name}_recv_from_{input_stage_index}_to_{stage_index}[{chunk_id}][{input_name}]",
                         from_stage=input_stage_index,
                         buffer=torch.empty(
-                            input_tensor_meta.size(),
-                            dtype=input_tensor_meta.dtype,
-                            layout=input_tensor_meta.layout,
+                            input_spec.shape,
+                            dtype=input_spec.dtype,
+                            layout=input_spec.layout,
                             device="cuda",  # force device
                         ),
                     )
         return handlers
 
     @staticmethod
-    def _build_outputs(output_stage_index: int | None, output_args: dict[str, torch.Tensor]) -> dict[str, StageOutput]:
+    def _build_outputs(output_stage_index: int | None, output_args: dict[str, TensorSpec]) -> dict[str, StageOutput]:
         handlers: dict[str, StageOutput] = {}
 
         for output_name in output_args:

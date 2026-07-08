@@ -3,8 +3,6 @@ from typing import Any
 
 import torch
 
-from .sharding import PipelineShardingSpec
-
 # TODO: feature - support any PyTrees as pipeline parameters
 
 
@@ -12,32 +10,21 @@ class PipelineSchedule(abc.ABC):
     """Abstract base class defining the interface for pipeline execution schedules."""
 
     @abc.abstractmethod
-    def configure_buffers(
-        self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any], sharding_spec: PipelineShardingSpec | None
+    def step(
+        self,
+        inputs_microbatches: tuple[dict[str, torch.Tensor], ...],
+        kwargs_microbatches: tuple[dict[str, Any], ...],
     ):
-        """Configures internal state and buffers based on input shapes.
+        """Executes a single pipeline step over one pack of microbatches.
 
-        This method allows the schedule to pre-allocate memory or setup sharding
-        specifications based on the structure of the input data before execution begins.
-
-        Args:
-            inputs: A dictionary of input tensors.
-            kwargs: A dictionary of keyword arguments.
-            sharding_spec: A specification defining how inputs and kwargs should be split
-                into micro-batches. If None, assumes standard split-by-zero-dim behavior.
-        """
-        ...
-
-    @abc.abstractmethod
-    def step(self, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
-        """Executes a single pipeline step using the provided inputs.
-
-        This typically involves distributing inputs across microbatches,
-        executing forward and backward passes according to the specific schedule logic,
-        and handling communications between stages.
+        The schedule receives the microbatches already split: ``inputs_microbatches[i]`` and
+        ``kwargs_microbatches[i]`` are the inputs and keyword arguments of the ``i``-th microbatch.
+        The number of microbatches in the step is ``len(inputs_microbatches)`` and may vary between
+        steps. Program compilation and buffer allocation happen lazily inside this call, reused across
+        steps when the microbatch count and shapes are unchanged.
 
         Args:
-            inputs: A dictionary of global input tensors.
-            kwargs: A dictionary of global keyword arguments.
+            inputs_microbatches: Per-microbatch input tensors (fed to the first pipeline stage).
+            kwargs_microbatches: Per-microbatch keyword arguments (fed to every pipeline stage).
         """
         ...

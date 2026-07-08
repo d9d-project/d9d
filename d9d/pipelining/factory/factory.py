@@ -43,7 +43,6 @@ def _build_schedule_local(
 
 def _build_schedule_distributed(
     dist_context: DistributedContext,
-    n_microbatches: int,
     schedule_config: AnyPipelineScheduleConfig,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
     callback: PipelineLossFn | PipelineResultFn,
@@ -79,9 +78,11 @@ def _build_schedule_distributed(
         )
         stages.append(stage)
 
-    program = program_builder.compose(num_microbatches=n_microbatches, pp_size=mesh.size())
     schedule = PipelineScheduleExecutor(
-        dist_context=dist_context, stages=stages, num_microbatches=n_microbatches, callback=callback, program=program
+        dist_context=dist_context,
+        stages=stages,
+        program_builder=program_builder,
+        callback=callback,
     )
 
     return PipelineScheduleInfo(
@@ -91,7 +92,6 @@ def _build_schedule_distributed(
 
 def build_schedule(
     dist_context: DistributedContext,
-    n_microbatches: int,
     schedule_config: AnyPipelineScheduleConfig,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
     callback: PipelineLossFn | PipelineResultFn,
@@ -102,11 +102,11 @@ def build_schedule(
     distributed, it builds a parallel schedule (`PipelineScheduleExecutor`) by
     calculating topology and creating stages for the current rank. If the
     context is local, it builds an offline schedule (`OfflinePipelineExecutor`)
-    for direct execution.
+    for direct execution. The number of microbatches is decided per step, when
+    the schedule receives a pack, so it is not fixed here.
 
     Args:
         dist_context: The distributed context.
-        n_microbatches: Number of microbatches per global step.
         schedule_config: Configuration object determining the schedule strategy.
         model_provider: A factory function that accepts stage info and returns an `nn.Module`
             for that specific stage.
@@ -120,7 +120,6 @@ def build_schedule(
     if dist_context.mesh_params.is_distributed:
         return _build_schedule_distributed(
             dist_context=dist_context,
-            n_microbatches=n_microbatches,
             schedule_config=schedule_config,
             model_provider=model_provider,
             callback=callback,
