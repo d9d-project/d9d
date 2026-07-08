@@ -88,7 +88,6 @@ def _group_params_for_buckets(
 
 
 def _make_bucket(
-    require_accumulations: int,
     group_marker: _ParameterGroupMarker,
     parameters: list[nn.Parameter],
     communicate_stream: torch.cuda.Stream,
@@ -109,7 +108,6 @@ def _make_bucket(
 
         return SyncGradientBucket(
             parameters=parameters,
-            require_accumulations=require_accumulations,
             device=group_marker.device,
             grad_dtype=group_marker.grad_dtype,
             reduce_mesh=group_marker.reduce_mesh,
@@ -120,7 +118,6 @@ def _make_bucket(
 def _fill_buckets(
     param_groups: dict[_ParameterGroupMarker, list[nn.Parameter]],
     bucket_size_mb: int,
-    require_accumulations: int,
     communicate_stream: torch.cuda.Stream,
 ) -> list[AbstractGradientBucket]:
     """Splits grouped parameters into buckets based on size constraints.
@@ -128,7 +125,6 @@ def _fill_buckets(
     Args:
         param_groups: Parameters grouped by sync requirements.
         bucket_size_mb: Max size for each bucket in megabytes.
-        require_accumulations: Number of gradient accumulations required before syncing gradients.
         communicate_stream: CUDA stream used for asynchronous gradient communication.
 
     Returns:
@@ -148,7 +144,6 @@ def _fill_buckets(
             if current_bucket_size + param_bytes >= bucket_size and unfinished_bucket:
                 buckets.append(
                     _make_bucket(
-                        require_accumulations=require_accumulations,
                         group_marker=param_group_marker,
                         parameters=unfinished_bucket,
                         communicate_stream=communicate_stream,
@@ -163,7 +158,6 @@ def _fill_buckets(
         if unfinished_bucket:
             buckets.append(
                 _make_bucket(
-                    require_accumulations=require_accumulations,
                     group_marker=param_group_marker,
                     parameters=unfinished_bucket,
                     communicate_stream=communicate_stream,
@@ -180,17 +174,16 @@ class GradientSynchronizer:
     during the backward pass.
     """
 
-    def __init__(self, param_groups: list[list[nn.Parameter]], bucket_size_mb: int, require_accumulations: int):
+    def __init__(self, param_groups: list[list[nn.Parameter]], bucket_size_mb: int):
         """Constructs a GradientSynchronizer.
 
         Args:
             param_groups: List of parameter groups.
             bucket_size_mb: Maximal size of a single gradient bucket in MB.
-            require_accumulations: Number of micro-batches to accumulate before reducing.
         """
         self._param_groups = param_groups
         self._bucket_size_mb = bucket_size_mb
-        self._require_accumulations = require_accumulations
+        self._require_accumulations: int | None = None
 
         self._communicate_stream: torch.cuda.Stream | None = None
         self._can_sync: bool
@@ -207,12 +200,17 @@ class GradientSynchronizer:
         self._buckets = _fill_buckets(
             _group_params_for_buckets(self._param_groups),
             bucket_size_mb=self._bucket_size_mb,
-            require_accumulations=self._require_accumulations,
             communicate_stream=stream,
         )
 
         for bucket in self._buckets:
             bucket.bind()
+
+        # Re-apply the accumulation count to the freshly built buckets if it was already set for this
+        # step (e.g. after an offload/onload rebind mid-training).
+        if self._require_accumulations is not None:
+            for bucket in self._buckets:
+                bucket.set_required_accumulations(self._require_accumulations)
 
     def unbind(self):
         """Releases resources.
@@ -236,3 +234,16 @@ class GradientSynchronizer:
         """Resets gradients and accumulation counters for all managed parameters."""
         for bucket in self._buckets:
             bucket.zero_grad()
+
+    def set_required_accumulations(self, require_accumulations: int):
+        """Sets the accumulation count for the current step across all buckets.
+
+        The count may change per step (pack length varies), so it is applied live to the already-bound
+        buckets and also stored so subsequent binds (e.g. after offload/onload) use the latest value.
+
+        Args:
+            require_accumulations: Number of accumulations required before reducing gradients.
+        """
+        self._require_accumulations = require_accumulations
+        for bucket in self._buckets:
+            bucket.set_required_accumulations(require_accumulations)

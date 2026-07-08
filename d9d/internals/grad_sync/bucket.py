@@ -42,6 +42,14 @@ class AbstractGradientBucket(abc.ABC):
     def mark_sync(self):
         """Marks this bucket as synchronized."""
 
+    @abc.abstractmethod
+    def set_required_accumulations(self, require_accumulations: int):
+        """Sets how many accumulations must happen before this bucket reduces gradients.
+
+        Args:
+            require_accumulations: Number of accumulations required before sync.
+        """
+
 
 class LocalGradientBucket(AbstractGradientBucket):
     """A bucket for parameters that do not require distributed synchronization."""
@@ -72,23 +80,33 @@ class LocalGradientBucket(AbstractGradientBucket):
     def mark_sync(self):
         """No-op for local buckets."""
 
+    def set_required_accumulations(self, require_accumulations: int):
+        """No-op for local buckets as they never reduce."""
+
 
 class AccumulationCounter:
     """Tracks the number of gradient accumulation steps for a set of parameters."""
 
-    def __init__(self, require_accumulations: int, parameters: list[nn.Parameter]):
+    def __init__(self, parameters: list[nn.Parameter]):
         """Constructs an AccumulationCounter.
 
         Args:
-            require_accumulations: Number of accumulations required before sync.
             parameters: List of parameters to track.
         """
-        self._require_accumulations = require_accumulations
+        self._require_accumulations: int | None = None
         self._param_to_sync_count = {param: 0 for param in parameters}
 
     def reset(self):
         """Resets all counters to zero."""
         self._param_to_sync_count = {param: 0 for param in self._param_to_sync_count}
+
+    def set_required_accumulations(self, require_accumulations: int):
+        """Updates the number of accumulations required before the bucket is ready to sync.
+
+        Args:
+            require_accumulations: Number of accumulations required before sync.
+        """
+        self._require_accumulations = require_accumulations
 
     def update(self, param: nn.Parameter):
         """Increments the counter for a specific parameter.
@@ -103,7 +121,12 @@ class AccumulationCounter:
 
         Returns:
             True if synchronization can proceed.
+
+        Raises:
+            RuntimeError: If the required accumulation count has not been set for this step.
         """
+        if self._require_accumulations is None:
+            raise RuntimeError("Required accumulation count was not set for this step")
         return all(x == self._require_accumulations for x in self._param_to_sync_count.values())
 
 
@@ -117,7 +140,6 @@ class SyncGradientBucket(AbstractGradientBucket):
     def __init__(
         self,
         parameters: list[nn.Parameter],
-        require_accumulations: int,
         device: torch.device,
         grad_dtype: torch.dtype,
         reduce_mesh: DeviceMesh,
@@ -127,7 +149,6 @@ class SyncGradientBucket(AbstractGradientBucket):
 
         Args:
             parameters: List of parameters to manage.
-            require_accumulations: Number of accumulations before triggering reduce.
             device: Device where parameters reside.
             grad_dtype: Data type for the gradients.
             reduce_mesh: DeviceMesh on which reduction happens.
@@ -140,7 +161,7 @@ class SyncGradientBucket(AbstractGradientBucket):
             raise ValueError("All parameters passed in synchronizable bucket should contain DTensor data")
 
         self._params = parameters
-        self._accum_counter = AccumulationCounter(require_accumulations, parameters)
+        self._accum_counter = AccumulationCounter(parameters)
         self._device = device
         self._grad_dtype = grad_dtype
         # iterate from innermost to outermost group
@@ -255,3 +276,11 @@ class SyncGradientBucket(AbstractGradientBucket):
             raise ValueError("This bucket is not ready for sync.")
 
         self._ready_to_sync = False
+
+    def set_required_accumulations(self, require_accumulations: int):
+        """Updates the accumulation count required before this bucket reduces gradients.
+
+        Args:
+            require_accumulations: Number of accumulations before triggering reduce.
+        """
+        self._accum_counter.set_required_accumulations(require_accumulations)
