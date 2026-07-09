@@ -1,6 +1,6 @@
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import datasets
 import torch
@@ -10,16 +10,13 @@ from d9d.dataset import (
     BufferSortedDataset,
     DatasetImplementingSortKeyProtocol,
     pad_stack_1d,
-    shard_dataset_data_parallel,
 )
+from d9d.loop.auto import AutoDataConfig, AutoDataProvider
 from d9d.loop.config import InferenceConfig
 from d9d.loop.control import (
     BuildForwardInputsContext,
     BuildForwardInputsResult,
-    DatasetProvider,
     InferenceTask,
-    InitializeDatasetContext,
-    InitializeDatasetResult,
     InitializeModelStageContext,
     InitializeModelStageResult,
     ModelProvider,
@@ -52,6 +49,7 @@ class DataConfig(BaseModel):
     tokenizer: str  # Path to the tokenizer.json file
     num_proc: int  # Number of CPU processes for data mapping
     presort_buffer_size: int  # Size of buffer for length-based presorting
+    presort_pack_size: int  # Window (in samples) the buffer sorts by length before yielding
 
 
 class ModelProviderConfig(BaseModel):
@@ -61,6 +59,7 @@ class ModelProviderConfig(BaseModel):
 
 class ProjectConfig(BaseModel):
     data: DataConfig
+    auto_data: AutoDataConfig  # Batch sizing + DataLoader settings for the default data stack
     mesh: DeviceMeshParameters
     model_provider: ModelProviderConfig
     inference: InferenceConfig
@@ -118,52 +117,50 @@ class ProjectDataset(Dataset, DatasetImplementingSortKeyProtocol):
         return len(self._dataset)
 
 
-class ProjectDatasetProvider(DatasetProvider):
-    def __init__(self, config: DataConfig):
-        self._config = config
+def _count_tokens(item: dict, text_column: str, tokenizer: Tokenizer) -> dict:
+    return {
+        "token_counts": len(tokenizer.encode(item[text_column]).tokens),
+    }
 
-    @staticmethod
-    def _count_tokens(item: dict, text_column: str, tokenizer: Tokenizer) -> dict:
-        return {
-            "token_counts": len(tokenizer.encode(item[text_column]).tokens),
-        }
 
-    def __call__(self, context: InitializeDatasetContext) -> InitializeDatasetResult:
-        tokenizer = Tokenizer.from_file(str(self._config.tokenizer))
+def build_dataset(config: DataConfig, dist_context: DistributedContext) -> Dataset:
+    """Builds the (unsharded) dataset. AutoDataProvider handles sharding, loading, and packing.
 
-        # IMPORTANT: main_process_first ensures that Rank 0 downloads/processes
-        # the dataset and builds the cache first. Ranks 1-N wait, then load from cache.
-        # Prevents race conditions and corruption on the HF cache.
-        with context.dist_context.main_process_first():
-            data = (
-                datasets.load_dataset(self._config.dataset, split=self._config.split)
-                .take(self._config.use_samples)
-                .shuffle(self._config.shuffle_seed)
-                .map(
-                    self._count_tokens,
-                    num_proc=self._config.num_proc,
-                    fn_kwargs={"tokenizer": tokenizer, "text_column": self._config.text_column},
-                )
+    Args:
+        config: The data configuration.
+        dist_context: The distributed context (used to guard dataset preparation on the main process).
+
+    Returns:
+        The unsharded, length-bucketed dataset.
+    """
+    tokenizer = Tokenizer.from_file(str(config.tokenizer))
+
+    # IMPORTANT: main_process_first ensures that Rank 0 downloads/processes
+    # the dataset and builds the cache first. Ranks 1-N wait, then load from cache.
+    # Prevents race conditions and corruption on the HF cache.
+    with dist_context.main_process_first():
+        data = (
+            datasets.load_dataset(config.dataset, split=config.split)
+            .take(config.use_samples)
+            .shuffle(config.shuffle_seed)
+            .map(
+                _count_tokens,
+                num_proc=config.num_proc,
+                fn_kwargs={"tokenizer": tokenizer, "text_column": config.text_column},
             )
-
-        dataset = ProjectDataset(data, tokenizer)
-
-        # BufferSortedDataset acts as a buffer that shuffles data locally
-        # but outputs batches sorted by length (defined in sort_key above)
-        dataset_buf = BufferSortedDataset(
-            dataset,
-            buffer_size=self._config.presort_buffer_size,
-            pack_size=context.batch_maths.global_batch_size,
-            init_seed=self._config.shuffle_seed,
         )
 
-        # Split dataset across data parallel ranks
-        dataset_shard = shard_dataset_data_parallel(dataset_buf, context.dist_context)
+    dataset = ProjectDataset(data, tokenizer)
 
-        return InitializeDatasetResult(
-            dataset=dataset_shard,
-            collator=ProjectDataset.collate,
-        )
+    # BufferSortedDataset acts as a buffer that shuffles data locally
+    # but outputs batches sorted by length (defined in sort_key above) to minimize padding overhead.
+    # Return it UNSHARDED - AutoDataProvider shards across data-parallel ranks itself.
+    return BufferSortedDataset(
+        dataset,
+        buffer_size=config.presort_buffer_size,
+        pack_size=config.presort_pack_size,
+        init_seed=config.shuffle_seed,
+    )
 
 
 # --------------
@@ -209,18 +206,20 @@ class ProjectModelProvider(ModelProvider[Qwen3MoEForCausalLM]):
 # --------------
 
 
-class PerplexityTask(InferenceTask[dict[str, torch.Tensor]]):
+class PerplexityState(TypedDict):
+    # Side-data carried from build_forward_inputs to output processing for the same microbatch.
+    labels: torch.Tensor
+
+
+class PerplexityTask(InferenceTask[dict[str, torch.Tensor], PerplexityState]):
     def __init__(self, dist_ctx: DistributedContext):
         self._dist_ctx = dist_ctx
         self._cache: list[torch.Tensor] = []
 
-    def build_forward_inputs(self, ctx: BuildForwardInputsContext) -> BuildForwardInputsResult:
+    def build_forward_inputs(self, ctx: BuildForwardInputsContext) -> BuildForwardInputsResult[PerplexityState]:
         # ctx.batch contains the output of the Collator.
 
-        # Save labels in state for access during loss computation later
-        ctx.state["labels"] = ctx.batch["labels"]
-
-        # Return inputs for model.forward()
+        # Return inputs for model.forward() plus the typed side-data for output processing.
         # inputs are only for the first pipeline stage
         # kwargs are the same for all the pipeline stages
         return BuildForwardInputsResult(
@@ -231,9 +230,10 @@ class PerplexityTask(InferenceTask[dict[str, torch.Tensor]]):
                 "labels": ctx.batch["labels"],
                 "position_ids": ctx.batch["position_ids"],
             },
+            state=PerplexityState(labels=ctx.batch["labels"]),
         )
 
-    def process_outputs(self, ctx: ProcessOutputsContext):
+    def process_outputs(self, ctx: ProcessOutputsContext[PerplexityState]):
         logps = ctx.pipeline_results["logps"]
 
         # Calculate number of valid tokens (ignoring the -100 padding)
@@ -267,7 +267,11 @@ def main():
         parameters=config.inference,
         task_provider=lambda ctx: PerplexityTask(ctx.dist_context),
         model_provider=ProjectModelProvider(config.model_provider),
-        data_provider=ProjectDatasetProvider(config.data),
+        data_provider=AutoDataProvider(
+            dataset_factory=lambda dist_context: build_dataset(config.data, dist_context),
+            collator=ProjectDataset.collate,
+            config=config.auto_data,
+        ),
     ).configure()
 
     # 3. Execution
