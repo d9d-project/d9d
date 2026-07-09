@@ -8,20 +8,6 @@ from d9d.tracker import AnyTrackerConfig, RunConfig
 from .types import StepActionPeriod
 
 
-class BatchingConfig(BaseModel):
-    """Configuration for batch sizing logic.
-
-    Attributes:
-        global_batch_size: The total effective batch size across all distributed
-            replicas and gradient accumulation steps.
-        microbatch_size: The distinct batch size fed into the model during a single
-            forward pass on a single device.
-    """
-
-    global_batch_size: int
-    microbatch_size: int
-
-
 class JobScheduleConfig(BaseModel):
     """Configuration for the job's duration.
 
@@ -62,21 +48,6 @@ class GarbageCollectionConfig(BaseModel):
     """
 
     period_steps: StepActionPeriod
-
-
-class DataLoadingConfig(BaseModel):
-    """Configuration for PyTorch DataLoaders.
-
-    Attributes:
-        num_workers: The number of subprocesses to use for data loading.
-        pin_memory: Whether to copy tensors into CUDA pinned memory before returning them.
-        persistent_workers: If True, the data loader will not shutdown the worker processes
-            after a dataset has been consumed once.
-    """
-
-    num_workers: int
-    pin_memory: bool
-    persistent_workers: bool
 
 
 class CheckpointingConfig(BaseModel):
@@ -182,9 +153,7 @@ class TrainerConfig(BaseModel):
 
     Attributes:
         run: Meta-information about the run (name, ID, tags).
-        batching: Batch sizing strategy.
         schedule: Job duration settings.
-        data_loading: DataLoader settings.
         logging: Experiment tracking settings.
         pipelining: Pipeline Parallelism schedule and settings. If None,
             pipeline parallelism is disabled.
@@ -199,9 +168,7 @@ class TrainerConfig(BaseModel):
     """
 
     run: RunConfig
-    batching: BatchingConfig
     schedule: JobScheduleConfig
-    data_loading: DataLoadingConfig
     logging: JobLoggerConfig
     pipelining: PipeliningConfig
     model_stage_factory: ModelStageFactoryConfig
@@ -218,9 +185,7 @@ class InferenceConfig(BaseModel):
     """Top-level configuration object defining an inference/evaluation job.
 
     Attributes:
-        batching: Batch sizing strategy.
         schedule: Job duration settings.
-        data_loading: DataLoader settings.
         model_stage_factory: Model initialization logic.
         determinism: Random seed settings.
         gc: Garbage collection settings.
@@ -229,9 +194,7 @@ class InferenceConfig(BaseModel):
         timeout: Distributed timeout settings.
     """
 
-    batching: BatchingConfig
     schedule: JobScheduleConfig
-    data_loading: DataLoadingConfig
     model_stage_factory: ModelStageFactoryConfig
     determinism: DeterminismConfig
     gc: GarbageCollectionConfig

@@ -1,7 +1,5 @@
 from .config import (
-    BatchingConfig,
     CheckpointingConfig,
-    DataLoadingConfig,
     DeterminismConfig,
     GarbageCollectionConfig,
     GradientClippingConfig,
@@ -18,9 +16,7 @@ from .config import (
 from .types import StepActionPeriod, StepActionSpecial
 
 __all__ = [
-    "BatchingConfig",
     "CheckpointingConfig",
-    "DataLoadingConfig",
     "DeterminismConfig",
     "GarbageCollectionConfig",
     "GradientClippingConfig",
