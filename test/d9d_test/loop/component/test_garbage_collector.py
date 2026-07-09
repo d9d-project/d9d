@@ -5,7 +5,19 @@ import pytest
 from d9d.core.dist_context import DeviceMeshParameters
 from d9d.loop.component.garbage_collector import ManualGarbageCollector
 from d9d.loop.component.job_schedule import JobSchedule
-from d9d.loop.config import GarbageCollectionConfig, StepActionSpecial
+from d9d.loop.config import GarbageCollectionConfig, JobScheduleConfig, StepActionSpecial
+
+
+class _FakeStream:
+    @property
+    def total_steps(self) -> int | None:
+        return None
+
+
+def _schedule_at_step(current_step: int) -> JobSchedule:
+    schedule = JobSchedule(config=JobScheduleConfig(total_steps=100), stream=_FakeStream())
+    schedule._current_step = current_step
+    return schedule
 
 
 @pytest.fixture
@@ -31,7 +43,7 @@ def gc_config_disable():
 def test_manual_gc_context_manager_lifecycle(mock_gc, dist_ctx_factory, gc_config_periodic):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())
 
-    manager = ManualGarbageCollector(dist_ctx, gc_config_periodic, JobSchedule(0, 100, None))
+    manager = ManualGarbageCollector(dist_ctx, gc_config_periodic, _schedule_at_step(0))
 
     with manager:
         mock_gc.disable.assert_called_once()
@@ -47,7 +59,7 @@ def test_manual_gc_context_manager_lifecycle(mock_gc, dist_ctx_factory, gc_confi
 def test_manual_gc_collect_forced(mock_gc, dist_ctx_factory, gc_config_periodic):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())
 
-    manager = ManualGarbageCollector(dist_ctx, gc_config_periodic, JobSchedule(5, 100, None))
+    manager = ManualGarbageCollector(dist_ctx, gc_config_periodic, _schedule_at_step(5))
 
     manager.collect_forced()
 
@@ -68,7 +80,7 @@ def test_manual_gc_collect_periodic(mock_gc, dist_ctx_factory, current_step, per
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())
 
     config = GarbageCollectionConfig(period_steps=period)
-    manager = ManualGarbageCollector(dist_ctx, config, JobSchedule(current_step, 100, None))
+    manager = ManualGarbageCollector(dist_ctx, config, _schedule_at_step(current_step))
     manager.collect_periodic()
 
     if should_collect:
@@ -81,7 +93,7 @@ def test_manual_gc_collect_periodic(mock_gc, dist_ctx_factory, current_step, per
 def test_manual_gc_disabled_config(mock_gc, dist_ctx_factory, gc_config_disable):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())
 
-    schedule = JobSchedule(10, 100, None)
+    schedule = _schedule_at_step(10)
 
     manager = ManualGarbageCollector(dist_ctx, gc_config_disable, schedule)
 

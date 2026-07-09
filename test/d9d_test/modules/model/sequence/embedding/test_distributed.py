@@ -1,7 +1,7 @@
 import pytest
 import torch
 from d9d.core.dist_context import DeviceMeshParameters
-from d9d.pipelining.api import PipelineShardingSpec, PipelineStageInfo
+from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import PipelineScheduleGPipeConfig, build_schedule
 from torch import nn
 
@@ -9,6 +9,7 @@ from d9d_test.modules.helper import (
     all_reduce_over_mesh_groups,
     check_grad_distance_all_local_dist,
     copy_params_local_to_dist,
+    microbatch_slice,
     sync_grads_manually,
 )
 from d9d_test.modules.model.meshes import MESHES_FOR_MODEL_TESTS
@@ -68,27 +69,26 @@ def test_consistent_to_itself_dist(
 
     schedule_info, models_dist = build_schedule(
         dist_context=dist_ctx,
-        n_microbatches=_N_MICROBATCHES,
         schedule_config=PipelineScheduleGPipeConfig(),
         model_provider=_model_provider,
-        callback=_callback,
     )
 
     # Run Local Model
-    schedule_info.schedule.configure_buffers(
-        inputs={"input_ids": batch_dist.sequence.input_ids},
-        kwargs={
-            "position_ids": batch_dist.sequence.position_ids,
-            "pooling_mask": batch_dist.pooling_mask,
-        },
-        sharding_spec=PipelineShardingSpec(),
+    inputs_microbatches = tuple(
+        {"input_ids": microbatch_slice(batch_dist.sequence.input_ids, microbatch_idx=i, n_microbatches=_N_MICROBATCHES)}
+        for i in range(_N_MICROBATCHES)
+    )
+    kwargs_microbatches = tuple(
+        {
+            "position_ids": microbatch_slice(
+                batch_dist.sequence.position_ids, microbatch_idx=i, n_microbatches=_N_MICROBATCHES
+            ),
+            "pooling_mask": microbatch_slice(batch_dist.pooling_mask, microbatch_idx=i, n_microbatches=_N_MICROBATCHES),
+        }
+        for i in range(_N_MICROBATCHES)
     )
     schedule_info.schedule.step(
-        inputs={"input_ids": batch_dist.sequence.input_ids},
-        kwargs={
-            "position_ids": batch_dist.sequence.position_ids,
-            "pooling_mask": batch_dist.pooling_mask,
-        },
+        inputs_microbatches=inputs_microbatches, kwargs_microbatches=kwargs_microbatches, callback=_callback
     )
 
     # Compare Loss & Grads

@@ -3,21 +3,18 @@ from d9d.loop.component.job_schedule import JobSchedule
 from d9d.loop.config import JobScheduleConfig, StepActionSpecial
 
 
-class FakeSizedDataLoader:
-    def __init__(self, report_size: int):
-        self._report_size = report_size
+class FakeStream:
+    def __init__(self, total_steps: int | None):
+        self._total_steps = total_steps
 
-    def __len__(self):
-        return self._report_size
-
-
-class FakeDataLoader:
-    pass
+    @property
+    def total_steps(self) -> int | None:
+        return self._total_steps
 
 
 @pytest.mark.local
 def test_job_schedule_initialization_and_stepping():
-    schedule = JobSchedule(config=JobScheduleConfig(total_steps=10), data_iterator=FakeDataLoader())
+    schedule = JobSchedule(config=JobScheduleConfig(total_steps=10), stream=FakeStream(None))
 
     assert schedule.current_step == 0
     assert schedule.total_steps == 10
@@ -33,34 +30,34 @@ def test_job_schedule_initialization_and_stepping():
 
 @pytest.mark.local
 @pytest.mark.parametrize(
-    ("config_total_steps", "data_iterator", "expected"),
+    ("config_total_steps", "stream", "expected"),
     [
-        (10, FakeDataLoader(), 10),  # config set, iterator not sized -> config
-        (10, FakeSizedDataLoader(20), 10),  # config set, len >= config -> config
-        (20, FakeSizedDataLoader(20), 20),  # config set, len == config -> config
-        (None, FakeSizedDataLoader(20), 20),  # config unset, iterator sized -> len
+        (10, FakeStream(None), 10),  # config set, stream length unknown -> config
+        (10, FakeStream(20), 10),  # config set, length >= config -> config
+        (20, FakeStream(20), 20),  # config set, length == config -> config
+        (None, FakeStream(20), 20),  # config unset, stream length known -> length
     ],
 )
-def test_job_schedule_total_steps_resolution(config_total_steps, data_iterator, expected):
-    schedule = JobSchedule(config=JobScheduleConfig(total_steps=config_total_steps), data_iterator=data_iterator)
+def test_job_schedule_total_steps_resolution(config_total_steps, stream, expected):
+    schedule = JobSchedule(config=JobScheduleConfig(total_steps=config_total_steps), stream=stream)
     assert schedule.total_steps == expected
 
 
 @pytest.mark.local
 def test_job_schedule_total_steps_config_exceeds_data():
     with pytest.raises(ValueError, match="exceeds the number of steps"):
-        JobSchedule(config=JobScheduleConfig(total_steps=30), data_iterator=FakeSizedDataLoader(20))
+        JobSchedule(config=JobScheduleConfig(total_steps=30), stream=FakeStream(20))
 
 
 @pytest.mark.local
 def test_job_schedule_total_steps_unresolvable():
     with pytest.raises(ValueError, match="Cannot resolve total_steps"):
-        JobSchedule(config=JobScheduleConfig(total_steps=None), data_iterator=FakeDataLoader())
+        JobSchedule(config=JobScheduleConfig(total_steps=None), stream=FakeStream(None))
 
 
 @pytest.mark.local
 def test_job_schedule_state_dict_roundtrip():
-    schedule = JobSchedule(config=JobScheduleConfig(total_steps=20), data_iterator=FakeDataLoader())
+    schedule = JobSchedule(config=JobScheduleConfig(total_steps=20), stream=FakeStream(None))
     schedule.step()
     schedule.step()
     schedule.step()
@@ -68,7 +65,7 @@ def test_job_schedule_state_dict_roundtrip():
     schedule.step()
     state = schedule.state_dict()
 
-    new_schedule = JobSchedule(config=JobScheduleConfig(total_steps=20), data_iterator=FakeDataLoader())
+    new_schedule = JobSchedule(config=JobScheduleConfig(total_steps=20), stream=FakeStream(None))
     new_schedule.load_state_dict(state)
 
     assert new_schedule.current_step == 5
@@ -78,11 +75,11 @@ def test_job_schedule_state_dict_roundtrip():
 
 @pytest.mark.local
 def test_job_schedule_load_state_dict_allows_changed_budget():
-    saver = JobSchedule(config=JobScheduleConfig(total_steps=100), data_iterator=FakeDataLoader())
+    saver = JobSchedule(config=JobScheduleConfig(total_steps=100), stream=FakeStream(None))
     state = saver.state_dict()
 
     # The budget can change across resumes - only the current step is restored.
-    loader = JobSchedule(config=JobScheduleConfig(total_steps=200), data_iterator=FakeDataLoader())
+    loader = JobSchedule(config=JobScheduleConfig(total_steps=200), stream=FakeStream(None))
     loader.load_state_dict(state)
 
     assert loader.current_step == 0
@@ -141,7 +138,7 @@ def test_should_do_action(
     is_post_step,
     expected,
 ) -> None:
-    schedule = JobSchedule(config=JobScheduleConfig(total_steps=total_steps), data_iterator=FakeDataLoader())
+    schedule = JobSchedule(config=JobScheduleConfig(total_steps=total_steps), stream=FakeStream(None))
     # Manually set private attribute to simulate state for test
     schedule._current_step = current_step
 
@@ -157,7 +154,7 @@ def test_should_do_action(
 
 @pytest.mark.local
 def test_should_do_action_invalid_input():
-    schedule = JobSchedule(config=JobScheduleConfig(total_steps=10), data_iterator=FakeDataLoader())
+    schedule = JobSchedule(config=JobScheduleConfig(total_steps=10), stream=FakeStream(None))
 
     with pytest.raises(ValueError):
         schedule.should_do_action(0)
