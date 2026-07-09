@@ -1,5 +1,4 @@
 from .data_provider import DataProvider, InitializeDataProviderContext
-from .dataset_provider import DatasetProvider, InitializeDatasetContext, InitializeDatasetResult
 from .lr_scheduler_provider import InitializeLRSchedulerContext, LRSchedulerProvider
 from .model_provider import (
     InitializeModelStageContext,
@@ -40,14 +39,11 @@ __all__ = [
     "CreateMetricsContext",
     "CreateMetricsResult",
     "DataProvider",
-    "DatasetProvider",
     "FinalizeContext",
     "InferenceTask",
     "InferenceTaskProvider",
     "InferenceTaskProviderContext",
     "InitializeDataProviderContext",
-    "InitializeDatasetContext",
-    "InitializeDatasetResult",
     "InitializeLRSchedulerContext",
     "InitializeModelStageContext",
     "InitializeModelStageResult",
