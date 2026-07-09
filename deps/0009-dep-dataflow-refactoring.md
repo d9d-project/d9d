@@ -11,7 +11,7 @@ Created: 2026-06-22
 
 ## Abstract
 
-The current data path conflates two unrelated concerns: how long a job runs and what one step feeds the model. This proposal splits them into two owners. **`JobSchedule`** replaces `Stepper` and resolves the job's duration. **`DataProvider`** replaces `DatasetProvider`, `DataLoaderFactory`, and `BatchMaths` as the data entry point — a factory that builds a **`MicrobatchPackStream`**: a `Stateful`, optionally `Sized` iterable yielding **microbatch packs**, a pack being exactly one step's worth of microbatches ready for the engine. Gradient accumulation stops being a loop in the trainer and becomes just a pipeline program over the pack; the executor no longer shards inputs but consumes the microbatches the stream produced, recompiling its program (and reallocating buffers) whenever pack length or microbatch shapes change — so pack length, and hence batch size, may vary step to step. This breaks the data and pipelining public APIs and therefore requires this DEP.
+The current data path conflates two unrelated concerns: how long a job runs and what one step feeds the model. This proposal splits them into two owners. **`JobSchedule`** replaces `Stepper` and resolves the job's duration. **`DataProvider`** replaces `DatasetProvider`, `DataLoaderFactory`, and `BatchMaths` as the data entry point — a factory that builds a **`MicrobatchPackStream`**: a `Stateful` iterable yielding **microbatch packs** and reporting its length via a `total_steps` property (`None` when unknown), a pack being exactly one step's worth of microbatches ready for the engine. Gradient accumulation stops being a loop in the trainer and becomes just a pipeline program over the pack; the executor no longer shards inputs but consumes the microbatches the stream produced, recompiling its program (and reallocating buffers) whenever pack length or microbatch shapes change — so pack length, and hence batch size, may vary step to step. This breaks the data and pipelining public APIs and therefore requires this DEP.
 
 ## Motivation
 
@@ -55,9 +55,9 @@ flowchart LR
 
     subgraph after["After"]
         direction LR
-        aBP["DataProvider<br/>(factory)"] -->|builds| aBI["MicrobatchPackStream<br/>(Stateful, optionally Sized)"]
+        aBP["DataProvider<br/>(factory)"] -->|builds| aBI["MicrobatchPackStream<br/>(Stateful, total_steps: int | None)"]
         aBI -->|"pack = list[microbatch]"| aEX["Executor<br/>(one program over len(pack); GA folded in)"]
-        aBI -.->|"len(stream) if Sized"| aJS["JobSchedule.total_steps"]
+        aBI -.->|"stream.total_steps"| aJS["JobSchedule.total_steps"]
         aCFG["JobScheduleConfig.total_steps"] -.-> aJS
     end
 
@@ -66,17 +66,17 @@ flowchart LR
 
 ### `JobSchedule`
 
-`JobSchedule` keeps everything `Stepper` did — `current_step` and `total_steps` tracking, the `step()` increment, `Stateful` save/load of progress, and the `should_do_action(...)` periodic-cadence helpers — but changes **where `total_steps` comes from**. It is resolved once at construction from two inputs: an optional explicit config value (`JobScheduleConfig.total_steps`), and the `MicrobatchPackStream` (consulted only if it is `Sized`). Only `current_step` is persisted in the `Stateful` state; `total_steps` is re-resolved on load, so the configured budget may change across resumes.
+`JobSchedule` keeps everything `Stepper` did — `current_step` and `total_steps` tracking, the `step()` increment, `Stateful` save/load of progress, and the `should_do_action(...)` periodic-cadence helpers — but changes **where `total_steps` comes from**. It is resolved once at construction from two inputs: an optional explicit config value (`JobScheduleConfig.total_steps`), and the `MicrobatchPackStream.total_steps` property (which is `None` when the stream cannot report a length). Only `current_step` is persisted in the `Stateful` state; `total_steps` is re-resolved on load, so the configured budget may change across resumes.
 
 Resolution rules:
 
-| config | stream is Sized     | outcome                       |
-|--------|---------------------|-------------------------------|
-| set    | no                  | use config                    |
-| set    | yes, `len ≥ config` | use config                    |
-| set    | yes, `len < config` | raise                         |
-| unset  | yes                 | use `len` (like current impl) |
-| unset  | no                  | raise                         |
+| config | `stream.total_steps`      | outcome                               |
+|--------|---------------------------|---------------------------------------|
+| set    | `None`                    | use config                            |
+| set    | `≥ config`                | use config                            |
+| set    | `< config`                | raise                                 |
+| unset  | not `None`                | use `total_steps` (like current impl) |
+| unset  | `None`                    | raise                                 |
 
 `Stepper` is deleted and every consumer migrates.
 
@@ -98,7 +98,9 @@ class DataProvider(Protocol):
 @typing.runtime_checkable
 class MicrobatchPackStream(Stateful, Protocol):
     def __iter__(self) -> Iterator[MicrobatchPack]: ...
-    # optionally also Sized: __len__() -> int  (number of *steps*)
+
+    @property
+    def total_steps(self) -> int | None: ...  # number of *steps*, or None when unknown
 ```
 
 `InitializeDataProviderContext` carries the run context the factory needs (only the `DistributedContext`). Data-loading settings are *not* passed through the context: a `DataProvider` fully owns how it builds its pipeline, and a custom one may not use a torch `DataLoader` at all.
@@ -107,9 +109,9 @@ The `MicrobatchPackStream`'s responsibilities:
 
 - **It yields packs.** A pack is one step. `len(pack)` is the number of microbatches *within* that step — there is no separate microbatch count to declare anywhere. This length may differ step to step.
 - **It is `Stateful`.** The stream is the single checkpoint boundary for the data; it saves and restores its own position so resumption is exact.
-- **It is optionally `Sized`.** If it can report the number of *steps* it will yield, `JobSchedule` may derive `total_steps` from it. If it cannot (streaming or data-dependent dynamic batching), `total_steps` must come from `JobScheduleConfig`.
+- **It reports its length via `total_steps`.** The `total_steps` property returns the number of *steps* it will yield, or `None` when that cannot be determined ahead of time (streaming or data-dependent dynamic batching). `JobSchedule` derives its budget from it when non-`None`; otherwise `total_steps` must come from `JobScheduleConfig`. This is an explicit, typed property rather than a structural `Sized`/`__len__` sniff, so it survives wrapping (e.g. the data-parallel checkpoint wrapper just forwards it).
 
-Two distinct lengths, previously conflated, are now explicit: `len(pack)` feeds the execution program; `len(stream)` (if present) feeds `JobSchedule`.
+Two distinct lengths, previously conflated, are now explicit: `len(pack)` feeds the execution program; `stream.total_steps` (when known) feeds `JobSchedule`.
 
 A `MicrobatchPackStream` yields CPU (optionally memory-pinned) tensors; moving each pack to the device is the loop's job.
 
@@ -133,7 +135,7 @@ stream = FixedCountMicrobatchPacker(loader, microbatches_per_step=accumulation_f
 ```
 
 - The loader layer is any object satisfying `DataLoaderProtocol` — a `Stateful`, `Sized` iterable of single microbatches. A torchdata `StatefulDataLoader` (with `batch_size` set to the microbatch size, over a pre-sharded dataset) satisfies it out of the box, so no wrapper class is shipped; the protocol lives in `d9d.core.protocol`.
-- **Packers** turn the microbatch stream into packs. `FixedCountMicrobatchPacker(microbatches_per_step=k)` yields packs of exactly `k` microbatches (with `drop_last` controlling whether a short trailing pack is dropped — training drops it, evaluation keeps it), reproducing today's gradient-accumulation behavior. It is `Sized`, and delegates its `Stateful` state to the loader.
+- **Packers** turn the microbatch stream into packs. `FixedCountMicrobatchPacker(microbatches_per_step=k)` yields packs of exactly `k` microbatches (with `drop_last` controlling whether a short trailing pack is dropped — training drops it, evaluation keeps it), reproducing today's gradient-accumulation behavior. Its `total_steps` is derived from the loader's length, and it delegates its `Stateful` state to the loader.
 
 The arithmetic that `BatchMaths` performed — `global_batch_size / (dp_size × microbatch_size)` to derive the accumulation factor — survives as a small free helper, `num_microbatches_for_global_batch`, used to configure the packer; it is no longer a stateful component threaded through the loop.
 
