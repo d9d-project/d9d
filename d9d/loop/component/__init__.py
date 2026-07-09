@@ -1,6 +1,4 @@
-from .batch_maths import BatchMaths
 from .checkpointer import StateCheckpointer
-from .data_loader_factory import DataLoaderFactory
 from .garbage_collector import ManualGarbageCollector
 from .gradient_clipper import GradientClipper
 from .gradient_manager import GradientManager
@@ -11,14 +9,12 @@ from .model_stage_exporter import ModelStageExporter
 from .model_stage_factory import ModelStageFactory, TrackedModules
 from .optimizer_factory import OptimizerFactory
 from .pipeline_result_processing import InferenceProcessor, LossComputer, PipelineOutputsProcessor
-from .task_operator import ForwardResult, InferenceTaskOperator, TrainTaskOperator
+from .pipeline_state import PipelineStateHandler
+from .task_operator import InferenceTaskOperator, TrainTaskOperator
 from .timeout_manager import TimeoutManager
 from .train_sleeper import TrainSleeper
 
 __all__ = [
-    "BatchMaths",
-    "DataLoaderFactory",
-    "ForwardResult",
     "GradientClipper",
     "GradientManager",
     "InferenceProcessor",
@@ -32,6 +28,7 @@ __all__ = [
     "ModelStageFactory",
     "OptimizerFactory",
     "PipelineOutputsProcessor",
+    "PipelineStateHandler",
     "StateCheckpointer",
     "TimeoutManager",
     "TrackedModules",
