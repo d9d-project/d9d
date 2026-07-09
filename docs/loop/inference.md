@@ -52,8 +52,10 @@ The `InferenceConfigurator.configure()` method performs a setup sequence similar
 4. **Task Instantiation**:
     *   Instantiates the `InferenceTask`. This defines how inputs are processed and what to do with the outputs (e.g., writing to a JSONL file).
 
-5. **Data Loader Construction**:
-    *   Creates a distributed `DataLoader` that handles sharding the inference dataset across ranks.
+5. **Data Stream Construction**:
+    *   Calls the `DataProvider` to build the `MicrobatchPackStream` that yields one pack (a step's worth
+        of microbatches) per iteration.
+    *   Triggers `EVENT_INFERENCE_DATA_STREAM_READY` event.
 
 6. **Model Materialization**:
     *   The `ModelStageFactory` runs to build the model.
@@ -85,7 +87,7 @@ Before the loop starts:
     *   Sets all model modules to `.eval()` mode (affecting Dropout, BatchNorm, etc.).
 2.  **State Loading**:
     *   The `StateCheckpointer` loads the model weights from the specified checkpoint.
-    *   If the job was interrupted previously, it also restores the `JobSchedule` and `DataLoader` state to resume exactly where it left off.
+    *   If the job was interrupted previously, it also restores the `JobSchedule` and `MicrobatchPackStream` state to resume exactly where it left off.
 3.  **Context Entry**:
     *   Enters UI, Garbage Collector, and Profiler contexts.
 4.  **Ready Hook Trigger**: `EVENT_INFERENCE_READY` is fired to mark initialization completion.
@@ -96,10 +98,9 @@ For every step:
 
 1. Triggers `EVENT_INFERENCE_STEP_PRE` event.
 2. **Microbatch Execution**:
-    *   Triggers `EVENT_INFERENCE_FORWARD_PRE` event.  
-    *   The `DataLoader` yields a batch group.
-    *   The `InferenceTaskOperator` manages the execution. 
-    *   Data is fed through the model.
+    *   Triggers `EVENT_INFERENCE_FORWARD_PRE` event.
+    *   The `MicrobatchPackStream` yields a **pack** containing $N$ microbatches (one step's worth); the loop moves it to the device.
+    *   The `InferenceTaskOperator` manages the execution: we delegate to the `InferenceTask` to map each microbatch before feeding it through the model, and to process the outputs.
     *   Unlike training, **no backward pass** is performed.
     *   Triggers `EVENT_INFERENCE_FORWARD_POST` event.
 
