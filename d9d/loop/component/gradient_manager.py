@@ -9,7 +9,6 @@ from d9d.internals.grad_sync import GradientSynchronizer
 from d9d.loop.config import GradientManagerConfig
 from d9d.metric.impl.aggregation import WeightedMeanMetric
 
-from .batch_maths import BatchMaths
 from .model_stage_factory import TrackedModules
 
 
@@ -26,7 +25,6 @@ class GradientManager(Offloadable):
         self,
         dist_context: DistributedContext,
         tracked_modules: TrackedModules,
-        batch_maths: BatchMaths,
         config: GradientManagerConfig,
     ):
         """Constructs the GradientManager and initializes the internal synchronizer.
@@ -34,12 +32,10 @@ class GradientManager(Offloadable):
         Args:
             dist_context: The distributed context.
             tracked_modules: Container of model modules to manage gradients for.
-            batch_maths: Calculation utility for batch sizes and accumulation steps.
             config: Configuration for gradient handling.
         """
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
-        self._batch_maths = batch_maths
         self._config = config
         self._loss = WeightedMeanMetric()
         self._loss.to("cuda")
@@ -47,7 +43,6 @@ class GradientManager(Offloadable):
         self._grad_sync = GradientSynchronizer(
             [list(module.parameters()) for module in self._tracked_modules.modules],
             bucket_size_mb=self._config.bucket_size_mb,
-            require_accumulations=self._batch_maths.num_backward_calls,
         )
         self._grads_to_scale: list[torch.Tensor] | None = None
 
@@ -109,6 +104,17 @@ class GradientManager(Offloadable):
         yield
         self._installed = False
         self._unbind()
+
+    def set_required_accumulations(self, require_accumulations: int):
+        """Sets how many backward passes are accumulated before gradients are reduced this step.
+
+        Must be called before the backward passes of the step, since pack length (and therefore the
+        number of accumulations) may vary between steps.
+
+        Args:
+            require_accumulations: Number of backward passes in the current step.
+        """
+        self._grad_sync.set_required_accumulations(require_accumulations)
 
     def add_loss_with_weight(self, loss: torch.Tensor, loss_weight: torch.Tensor):
         """Accumulates a loss value and its corresponding weight into the internal metric.
