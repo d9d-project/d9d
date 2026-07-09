@@ -7,7 +7,7 @@ from d9d.tracker import BaseTrackerRun
 
 from .common import (
     EventConfigurationStartedContext,
-    EventDataLoaderReadyContext,
+    EventDataStreamReadyContext,
     EventModelStagesReadyContext,
     EventStepContext,
 )
@@ -63,8 +63,8 @@ class EventSleepContext:
 EVENT_TRAIN_CONFIG_STARTED = Event[EventConfigurationStartedContext](id="train.configuration.start")
 """Triggered when the training configuration process begins. Provides access to the distributed context."""
 
-EVENT_TRAIN_DATA_LOADER_READY = Event[EventDataLoaderReadyContext](id="train.configuration.data_loader")
-"""Triggered when the training data loader has been fully initialized."""
+EVENT_TRAIN_DATA_STREAM_READY = Event[EventDataStreamReadyContext](id="train.configuration.data_stream")
+"""Triggered when the training microbatch pack stream has been fully initialized."""
 
 EVENT_TRAIN_MODEL_STAGES_READY = Event[EventModelStagesReadyContext](id="train.configuration.model_stages")
 """Triggered when the model stages are initialized and parallelized."""

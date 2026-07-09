@@ -2,9 +2,9 @@ import dataclasses
 from typing import TYPE_CHECKING
 
 from torch import nn
-from torch.utils.data import DataLoader
 
 from d9d.core.dist_context import DistributedContext
+from d9d.core.protocol import MicrobatchPackStream
 
 if TYPE_CHECKING:
     from d9d.loop.component import JobSchedule
@@ -33,14 +33,14 @@ class EventConfigurationStartedContext:
 
 
 @dataclasses.dataclass(kw_only=True)
-class EventDataLoaderReadyContext:
-    """Context provided when the data loader has been fully initialized.
+class EventDataStreamReadyContext:
+    """Context provided when the microbatch pack stream has been fully initialized.
 
     Attributes:
-        data_loader: The data loader instance.
+        stream: The microbatch pack stream instance.
     """
 
-    data_loader: DataLoader
+    stream: MicrobatchPackStream
 
 
 @dataclasses.dataclass(kw_only=True)

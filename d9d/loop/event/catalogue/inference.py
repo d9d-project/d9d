@@ -4,7 +4,7 @@ from d9d.loop.event import Event
 
 from .common import (
     EventConfigurationStartedContext,
-    EventDataLoaderReadyContext,
+    EventDataStreamReadyContext,
     EventModelStagesReadyContext,
     EventStepContext,
 )
@@ -25,8 +25,8 @@ class EventInferenceFinishedContext:
 EVENT_INFERENCE_CONFIG_STARTED = Event[EventConfigurationStartedContext](id="inference.configuration.start")
 """Triggered when the inference configuration process begins. Provides access to the distributed context."""
 
-EVENT_INFERENCE_DATA_LOADER_READY = Event[EventDataLoaderReadyContext](id="inference.configuration.data_loader")
-"""Triggered when the inference data loader has been fully initialized."""
+EVENT_INFERENCE_DATA_STREAM_READY = Event[EventDataStreamReadyContext](id="inference.configuration.data_stream")
+"""Triggered when the inference microbatch pack stream has been fully initialized."""
 
 EVENT_INFERENCE_MODEL_STAGES_READY = Event[EventModelStagesReadyContext](id="inference.configuration.model_stages")
 """Triggered when the model stages are initialized for inference."""
