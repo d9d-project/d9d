@@ -6,20 +6,18 @@ from tqdm import tqdm
 from d9d.core.dist_context import DeviceMeshParameters
 from d9d.core.offload import DEFAULT_SLEEP_TAGS, SleepTag
 from d9d.internals.determinism import set_seeds
-from d9d.internals.pipeline_state import PipelineStateHandler
 from d9d.loop.component import (
-    BatchMaths,
-    DataLoaderFactory,
+    DataParallelMicrobatchPackStream,
     GradientClipper,
     GradientManager,
     JobLogger,
     JobProfiler,
     JobSchedule,
-    LossComputer,
     ManualGarbageCollector,
     ModelStageExporter,
     ModelStageFactory,
     OptimizerFactory,
+    PipelineStateHandler,
     StateCheckpointer,
     TimeoutManager,
     TrainSleeper,
@@ -28,8 +26,9 @@ from d9d.loop.component import (
 from d9d.loop.config import TrainerConfig
 from d9d.loop.control import (
     CreateMetricsContext,
-    DatasetProvider,
+    DataProvider,
     FinalizeContext,
+    InitializeDataProviderContext,
     LRSchedulerProvider,
     ModelProvider,
     OptimizerProvider,
@@ -41,13 +40,13 @@ from d9d.loop.control import (
 from d9d.loop.event import EventBus
 from d9d.loop.event.catalogue.common import (
     EventConfigurationStartedContext,
-    EventDataLoaderReadyContext,
+    EventDataStreamReadyContext,
     EventModelStagesReadyContext,
     EventStepContext,
 )
 from d9d.loop.event.catalogue.train import (
     EVENT_TRAIN_CONFIG_STARTED,
-    EVENT_TRAIN_DATA_LOADER_READY,
+    EVENT_TRAIN_DATA_STREAM_READY,
     EVENT_TRAIN_FINISHED,
     EVENT_TRAIN_FORWARD_BACKWARD_POST,
     EVENT_TRAIN_FORWARD_BACKWARD_PRE,
@@ -67,6 +66,8 @@ from d9d.loop.event.catalogue.train import (
 from d9d.loop.state import TrainJobState
 from d9d.metric.impl.container import ComposeMetric
 
+from ._device import move_pack_to_device
+
 
 class TrainingConfigurator:
     """Orchestrates the assembly of the distributed training environment.
@@ -82,7 +83,7 @@ class TrainingConfigurator:
         parameters: TrainerConfig,
         task_provider: TrainTaskProvider,
         model_provider: ModelProvider,
-        data_provider: DatasetProvider,
+        data_provider: DataProvider,
         optimizer_provider: OptimizerProvider,
         lr_scheduler_provider: LRSchedulerProvider,
     ):
@@ -93,7 +94,7 @@ class TrainingConfigurator:
             parameters: The global configuration object for the trainer.
             task_provider: Factory for creating the training task logic.
             model_provider: Factory for defining and creating model stages.
-            data_provider: Factory for providing training datasets.
+            data_provider: Factory for building the microbatch pack stream.
             optimizer_provider: Factory for creating the optimizer.
             lr_scheduler_provider: Factory for creating the learning rate scheduler.
         """
@@ -121,49 +122,44 @@ class TrainingConfigurator:
 
         event_bus.trigger(EVENT_TRAIN_CONFIG_STARTED, EventConfigurationStartedContext(dist_context=dist_context))
 
-        batch_maths = BatchMaths(
-            dist_context=dist_context,
-            config_batching=self._parameters.batching,
-            config_pipelining=self._parameters.pipelining,
-        )
+        microbatch_pack_stream = self._data_provider(InitializeDataProviderContext(dist_context=dist_context))
+        event_bus.trigger(EVENT_TRAIN_DATA_STREAM_READY, EventDataStreamReadyContext(stream=microbatch_pack_stream))
 
-        data_loader_factory = DataLoaderFactory(
+        checkpointable_stream = DataParallelMicrobatchPackStream(
             dist_context=dist_context,
-            provider=self._data_provider,
-            config_data_loading=self._parameters.data_loading,
-            batch_maths=batch_maths,
+            inner=microbatch_pack_stream,
         )
-        data_loader_train = data_loader_factory.build_dataloader_for_train_job()
-        event_bus.trigger(EVENT_TRAIN_DATA_LOADER_READY, EventDataLoaderReadyContext(data_loader=data_loader_train))
 
         schedule = JobSchedule(
             config=self._parameters.schedule,
-            data_iterator=data_loader_train,
+            stream=checkpointable_stream,
         )
 
-        pipeline_state_handler = PipelineStateHandler(
-            sharding_spec={}, num_shards=batch_maths.num_microbatches_pipelining
-        )
-
-        loss_computer = LossComputer(state=pipeline_state_handler, task=task, schedule=schedule)
+        pipeline_state_handler = PipelineStateHandler()
 
         pipeline_schedule, modules = ModelStageFactory(
             model_provider=self._model_provider,
             dist_context=dist_context,
             config_model=self._parameters.model_stage_factory,
             config_pipelining=self._parameters.pipelining,
-            batch_maths=batch_maths,
-            pipeline_callback=loss_computer,
         ).build_pipeline_and_modules()
         event_bus.trigger(EVENT_TRAIN_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
 
         metrics = ComposeMetric(task.create_metrics(CreateMetricsContext()).metrics)
+
+        gradient_manager = GradientManager(
+            dist_context=dist_context,
+            tracked_modules=modules,
+            config=self._parameters.gradient_manager,
+        )
 
         task_operator = TrainTaskOperator(
             dist_context=dist_context,
             task=task,
             pipeline=pipeline_schedule,
             pipeline_state=pipeline_state_handler,
+            gradient_manager=gradient_manager,
+            job_schedule=schedule,
             metrics=metrics,
         )
 
@@ -198,13 +194,6 @@ class TrainingConfigurator:
 
         exporter = ModelStageExporter(model_provider=self._model_provider, dist_context=dist_context, modules=modules)
 
-        gradient_manager = GradientManager(
-            dist_context=dist_context,
-            tracked_modules=modules,
-            batch_maths=batch_maths,
-            config=self._parameters.gradient_manager,
-        )
-
         job_logger = JobLogger(
             dist_context=dist_context,
             config=self._parameters.logging,
@@ -216,11 +205,10 @@ class TrainingConfigurator:
 
         return TrainJobState(
             dist_context=dist_context,
-            data_loader=data_loader_train,
+            microbatch_pack_stream=checkpointable_stream,
             schedule=schedule,
             tracked_modules=modules,
             garbage_collector=gc,
-            batch_maths=batch_maths,
             checkpointer=checkpointer,
             optimizer=optimizer,
             task=task,
@@ -305,22 +293,20 @@ class Trainer:
             run.set_context({"stage": "train"})
             self._state.event_bus.trigger(EVENT_TRAIN_READY, EventTrainReadyContext(run=run))
 
-            for batch_group in self._state.data_loader:
+            for pack in self._state.microbatch_pack_stream:
                 run.set_step(self._state.schedule.current_step)
                 self._state.event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
+
+                device_pack = move_pack_to_device(pack, "cuda")
 
                 with self._state.event_bus.bounded(
                     EVENT_TRAIN_FORWARD_BACKWARD_PRE, EVENT_TRAIN_FORWARD_BACKWARD_POST, step_ctx
                 ):
-                    for batch in batch_group:
-                        # we do both forward and backward passes
-                        # since GradientManager is installed - it should start performing
-                        # synchronization overlapping grad sync with compute
-                        loss = self._state.task_operator.forward_backward(batch)
-
-                        # add loss for grad manager - it want it for grad reduction
-                        if loss is not None:
-                            self._state.gradient_manager.add_loss_with_weight(loss.loss, loss.loss_weight)
+                    # we do both forward and backward passes over the whole pack of microbatches;
+                    # since GradientManager is installed - it should start performing
+                    # synchronization overlapping grad sync with compute. Loss/weight is accumulated
+                    # into the gradient manager per microbatch inside the loss callback.
+                    self._state.task_operator.forward_backward(device_pack)
 
                 # metrics were successfully accumulated during forward passes - we can schedule their synchronization
                 self._state.logger.trigger_sync()

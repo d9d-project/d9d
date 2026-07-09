@@ -3,25 +3,24 @@ from tqdm import tqdm
 
 from d9d.core.dist_context import DeviceMeshParameters
 from d9d.internals.determinism import set_seeds
-from d9d.internals.pipeline_state import PipelineStateHandler
 from d9d.loop.component import (
-    BatchMaths,
-    DataLoaderFactory,
-    InferenceProcessor,
+    DataParallelMicrobatchPackStream,
     InferenceTaskOperator,
     JobProfiler,
     JobSchedule,
     ManualGarbageCollector,
     ModelStageFactory,
+    PipelineStateHandler,
     StateCheckpointer,
     TimeoutManager,
 )
 from d9d.loop.config import InferenceConfig, PipeliningConfig
 from d9d.loop.control import (
-    DatasetProvider,
+    DataProvider,
     FinalizeContext,
     InferenceTaskProvider,
     InferenceTaskProviderContext,
+    InitializeDataProviderContext,
     ModelProvider,
     RegisterModelEventsContext,
     RegisterTaskEventsContext,
@@ -31,13 +30,13 @@ from d9d.loop.event import (
 )
 from d9d.loop.event.catalogue.common import (
     EventConfigurationStartedContext,
-    EventDataLoaderReadyContext,
+    EventDataStreamReadyContext,
     EventModelStagesReadyContext,
     EventStepContext,
 )
 from d9d.loop.event.catalogue.inference import (
     EVENT_INFERENCE_CONFIG_STARTED,
-    EVENT_INFERENCE_DATA_LOADER_READY,
+    EVENT_INFERENCE_DATA_STREAM_READY,
     EVENT_INFERENCE_FINISHED,
     EVENT_INFERENCE_FORWARD_POST,
     EVENT_INFERENCE_FORWARD_PRE,
@@ -50,6 +49,8 @@ from d9d.loop.event.catalogue.inference import (
 )
 from d9d.loop.state import InferenceJobState
 from d9d.pipelining.factory import PipelineScheduleInferenceConfig
+
+from ._device import move_pack_to_device
 
 
 class InferenceConfigurator:
@@ -66,7 +67,7 @@ class InferenceConfigurator:
         parameters: InferenceConfig,
         task_provider: InferenceTaskProvider,
         model_provider: ModelProvider,
-        data_provider: DatasetProvider,
+        data_provider: DataProvider,
     ):
         """Constructs a configurator capable of building the full inference state.
 
@@ -75,7 +76,7 @@ class InferenceConfigurator:
             parameters: The global configuration object for inference.
             task_provider: Factory for creating the inference task logic.
             model_provider: Factory for defining and creating model stages.
-            data_provider: Factory for providing inference datasets.
+            data_provider: Factory for building the microbatch pack stream.
         """
         self._mesh = mesh
         self._parameters = parameters
@@ -101,37 +102,26 @@ class InferenceConfigurator:
 
         event_bus.trigger(EVENT_INFERENCE_CONFIG_STARTED, EventConfigurationStartedContext(dist_context=dist_context))
 
-        batch_maths = BatchMaths(
-            dist_context=dist_context, config_batching=self._parameters.batching, config_pipelining=pipelining_config
-        )
+        microbatch_pack_stream = self._data_provider(InitializeDataProviderContext(dist_context=dist_context))
+        event_bus.trigger(EVENT_INFERENCE_DATA_STREAM_READY, EventDataStreamReadyContext(stream=microbatch_pack_stream))
 
-        data_loader_factory = DataLoaderFactory(
+        checkpointable_stream = DataParallelMicrobatchPackStream(
             dist_context=dist_context,
-            provider=self._data_provider,
-            config_data_loading=self._parameters.data_loading,
-            batch_maths=batch_maths,
+            inner=microbatch_pack_stream,
         )
-        data_loader_infer = data_loader_factory.build_dataloader_for_infer_job()
-        event_bus.trigger(EVENT_INFERENCE_DATA_LOADER_READY, EventDataLoaderReadyContext(data_loader=data_loader_infer))
 
         schedule = JobSchedule(
             config=self._parameters.schedule,
-            data_iterator=data_loader_infer,
+            stream=checkpointable_stream,
         )
 
-        pipeline_state_handler = PipelineStateHandler(
-            sharding_spec={}, num_shards=batch_maths.num_microbatches_pipelining
-        )
-
-        processor = InferenceProcessor(state=pipeline_state_handler, task=task)
+        pipeline_state_handler = PipelineStateHandler()
 
         pipeline_schedule, modules = ModelStageFactory(
             model_provider=self._model_provider,
             dist_context=dist_context,
             config_model=self._parameters.model_stage_factory,
             config_pipelining=pipelining_config,
-            batch_maths=batch_maths,
-            pipeline_callback=processor,
         ).build_pipeline_and_modules()
         event_bus.trigger(EVENT_INFERENCE_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
 
@@ -149,11 +139,10 @@ class InferenceConfigurator:
 
         return InferenceJobState(
             dist_context=dist_context,
-            data_loader=data_loader_infer,
+            microbatch_pack_stream=checkpointable_stream,
             schedule=schedule,
             tracked_modules=modules,
             garbage_collector=gc,
-            batch_maths=batch_maths,
             checkpointer=checkpointer,
             task=task,
             profiler=profiler,
@@ -235,14 +224,15 @@ class Inference:
             ):
                 self._state.event_bus.trigger(EVENT_INFERENCE_READY, EventInferenceReadyContext())
 
-                for batch_group in self._state.data_loader:
+                for pack in self._state.microbatch_pack_stream:
                     self._state.event_bus.trigger(EVENT_INFERENCE_STEP_PRE, step_ctx)
+
+                    device_pack = move_pack_to_device(pack, "cuda")
 
                     with self._state.event_bus.bounded(
                         EVENT_INFERENCE_FORWARD_PRE, EVENT_INFERENCE_FORWARD_POST, step_ctx
                     ):
-                        for batch in batch_group:
-                            self._state.task_operator.forward(batch)
+                        self._state.task_operator.forward(device_pack)
 
                     gc.collect_periodic()
 
