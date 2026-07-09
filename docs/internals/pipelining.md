@@ -29,7 +29,7 @@ Consists of:
 *   **Computation Handlers**: 
     *   `ForwardComputeHandler`: Performs forward pass, caches inputs/outputs for backward passes.
     *   `BackwardComputeHandler`: Performs backward pass, capable of splitting backward passes into `backward_input` (dI) and `backward_weight` (dW) for advanced schedules.
-*   **Communication Handlers**: Contain and manage the P2P buffers for both forward and backward passes.
+*   **Communication Handlers**: Contain and manage the P2P buffers for both forward and backward passes. Buffer sizes are inferred per microbatch, so each microbatch in a pack may have a different shape.
 
 #### Actions (`infra/schedule/component/runtime/action.py`)
 
@@ -47,15 +47,17 @@ Actions are designed to be declarative and immutable.
 
 A `Program` is simply `dict[int, list[ActionBase]]` — a mapping of Rank ID to a sequential list of Actions.
 
+A program depends only on the microbatch count and the (fixed) pipeline topology, so the `PipelineProgramCache` composes each microbatch count once and reuses it across steps, keeping this rank's action list alongside whether the program contains any backward work.
+
 #### Executor (`infra/schedule/component/runtime/executor.py`)
 
-The `PipelineScheduleExecutor` is the runtime engine. 
+The `PipelineScheduleExecutor` is the runtime engine.
 
-It:
+It receives a **pack** — a sequence of ready per-microbatch inputs — plus the callback to run on each microbatch's outputs, and per step:
 
-1.  Shards global inputs into microbatches.
-2.  Iterates through the `Program` action list.
-3.  Dispatches calls to `Action`s that perform computation or communication workload.
+1.  Fetches the compiled `Program` for the pack length from the `PipelineProgramCache` (composed once per microbatch count, then reused).
+2.  Configures stage buffers for the pack, sizing each microbatch's P2P buffers independently, so microbatches may differ in shape. This is skipped when the pack's shapes match the previous step's.
+3.  Iterates through the `Program` action list, dispatching to `Action`s that perform computation or communication workload.
 
 ### Comparison with PyTorch
 
