@@ -24,6 +24,14 @@ from d9d_test.pipelining.definitions import (
 )
 
 
+def _assert_no_live_buffers(stage_object: PipelineStage):
+    # P2P receive buffers are released once consumed, so none should linger after a step.
+    if stage_object._forward_comm is not None:
+        assert len(stage_object._forward_comm._live_buffers) == 0
+    if stage_object._backward_comm is not None:
+        assert len(stage_object._backward_comm._live_buffers) == 0
+
+
 def _do_standard_backward(stages: list[PipelineModel], x: torch.Tensor, y: torch.Tensor):
     x_in = x
     for stage in stages:
@@ -126,6 +134,7 @@ def test_e2e(
         stage_object: PipelineStage = schedule_info.schedule._stages[this_stage_i]
         assert len(stage_object._backward_comp._cache) == 0
         assert len(stage_object._forward_comp._cache) == 0
+        _assert_no_live_buffers(stage_object)
 
         check_pp_hooks_ran(this_hooks, n_microbatches, override_w1=0 if freeze_w1 else None)
 

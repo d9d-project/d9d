@@ -13,12 +13,12 @@ class ReceiveStageInput:
     Attributes:
         name: A unique identifier for the communication operation.
         from_stage: The stage index sending the data.
-        buffer: The pre-allocated tensor buffer where data will be received.
+        spec: The shape/dtype/layout describing the tensor to receive.
     """
 
     name: str
     from_stage: int
-    buffer: torch.Tensor
+    spec: TensorSpec
 
 
 @dataclasses.dataclass
@@ -97,6 +97,12 @@ class StageCommunicationHandler:
         self._stage_idx_to_host_rank = stage_idx_to_host_rank
         self._group = group
 
+        self._input_requires_grad = False
+        # Currently-allocated receive buffers, keyed by microbatch then input name. Populated lazily on
+        # receive/local-set and released (popped) when consumed by get_inputs, so only in-flight
+        # microbatches hold live buffers at any moment.
+        self._live_buffers: dict[int, dict[str, torch.Tensor]] = {}
+
     @staticmethod
     def _build_inputs(
         name: str,
@@ -115,12 +121,7 @@ class StageCommunicationHandler:
                     handlers[chunk_id][input_name] = ReceiveStageInput(
                         name=f"{name}_recv_from_{input_stage_index}_to_{stage_index}[{chunk_id}][{input_name}]",
                         from_stage=input_stage_index,
-                        buffer=torch.empty(
-                            input_spec.shape,
-                            dtype=input_spec.dtype,
-                            layout=input_spec.layout,
-                            device="cuda",  # force device
-                        ),
+                        spec=input_spec,
                     )
         return handlers
 
@@ -136,17 +137,23 @@ class StageCommunicationHandler:
         return handlers
 
     def set_input_requires_grad_(self, requires_grad: bool):
-        """Sets the `requires_grad` flag for all internal input buffers.
+        """Records whether receive buffers should require gradients.
 
         Typically used to enable gradient flow from backward stages to forward stages.
 
         Args:
             requires_grad: Whether the buffers should require gradients.
         """
-        for inputs in self._input_handlers.values():
-            for info in inputs.values():
-                if isinstance(info, ReceiveStageInput):
-                    info.buffer.requires_grad_(requires_grad)
+        self._input_requires_grad = requires_grad
+
+    def _allocate_buffer(self, spec: TensorSpec) -> torch.Tensor:
+        return torch.empty(
+            spec.shape,
+            dtype=spec.dtype,
+            layout=spec.layout,
+            device="cuda",  # force device
+            requires_grad=self._input_requires_grad,
+        )
 
     def set_inputs_local(self, inputs: dict[str, torch.Tensor], microbatch_index: int):
         """Manually fills the input buffer for a specific microbatch with local data.
@@ -161,15 +168,18 @@ class StageCommunicationHandler:
         Raises:
             RuntimeError: If tried to set a buffer for a no-receive stage input.
         """
+        live = self._live_buffers.setdefault(microbatch_index, {})
         for input_name, input_value in inputs.items():
             handler = self._input_handlers[microbatch_index][input_name]
             if not isinstance(handler, ReceiveStageInput):
                 raise RuntimeError("Tried to set a buffer of no-receive stage input")
-            prev_requires_grad = handler.buffer.requires_grad
-            handler.buffer = input_value.detach().requires_grad_(prev_requires_grad)
+            live[input_name] = input_value.detach().requires_grad_(self._input_requires_grad)
 
     def get_inputs(self, microbatch_index: int) -> dict[str, torch.Tensor]:
-        """Retrieves the input tensors for a specific microbatch from the internal buffers.
+        """Retrieves and releases the input tensors for a specific microbatch.
+
+        Ownership of the buffers is transferred to the caller: the handler drops its references so the
+        memory can be freed once the caller (e.g. the forward/backward cache) releases it.
 
         Args:
             microbatch_index: The microbatch identifier.
@@ -179,18 +189,19 @@ class StageCommunicationHandler:
 
         Raises:
             RuntimeError: If tried to get a buffer for a no-receive stage input.
+            KeyError: If no buffer has been allocated for the microbatch (never received or set).
         """
-        outputs: dict[str, torch.Tensor] = {}
-
-        for input_name, input_info in self._input_handlers[microbatch_index].items():
+        for input_info in self._input_handlers[microbatch_index].values():
             if not isinstance(input_info, ReceiveStageInput):
                 raise RuntimeError("Tried to get a buffer of no receive stage input")
-            outputs[input_name] = input_info.buffer
 
-        return outputs
+        return self._live_buffers.pop(microbatch_index)
 
     def create_receive_ops(self, microbatch_index: int) -> list[dist.P2POp]:
         """Generates the PyTorch P2P receive operations for a specific microbatch.
+
+        Allocates the receive buffers for the microbatch on demand and registers them as live until
+        consumed by :meth:`get_inputs`.
 
         Args:
             microbatch_index: The microbatch identifier.
@@ -204,15 +215,18 @@ class StageCommunicationHandler:
         ops = []
 
         inputs = self._input_handlers[microbatch_index]
+        live = self._live_buffers.setdefault(microbatch_index, {})
         # sort ops by parameter names to ensure receive ops are ordered the same for send and recv
-        for _input_name, input_info in sorted(inputs.items(), key=lambda x: x[0]):
+        for input_name, input_info in sorted(inputs.items(), key=lambda x: x[0]):
             match input_info:
                 case StartStageInput():
                     pass
                 case ReceiveStageInput():
+                    buffer = self._allocate_buffer(input_info.spec)
+                    live[input_name] = buffer
                     peer_rank = self._stage_idx_to_host_rank[input_info.from_stage]
                     peer_global_rank = dist.get_global_rank(self._group, peer_rank)
-                    op = dist.P2POp(dist.irecv, input_info.buffer, peer_global_rank, self._group)
+                    op = dist.P2POp(dist.irecv, buffer, peer_global_rank, self._group)
                     ops.append(op)
                 case _:
                     raise ValueError()
@@ -251,8 +265,5 @@ class StageCommunicationHandler:
         return ops
 
     def reset(self):
-        """Resets the internal state, specifically clearing gradients on input buffers."""
-        for inp_handlers in self._input_handlers.values():
-            for inp_handler in inp_handlers.values():
-                if isinstance(inp_handler, ReceiveStageInput):
-                    inp_handler.buffer.grad = None
+        """Resets the internal state, releasing any live receive buffers."""
+        self._live_buffers.clear()
