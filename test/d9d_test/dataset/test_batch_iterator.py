@@ -103,7 +103,7 @@ def test_fixed_count_packer_groups_into_packs(size, microbatch_size, microbatche
     loader = _make_loader(size=size, microbatch_size=microbatch_size)
     packer = FixedCountMicrobatchPacker(loader, microbatches_per_step=microbatches_per_step, drop_last=drop_last)
 
-    assert len(packer) == len(expected)
+    assert packer.total_steps == len(expected)
 
     packs = list(packer)
 
