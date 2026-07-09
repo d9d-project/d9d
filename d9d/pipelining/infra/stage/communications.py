@@ -65,9 +65,8 @@ class StageCommunicationHandler:
         self,
         name: str,
         stage_index: int,
-        num_microbatches: int,
         input_stage_index: int | None,
-        input_args: dict[str, TensorSpec],
+        input_args_per_microbatch: tuple[dict[str, TensorSpec], ...],
         output_stage_index: int | None,
         output_args: dict[str, TensorSpec],
         stage_idx_to_host_rank: dict[int, int],
@@ -78,20 +77,20 @@ class StageCommunicationHandler:
         Args:
             name: Name prefix for this handler (e.g., 'fwd', 'bwd').
             stage_index: The logical index of the current stage.
-            num_microbatches: Total number of microbatches ("chunks") to schedule.
             input_stage_index: The logical index of the stage providing inputs, or None if inputs are local.
-            input_args: Specs (shape/dtype/layout) for input tensors.
+            input_args_per_microbatch: Per-microbatch input specs (shape/dtype/layout); the receive buffer for
+                microbatch ``i`` is sized from entry ``i``. The number of microbatches is its length.
             output_stage_index: The logical index of the stage consuming outputs, or None if outputs are terminal.
-            output_args: Specs (shape/dtype/layout) for output tensors.
+            output_args: Structural output specs (names). Send buffers are not pre-allocated — send ops read
+                the produced tensors directly — so only names matter here, not per-microbatch shapes.
             stage_idx_to_host_rank: Mapping from logical stage indices to physical world ranks.
             group: The process group strictly for pipeline communication.
         """
         self._input_handlers = self._build_inputs(
             name=name,
             stage_index=stage_index,
-            num_microbatches=num_microbatches,
             input_stage_index=input_stage_index,
-            input_args=input_args,
+            input_args_per_microbatch=input_args_per_microbatch,
         )
         self._output_handlers = self._build_outputs(output_stage_index=output_stage_index, output_args=output_args)
 
@@ -102,13 +101,12 @@ class StageCommunicationHandler:
     def _build_inputs(
         name: str,
         stage_index: int,
-        num_microbatches: int,
         input_stage_index: int | None,
-        input_args: dict[str, TensorSpec],
+        input_args_per_microbatch: tuple[dict[str, TensorSpec], ...],
     ) -> dict[int, dict[str, StageInput]]:
         handlers: dict[int, dict[str, StageInput]] = {}
 
-        for chunk_id in range(num_microbatches):
+        for chunk_id, input_args in enumerate(input_args_per_microbatch):
             handlers[chunk_id] = {}
             for input_name, input_spec in input_args.items():
                 if input_stage_index is None:

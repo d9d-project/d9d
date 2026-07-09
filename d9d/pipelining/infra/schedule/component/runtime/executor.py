@@ -19,30 +19,50 @@ if TYPE_CHECKING:
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class _BufferConfig:
-    """Identifies a stage-buffer allocation: microbatch count plus representative microbatch specs."""
+class _MicrobatchInputSpec:
+    """A hashable shape/dtype fingerprint of one microbatch's named input tensors."""
 
-    num_microbatches: int
-    inputs: tuple[tuple[str, TensorSpec], ...]
+    named_specs: tuple[tuple[str, TensorSpec], ...]
 
     @classmethod
-    def of(cls, num_microbatches: int, representative_microbatch: dict[str, torch.Tensor]) -> "_BufferConfig":
-        """Builds a buffer config from a microbatch count and a representative microbatch.
+    def of(cls, microbatch: dict[str, torch.Tensor]) -> "_MicrobatchInputSpec":
+        """Builds a fingerprint from a single microbatch's inputs.
 
         Args:
-            num_microbatches: Number of microbatches in the step.
-            representative_microbatch: A single microbatch whose tensor shapes/dtypes size the buffers.
+            microbatch: The microbatch's input tensors.
 
         Returns:
-            A hashable buffer configuration key.
+            A hashable fingerprint of its named tensor specs.
         """
         return cls(
-            num_microbatches=num_microbatches,
-            inputs=tuple(
+            named_specs=tuple(
                 (name, TensorSpec(shape=tuple(tensor.shape), dtype=tensor.dtype, layout=tensor.layout))
-                for name, tensor in sorted(representative_microbatch.items())
-            ),
+                for name, tensor in sorted(microbatch.items())
+            )
         )
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class _BufferConfig:
+    """Identifies a stage-buffer allocation: the input fingerprint of every microbatch in the pack.
+
+    Buffers are sized per microbatch, so the cache key covers all of them — a pack whose microbatch
+    shapes differ from the last step's (in count or in any individual shape) reconfigures.
+    """
+
+    microbatches: tuple[_MicrobatchInputSpec, ...]
+
+    @classmethod
+    def of(cls, inputs_microbatches: tuple[dict[str, torch.Tensor], ...]) -> "_BufferConfig":
+        """Builds a buffer config from the per-microbatch inputs of a pack.
+
+        Args:
+            inputs_microbatches: The per-microbatch input tensors whose shapes/dtypes size the buffers.
+
+        Returns:
+            A hashable buffer configuration key covering every microbatch.
+        """
+        return cls(microbatches=tuple(_MicrobatchInputSpec.of(microbatch) for microbatch in inputs_microbatches))
 
 
 class PipelineScheduleExecutor(PipelineSchedule):
@@ -71,17 +91,14 @@ class PipelineScheduleExecutor(PipelineSchedule):
 
         self._buffer_config: _BufferConfig | None = None
 
-    def _configure_buffers(
-        self, num_microbatches: int, representative_microbatch: dict[str, torch.Tensor], has_backward: bool
-    ):
-        config = _BufferConfig.of(num_microbatches, representative_microbatch)
+    def _configure_buffers(self, inputs_microbatches: tuple[dict[str, torch.Tensor], ...], has_backward: bool):
+        config = _BufferConfig.of(inputs_microbatches)
         if config == self._buffer_config:
             return
 
         for stage in self._stages.values():
             stage.configure_buffers(
-                num_microbatches=num_microbatches,
-                pipeline_inputs=representative_microbatch,
+                pipeline_inputs_per_microbatch=inputs_microbatches,
                 has_backward=has_backward,
             )
 
@@ -98,8 +115,12 @@ class PipelineScheduleExecutor(PipelineSchedule):
         if len(kwargs_microbatches) != num_microbatches:
             raise ValueError("inputs_microbatches and kwargs_microbatches must have the same length")
 
+        expected_names = inputs_microbatches[0].keys()
+        if any(microbatch.keys() != expected_names for microbatch in inputs_microbatches):
+            raise ValueError("All microbatches in a pack must have the same input names")
+
         program = self._programs.program_for(num_microbatches)
-        self._configure_buffers(num_microbatches, inputs_microbatches[0], program.has_backward)
+        self._configure_buffers(inputs_microbatches, program.has_backward)
 
         callback = (
             PipelineLossHandler(self._callback_fn) if program.has_backward else PipelineResultHandler(self._callback_fn)

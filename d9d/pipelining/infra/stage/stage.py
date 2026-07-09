@@ -50,15 +50,18 @@ class PipelineStage:
     def info(self) -> PipelineStageInfo:
         return self._info
 
-    def configure_buffers(self, num_microbatches: int, has_backward: bool, pipeline_inputs: dict[str, torch.Tensor]):
+    def configure_buffers(
+        self, has_backward: bool, pipeline_inputs_per_microbatch: tuple[dict[str, torch.Tensor], ...]
+    ):
         """Initializes the communication handlers and buffers for the stage.
 
-        This must be called before execution to establish P2P buffer sizes and directions.
+        This must be called before execution to establish P2P buffer sizes and directions. Input/output
+        shapes are inferred per microbatch, so each microbatch's receive buffers are sized independently
+        and the microbatches in a pack may differ in shape.
 
         Args:
-            num_microbatches: Total number of microbatches to process.
             has_backward: Does this pipeline stage should store info for a backward pass
-            pipeline_inputs: Pipeline input data.
+            pipeline_inputs_per_microbatch: A representative input for each microbatch in the pack.
 
         Raises:
             TypeError: If the module does not support pipelining.
@@ -70,17 +73,23 @@ class PipelineStage:
 
         if not isinstance(self._module, ModuleSupportsPipelining):
             raise TypeError("Module does not implement ModuleSupportsPipelining protocol")
-        inputs_meta = self._module.infer_stage_inputs_from_pipeline_inputs(microbatch_inputs=pipeline_inputs)
-        outputs_meta = self._module.infer_stage_outputs_from_pipeline_inputs(microbatch_inputs=pipeline_inputs)
+
+        inputs_meta_per_microbatch = tuple(
+            self._module.infer_stage_inputs_from_pipeline_inputs(microbatch_inputs=microbatch)
+            for microbatch in pipeline_inputs_per_microbatch
+        )
+        outputs_meta_per_microbatch = tuple(
+            self._module.infer_stage_outputs_from_pipeline_inputs(microbatch_inputs=microbatch)
+            for microbatch in pipeline_inputs_per_microbatch
+        )
 
         self._forward_comm = StageCommunicationHandler(
             name="fwd",
             stage_index=self._info.current_stage,
-            num_microbatches=num_microbatches,
             input_stage_index=prev_stage_idx,
-            input_args=inputs_meta,
+            input_args_per_microbatch=inputs_meta_per_microbatch,
             output_stage_index=next_stage_idx,
-            output_args=outputs_meta,
+            output_args=outputs_meta_per_microbatch[0],
             group=self._group,
             stage_idx_to_host_rank=self._stage_to_host_topology,
         )
@@ -92,11 +101,10 @@ class PipelineStage:
             self._backward_comm = StageCommunicationHandler(
                 name="bwd",
                 stage_index=self._info.current_stage,
-                num_microbatches=num_microbatches,
                 input_stage_index=next_stage_idx,
-                input_args=outputs_meta,
+                input_args_per_microbatch=outputs_meta_per_microbatch,
                 output_stage_index=prev_stage_idx,
-                output_args=inputs_meta,
+                output_args=inputs_meta_per_microbatch[0],
                 group=self._group,
                 stage_idx_to_host_rank=self._stage_to_host_topology,
             )
