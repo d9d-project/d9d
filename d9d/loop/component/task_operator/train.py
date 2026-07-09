@@ -50,13 +50,7 @@ class LossComputer:
 
         Returns:
             The calculated loss multiplied by its weight.
-
-        Raises:
-            ValueError: If called before "bind".
         """
-        if self._gradient_manager is None or self._metrics is None:
-            raise ValueError("LossComputer must be bound before use")
-
         with self._state.scope(microbatch_idx) as state:
             computation = self._task.compute_loss(
                 ComputeLossContext(pipeline_results=pipeline_outputs, state=state, schedule=self._schedule)
