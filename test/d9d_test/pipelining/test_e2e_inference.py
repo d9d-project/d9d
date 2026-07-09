@@ -23,20 +23,37 @@ def _do_standard_forward(stages: list[PipelineModel], x: torch.Tensor, y: torch.
     return x_in
 
 
-@pytest.mark.parametrize("n_microbatches", [1, 2, 4, 8, 16, 32])
+@pytest.mark.parametrize(
+    "microbatch_sizes",
+    [
+        [16],  # single microbatch
+        [16, 16],
+        [16] * 4,
+        [16] * 8,
+        [16] * 16,
+        [16] * 32,
+        [3, 7, 1, 5],  # microbatches within the pack differ in batch size
+    ],
+)
 @pytest.mark.distributed
-def test_inference_e2e(dist_ctx_factory, n_microbatches: int):
+def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
+    # Each microbatch's P2P buffers are sized independently, so a pack whose microbatches differ in
+    # shape exercises the per-microbatch buffer allocation.
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=8))
     pp_mesh = dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"]
     n_stages = pp_mesh.size()
 
-    x, y = build_pp_inputs(x_with_grad=False)
+    torch.manual_seed(4242)
+    microbatch_xs = [torch.randn(size, 8, device="cuda") for size in microbatch_sizes]
+    microbatch_ys = [torch.randn(size, 8, device="cuda") for size in microbatch_sizes]
 
     full_stage_modules = [build_pp_model().eval() for _ in range(n_stages)]
     for m in full_stage_modules:
         m.requires_grad_(False)
 
-    ref_output = _do_standard_forward(full_stage_modules, x, y)
+    ref_outputs = [
+        _do_standard_forward(full_stage_modules, x, y) for x, y in zip(microbatch_xs, microbatch_ys, strict=True)
+    ]
 
     this_rank_stages = []
 
@@ -56,18 +73,16 @@ def test_inference_e2e(dist_ctx_factory, n_microbatches: int):
         callback=_result_fn,
     )
 
-    inputs_microbatches = tuple({"x": x_mb} for x_mb in torch.tensor_split(x, n_microbatches, dim=0))
-    kwargs_microbatches = tuple({"y": y_mb} for y_mb in torch.tensor_split(y, n_microbatches, dim=0))
+    inputs_microbatches = tuple({"x": x} for x in microbatch_xs)
+    kwargs_microbatches = tuple({"y": y} for y in microbatch_ys)
 
     schedule_info.schedule.step(inputs_microbatches=inputs_microbatches, kwargs_microbatches=kwargs_microbatches)
 
     if pp_mesh.get_local_rank() == pp_mesh.size() - 1:
-        assert len(collected_results) == n_microbatches
-
-        sorted_chunks = [collected_results[i] for i in range(n_microbatches)]
-        final_pipeline_output = torch.cat(sorted_chunks, dim=0)
-
-        assert torch.allclose(final_pipeline_output, ref_output)
+        assert len(collected_results) == len(microbatch_sizes)
+        for idx, (ref, size) in enumerate(zip(ref_outputs, microbatch_sizes, strict=True)):
+            assert collected_results[idx].shape[0] == size
+            assert torch.allclose(collected_results[idx], ref)
 
     for this_stage_i in this_rank_stages:
         assert full_stage_modules[this_stage_i].w1.grad is None
