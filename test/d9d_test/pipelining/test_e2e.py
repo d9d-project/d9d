@@ -97,7 +97,6 @@ def test_e2e(
         dist_context=dist_ctx,
         schedule_config=schedule_config,
         model_provider=_model_provider,
-        callback=_loss_fn,
     )
 
     not_this_rank_stages = [i for i in range(len(full_stage_modules)) if i not in this_rank_stages]
@@ -105,7 +104,9 @@ def test_e2e(
     inputs_microbatches = tuple({"x": x_mb} for x_mb in torch.tensor_split(x, n_microbatches, dim=0))
     kwargs_microbatches = tuple({"y": y_mb} for y_mb in torch.tensor_split(y, n_microbatches, dim=0))
 
-    schedule_info.schedule.step(inputs_microbatches=inputs_microbatches, kwargs_microbatches=kwargs_microbatches)
+    schedule_info.schedule.step(
+        inputs_microbatches=inputs_microbatches, kwargs_microbatches=kwargs_microbatches, callback=_loss_fn
+    )
 
     assert x.grad is None
     assert y.grad is None
@@ -165,7 +166,6 @@ def test_e2e_local(dist_ctx_factory, freeze_w1: bool):
         dist_context=dist_ctx,
         schedule_config=schedule_config,
         model_provider=_model_provider,
-        callback=_loss_fn,
     )
 
     assert isinstance(schedule_info.schedule, OfflinePipelineExecutor)
@@ -174,7 +174,7 @@ def test_e2e_local(dist_ctx_factory, freeze_w1: bool):
     assert schedule_info.has_first_stage
     assert schedule_info.has_last_stage
 
-    schedule_info.schedule.step(inputs_microbatches=({"x": x},), kwargs_microbatches=({"y": y},))
+    schedule_info.schedule.step(inputs_microbatches=({"x": x},), kwargs_microbatches=({"y": y},), callback=_loss_fn)
 
     if freeze_w1:
         assert model.w1.grad is None

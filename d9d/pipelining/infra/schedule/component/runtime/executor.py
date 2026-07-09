@@ -73,7 +73,6 @@ class PipelineScheduleExecutor(PipelineSchedule):
         dist_context: DistributedContext,
         stages: list[PipelineStage],
         program_builder: "PipelineProgramBuilder",
-        callback: PipelineLossFn | PipelineResultFn,
     ):
         """Constructs the schedule executor.
 
@@ -81,12 +80,10 @@ class PipelineScheduleExecutor(PipelineSchedule):
             dist_context: The distributed context.
             stages: List of stages managed by this executor.
             program_builder: Builder that composes the per-rank action program for a microbatch count.
-            callback: Function to compute loss or process pipeline results.
         """
         self._dist_ctx = dist_context
         self._stages = {stage.info.current_stage: stage for stage in stages}
         self._programs = PipelineProgramCache(dist_context, program_builder)
-        self._callback_fn = callback
         self._comm_handler = PipelineCommunicationHandler(self._stages)
 
         self._buffer_config: _BufferConfig | None = None
@@ -108,6 +105,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
         self,
         inputs_microbatches: tuple[dict[str, torch.Tensor], ...],
         kwargs_microbatches: tuple[dict[str, Any], ...],
+        callback: PipelineLossFn | PipelineResultFn,
     ):
         num_microbatches = len(inputs_microbatches)
         if num_microbatches == 0:
@@ -122,9 +120,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
         program = self._programs.program_for(num_microbatches)
         self._configure_buffers(inputs_microbatches, program.has_backward)
 
-        callback = (
-            PipelineLossHandler(self._callback_fn) if program.has_backward else PipelineResultHandler(self._callback_fn)
-        )
+        callback_fn = PipelineLossHandler(callback) if program.has_backward else PipelineResultHandler(callback)
 
         self._dist_ctx.logger.debug("Begin pipeline step")
 
@@ -136,7 +132,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
                 self._dist_ctx.logger.debug(f"Running pipeline action {action}")
                 action.apply(
                     ActionContext(
-                        callback=callback,
+                        callback=callback_fn,
                         stages=self._stages,
                         communications=self._comm_handler,
                         pipeline_inputs_microbatches=inputs_microbatches,

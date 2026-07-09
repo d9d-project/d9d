@@ -4,7 +4,7 @@ from collections.abc import Callable
 from torch import nn
 
 from ...core.dist_context import REGULAR_DOMAIN, DistributedContext
-from ..api import PipelineLossFn, PipelineResultFn, PipelineSchedule, PipelineStageInfo
+from ..api import PipelineSchedule, PipelineStageInfo
 from ..infra.schedule.component.program import (
     build_stage_to_host_rank_topology,
     invert_stage_to_host_rank_topology,
@@ -30,13 +30,12 @@ class PipelineScheduleInfo:
 def _build_schedule_local(
     schedule_config: AnyPipelineScheduleConfig,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
-    callback: PipelineLossFn | PipelineResultFn,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     stage_info = PipelineStageInfo(num_stages=1, current_stage=0)
 
     model = model_provider(stage_info)
     has_backward = not isinstance(schedule_config, PipelineScheduleInferenceConfig)
-    scheduler = OfflinePipelineExecutor(model=model, callback=callback, do_backward=has_backward)
+    scheduler = OfflinePipelineExecutor(model=model, do_backward=has_backward)
 
     return PipelineScheduleInfo(schedule=scheduler, has_first_stage=True, has_last_stage=True), [model]
 
@@ -45,7 +44,6 @@ def _build_schedule_distributed(
     dist_context: DistributedContext,
     schedule_config: AnyPipelineScheduleConfig,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
-    callback: PipelineLossFn | PipelineResultFn,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     program_builder = PIPELINE_PROGRAM_REGISTRY.program_for(schedule_config)
     mesh = dist_context.mesh_for(REGULAR_DOMAIN)["pp"]
@@ -82,7 +80,6 @@ def _build_schedule_distributed(
         dist_context=dist_context,
         stages=stages,
         program_builder=program_builder,
-        callback=callback,
     )
 
     return PipelineScheduleInfo(
@@ -94,7 +91,6 @@ def build_schedule(
     dist_context: DistributedContext,
     schedule_config: AnyPipelineScheduleConfig,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
-    callback: PipelineLossFn | PipelineResultFn,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     """Constructs the pipeline schedule and instantiates model stages.
 
@@ -110,8 +106,6 @@ def build_schedule(
         schedule_config: Configuration object determining the schedule strategy.
         model_provider: A factory function that accepts stage info and returns an `nn.Module`
             for that specific stage.
-        callback: Callback either computing loss function (if training) or just processing pipeline outputs
-            (if not training).
 
     Returns:
         A tuple containing the schedule info (executor and metadata) and a list
@@ -122,7 +116,6 @@ def build_schedule(
             dist_context=dist_context,
             schedule_config=schedule_config,
             model_provider=model_provider,
-            callback=callback,
         )
     else:
-        return _build_schedule_local(schedule_config=schedule_config, model_provider=model_provider, callback=callback)
+        return _build_schedule_local(schedule_config=schedule_config, model_provider=model_provider)

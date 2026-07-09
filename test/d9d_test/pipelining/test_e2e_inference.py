@@ -70,13 +70,14 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
         dist_context=dist_ctx,
         schedule_config=PipelineScheduleInferenceConfig(),
         model_provider=_model_provider,
-        callback=_result_fn,
     )
 
     inputs_microbatches = tuple({"x": x} for x in microbatch_xs)
     kwargs_microbatches = tuple({"y": y} for y in microbatch_ys)
 
-    schedule_info.schedule.step(inputs_microbatches=inputs_microbatches, kwargs_microbatches=kwargs_microbatches)
+    schedule_info.schedule.step(
+        inputs_microbatches=inputs_microbatches, kwargs_microbatches=kwargs_microbatches, callback=_result_fn
+    )
 
     if pp_mesh.get_local_rank() == pp_mesh.size() - 1:
         assert len(collected_results) == len(microbatch_sizes)
@@ -114,12 +115,11 @@ def test_inference_e2e_local(dist_ctx_factory):
         dist_context=dist_ctx,
         schedule_config=PipelineScheduleInferenceConfig(),
         model_provider=_model_provider,
-        callback=_result_fn,
     )
 
     assert isinstance(schedule_info.schedule, OfflinePipelineExecutor)
 
-    schedule_info.schedule.step(inputs_microbatches=({"x": x},), kwargs_microbatches=({"y": y},))
+    schedule_info.schedule.step(inputs_microbatches=({"x": x},), kwargs_microbatches=({"y": y},), callback=_result_fn)
 
     # trace should have exactly one result at index 0 because OfflineExecutor does not shard
     assert len(collected_results) == 1

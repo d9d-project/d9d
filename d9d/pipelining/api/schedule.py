@@ -3,6 +3,8 @@ from typing import Any
 
 import torch
 
+from .types import PipelineLossFn, PipelineResultFn
+
 # TODO: feature - support any PyTrees as pipeline parameters
 
 
@@ -14,6 +16,7 @@ class PipelineSchedule(abc.ABC):
         self,
         inputs_microbatches: tuple[dict[str, torch.Tensor], ...],
         kwargs_microbatches: tuple[dict[str, Any], ...],
+        callback: PipelineLossFn | PipelineResultFn,
     ):
         """Executes a single pipeline step over one pack of microbatches.
 
@@ -26,5 +29,6 @@ class PipelineSchedule(abc.ABC):
         Args:
             inputs_microbatches: Per-microbatch input tensors (fed to the first pipeline stage).
             kwargs_microbatches: Per-microbatch keyword arguments (fed to every pipeline stage).
+            callback: Function to compute loss or process pipeline results.
         """
         ...

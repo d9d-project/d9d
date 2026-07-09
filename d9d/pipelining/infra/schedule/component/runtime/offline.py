@@ -14,22 +14,21 @@ class OfflinePipelineExecutor(PipelineSchedule):
     within the pipeline abstraction.
     """
 
-    def __init__(self, model: nn.Module, callback: PipelineLossFn | PipelineResultFn, do_backward: bool):
+    def __init__(self, model: nn.Module, do_backward: bool):
         """Constructs the offline pipeline executor.
 
         Args:
             model: The PyTorch module to execute.
-            callback: Function to compute loss or process pipeline results.
             do_backward: Whether to execute the backward pass.
         """
         self._model = model
-        self._callback = callback
         self._do_backward = do_backward
 
     def step(
         self,
         inputs_microbatches: tuple[dict[str, torch.Tensor], ...],
         kwargs_microbatches: tuple[dict[str, Any], ...],
+        callback: PipelineLossFn | PipelineResultFn,
     ):
         num_microbatches = len(inputs_microbatches)
         if num_microbatches == 0:
@@ -42,7 +41,7 @@ class OfflinePipelineExecutor(PipelineSchedule):
             kwargs = kwargs_microbatches[microbatch_idx]
 
             result = self._model(**inputs, **kwargs)
-            processing_result = self._callback(result, microbatch_idx)
+            processing_result = callback(result, microbatch_idx)
 
             if self._do_backward:
                 if not isinstance(processing_result, torch.Tensor):
