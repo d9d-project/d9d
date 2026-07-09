@@ -12,7 +12,8 @@ class FixedCountMicrobatchPacker(MicrobatchPackStream):
     Keeping a short trailing pack (``drop_last=False``) is only consistent across ranks when every rank sees the
     same number of microbatches (e.g. the dataset was sharded with ``pad_to_equal_size_across_shards``).
 
-    It is ``Sized`` when the loader is, and delegates its state to the loader (the checkpoint boundary).
+    Its ``total_steps`` is derived from the loader's length, and it delegates its state to the loader
+    (the checkpoint boundary).
     """
 
     def __init__(self, loader: DataLoaderProtocol, microbatches_per_step: int, drop_last: bool = True):
@@ -49,7 +50,8 @@ class FixedCountMicrobatchPacker(MicrobatchPackStream):
         if pack and not self._drop_last:
             yield pack
 
-    def __len__(self) -> int:
+    @property
+    def total_steps(self) -> int | None:
         """Returns the number of packs (steps) this packer yields.
 
         Returns:

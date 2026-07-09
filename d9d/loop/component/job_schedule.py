@@ -1,4 +1,3 @@
-from collections.abc import Sized
 from typing import Any
 
 from torch.distributed.checkpoint.stateful import Stateful
@@ -7,8 +6,8 @@ from d9d.core.protocol import MicrobatchPackStream
 from d9d.loop.config import JobScheduleConfig, StepActionPeriod, StepActionSpecial
 
 
-def _resolve_total_steps(config: JobScheduleConfig, data_iterator: MicrobatchPackStream) -> int:
-    data_steps = len(data_iterator) if isinstance(data_iterator, Sized) else None
+def _resolve_total_steps(config: JobScheduleConfig, stream: MicrobatchPackStream) -> int:
+    data_steps = stream.total_steps
 
     config_steps = config.total_steps
 
@@ -25,25 +24,25 @@ def _resolve_total_steps(config: JobScheduleConfig, data_iterator: MicrobatchPac
 
     raise ValueError(
         "Cannot resolve total_steps: the schedule config does not specify total_steps and "
-        "the batch iterator is not sized. Please set `total_steps` in the schedule config."
+        "the data stream does not report its length. Please set `total_steps` in the schedule config."
     )
 
 
 class JobSchedule(Stateful):
     """Tracks the progress and resolves the duration of a job loop."""
 
-    def __init__(self, config: JobScheduleConfig, data_iterator: MicrobatchPackStream):
+    def __init__(self, config: JobScheduleConfig, stream: MicrobatchPackStream):
         """Constructs a JobSchedule object.
 
         Args:
             config: The schedule configuration carrying the optional explicit step budget.
-            data_iterator: The microbatch pack stream driving the loop, consulted for its length when sized.
+            stream: The microbatch pack stream driving the loop, consulted for its ``total_steps``.
 
         Raises:
-            ValueError: If "total_steps" cannot be resolved from the config and the data iterator.
+            ValueError: If "total_steps" cannot be resolved from the config and the stream.
         """
         self._current_step = 0
-        self._total_steps = _resolve_total_steps(config, data_iterator)
+        self._total_steps = _resolve_total_steps(config, stream)
 
     def step(self):
         """Increments the current step counter by one."""

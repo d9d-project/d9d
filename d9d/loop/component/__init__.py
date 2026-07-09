@@ -1,4 +1,5 @@
 from .checkpointer import StateCheckpointer
+from .data_parallel_stream import DataParallelMicrobatchPackStream
 from .garbage_collector import ManualGarbageCollector
 from .gradient_clipper import GradientClipper
 from .gradient_manager import GradientManager
@@ -14,6 +15,7 @@ from .timeout_manager import TimeoutManager
 from .train_sleeper import TrainSleeper
 
 __all__ = [
+    "DataParallelMicrobatchPackStream",
     "GradientClipper",
     "GradientManager",
     "InferenceTaskOperator",

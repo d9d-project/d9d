@@ -39,9 +39,8 @@ class MicrobatchPackStream(Stateful, Protocol):
 
     This protocol ensures that iterating the stream yields packs - one pack is exactly one step's
     worth of microbatches - and that it supports state checkpointing via the Stateful interface,
-    acting as the single checkpoint boundary for the data stream. It may optionally also be Sized,
-    reporting the number of steps it will yield. It yields CPU (optionally memory-pinned) tensors;
-    moving each pack to the device is the loop's responsibility.
+    acting as the single checkpoint boundary for the data stream. It yields CPU (optionally
+    memory-pinned) tensors; moving each pack to the device is the loop's responsibility.
     """
 
     def __iter__(self) -> Iterator[MicrobatchPack]:
@@ -49,5 +48,15 @@ class MicrobatchPackStream(Stateful, Protocol):
 
         Returns:
             An iterator yielding one microbatch pack (one step's worth of microbatches) at a time.
+        """
+        ...
+
+    @property
+    def total_steps(self) -> int | None:
+        """The number of steps (packs) this stream will yield, if known.
+
+        Returns:
+            The step count, or ``None`` when it cannot be determined ahead of time (e.g. a streaming
+            or data-dependent source). When ``None``, the job duration must come from ``JobScheduleConfig``.
         """
         ...
