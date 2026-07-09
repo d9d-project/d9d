@@ -18,8 +18,8 @@ How to configure and run jobs.
 
 *   **[Training Loop](./loop/train.md)**: The lifecycle of the `Trainer`, dependency injection, and execution flow.
 *   **[Inference Loop](./loop/inference.md)**: The lifecycle of distributed `Inference` and forward-only execution.
-*   **[Configuration](./loop/config.md)**: Pydantic schemas for configuring jobs, batching, and logging.
-*   **[Interfaces (Providers & Tasks)](./loop/interfaces/index.md)**: How to inject your custom Model, Dataset, and Step logic (Train & Infer).
+*   **[Configuration](./loop/config.md)**: Pydantic schemas for configuring jobs, scheduling, and logging.
+*   **[Interfaces (Providers & Tasks)](./loop/interfaces/index.md)**: How to inject your custom Model, Data, and Step logic (Train & Infer).
 
 
 ## 💾 Data & State
