@@ -43,7 +43,7 @@ Below is a skeleton of a Transformer-like model implemented for d9d pipelining.
 ```python
 import torch
 from torch import nn
-from d9d.pipelining.api import PipelineStageInfo, distribute_layers_for_pipeline_stage
+from d9d.pipelining.api import PipelineStageInfo, TensorSpec, distribute_layers_for_pipeline_stage
 
 class MyModelChunk(nn.Module):
     def __init__(self, stage: PipelineStageInfo, config):
@@ -93,29 +93,29 @@ class MyModelChunk(nn.Module):
         return outputs
 
     # --- Protocol Implementation ---
+    # These receive a single representative microbatch (not a global batch), so shapes are used as-is,
+    # and return TensorSpec descriptors (shape/dtype/layout) — no tensors are allocated.
 
-    def infer_stage_inputs_from_pipeline_inputs(self, inputs: dict[str, torch.Tensor], n_microbatches: int):
-        batch_size = inputs['input_ids'].shape[0]
-        micro_batch_size = batch_size // n_microbatches
-        seq_len = inputs['input_ids'].shape[1]
+    def infer_stage_inputs_from_pipeline_inputs(self, microbatch_inputs: dict[str, torch.Tensor]):
+        micro_batch_size = microbatch_inputs['input_ids'].shape[0]
+        seq_len = microbatch_inputs['input_ids'].shape[1]
         
         if self.stage.is_current_stage_first:
             # First stage receives raw input IDs
-            return {"input_ids": torch.empty((micro_batch_size, seq_len), dtype=torch.long)}
+            return {"input_ids": TensorSpec(shape=(micro_batch_size, seq_len), dtype=torch.long)}
         else:
             # Intermediate stages receive hidden states from previous stage
-            return {"hidden_states": torch.empty((micro_batch_size, seq_len, self.hidden_dim))}
+            return {"hidden_states": TensorSpec(shape=(micro_batch_size, seq_len, self.hidden_dim), dtype=torch.bfloat16)}
 
-    def infer_stage_outputs_from_pipeline_inputs(self, inputs: dict[str, torch.Tensor], n_microbatches: int):
-        batch_size = inputs['input_ids'].shape[0]
-        micro_batch_size = batch_size // n_microbatches
-        seq_len = inputs['input_ids'].shape[1]
+    def infer_stage_outputs_from_pipeline_inputs(self, microbatch_inputs: dict[str, torch.Tensor]):
+        micro_batch_size = microbatch_inputs['input_ids'].shape[0]
+        seq_len = microbatch_inputs['input_ids'].shape[1]
         
-        outputs = {"hidden_states": torch.empty((micro_batch_size, seq_len, self.config.hidden_dim))}
+        outputs = {"hidden_states": TensorSpec(shape=(micro_batch_size, seq_len, self.config.hidden_dim), dtype=torch.bfloat16)}
         
         if self.stage.is_current_stage_last:
             # Last stage outputs logits too
-            outputs["logits"] = torch.empty((micro_batch_size, seq_len, self.config.vocab_size))
+            outputs["logits"] = TensorSpec(shape=(micro_batch_size, seq_len, self.config.vocab_size), dtype=torch.bfloat16)
         
         return outputs
 ```
@@ -133,29 +133,13 @@ class MyModelChunk(nn.Module):
 | `{"schedule": "zero_bubble_v"}`                                       | Zero Bubble V (ZBV) execution. A specialized V-shape topology schedule that splits backward passes into Input and Weight gradients. Requires exactly 2 stages per rank. |
 | `{"schedule": "dual_pipe_v"}`                                         | DualPipeV execution. A bidirectional pipeline schedule for high-throughput training using V-shape topology and reciprocal forward/backward scheduling.                  |
 
-### Batch Sharding
+### Microbatches and packs
 
-Pipelining works by splitting the input batch into `N` microbatches. 
-By default, d9d assumes all input and output tensors should be split along dimension 0.
-
-However, if your inputs require different sharding strategy, you can customize this via `PipelineShardingSpec`.
-
-Please see the [sharding utils docs](../core/sharding.md).
-
-```python
-from d9d.pipelining.api import PipelineShardingSpec
-from d9d.core.sharding import ShardingSpec
-from torch.distributed.tensor import Shard
-
-# Example: Split 'images' on dim 1, but replicate 'camera_angles' across all microbatches
-my_spec = PipelineShardingSpec(
-    input_data={
-        "images": Shard(1),
-        "camera_angles": None
-    }
-    # input_kwargs can be defined similarly
-)
-```
+Pipelining consumes a **pack**: a sequence of ready microbatches for one step. The pack length (and therefore the batch size) may vary from step to step. Buffers are sized
+**per microbatch** — each stage infers shapes for every microbatch in the pack independently — so the
+microbatches within a single pack may also differ in shape.
+The schedule recompiles its program when the microbatch count changes and reallocates buffers when any
+microbatch's shape changes.
 
 ### Usage within the Trainer
 
@@ -169,67 +153,51 @@ The `build_schedule` function requires a **Model Provider** logic. Instead of pa
 
 ```python
 from torch import Tensor
-from torch.distributed.tensor import Shard
 import torch.nn.functional as F
 
 from d9d.core.dist_context import DistributedContext
-from d9d.core.sharding import shard_tree
 from d9d.pipelining.factory import build_schedule, PipelineSchedule1F1BConfig
-from d9d.pipelining.api import PipelineShardingSpec
 
 
-# 0. Define an object that manages loss calculation across steps
+# 0. Define an object that manages loss calculation per microbatch
 class PipelineLossHandler:
-    def __init__(self, num_microbatches: int):
-        self._shard_spec = {
-            'target': Shard(0)
-        }
-        self._num_microbatches = num_microbatches
-        self._targets = None
-
-    def set_targets(self, targets: Tensor):
-        self._targets = shard_tree(
-            {'target': targets},
-            sharding_spec=self._shard_spec,
-            num_shards=self._num_microbatches,
-            enforce_even_split=True
-        )
+    def __init__(self, targets_microbatches: list[Tensor]):
+        self._targets = targets_microbatches
 
     def compute_loss(self, outputs: dict[str, Tensor], microbatch_idx: int):
         # Implement any custom logic here
         current_target = self._targets[microbatch_idx]
         return F.cross_entropy(outputs['logits'].view(-1, outputs['logits'].shape[-1]), current_target.view(-1))
 
-    
+
 # 1. Define configuration
 dist_context: DistributedContext = ...
 model_config = ...
-n_microbatches = 32
 schedule_config = PipelineSchedule1F1BConfig(
     num_stages_per_rank=4,  # 4 Virtual stages per rank
     zero_bubble=True  # Enable ZB1P optimization
 )
 
-# 2. Build the schedule, model shards and loss compute function
-loss_handler = PipelineLossHandler(num_microbatches=n_microbatches)
+# 2. Build the per-microbatch inputs (the "pack"). The number of microbatches is decided here, per step.
+inputs_microbatches = tuple({"input_ids": mb} for mb in my_input_microbatches)
+kwargs_microbatches = tuple({} for _ in inputs_microbatches)
+targets_microbatches = [...]  # one target tensor per microbatch
+
+# 3. Build the schedule and model shards (the callback is supplied per step, not here)
+loss_handler = PipelineLossHandler(targets_microbatches)
 schedule_info, modules = build_schedule(
     dist_context=dist_context,
-    n_microbatches=32,
     schedule_config=schedule_config,
     model_provider=lambda stage: MyModelChunk(stage, model_config),  # Factory function
-    callback=loss_handler.compute_loss
 )
 
-# 3. Execution
-# The schedule object exposes a simple step API
-inputs = {"input_ids": ...}  # Full batch
-loss_handler.set_targets(...)  # Set targets for full batch
-schedule_info.schedule.configure_buffers(  # Pre-allocate buffers
-    inputs, 
-    kwargs={}, 
-    sharding_spec=PipelineShardingSpec()
+# 4. Execution
+# The callback is passed to each step, so it can close over per-step data (here, the targets).
+schedule_info.schedule.step(
+    inputs_microbatches=inputs_microbatches,
+    kwargs_microbatches=kwargs_microbatches,
+    callback=loss_handler.compute_loss,
 )
-schedule_info.schedule.step(inputs, kwargs={})
 ```
 
 ::: d9d.pipelining.api
