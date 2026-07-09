@@ -2,12 +2,12 @@ from collections.abc import Sized
 from typing import Any
 
 from torch.distributed.checkpoint.stateful import Stateful
-from torch.utils.data import DataLoader
 
+from d9d.core.protocol import MicrobatchPackStream
 from d9d.loop.config import JobScheduleConfig, StepActionPeriod, StepActionSpecial
 
 
-def _resolve_total_steps(config: JobScheduleConfig, data_iterator: DataLoader) -> int:
+def _resolve_total_steps(config: JobScheduleConfig, data_iterator: MicrobatchPackStream) -> int:
     data_steps = len(data_iterator) if isinstance(data_iterator, Sized) else None
 
     config_steps = config.total_steps
@@ -32,12 +32,12 @@ def _resolve_total_steps(config: JobScheduleConfig, data_iterator: DataLoader) -
 class JobSchedule(Stateful):
     """Tracks the progress and resolves the duration of a job loop."""
 
-    def __init__(self, config: JobScheduleConfig, data_iterator: DataLoader):
+    def __init__(self, config: JobScheduleConfig, data_iterator: MicrobatchPackStream):
         """Constructs a JobSchedule object.
 
         Args:
             config: The schedule configuration carrying the optional explicit step budget.
-            data_iterator: The data iterator driving the loop, consulted for its length when sized.
+            data_iterator: The microbatch pack stream driving the loop, consulted for its length when sized.
 
         Raises:
             ValueError: If "total_steps" cannot be resolved from the config and the data iterator.
