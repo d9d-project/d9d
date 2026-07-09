@@ -15,9 +15,6 @@ from d9d.module.base import ModuleLateInit
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory.factory import PipelineScheduleInfo, build_schedule
 
-from .batch_maths import BatchMaths
-from .pipeline_result_processing import PipelineOutputsProcessor
-
 StatefulPredicate = Callable[[str, torch.Tensor], bool]
 """Determines if a specific parameter or buffer should be included in the state dictionary."""
 
@@ -199,18 +196,14 @@ class ModelStageFactory:
         self,
         model_provider: ModelProvider,
         dist_context: DistributedContext,
-        batch_maths: BatchMaths,
         config_model: ModelStageFactoryConfig,
         config_pipelining: PipeliningConfig,
-        pipeline_callback: PipelineOutputsProcessor,
     ):
         """Constructs a ModelStageFactory object."""
         self._model_provider = model_provider
         self._dist_context = dist_context
         self._config_model = config_model
         self._config_pipelining = config_pipelining
-        self._batch_maths = batch_maths
-        self._pipeline_callback = pipeline_callback
 
     def _build_model_stage(self, stage: PipelineStageInfo) -> nn.Module:
         # create a model with no real memory occupied
@@ -268,10 +261,8 @@ class ModelStageFactory:
 
         schedule, modules = build_schedule(
             dist_context=self._dist_context,
-            n_microbatches=self._batch_maths.num_microbatches_pipelining,
             schedule_config=self._config_pipelining.schedule,
             model_provider=self._build_model_stage,
-            callback=self._pipeline_callback,
         )
 
         return schedule, TrackedModules(self._dist_context, modules, stateful_predicate)
