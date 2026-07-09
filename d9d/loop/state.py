@@ -2,12 +2,10 @@ import dataclasses
 from typing import Any
 
 from torch.distributed.checkpoint.stateful import Stateful
-from torchdata.stateful_dataloader import StatefulDataLoader
 
 from d9d.core.dist_context import DistributedContext
-from d9d.core.protocol import LRSchedulerProtocol, OptimizerProtocol
+from d9d.core.protocol import LRSchedulerProtocol, MicrobatchPackStream, OptimizerProtocol
 from d9d.loop.component import (
-    BatchMaths,
     GradientClipper,
     GradientManager,
     InferenceTaskOperator,
@@ -41,8 +39,7 @@ class JobState(Stateful):
         checkpointer: Component responsible for saving and loading execution states.
         profiler: Component for performance profiling.
         tracked_modules: Container holding the model (or model parts) being executed.
-        batch_maths: Helper for calculating batch sizes and gradient accumulation steps.
-        data_loader: The input data stream.
+        microbatch_pack_stream: The microbatch pack stream feeding the loop.
         timeout_manager: Component for checking and refreshing distributed timeouts.
     """
 
@@ -54,9 +51,8 @@ class JobState(Stateful):
     profiler: JobProfiler
 
     tracked_modules: TrackedModules
-    batch_maths: BatchMaths
 
-    data_loader: StatefulDataLoader
+    microbatch_pack_stream: MicrobatchPackStream
 
     timeout_manager: TimeoutManager
 
@@ -64,13 +60,13 @@ class JobState(Stateful):
         return {
             "schedule": self.schedule.state_dict(),
             "tracked_modules": self.tracked_modules.state_dict(),
-            "data_loader": self.data_loader.state_dict(),
+            "microbatch_pack_stream": self.microbatch_pack_stream.state_dict(),
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         self.schedule.load_state_dict(state_dict["schedule"])
         self.tracked_modules.load_state_dict(state_dict["tracked_modules"])
-        self.data_loader.load_state_dict(state_dict["data_loader"])
+        self.microbatch_pack_stream.load_state_dict(state_dict["microbatch_pack_stream"])
 
 
 @dataclasses.dataclass(kw_only=True)
