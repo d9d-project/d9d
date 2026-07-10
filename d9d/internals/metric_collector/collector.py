@@ -1,7 +1,7 @@
 import torch
-import torch.utils._pytree as pytree  # noqa: PLC2701
 from torch.profiler import record_function
 
+from d9d.core import pytree
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import PyTree
 from d9d.metric import Metric

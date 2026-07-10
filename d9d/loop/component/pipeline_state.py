@@ -1,29 +1,13 @@
 from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Generic, TypeVar, cast
+from typing import Generic, TypeVar
 
 import torch
-import torch.utils._pytree as pytree  # noqa: PLC2701
 
+from d9d.core import pytree
 from d9d.core.types import PyTree
 
 TState = TypeVar("TState", bound=PyTree)
-
-TMap = TypeVar("TMap")
-
-
-def _detach_leaf(x: TMap) -> TMap:
-    """Detaches a tensor from the computation graph if the input is a tensor.
-
-    Args:
-        x: The input object.
-
-    Returns:
-        The detached tensor or original object.
-    """
-    if isinstance(x, torch.Tensor):
-        return cast(TMap, x.detach())
-    return x
 
 
 class PipelineStateHandler(Generic[TState]):
@@ -46,7 +30,7 @@ class PipelineStateHandler(Generic[TState]):
             microbatch_idx: The index of the microbatch within the current pack.
             state: The side-data PyTree to store; every tensor leaf is detached.
         """
-        self._state[microbatch_idx] = pytree.tree_map(_detach_leaf, state)
+        self._state[microbatch_idx] = pytree.tree_map_only(torch.Tensor, lambda x: x.detach(), state)
 
     @contextmanager
     def scope(self, microbatch_idx: int) -> Iterator[TState]:
@@ -66,7 +50,7 @@ class PipelineStateHandler(Generic[TState]):
         try:
             yield state
         finally:
-            self._state[microbatch_idx] = pytree.tree_map(_detach_leaf, state)
+            self._state[microbatch_idx] = pytree.tree_map_only(torch.Tensor, lambda x: x.detach(), state)
 
     def reset(self):
         """Resets the underlying storage, clearing all state."""

@@ -1,6 +1,6 @@
 import torch
-import torch.utils._pytree as pytree  # noqa: PLC2701
 
+from d9d.core import pytree
 from d9d.core.types import MicrobatchPack
 
 
@@ -14,6 +14,4 @@ def move_pack_to_device(pack: MicrobatchPack, device: torch.types.Device) -> Mic
     Returns:
         A new pack with all tensors moved to the device.
     """
-    return [
-        pytree.tree_map(lambda x: x.to(device) if isinstance(x, torch.Tensor) else x, microbatch) for microbatch in pack
-    ]
+    return [pytree.tree_map_only(torch.Tensor, lambda x: x.to(device), microbatch) for microbatch in pack]
