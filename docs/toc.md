@@ -10,6 +10,7 @@ The foundational primitives managing the cluster.
 *   **[Distributed Context](./core/dist_context.md)**: The Source of Truth for topology. Understanding `DeviceMesh` domains (`dense`, `expert`, `batch`).
 *   **[Distributed Operations](./core/dist_ops.md)**: Utilities for gathering var-length tensors and objects.
 *   **[State Offloading](./core/offload.md)**: Releasing GPU training state to host memory for colocated RL (the sleep/wake primitives).
+*   **[PyTree Traversal](./core/pytree.md)**: Dataclass-aware recursive mapping and flattening over nested tensor structures.
 *   **[Typing Extensions](./core/types.md)**: Python type annotations for common objects and structures.
 
 
