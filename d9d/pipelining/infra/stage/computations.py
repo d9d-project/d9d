@@ -1,10 +1,12 @@
 import dataclasses
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping
 from typing import Any, cast
 
 import torch
 from torch import nn
 from torch.autograd.graph import Node
+
+from d9d.core import pytree
 
 from .splitgrad import (
     ParamGroup,
@@ -12,7 +14,6 @@ from .splitgrad import (
     stage_backward_input,
     stage_backward_weight,
 )
-from .struct_helper import DictFlattener
 
 # TODO/NOTICE: We WILL NOT disable FSDP's resharding for microbatches since it will modify
 # TODO/NOTICE: its behavior in an unexpected way. Perhaps we need better FSDP resharding policy handler?
@@ -161,18 +162,17 @@ class BackwardComputeHandler:
         if microbatch_index in self._cache:
             raise ValueError(f"S{self._stage_idx}B{microbatch_index} double backward")
 
-        inputs_flattener = DictFlattener(inputs.keys())
-        outputs_flattener = DictFlattener(outputs.keys())
+        input_leaves, input_spec = pytree.tree_flatten(inputs)
 
         inputs_grad_linear = stage_backward_full(
-            outputs=outputs_flattener.flatten(outputs),
-            output_grads=outputs_flattener.flatten(outputs_grad) if outputs_grad is not None else None,
-            inputs=inputs_flattener.flatten(inputs),
+            outputs=pytree.tree_leaves(outputs),
+            output_grads=pytree.tree_leaves(outputs_grad) if outputs_grad is not None else None,
+            inputs=input_leaves,
         )
 
         if self._stage_idx != 0:
             self._cache[microbatch_index] = BackwardCacheFull(
-                inputs_grad=inputs_flattener.unflatten(inputs_grad_linear)
+                inputs_grad=cast(dict[str, torch.Tensor | None], pytree.tree_unflatten(input_spec, inputs_grad_linear))
             )
 
     def backward_input(
@@ -198,25 +198,28 @@ class BackwardComputeHandler:
         if microbatch_index in self._cache:
             raise ValueError("Double backward pass")
 
-        inputs_flattener = DictFlattener(inputs.keys())
-        outputs_flattener = DictFlattener(outputs.keys())
+        input_leaves, input_spec = pytree.tree_flatten(inputs)
+        output_grad_leaves = pytree.tree_leaves(outputs_grad) if outputs_grad is not None else None
 
         if self._stage_idx == 0:
             self._cache[microbatch_index] = BackwardCacheInputForFull(
-                stage_outputs_or_loss=outputs_flattener.flatten(outputs),
-                output_grads=outputs_flattener.flatten(outputs_grad) if outputs_grad is not None else None,
-                input_values=inputs_flattener.flatten(inputs),
+                stage_outputs_or_loss=pytree.tree_leaves(outputs),
+                output_grads=output_grad_leaves,
+                input_values=input_leaves,
             )
         else:
             results = stage_backward_input(
-                outputs=outputs_flattener.flatten(outputs),
-                output_grads=outputs_flattener.flatten(outputs_grad) if outputs_grad is not None else None,
-                inputs=inputs_flattener.flatten(inputs),
+                outputs=pytree.tree_leaves(outputs),
+                output_grads=output_grad_leaves,
+                inputs=input_leaves,
                 weights=self._parameters_with_grad(),
             )
 
             self._cache[microbatch_index] = BackwardCacheInputForWeight(
-                inputs_grad=inputs_flattener.unflatten(cast(Sequence[torch.Tensor], results.input_grads)),
+                inputs_grad=cast(
+                    dict[str, torch.Tensor],
+                    pytree.tree_unflatten(input_spec, cast(list[torch.Tensor], results.input_grads)),
+                ),
                 param_groups=results.param_groups,
                 ownership_tokens=results.grad_ownership_tokens,
             )
