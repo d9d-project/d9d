@@ -75,7 +75,7 @@ Parallelism](../models/pipeline_parallelism.md)). `TrainTask` is generic over
 
 * `TPipelineInput` — the `PipelineInput` fed to the **first** stage (built here).
 * `TSharedInput` — the `SharedInput` broadcast to **every** stage.
-* `TPipelineOutput` — the `PipelineOutput` produced by the **last** stage; read by attribute in `compute_loss`.
+* `TPipelineOutput` — the `PipelineOutput` produced by the **last** stage; for a model composed with named task heads this is each head's output keyed by head name, read in `compute_loss`.
 
 `build_forward_inputs` returns a `BuildForwardInputsResult` with `input` / `shared` / `state`
 fields — no dict keys.
@@ -87,7 +87,13 @@ from typing import TypedDict
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import ScalarTree
 from d9d.module.block.head import LM_IGNORE_INDEX
-from d9d.module.model.io import SequenceCausalLMOutput, SequenceCausalLMShared, SequenceInput, SequenceShared
+from d9d.module.model.io import (
+    SequenceCausalLMHeadShared,
+    SequenceHeadsOutput,
+    SequenceHeadsShared,
+    SequenceInput,
+    SequenceShared,
+)
 from d9d.loop.control import *
 
 
@@ -96,23 +102,24 @@ class SFTState(TypedDict):  # it also could be a dataclass
 
 
 class SFTTask(
-    TrainTask[dict[str, torch.Tensor], SequenceInput, SequenceCausalLMShared, SequenceCausalLMOutput, SFTState]
+    TrainTask[dict[str, torch.Tensor], SequenceInput, SequenceHeadsShared, SequenceHeadsOutput, SFTState]
 ):
     def __init__(self, dist_ctx: DistributedContext):
         self._dist_ctx = dist_ctx
 
     def build_forward_inputs(
         self, ctx: BuildForwardInputsContext
-    ) -> BuildForwardInputsResult[SequenceInput, SequenceCausalLMShared, SFTState]:
+    ) -> BuildForwardInputsResult[SequenceInput, SequenceHeadsShared, SFTState]:
         # ctx.batch contains the output of the Collator.
 
         # Return the PipelineInput, the SharedInput and the typed
         # side-data carried to loss computation for this same microbatch.
+        # The SharedInput routes position ids to the backbone and labels to the "lm" head.
         return BuildForwardInputsResult(
             input=SequenceInput(input_ids=ctx.batch["input_ids"]),
-            shared=SequenceCausalLMShared(
+            shared=SequenceHeadsShared(
                 sequence=SequenceShared(position_ids=ctx.batch["position_ids"]),
-                labels=ctx.batch["labels"],
+                heads={"lm": SequenceCausalLMHeadShared(labels=ctx.batch["labels"])},
             ),
             state=SFTState(labels=ctx.batch["labels"]),
         )
@@ -120,9 +127,9 @@ class SFTTask(
     def dump_hparams(self) -> ScalarTree:
         return super().dump_hparams()
 
-    def compute_loss(self, ctx: ComputeLossContext[SequenceCausalLMOutput, SFTState]) -> ComputeLossResult:
-        # Retrieve log_probs calculated by the model pipeline
-        logps = ctx.pipeline_results.logps
+    def compute_loss(self, ctx: ComputeLossContext[SequenceHeadsOutput, SFTState]) -> ComputeLossResult:
+        # Retrieve log_probs calculated by the model pipeline, keyed by the "lm" head name
+        logps = ctx.pipeline_results["lm"].logps
 
         # Calculate number of valid tokens (ignoring the -100 padding)
         # This is crucial for variable length batches.

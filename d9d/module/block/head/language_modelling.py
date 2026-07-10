@@ -5,13 +5,14 @@ import torch
 from torch import nn
 
 from d9d.kernel.cce import linear_cross_entropy
-from d9d.module.base import ModuleLateInit
+from d9d.module.block.head.base import TaskHead
+from d9d.module.model.io import SequenceCausalLMHeadShared, SequenceCausalLMOutput
 
 LM_IGNORE_INDEX = -100
 """Index ignored by LM head while calculating logps"""
 
 
-class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
+class SplitLanguageModellingHead(TaskHead[SequenceCausalLMHeadShared, SequenceCausalLMOutput]):
     """A segmented language modeling head computing per-token cross-entropy loss.
 
     Computes per-token cross-entropy loss values using a composed weight matrix.
@@ -47,24 +48,24 @@ class SplitLanguageModellingHead(nn.Module, ModuleLateInit):
         self._split_order = split_order
         self._hidden_size = hidden_size
 
-    def forward(self, hidden_states: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor, shared: SequenceCausalLMHeadShared) -> SequenceCausalLMOutput:
         """Computes the cross-entropy loss for the given hidden states and labels.
 
         Args:
             hidden_states: Input tensor of shape `(B, S, H)`.
-            labels: Target label tensor of shape `(B, S)`. Indices must correspond
-                to the global vocabulary formed by concatenating splits in `split_order`.
+            shared: The head shared input. Its `labels` of shape `(B, S)` must correspond to the
+                global vocabulary formed by concatenating splits in `split_order`.
 
         Returns:
-            A tensor containing per-token loss values (reduction='none'), matching the
-            shape of the labels tensor.
+            The causal LM output holding per-token loss values (reduction='none'), matching the
+                shape of the labels tensor.
         """
         lm_head_weight = torch.cat([self.lm_head[split_name].weight for split_name in self._split_order], dim=0)
 
         losses = linear_cross_entropy(
-            hidden_states, lm_head_weight, labels, ignore_index=LM_IGNORE_INDEX, reduction="none"
+            hidden_states, lm_head_weight, shared.labels, ignore_index=LM_IGNORE_INDEX, reduction="none"
         )
-        return losses
+        return SequenceCausalLMOutput(logps=losses)
 
     def reset_parameters(self):
         """Resets module parameters."""

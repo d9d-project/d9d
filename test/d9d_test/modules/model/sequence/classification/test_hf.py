@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn.functional as F
-from d9d.module.model.io import SequenceInput, SequencePoolingShared, SequenceShared
+from d9d.module.model.io import SequenceHeadsShared, SequenceInput, SequencePoolingHeadShared, SequenceShared
 from d9d.pipelining.api import PipelineStageInfo
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.testing import assert_close
@@ -13,6 +13,7 @@ from d9d_test.modules.model.sequence.classification.batch import build_classific
 from d9d_test.modules.model.sequence.classification.catalogue import (
     D9D_MODEL_FACTORIES_CLS,
     D9D_TO_HF_MAPPER_CLS,
+    HEAD_NAME_CLS,
     HF_MODEL_FACTORY_CLS,
     HF_TO_D9D_MAPPER_CLS,
 )
@@ -49,11 +50,12 @@ def test_consistent_to_hf(model_type: ModelCatalogue, model_factory_d9d):
 
     outputs_d9d = model_d9d(
         SequenceInput(input_ids=batch.sequence.input_ids),
-        SequencePoolingShared(
-            sequence=SequenceShared(position_ids=batch.sequence.position_ids), pooling_mask=batch.pooling_mask
+        SequenceHeadsShared(
+            sequence=SequenceShared(position_ids=batch.sequence.position_ids),
+            heads={HEAD_NAME_CLS: SequencePoolingHeadShared(pooling_mask=batch.pooling_mask)},
         ),
     )
-    scores = outputs_d9d.scores
+    scores = outputs_d9d[HEAD_NAME_CLS].scores
     assert scores.dtype == torch.float32
 
     assert_kl_div_close_logits(scores.bfloat16(), outputs_hf.logits, threshold=1e-3)

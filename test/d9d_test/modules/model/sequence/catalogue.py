@@ -1,9 +1,32 @@
-from collections.abc import Callable
+import dataclasses
+from collections.abc import Callable, Mapping
 from enum import StrEnum, auto
-from typing import TypeVar
 
-from d9d.module.model.qwen3_dense import Qwen3DenseLayerParameters, Qwen3DenseParameters
-from d9d.module.model.qwen3_moe import Qwen3MoELayerParameters, Qwen3MoEParameters
+from d9d.core.dist_context import DistributedContext
+from d9d.model_state.mapper import ModelStateMapper
+from d9d.module.block.head import AnyHeadConfig, TaskHead, build_head
+from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
+from d9d.module.model import DecoderWithHeads
+from d9d.module.model.qwen3_dense import (
+    Qwen3DenseLayerParameters,
+    Qwen3DenseModel,
+    Qwen3DenseParameters,
+    mapper_from_huggingface_qwen3_dense,
+    mapper_to_huggingface_qwen3_dense,
+)
+from d9d.module.model.qwen3_moe import (
+    Qwen3MoEExpertsFormat,
+    Qwen3MoELayerParameters,
+    Qwen3MoEModel,
+    Qwen3MoEParameters,
+    mapper_from_huggingface_qwen3_moe,
+    mapper_to_huggingface_qwen3_moe,
+)
+from d9d.module.parallelism.model import (
+    parallelize_qwen3_dense_model,
+    parallelize_qwen3_moe_model,
+    parallelize_task_head,
+)
 from d9d.pipelining.api import PipelineStageInfo
 from transformers import PretrainedConfig, PreTrainedModel, Qwen3Config, Qwen3MoeConfig
 
@@ -35,7 +58,11 @@ _VOCAB_MERGED = 100
 _PAD_TOKEN_ID = 99
 
 
-D9D_MODEL_PARAMETERS = {
+# HuggingFace experts layout the d9d MoE mappers translate from/to in these tests.
+_MOE_EXPERTS_FORMAT = Qwen3MoEExpertsFormat.FUSED
+
+
+D9D_MODEL_PARAMETERS: dict[ModelCatalogue, Qwen3MoEParameters | Qwen3DenseParameters] = {
     ModelCatalogue.QWEN3_MOE: Qwen3MoEParameters(
         layer=Qwen3MoELayerParameters(
             hidden_size=_HIDDEN_SIZE,
@@ -71,7 +98,7 @@ D9D_MODEL_PARAMETERS = {
 }
 
 
-HF_MODEL_PARAMETERS = {
+HF_MODEL_PARAMETERS: dict[ModelCatalogue, PretrainedConfig] = {
     ModelCatalogue.QWEN3_MOE: Qwen3MoeConfig(
         vocab_size=_VOCAB_MERGED,
         num_hidden_layers=_NUM_LAYERS,
@@ -120,6 +147,17 @@ HF_MODEL_PARAMETERS = {
 }
 
 
+BACKBONE_CLASSES: dict[ModelCatalogue, type[Qwen3MoEModel] | type[Qwen3DenseModel]] = {
+    ModelCatalogue.QWEN3_MOE: Qwen3MoEModel,
+    ModelCatalogue.QWEN3_DENSE: Qwen3DenseModel,
+}
+
+BACKBONE_PARALLELIZE_FN: dict[ModelCatalogue, Callable[..., None]] = {
+    ModelCatalogue.QWEN3_MOE: parallelize_qwen3_moe_model,
+    ModelCatalogue.QWEN3_DENSE: parallelize_qwen3_dense_model,
+}
+
+
 _HF_INIT_SEED = 131232
 _D9D_INIT_SEED = 123213
 
@@ -141,17 +179,81 @@ def hf_model_factory(
     return _build_fn
 
 
-TModel = TypeVar("TModel")
+@dataclasses.dataclass
+class _BackboneDims:
+    """A lightweight stand-in exposing only the backbone-shared dimensions ``build_head`` reads."""
+
+    hidden_size: int
+    split_vocab_size: dict[str, int]
+    split_vocab_order: list[str]
 
 
-def d9d_model_factory(
-    model_class: type[TModel],
-    **model_kwargs,
-) -> Callable[[PipelineStageInfo], TModel]:
-    def _build_fn(stage: PipelineStageInfo):
+def build_head_for(model_type: ModelCatalogue, config: AnyHeadConfig) -> TaskHead:
+    """Builds a head instance from the family's backbone dimensions, for state-mapper construction."""
+    params = D9D_MODEL_PARAMETERS[model_type]
+    stub = _BackboneDims(
+        hidden_size=params.layer.hidden_size,
+        split_vocab_size=params.split_vocab_size,
+        split_vocab_order=params.split_vocab_order,
+    )
+    return build_head(config, backbone=stub, stage=PipelineStageInfo(current_stage=0, num_stages=1))
+
+
+def make_d9d_model_factory(
+    model_type: ModelCatalogue,
+    heads: Mapping[str, AnyHeadConfig],
+    enable_checkpointing: bool,
+) -> Callable[[PipelineStageInfo], DecoderWithHeads]:
+    """Builds a factory that composes the backbone with the given named heads on the target device."""
+
+    def _build_fn(stage: PipelineStageInfo) -> DecoderWithHeads:
         with torch_seed(_D9D_INIT_SEED):
-            model = model_class(**model_kwargs, stage=stage).cuda().bfloat16()
+            backbone = BACKBONE_CLASSES[model_type](
+                D9D_MODEL_PARAMETERS[model_type],
+                stage,
+                hidden_states_snapshot_mode=HiddenStatesAggregationMode.no,
+                enable_checkpointing=enable_checkpointing,
+            )
+            built_heads = {name: build_head(config, backbone=backbone, stage=stage) for name, config in heads.items()}
+            model = DecoderWithHeads(backbone, built_heads, stage).cuda().bfloat16()
             model.reset_parameters()
             return model
 
     return _build_fn
+
+
+def parallelize_decoder_with_heads(
+    model: DecoderWithHeads,
+    model_type: ModelCatalogue,
+    dist_context: DistributedContext,
+    stage: PipelineStageInfo,
+) -> None:
+    """Parallelizes a composed decoder: the per-family backbone routine, then each head (HSDP)."""
+    BACKBONE_PARALLELIZE_FN[model_type](dist_context, model.model, stage)
+    if stage.is_current_stage_last:
+        for head in model.heads.values():
+            parallelize_task_head(head, dist_context)
+
+
+def backbone_from_hf_mapper(model_type: ModelCatalogue) -> ModelStateMapper:
+    """Builds the backbone-only HuggingFace-to-d9d state mapper for the given family."""
+    match model_type:
+        case ModelCatalogue.QWEN3_MOE:
+            return mapper_from_huggingface_qwen3_moe(
+                D9D_MODEL_PARAMETERS[model_type], experts_format=_MOE_EXPERTS_FORMAT
+            )
+        case ModelCatalogue.QWEN3_DENSE:
+            return mapper_from_huggingface_qwen3_dense(D9D_MODEL_PARAMETERS[model_type])
+        case _:
+            raise ValueError(f"Unknown model type: {model_type}")
+
+
+def backbone_to_hf_mapper(model_type: ModelCatalogue) -> ModelStateMapper:
+    """Builds the backbone-only d9d-to-HuggingFace state mapper for the given family."""
+    match model_type:
+        case ModelCatalogue.QWEN3_MOE:
+            return mapper_to_huggingface_qwen3_moe(D9D_MODEL_PARAMETERS[model_type], experts_format=_MOE_EXPERTS_FORMAT)
+        case ModelCatalogue.QWEN3_DENSE:
+            return mapper_to_huggingface_qwen3_dense(D9D_MODEL_PARAMETERS[model_type])
+        case _:
+            raise ValueError(f"Unknown model type: {model_type}")

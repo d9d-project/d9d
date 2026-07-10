@@ -1,5 +1,5 @@
 import pytest
-from d9d.module.model.io import SequenceCausalLMShared, SequenceInput, SequenceShared
+from d9d.module.model.io import SequenceCausalLMHeadShared, SequenceHeadsShared, SequenceInput, SequenceShared
 from d9d.pipelining.api import PipelineStageInfo
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.testing import assert_close
@@ -10,6 +10,7 @@ from d9d_test.modules.model.sequence.causal_lm.batch import build_causal_lm_batc
 from d9d_test.modules.model.sequence.causal_lm.catalogue import (
     D9D_MODEL_FACTORIES_CAUSAL_LM,
     D9D_TO_HF_MAPPER_CAUSAL_LM,
+    HEAD_NAME_LM,
     HF_MODEL_FACTORY_CAUSAL_LM,
     HF_TO_D9D_MAPPER_CAUSAL_LM,
 )
@@ -48,11 +49,12 @@ def test_consistent_to_hf(model_type: ModelCatalogue, model_factory_d9d):
 
     outputs_d9d = model_d9d(
         SequenceInput(input_ids=batch.sequence.input_ids[:, :-1]),
-        SequenceCausalLMShared(
-            sequence=SequenceShared(position_ids=batch.sequence.position_ids[:, :-1]), labels=labels_shift
+        SequenceHeadsShared(
+            sequence=SequenceShared(position_ids=batch.sequence.position_ids[:, :-1]),
+            heads={HEAD_NAME_LM: SequenceCausalLMHeadShared(labels=labels_shift)},
         ),
     )
-    loss_d9d = outputs_d9d.logps[labels_shift != -100].mean()
+    loss_d9d = outputs_d9d[HEAD_NAME_LM].logps[labels_shift != -100].mean()
     loss_d9d.backward()
 
     assert_close(loss_d9d, outputs_hf.loss, atol=1e-4, rtol=0.001)

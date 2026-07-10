@@ -1,7 +1,13 @@
 import pytest
 import torch
 from d9d.core.dist_context import DeviceMeshParameters
-from d9d.module.model.io import SequenceEmbeddingOutput, SequenceInput, SequencePoolingShared, SequenceShared
+from d9d.module.model.io import (
+    SequenceHeadsOutput,
+    SequenceHeadsShared,
+    SequenceInput,
+    SequencePoolingHeadShared,
+    SequenceShared,
+)
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import PipelineScheduleGPipeConfig, build_schedule
 from torch import nn
@@ -14,9 +20,9 @@ from d9d_test.modules.helper import (
     sync_grads_manually,
 )
 from d9d_test.modules.model.meshes import MESHES_FOR_MODEL_TESTS
-from d9d_test.modules.model.sequence.catalogue import ModelCatalogue
+from d9d_test.modules.model.sequence.catalogue import ModelCatalogue, parallelize_decoder_with_heads
 from d9d_test.modules.model.sequence.embedding.batch import build_embedding_batch, shard_embedding_batch
-from d9d_test.modules.model.sequence.embedding.catalogue import D9D_MODEL_FACTORIES_EMBEDDING, D9D_PARALLELIZE_FN
+from d9d_test.modules.model.sequence.embedding.catalogue import D9D_MODEL_FACTORIES_EMBEDDING, HEAD_NAME_EMBEDDING
 
 _N_MICROBATCHES = 2
 
@@ -48,25 +54,26 @@ def test_consistent_to_itself_dist(
     model_global = model_factory_d9d(stage_global)
     outputs_global = model_global(
         SequenceInput(input_ids=batch_global.sequence.input_ids),
-        SequencePoolingShared(
+        SequenceHeadsShared(
             sequence=SequenceShared(position_ids=batch_global.sequence.position_ids),
-            pooling_mask=batch_global.pooling_mask,
+            heads={HEAD_NAME_EMBEDDING: SequencePoolingHeadShared(pooling_mask=batch_global.pooling_mask)},
         ),
     )
 
     # Use MSE-style dummy loss for embedding gradient tests
-    loss_global = outputs_global.embeddings.mean()
+    loss_global = outputs_global[HEAD_NAME_EMBEDDING].embeddings.mean()
     loss_global.backward()
 
     # Create Local Model and PP Schedule
-    def _callback(outputs: SequenceEmbeddingOutput, microbatch_idx: int) -> torch.Tensor:
-        loss_value = outputs.embeddings.sum() / batch_global.pooling_mask.sum() / outputs.embeddings.shape[1]
+    def _callback(outputs: SequenceHeadsOutput, microbatch_idx: int) -> torch.Tensor:
+        embeddings = outputs[HEAD_NAME_EMBEDDING].embeddings
+        loss_value = embeddings.sum() / batch_global.pooling_mask.sum() / embeddings.shape[1]
         dist_loss_accum.append(loss_value.detach())
         return loss_value
 
     def _model_provider(dist_stage: PipelineStageInfo) -> nn.Module:
         model_dist = model_factory_d9d(dist_stage)
-        D9D_PARALLELIZE_FN[model_type](dist_ctx, model_dist, dist_stage)
+        parallelize_decoder_with_heads(model_dist, model_type, dist_ctx, dist_stage)
         copy_params_local_to_dist(model_global, model_dist)
         return model_dist
 
@@ -84,13 +91,19 @@ def test_consistent_to_itself_dist(
         for i in range(_N_MICROBATCHES)
     )
     shared_microbatches = tuple(
-        SequencePoolingShared(
+        SequenceHeadsShared(
             sequence=SequenceShared(
                 position_ids=microbatch_slice(
                     batch_dist.sequence.position_ids, microbatch_idx=i, n_microbatches=_N_MICROBATCHES
                 )
             ),
-            pooling_mask=microbatch_slice(batch_dist.pooling_mask, microbatch_idx=i, n_microbatches=_N_MICROBATCHES),
+            heads={
+                HEAD_NAME_EMBEDDING: SequencePoolingHeadShared(
+                    pooling_mask=microbatch_slice(
+                        batch_dist.pooling_mask, microbatch_idx=i, n_microbatches=_N_MICROBATCHES
+                    )
+                )
+            },
         )
         for i in range(_N_MICROBATCHES)
     )

@@ -29,15 +29,15 @@ architecture writes its backbone once and is usable with any head, or several. B
 
 The duplication has **two axes**, a structural ceiling, and it repeats three times over.
 
-**Across heads.** In `qwen3_moe/model.py` the three wrappers are ~110 lines each and ~90% identical. The only per-head
-differences are:
+**Across heads.** In `qwen3_moe/model.py` the three wrappers are ~70-85 lines each and ~90% identical. The only
+per-head differences are:
 
 | Concern | CausalLM | Classification | Embedding |
 |---|---|---|---|
 | head submodule (attr) | `lm_head` | `cls_head` | `embedding_head` |
-| extra `forward` input | `labels` | `pooling_mask` | `pooling_mask` |
-| output key | `logps` | `scores` | `embeddings` |
-| inferred output shape | `input_ids.shape` | `(B, num_labels)` | `(B, embedding_dim)` |
+| `SharedInput` type | `SequenceCausalLMShared` | `SequencePoolingShared` | `SequencePoolingShared` |
+| extra shared field | `labels` | `pooling_mask` | `pooling_mask` |
+| `PipelineOutput` type | `SequenceCausalLMOutput` | `SequenceClassificationOutput` | `SequenceEmbeddingOutput` |
 
 Everything else is mechanical glue.
 
@@ -56,42 +56,44 @@ copies cheaper leaves the grids and the ceiling in place — removing the wrappe
 
 ### Contracts
 
-A **backbone** maps stage inputs to hidden states, reports its `hidden_size`, and supports late init and pipelining —
-exactly the surface the wrappers already call on `self.model`. Its `forward` keeps the typed standard inputs plus a
-`**inputs` catch-all, so a backbone may consume additional tensors without a contract change:
+A **backbone** maps stage inputs to hidden states, reports its `hidden_size` and split-vocabulary layout, and
+supports late init and pipelining — exactly the surface the wrappers already call on `self.model`. It is the sequence
+backbone the pipelining PyTree IO of [DEP-0010](0010-dep-pipelining-pytree-io.md) already describes, with the shared
+dimensions the heads derive from made public:
 
 ```python
-HeadInputs: TypeAlias = Mapping[str, torch.Tensor | None]
-
-
 @typing.runtime_checkable
-class DecoderBackbone(ModuleLateInit, ModuleSupportsPipelining, Protocol):
+class DecoderBackbone(
+    ModuleLateInit,
+    ModuleSupportsPipelining[
+        SequenceInput, SequenceTransfer[torch.Tensor], SequenceShared, SequenceTransfer[torch.Tensor]
+    ],
+    Protocol,
+):
     hidden_size: int
-
-    def forward(self, input_ids=None, hidden_states=None, position_ids=None,
-                hidden_states_snapshot=None, hidden_states_agg_mask=None, **inputs) -> dict[str, torch.Tensor | None]: ...
+    split_vocab_size: dict[str, int]
+    split_vocab_order: list[str]
 ```
 
-`Qwen3MoEModel` and `Qwen3DenseModel` conform by exposing `hidden_size` (a one-line addition; both already receive it
-via params).
+`Qwen3MoEModel` and `Qwen3DenseModel` conform by exposing those three dimensions (a three-line addition; all already
+arrive via params).
 
-A **head** turns hidden states into named outputs. The module is confined to *compute* — its parallelization and
-checkpoint mapping are kept out of it (separate concerns, below). Alongside the shared `hidden_states`, it reads any
-head-specific tensors (`labels`, `pooling_mask`, targets, …) from a `HeadInputs` mapping, so a new input needs no
-signature change:
+A **head** turns hidden states into its own typed output PyTree. The module is confined to *compute* — its
+parallelization and checkpoint mapping are kept out of it (separate concerns, below). Alongside the shared
+`hidden_states` it reads its **own** shared input, so `labels`, `pooling_mask` and any future signal are typed rather
+than looked up by string:
 
 ```python
-class TaskHead(nn.Module, ModuleLateInit, abc.ABC):
+class TaskHead(nn.Module, ModuleLateInit, abc.ABC, Generic[THeadShared, THeadOutput]):
     @abc.abstractmethod
-    def forward(self, hidden_states: torch.Tensor, inputs: HeadInputs) -> dict[str, torch.Tensor]: ...
-
-    @abc.abstractmethod
-    def infer_output_shapes(self, pipeline_inputs: dict[str, torch.Tensor], n_microbatches: int) -> dict[str, torch.Tensor]: ...
+    def forward(self, hidden_states: torch.Tensor, shared: THeadShared) -> THeadOutput: ...
 ```
 
-The three existing heads in `d9d/module/block/head/` implement this directly. A custom head — even a plain `nn.Module` —
-just meets this small contract (subclass `TaskHead`, or wrap the module in a thin adapter adding `infer_output_shapes`);
-its sharding and state mapping are then supplied at composition, exactly as for built-in heads.
+The three existing heads in `d9d/module/block/head/` implement this directly — `SplitLanguageModellingHead` as
+`TaskHead[SequenceCausalLMHeadShared, SequenceCausalLMOutput]`, and so on. A custom head just meets this small contract;
+its sharding and state mapping are then supplied at composition, exactly as for built-in heads. Nothing else is
+required: the engine sizes its buffers from `stage_transfer_spec`, which describes only what crosses a stage boundary,
+and the last stage's outgoing edge never transfers — so a head declares no shapes.
 
 ### Head configuration
 
@@ -121,47 +123,55 @@ keeps its precise type for `parallelize_*`. It does not build heads — that is 
 of the config union:
 
 ```python
-class DecoderWithHeads(nn.Module, ModuleLateInit, ModuleSupportsPipelining, Generic[TBackbone]):
+class DecoderWithHeads(
+    nn.Module,
+    ModuleLateInit,
+    ModuleSupportsPipelining[SequenceInput, SequenceTransfer[torch.Tensor], SequenceHeadsShared, SequenceHeadsOutput],
+    Generic[TBackbone],
+):
     def __init__(self, backbone: TBackbone, heads: Mapping[str, TaskHead], stage: PipelineStageInfo):
         self.model = backbone                                   # FQN: model.*
         self._stage = stage
         if stage.is_current_stage_last:
             self.heads = nn.ModuleDict(...)                     # FQN: heads.<name>.*
 
-    def forward(self, input_ids=None, hidden_states=None, position_ids=None,
-                hidden_states_snapshot=None, hidden_states_agg_mask=None, **inputs):
-        out = self.model(input_ids=input_ids, hidden_states=hidden_states, position_ids=position_ids,
-                         hidden_states_snapshot=hidden_states_snapshot,
-                         hidden_states_agg_mask=hidden_states_agg_mask, **inputs)
-        if self._stage.is_current_stage_last:
-            for name, head in self.heads.items():
-                out.update({f"{name}/{k}": v for k, v in head(out["hidden_states"], inputs).items()})
-        return out
+    def forward(self, inputs, shared: SequenceHeadsShared):
+        model_outputs = self.model(inputs, shared.sequence)
+        if not self._stage.is_current_stage_last:
+            return model_outputs
+        return {name: head(model_outputs.hidden_states, shared.heads[name]) for name, head in self.heads.items()}
 ```
 
-The pipeline engine invokes the model as `module(**stage_inputs)` (the flat-dict contract below): the typed standard
-inputs flow to the backbone, and the `**inputs` catch-all is both forwarded to the backbone (it absorbs extras via its
-own `**inputs`) and handed to each head as its `HeadInputs`. `reset_parameters` and `infer_stage_outputs` delegate to the
-backbone and the heads; `infer_stage_inputs` delegates to the backbone. The backbone (`self.model`) and the heads
+The `SharedInput` carries both halves of the composition — `shared.sequence` for the backbone, `shared.heads[name]` for
+each head — so routing is by *name*, not by string keys in a flat bag:
+
+```python
+@dataclasses.dataclass
+class SequenceHeadsShared:
+    sequence: SequenceShared
+    heads: Mapping[str, Any]
+```
+
+`reset_parameters` delegates to the backbone and the heads; `stage_transfer_spec` delegates to the backbone, since the
+heads only run on the last stage, whose outgoing edge never transfers. The backbone (`self.model`) and the heads
 (`self.heads`) are public, so a provider parallelizes each independently.
 
 ### Multi-head semantics
 
-Supporting more than one head follows from the flat `dict[str, torch.Tensor]` the pipeline passes to the task. That flat
-dict — with `"<head>/<key>"` keys *simulating* hierarchy — is what the current pipeline-parallel engine expects;
-migrating model outputs to a properly nested structure is deferred to a future change. Given that constraint:
+The pipeline moves arbitrary PyTrees between stages and to the task, so more than one head needs no encoding trick —
+a mapping keyed by head name *is* the `PipelineOutput`:
 
-* **Outputs are namespaced by head.** Each head's outputs are merged under its mapping key — `out["lm/logps"]`,
-  `out["cls/scores"]`. The key is unique by construction, so two heads of the same type just take different keys
-  (`{"cls_a": ..., "cls_b": ...}` → `out["cls_a/scores"]`, `out["cls_b/scores"]`) with no extra config and no collision
-  check. Backbone outputs (`hidden_states`) stay top-level.
-* **Loss combination is the task's job.** The model only emits per-head tensors; `BaseTask.compute_loss` reads the keys
-  it wants and combines them. The model holds no loss policy.
-* **No "primary" output.** The pipeline contract is the whole dict; the task selects keys.
-* **Inputs are routed, not enumerated.** The standard inputs stay typed kwargs; everything else (`labels`,
-  `pooling_mask`, future targets, …) arrives via `**inputs` and reaches whatever consumes it — the backbone (via its
-  `**inputs`) or a head (via its `HeadInputs`). An open set of heads cannot be named kwargs; this mapping is the
-  irreducible cost of genuine multi-head, and it makes a new input a no-signature-change addition.
+* **Outputs are keyed by head.** `out["lm"]` is a `SequenceCausalLMOutput`, `out["cls"]` a
+  `SequenceClassificationOutput` — each head's own typed output, unflattened. The key is unique by construction, so two
+  heads of the same type just take different keys (`{"cls_a": ..., "cls_b": ...}`) with no extra config and no collision
+  check.
+* **Loss combination is the task's job.** The model only emits per-head outputs; `BaseTask.compute_loss` reads the ones
+  it wants and combines them (`ctx.pipeline_results["lm"].logps`). The model holds no loss policy.
+* **No "primary" output.** The pipeline contract is the whole mapping; the task selects heads.
+* **Inputs are routed by name, not enumerated.** Each head's shared input is a typed PyTree the head declares
+  (`SequenceCausalLMHeadShared`, `SequencePoolingHeadShared`, …), delivered under the head's own key. An open set of
+  heads cannot be named kwargs, so the mapping level is irreducible — but everything below it stays typed, and a new
+  input to a head is a field on that head's shared dataclass, not a new signature anywhere else.
 
 ### Parallelization & checkpoint mapping
 
@@ -216,7 +226,12 @@ heads = {
     "lm": build_head(CausalLMHeadConfig(), backbone=backbone, stage=stage),
     "cls": build_head(ClassificationHeadConfig(num_labels=3), backbone=backbone, stage=stage),
 }
-# loss = lm_loss(out["lm/logps"]) + alpha * cls_loss(out["cls/scores"])
+# shared = SequenceHeadsShared(
+#     sequence=SequenceShared(position_ids=...),
+#     heads={"lm": SequenceCausalLMHeadShared(labels=...),
+#            "cls": SequencePoolingHeadShared(pooling_mask=...)},
+# )
+# loss = lm_loss(out["lm"].logps) + alpha * cls_loss(out["cls"].scores)
 ```
 
 ## Backward Compatibility
@@ -225,12 +240,15 @@ A deliberate, pre-1.0 break; every cost is one-time and mechanical:
 
 - **Classes & functions.** The `*For*` models and their `*For*Parameters` are removed, along with the per-head
   `parallelize_*_for_*` and `mapper_*_for_*` functions; providers compose `DecoderWithHeads`, head sharding moves to
-  `parallelize_task_head`, and head renames move to one mapper per head type. The backbone `forward` gains `**inputs`;
-  backbone params and the per-family backbone `parallelize`/`mapper` routines are otherwise unchanged.
+  `parallelize_task_head`, and head renames move to one mapper per head type. The backbone exposes `hidden_size` and
+  its split-vocab layout publicly; backbone params, its `forward`, and the per-family backbone `parallelize`/`mapper`
+  routines are otherwise unchanged.
 - **Parameter FQNs.** Heads move `lm_head.* → heads.lm.*` (etc.); the backbone stays `model.*`. Existing checkpoints
   need a one-pass key remap; the HuggingFace renames update accordingly (now emitted by the per-head-type mapper).
-- **Output keys.** Head outputs are now namespaced (`out["lm/logps"]` instead of `out["logps"]`); code reading pipeline
-  results updates to the namespaced keys.
+- **IO types.** `SequenceCausalLMShared` / `SequencePoolingShared` (a backbone shared input bundled with one head's
+  payload) are replaced by `SequenceHeadsShared` plus the per-head `SequenceCausalLMHeadShared` /
+  `SequencePoolingHeadShared`. The `PipelineOutput` becomes a mapping keyed by head name, so `results.logps` becomes
+  `results["lm"].logps`; the per-head output dataclasses themselves are unchanged.
 - **Tests.** The suites under `test/d9d_test/modules/model/sequence/` (HF parity + state-dict round-trip across both
   families × all heads) update to the new construction and are the regression gate.
 
@@ -245,11 +263,16 @@ per-family subclass; lifting it (pre-1.0) is what unlocks composition.
 a config mapping. *Rejected:* it couples the composition class to the head-config union; keeping construction in the free
 `build_head` factory leaves the class a pure composition of prebuilt modules and lets custom heads in on equal footing.
 
-**A typed input DTO instead of the `HeadInputs` mapping.** Replace the mapping with a frozen dataclass of named input
-fields. *Rejected:* the input set is open (any head, any future signal) and the pipeline engine calls the model with a
-flat `**dict`, so a DTO would still need an `extra: dict` escape hatch plus a dict→DTO conversion at the boundary. A
-named `Mapping` alias keeps the standard inputs typed where it matters and stays aligned with the engine's flat-dict
-contract.
+**A flat `dict[str, torch.Tensor]` with `"<head>/<key>"` keys.** Keep the model's IO a single flat bag and simulate
+hierarchy in the key strings, with a `HeadInputs: Mapping[str, torch.Tensor | None]` for the inputs and a matching
+`infer_output_shapes` on every head. *Rejected:* this was the shape of an earlier draft, written when the engine could
+only move flat dicts. [DEP-0009](0009-dep-dataflow-refactoring.md) and
+[DEP-0010](0010-dep-pipelining-pytree-io.md) removed that constraint — the engine now carries arbitrary PyTrees and
+sizes buffers from `stage_transfer_spec` alone — so the string namespacing and the shape-inference method would both be
+pure ceremony, and every head input and output would lose its type.
+
+**A single flat output dataclass with per-head fields.** *Rejected:* the head set is open and named at composition, so
+the fields cannot be known in advance; the mapping keyed by head name is the minimum structure that supports it.
 
 **Dynamic class factory.** Generating each wrapper at import time. *Rejected:* metaprogramming defeats `ty`, erases
 docstrings and IDE navigation, and removes no duplication that composition does not.

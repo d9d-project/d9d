@@ -17,9 +17,6 @@ from d9d.model_state.mapper.leaf import (
 )
 
 from .params import (
-    Qwen3MoEForCausalLMParameters,
-    Qwen3MoEForClassificationParameters,
-    Qwen3MoEForEmbeddingParameters,
     Qwen3MoELayerParameters,
     Qwen3MoEParameters,
 )
@@ -147,75 +144,6 @@ def mapper_from_huggingface_qwen3_moe(
     )
 
 
-def mapper_from_huggingface_qwen3_moe_for_causal_lm(
-    params: Qwen3MoEForCausalLMParameters,
-    experts_format: Qwen3MoEExpertsFormat,
-) -> ModelStateMapper:
-    """Creates a state mapper translating Qwen3 MoE Causal LM HuggingFace keys into the d9d format.
-
-    Args:
-        params: Causal LM model parameters.
-        experts_format: Format of the MoE experts storage.
-
-    Returns:
-        A composite state mapper.
-    """
-    vocab_name = _vocab_name_for(params.model)
-    return ModelStateMapperParallel(
-        [
-            ModelStateMapperPrefixScope(
-                mapper_from_huggingface_qwen3_moe(params.model, experts_format),
-                source_prefix="model.",
-                target_prefix="model.",
-            ),
-            ModelStateMapperRename(name_from="lm_head.weight", name_to=f"lm_head.lm_head.{vocab_name}.weight"),
-        ]
-    )
-
-
-def mapper_from_huggingface_qwen3_moe_for_classification(
-    params: Qwen3MoEForClassificationParameters,
-    experts_format: Qwen3MoEExpertsFormat,
-) -> ModelStateMapper:
-    """Creates a state mapper translating Qwen3 MoE classification HuggingFace keys into the d9d format.
-
-    Args:
-        params: Classification model parameters.
-        experts_format: Format of the MoE experts storage.
-
-    Returns:
-        A composite state mapper.
-    """
-    return ModelStateMapperParallel(
-        [
-            ModelStateMapperPrefixScope(
-                mapper_from_huggingface_qwen3_moe(params.model, experts_format),
-                source_prefix="model.",
-                target_prefix="model.",
-            ),
-            ModelStateMapperRename(name_from="score.weight", name_to="cls_head.score.weight"),
-        ]
-    )
-
-
-def mapper_from_huggingface_qwen3_moe_for_embedding(
-    params: Qwen3MoEForEmbeddingParameters,
-    experts_format: Qwen3MoEExpertsFormat,
-) -> ModelStateMapper:
-    """Creates a state mapper translating Qwen3 MoE embedding HuggingFace keys into the d9d format.
-
-    Args:
-        params: Embedding model parameters.
-        experts_format: Format of the MoE experts storage.
-
-    Returns:
-        A composite state mapper.
-    """
-    return ModelStateMapperPrefixScope(
-        mapper_from_huggingface_qwen3_moe(params.model, experts_format=experts_format), target_prefix="model."
-    )
-
-
 def _experts_mappers_to_huggingface(
     params: Qwen3MoELayerParameters, experts_format: Qwen3MoEExpertsFormat
 ) -> list[ModelStateMapper]:
@@ -316,79 +244,4 @@ def mapper_to_huggingface_qwen3_moe(
             ),
             ModelStateMapperIdentity("norm.weight"),
         ]
-    )
-
-
-def mapper_to_huggingface_qwen3_moe_for_causal_lm(
-    params: Qwen3MoEForCausalLMParameters,
-    experts_format: Qwen3MoEExpertsFormat,
-) -> ModelStateMapper:
-    """Creates a state mapper translating Qwen3 MoE Causal LM d9d keys back into the HuggingFace format.
-
-    Args:
-        params: Causal LM model parameters.
-        experts_format: Format of the MoE experts storage.
-
-    Returns:
-        A composite state mapper.
-    """
-    vocab_name = _vocab_name_for(params.model)
-    return ModelStateMapperParallel(
-        [
-            ModelStateMapperPrefixScope(
-                mapper_to_huggingface_qwen3_moe(params.model, experts_format),
-                source_prefix="model.",
-                target_prefix="model.",
-            ),
-            ModelStateMapperRename(name_from=f"lm_head.lm_head.{vocab_name}.weight", name_to="lm_head.weight"),
-        ]
-    )
-
-
-def mapper_to_huggingface_qwen3_moe_for_classification(
-    params: Qwen3MoEForClassificationParameters,
-    experts_format: Qwen3MoEExpertsFormat,
-) -> ModelStateMapper:
-    """Creates a state mapper translating Qwen3 MoE classification d9d keys back into the HuggingFace format.
-
-    Args:
-        params: Classification model parameters.
-        experts_format: Format of the MoE experts storage.
-
-    Returns:
-        A composite state mapper.
-    """
-    return ModelStateMapperParallel(
-        [
-            ModelStateMapperPrefixScope(
-                mapper_to_huggingface_qwen3_moe(params.model, experts_format),
-                source_prefix="model.",
-                target_prefix="model.",
-            ),
-            ModelStateMapperRename(name_from="cls_head.score.weight", name_to="score.weight"),
-        ]
-    )
-
-
-def mapper_to_huggingface_qwen3_moe_for_embedding(
-    params: Qwen3MoEForEmbeddingParameters,
-    experts_format: Qwen3MoEExpertsFormat,
-) -> ModelStateMapper:
-    """Creates a state mapper translating Qwen3 MoE embedding d9d keys back into the HuggingFace format.
-
-    Args:
-        params: Embedding model parameters.
-        experts_format: Format of the MoE experts storage.
-
-    Returns:
-        A composite state mapper.
-
-    Raises:
-        ValueError: If the model has a trained embedding projection.
-    """
-    if params.embedding_dim is not None:
-        raise ValueError("Cannot convert a model with trained embedding projection back to HuggingFace")
-
-    return ModelStateMapperPrefixScope(
-        mapper_to_huggingface_qwen3_moe(params.model, experts_format=experts_format), source_prefix="model."
     )

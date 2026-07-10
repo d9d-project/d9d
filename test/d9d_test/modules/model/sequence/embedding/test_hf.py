@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.module.model.io import SequenceInput, SequencePoolingShared, SequenceShared
+from d9d.module.model.io import SequenceHeadsShared, SequenceInput, SequencePoolingHeadShared, SequenceShared
 from d9d.pipelining.api import PipelineStageInfo
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
@@ -11,6 +11,7 @@ from d9d_test.modules.model.sequence.embedding.batch import build_embedding_batc
 from d9d_test.modules.model.sequence.embedding.catalogue import (
     D9D_MODEL_FACTORIES_EMBEDDING,
     D9D_TO_HF_MAPPER_EMBEDDING,
+    HEAD_NAME_EMBEDDING,
     HF_MODEL_FACTORY_EMBEDDING,
     HF_TO_D9D_MAPPER_EMBEDDING,
 )
@@ -52,11 +53,12 @@ def test_consistent_to_hf(model_type: ModelCatalogue, model_factory_d9d) -> None
 
     outputs_d9d = model_d9d(
         SequenceInput(input_ids=batch.sequence.input_ids),
-        SequencePoolingShared(
-            sequence=SequenceShared(position_ids=batch.sequence.position_ids), pooling_mask=batch.pooling_mask
+        SequenceHeadsShared(
+            sequence=SequenceShared(position_ids=batch.sequence.position_ids),
+            heads={HEAD_NAME_EMBEDDING: SequencePoolingHeadShared(pooling_mask=batch.pooling_mask)},
         ),
     )
-    embeddings = outputs_d9d.embeddings
+    embeddings = outputs_d9d[HEAD_NAME_EMBEDDING].embeddings
     assert embeddings.dtype == torch.float32
 
     assert_angle_and_norm_close(

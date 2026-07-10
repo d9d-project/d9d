@@ -1,23 +1,27 @@
 """Typed pipeline IO dataclasses for the model catalogue."""
 
 from .sequence import (
+    SequenceCausalLMHeadShared,
     SequenceCausalLMOutput,
-    SequenceCausalLMShared,
     SequenceClassificationOutput,
     SequenceEmbeddingOutput,
+    SequenceHeadsOutput,
+    SequenceHeadsShared,
     SequenceInput,
-    SequencePoolingShared,
+    SequencePoolingHeadShared,
     SequenceShared,
     SequenceTransfer,
 )
 
 __all__ = [
+    "SequenceCausalLMHeadShared",
     "SequenceCausalLMOutput",
-    "SequenceCausalLMShared",
     "SequenceClassificationOutput",
     "SequenceEmbeddingOutput",
+    "SequenceHeadsOutput",
+    "SequenceHeadsShared",
     "SequenceInput",
-    "SequencePoolingShared",
+    "SequencePoolingHeadShared",
     "SequenceShared",
     "SequenceTransfer",
 ]

@@ -27,14 +27,23 @@ from d9d.loop.control import (
 )
 from d9d.loop.run import InferenceConfigurator
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
-from d9d.module.block.head import LM_IGNORE_INDEX
+from d9d.module.block.head import LM_IGNORE_INDEX, CausalLMHeadConfig, build_head
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.module.model.io import SequenceCausalLMOutput, SequenceCausalLMShared, SequenceInput, SequenceShared
-from d9d.module.model.qwen3_moe import Qwen3MoEForCausalLM, Qwen3MoEForCausalLMParameters
-from d9d.module.parallelism.model.qwen3_moe import parallelize_qwen3_moe_for_causal_lm
+from d9d.module.model import DecoderWithHeads
+from d9d.module.model.io import (
+    SequenceCausalLMHeadShared,
+    SequenceHeadsOutput,
+    SequenceHeadsShared,
+    SequenceInput,
+    SequenceShared,
+)
+from d9d.module.model.qwen3_moe import Qwen3MoEModel, Qwen3MoEParameters
+from d9d.module.parallelism.model import parallelize_qwen3_moe_model, parallelize_task_head
 from pydantic import BaseModel
 from tokenizers import Tokenizer
 from torch.utils.data import Dataset
+
+LM_HEAD_NAME = "lm"  # the name the causal LM head is composed under; the task reads its output by it
 
 # -----------------------------------
 # Configuration Schema using Pydantic
@@ -54,7 +63,7 @@ class DataConfig(BaseModel):
 
 
 class ModelProviderConfig(BaseModel):
-    model: Qwen3MoEForCausalLMParameters  # Hyperparameters for Qwen3 MoE
+    model: Qwen3MoEParameters  # Hyperparameters for the Qwen3 MoE backbone
     checkpointing: bool  # Enable gradient checkpointing to save VRAM
 
 
@@ -169,18 +178,21 @@ def build_dataset(config: DataConfig, dist_context: DistributedContext) -> Datas
 # --------------
 
 
-class ProjectModelProvider(ModelProvider[Qwen3MoEForCausalLM]):
+class ProjectModelProvider(ModelProvider[DecoderWithHeads[Qwen3MoEModel]]):
     def __init__(self, config: ModelProviderConfig):
         self._config = config
 
     def initialize_model_stage(self, context: InitializeModelStageContext) -> InitializeModelStageResult:
-        # Initialize the raw model on CPU or Meta device in BF16 precision
-        model = Qwen3MoEForCausalLM(
+        # Initialize the raw model on CPU or Meta device in BF16 precision.
+        # Compose the Qwen3 MoE backbone with a single causal LM head named "lm".
+        backbone = Qwen3MoEModel(
             params=self._config.model,
             stage=context.stage,
             hidden_states_snapshot_mode=HiddenStatesAggregationMode.no,
             enable_checkpointing=self._config.checkpointing,
-        ).bfloat16()
+        )
+        heads = {LM_HEAD_NAME: build_head(CausalLMHeadConfig(), backbone=backbone, stage=context.stage)}
+        model = DecoderWithHeads(backbone, heads, context.stage).bfloat16()
 
         return InitializeModelStageResult(
             model=model,
@@ -188,10 +200,13 @@ class ProjectModelProvider(ModelProvider[Qwen3MoEForCausalLM]):
         )
 
     def parallelize_model_stage(self, context: ParallelizeModelStageContext):
-        # Applies specific distributed strategies
-        # suited for Qwen3 MoE architecture.
+        # Applies specific distributed strategies suited for the Qwen3 MoE architecture:
+        # the per-family backbone routine on the backbone, then uniform HSDP on each head.
         # You can apply your own horizontal parallelism strategy here.
-        parallelize_qwen3_moe_for_causal_lm(dist_context=context.dist_context, stage=context.stage, model=context.model)
+        parallelize_qwen3_moe_model(context.dist_context, context.model.model, context.stage)
+        if context.stage.is_current_stage_last:
+            for head in context.model.heads.values():
+                parallelize_task_head(head, context.dist_context)
 
     def prepare_export_model_stage(self, context: PrepareExportModelStageContext) -> PrepareExportModelStageResult:
         # When exporting, save model weights as-is
@@ -213,9 +228,7 @@ class PerplexityState(TypedDict):
 
 
 class PerplexityTask(
-    InferenceTask[
-        dict[str, torch.Tensor], SequenceInput, SequenceCausalLMShared, SequenceCausalLMOutput, PerplexityState
-    ]
+    InferenceTask[dict[str, torch.Tensor], SequenceInput, SequenceHeadsShared, SequenceHeadsOutput, PerplexityState]
 ):
     def __init__(self, dist_ctx: DistributedContext):
         self._dist_ctx = dist_ctx
@@ -223,21 +236,23 @@ class PerplexityTask(
 
     def build_forward_inputs(
         self, ctx: BuildForwardInputsContext
-    ) -> BuildForwardInputsResult[SequenceInput, SequenceCausalLMShared, PerplexityState]:
+    ) -> BuildForwardInputsResult[SequenceInput, SequenceHeadsShared, PerplexityState]:
         # ctx.batch contains the output of the Collator.
 
         # Return the pipeline input (first stage only) plus the shared input (every stage) and the
-        # typed side-data carried to output processing.
+        # typed side-data carried to output processing. The shared input routes position ids to the
+        # backbone and labels to the "lm" head this model was composed with.
         return BuildForwardInputsResult(
             input=SequenceInput(input_ids=ctx.batch["input_ids"]),
-            shared=SequenceCausalLMShared(
-                sequence=SequenceShared(position_ids=ctx.batch["position_ids"]), labels=ctx.batch["labels"]
+            shared=SequenceHeadsShared(
+                sequence=SequenceShared(position_ids=ctx.batch["position_ids"]),
+                heads={LM_HEAD_NAME: SequenceCausalLMHeadShared(labels=ctx.batch["labels"])},
             ),
             state=PerplexityState(labels=ctx.batch["labels"]),
         )
 
-    def process_outputs(self, ctx: ProcessOutputsContext[SequenceCausalLMOutput, PerplexityState]):
-        logps = ctx.pipeline_results.logps
+    def process_outputs(self, ctx: ProcessOutputsContext[SequenceHeadsOutput, PerplexityState]):
+        logps = ctx.pipeline_results[LM_HEAD_NAME].logps
 
         # Calculate number of valid tokens (ignoring the -100 padding)
         # This is crucial for variable length batches.

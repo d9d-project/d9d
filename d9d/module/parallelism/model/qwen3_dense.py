@@ -1,10 +1,5 @@
 from d9d.core.dist_context import DENSE_DOMAIN, DistributedContext
-from d9d.module.model.qwen3_dense import (
-    Qwen3DenseForCausalLM,
-    Qwen3DenseForClassification,
-    Qwen3DenseForEmbedding,
-    Qwen3DenseModel,
-)
+from d9d.module.model.qwen3_dense import Qwen3DenseModel
 from d9d.module.parallelism.api import parallelize_hsdp
 from d9d.pipelining.api import PipelineStageInfo
 
@@ -58,80 +53,5 @@ def parallelize_qwen3_dense_model(dist_context: DistributedContext, model: Qwen3
         )
         parallelize_hsdp(
             layer.post_attention_layernorm,
-            mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"],
-        )
-
-
-def parallelize_qwen3_dense_for_causal_lm(
-    dist_context: DistributedContext, model: Qwen3DenseForCausalLM, stage: PipelineStageInfo
-):
-    """Parallelizes the Qwen3 Dense Causal LM model.
-
-    This function delegates backbone parallelization to ``parallelize_qwen3_dense_model``
-    and additionally configures the language model head with Hybrid Sharded Data
-    Parallelism (HSDP).
-
-    Args:
-        dist_context: The distributed context containing device meshes and topology info.
-        model: The Qwen3 Dense Causal LM model to parallelize.
-        stage: Information about the current pipeline stage.
-    """
-    dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
-
-    parallelize_qwen3_dense_model(dist_context, model.model, stage)
-
-    if stage.is_current_stage_last:
-        parallelize_hsdp(
-            model.lm_head,
-            mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"],
-        )
-
-
-def parallelize_qwen3_dense_for_classification(
-    dist_context: DistributedContext, model: Qwen3DenseForClassification, stage: PipelineStageInfo
-):
-    """Parallelizes the Qwen3 Dense classification model.
-
-    This function delegates backbone parallelization to ``parallelize_qwen3_dense_model``
-    and additionally configures the classification head with Hybrid Sharded Data
-    Parallelism (HSDP).
-
-    Args:
-        dist_context: The distributed context containing device meshes and topology info.
-        model: The Qwen3 Dense classification model to parallelize.
-        stage: Information about the current pipeline stage.
-    """
-    dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
-
-    parallelize_qwen3_dense_model(dist_context, model.model, stage)
-
-    if stage.is_current_stage_last:
-        parallelize_hsdp(
-            model.cls_head,
-            mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"],
-        )
-
-
-def parallelize_qwen3_dense_for_embedding(
-    dist_context: DistributedContext, model: Qwen3DenseForEmbedding, stage: PipelineStageInfo
-):
-    """Parallelizes the Qwen3 Dense embedding model.
-
-    This function delegates backbone parallelization to ``parallelize_qwen3_dense_model``
-    and additionally configures the embedding head with Hybrid Sharded Data
-    Parallelism (HSDP).
-
-    Args:
-        dist_context: The distributed context containing device meshes and topology info.
-        model: The Qwen3 Dense embedding model to parallelize.
-        stage: Information about the current pipeline stage.
-    """
-    dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
-
-    parallelize_qwen3_dense_model(dist_context, model.model, stage)
-
-    if stage.is_current_stage_last:
-        parallelize_hsdp(
-            model.embedding_head,
             mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"],
         )

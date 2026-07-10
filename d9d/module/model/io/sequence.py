@@ -1,5 +1,6 @@
 import dataclasses
-from typing import Generic, TypeVar
+from collections.abc import Mapping
+from typing import Any, Generic, TypeAlias, TypeVar
 
 import torch
 
@@ -45,30 +46,49 @@ class SequenceShared:
 
 
 @dataclasses.dataclass
-class SequenceCausalLMShared:
-    """The shared input for causal language modeling, broadcast to every stage.
+class SequenceCausalLMHeadShared:
+    """The shared input a causal language modeling head consumes.
 
     Attributes:
-        sequence: The backbone shared input.
-        labels: Target tokens for the loss computation (used on the last stage).
+        labels: Target tokens for the loss computation.
     """
 
-    sequence: SequenceShared
-    labels: torch.Tensor | None = None
+    labels: torch.Tensor
 
 
 @dataclasses.dataclass
-class SequencePoolingShared:
-    """The shared input for pooled heads (classification/embedding), broadcast to every stage.
+class SequencePoolingHeadShared:
+    """The shared input a pooled head (classification/embedding) consumes.
+
+    Attributes:
+        pooling_mask: Binary mask indicating which token(s) to pool. You can use
+            ``d9d.dataset.token_pooling_mask_from_attention_mask`` to build it from an attention mask.
+    """
+
+    pooling_mask: torch.Tensor | None = None
+
+
+@dataclasses.dataclass
+class SequenceHeadsShared:
+    """The shared input a backbone composed with named task heads consumes on every stage.
 
     Attributes:
         sequence: The backbone shared input.
-        pooling_mask: Binary mask indicating which token(s) to pool (used on the last stage). You can
-            use ``d9d.dataset.token_pooling_mask_from_attention_mask`` to build it from an attention mask.
+        heads: Each head's own shared input, keyed by the names the heads were composed under
+            (read on the last stage).
     """
 
     sequence: SequenceShared
-    pooling_mask: torch.Tensor | None = None
+    heads: Mapping[str, Any]
+
+
+SequenceHeadsOutput: TypeAlias = Mapping[str, Any]
+"""
+The output of a backbone composed with named task heads: each head's output, keyed by head name.
+
+The key is the name the head was composed under, so two heads of the same type simply take
+different keys and cannot collide.
+"""
 
 
 @dataclasses.dataclass
