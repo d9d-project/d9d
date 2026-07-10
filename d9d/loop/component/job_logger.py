@@ -3,9 +3,9 @@ from contextlib import contextmanager
 from typing import Any
 
 import torch
-import torch.utils._pytree as pytree  # noqa: PLC2701
 from torch.distributed.checkpoint.stateful import Stateful
 
+from d9d.core import pytree
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import PyTree, ScalarTree
 from d9d.internals.metric_collector import AsyncMetricCollector
@@ -22,20 +22,7 @@ def _flatten_pytree_for_metrics(tree: PyTree[float]) -> dict[str, float]:
     flat_dict = {}
 
     for path_tuple, value in pytree.tree_leaves_with_path(tree):
-        path_segments = []
-
-        for key in path_tuple:
-            match key:
-                case pytree.MappingKey(k):
-                    path_segments.append(str(k))
-                case pytree.SequenceKey(idx):
-                    path_segments.append(str(idx))
-                case pytree.GetAttrKey(name):
-                    path_segments.append(name)
-                case _:
-                    path_segments.append(str(key))
-
-        flat_key = "/".join(path_segments)
+        flat_key = "/".join(str(segment) for segment in path_tuple)
         flat_dict[flat_key] = value
 
     return flat_dict
