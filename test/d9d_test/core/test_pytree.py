@@ -123,6 +123,46 @@ def test_flatten_unflatten_roundtrip():
     assert rebuilt == tree
 
 
+@dataclasses.dataclass(frozen=True)
+class OpaqueLeaf:
+    value: int
+
+
+@pytest.mark.local
+def test_is_leaf_keeps_matching_node_as_leaf():
+    tree = {"a": OpaqueLeaf(1), "b": [OpaqueLeaf(2), OpaqueLeaf(3)]}
+    leaves = pytree.tree_leaves(tree, is_leaf=lambda x: isinstance(x, OpaqueLeaf))
+    assert leaves == [OpaqueLeaf(1), OpaqueLeaf(2), OpaqueLeaf(3)]
+
+
+@pytest.mark.local
+def test_is_leaf_roundtrip():
+    tree = {"a": OpaqueLeaf(1), "b": OpaqueLeaf(2)}
+    leaves, treespec = pytree.tree_flatten(tree, is_leaf=lambda x: isinstance(x, OpaqueLeaf))
+    assert pytree.tree_unflatten(treespec, leaves) == tree
+
+
+@pytest.mark.local
+def test_is_leaf_does_not_globally_register_the_stopped_type():
+    # A dataclass kept as a leaf via is_leaf must NOT be registered: a later plain flatten must
+    # still descend into it, proving the registry was not mutated as a side effect.
+    @dataclasses.dataclass
+    class Boundary:
+        a: torch.Tensor
+        b: torch.Tensor
+
+    stopped = pytree.tree_leaves(
+        {"k": Boundary(torch.tensor(1.0), torch.tensor(2.0))}, is_leaf=lambda x: isinstance(x, Boundary)
+    )
+    assert len(stopped) == 1
+    assert isinstance(stopped[0], Boundary)
+
+    # Without is_leaf, the same type is descended into (registered lazily now, not before).
+    descended = pytree.tree_leaves({"k": Boundary(torch.tensor(1.0), torch.tensor(2.0))})
+    assert len(descended) == 2
+    assert all(isinstance(leaf, torch.Tensor) for leaf in descended)
+
+
 @pytest.mark.local
 def test_lazily_discovered_nested_new_dataclass_type():
     # A dataclass type first seen only deep inside a container of an already-seen dataclass.

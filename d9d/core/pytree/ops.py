@@ -5,7 +5,7 @@ import optree
 
 from d9d.core.types import PyTree
 
-from .flatten import PyTreeFlattener
+from .flatten import IsLeaf, PyTreeFlattener
 
 TLeaf = TypeVar("TLeaf")
 TMapped = TypeVar("TMapped")
@@ -17,17 +17,19 @@ PyTreeSpec = optree.PyTreeSpec
 _flattener = PyTreeFlattener()
 
 
-def tree_flatten(tree: PyTree[TLeaf]) -> tuple[list[TLeaf], PyTreeSpec]:
+def tree_flatten(tree: PyTree[TLeaf], is_leaf: IsLeaf | None = None) -> tuple[list[TLeaf], PyTreeSpec]:
     """Flattens a pytree into its leaves and a structure specification.
 
     Args:
         tree: The nested structure to flatten.
+        is_leaf: Optional predicate; when it returns ``True`` for a node, that node is kept as a leaf
+            and not traversed further.
 
     Returns:
         A tuple of the leaf list and a ``PyTreeSpec`` that can rebuild the structure via
         `tree_unflatten`.
     """
-    return _flattener.flatten(tree)
+    return _flattener.flatten(tree, is_leaf)
 
 
 def tree_unflatten(treespec: PyTreeSpec, leaves: list[TLeaf]) -> PyTree[TLeaf]:
@@ -43,16 +45,18 @@ def tree_unflatten(treespec: PyTreeSpec, leaves: list[TLeaf]) -> PyTree[TLeaf]:
     return optree.tree_unflatten(treespec, leaves)
 
 
-def tree_leaves(tree: PyTree[TLeaf]) -> list[TLeaf]:
+def tree_leaves(tree: PyTree[TLeaf], is_leaf: IsLeaf | None = None) -> list[TLeaf]:
     """Returns the leaves of a pytree in deterministic (sorted-key) order.
 
     Args:
         tree: The nested structure to flatten.
+        is_leaf: Optional predicate; when it returns ``True`` for a node, that node is kept as a leaf
+            and not traversed further.
 
     Returns:
         The list of leaves.
     """
-    return _flattener.flatten(tree)[0]
+    return _flattener.flatten(tree, is_leaf)[0]
 
 
 def tree_map(func: Callable[[TLeaf], TMapped], tree: PyTree[TLeaf]) -> PyTree[TMapped]:
@@ -94,7 +98,7 @@ def tree_map_only(
     return cast(TTree, optree.tree_unflatten(treespec, mapped))
 
 
-def tree_leaves_with_path(tree: PyTree[TLeaf]) -> list[tuple[tuple[Any, ...], TLeaf]]:
+def tree_leaves_with_path(tree: PyTree[TLeaf], is_leaf: IsLeaf | None = None) -> list[tuple[tuple[Any, ...], TLeaf]]:
     """Returns ``(path, leaf)`` pairs for every leaf of a pytree.
 
     Each path is a tuple of keys and indices reaching the leaf from the root: ``str`` for dict keys
@@ -102,9 +106,11 @@ def tree_leaves_with_path(tree: PyTree[TLeaf]) -> list[tuple[tuple[Any, ...], TL
 
     Args:
         tree: The nested structure to flatten.
+        is_leaf: Optional predicate; when it returns ``True`` for a node, that node is kept as a leaf
+            and not traversed further.
 
     Returns:
         A list of ``(path, leaf)`` tuples in deterministic (sorted-key) order.
     """
-    paths, leaves, _ = _flattener.flatten_with_path(cast(Any, tree))
+    paths, leaves, _ = _flattener.flatten_with_path(cast(Any, tree), is_leaf)
     return list(zip(paths, leaves, strict=True))
