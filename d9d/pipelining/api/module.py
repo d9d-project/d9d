@@ -1,9 +1,10 @@
 import dataclasses
+import enum
 import typing
 
-import torch
+from d9d.core.types import PyTree, TensorSpec
 
-from d9d.core.types import TensorSpec
+from .types import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
 
 
 @dataclasses.dataclass
@@ -100,39 +101,65 @@ def distribute_layers_for_pipeline_stage(
     return start_layer_id, start_layer_id + num_layers_in_stage
 
 
-@typing.runtime_checkable
-class ModuleSupportsPipelining(typing.Protocol):
-    """Protocol for modules that support pipeline parallelism metadata inference.
+class StageBoundary(enum.Enum):
+    """Identifies which inter-stage edge of a stage a transfer spec describes.
 
-    Classes implementing this protocol enable the framework to pre-calculate
-    tensor shapes and types required for inter-stage communication (p2p)
-    without executing the full forward pass.
+    Attributes:
+        incoming: The ``StageTransfer`` this stage receives from the previous stage.
+        outgoing: The ``StageTransfer`` this stage sends to the next stage.
     """
 
-    def infer_stage_inputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        """Infers the input tensor specs for the current pipeline stage from a single microbatch.
+    incoming = "incoming"
+    outgoing = "outgoing"
+
+
+@typing.runtime_checkable
+class ModuleSupportsPipelining(typing.Protocol[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
+    """Protocol for modules that can be split across pipeline stages.
+
+    A pipelined module carries four distinct IO roles, each an arbitrary PyTree (dataclasses are the
+    recommended form). The module knows its position from the ``PipelineStageInfo`` it receives at
+    construction and branches on it explicitly.
+
+    Type parameters:
+        TPipelineInput: Input consumed by the *first* stage.
+        TStageTransfer: Payload transferred between adjacent stages. The outgoing transfer of stage
+            ``N`` and the incoming transfer of stage ``N+1`` are the *same* type.
+        TSharedInput: Value passed to *every* stage's forward.
+        TPipelineOutput: Output produced by the *last* stage.
+    """
+
+    def forward(
+        self,
+        inputs: TPipelineInput | TStageTransfer,
+        shared: TSharedInput,
+    ) -> TStageTransfer | TPipelineOutput:
+        """Runs this stage.
 
         Args:
-            microbatch_inputs: A representative single microbatch of pipeline inputs. Shapes are taken
-                as-is; there is no global batch to divide.
+            inputs: ``PipelineInput`` on the first stage; ``StageTransfer`` otherwise.
+            shared: The value broadcast to every stage.
 
         Returns:
-            Dictionary of input tensor specs expected by this specific stage locally.
+            ``PipelineOutput`` on the last stage; ``StageTransfer`` otherwise.
         """
         ...
 
-    def infer_stage_outputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        """Infers the output tensor specs for the current pipeline stage from a single microbatch.
+    def stage_transfer_spec(self, pipeline_input: TPipelineInput, boundary: StageBoundary) -> PyTree[TensorSpec] | None:
+        """Describes the ``StageTransfer`` crossing the given boundary of this stage.
+
+        The returned PyTree is structurally identical to the ``StageTransfer`` itself, with every
+        tensor leaf replaced by its ``TensorSpec``. Shapes are derived by cheap arithmetic on
+        ``pipeline_input``; the ``forward`` body is never executed.
 
         Args:
-            microbatch_inputs: A representative single microbatch of pipeline inputs. Shapes are taken
-                as-is; there is no global batch to divide.
+            pipeline_input: A representative single microbatch of pipeline input. Only shapes and
+                dtypes are read; values are never used.
+            boundary: ``incoming`` (received from the previous stage) or ``outgoing`` (sent to the
+                next stage).
 
         Returns:
-            Dictionary of output tensor specs produced by this specific stage locally.
+            A PyTree of ``TensorSpec`` for the transfer crossing that boundary, or ``None`` when the
+            boundary is terminal (``incoming`` on the first stage, ``outgoing`` on the last stage).
         """
         ...

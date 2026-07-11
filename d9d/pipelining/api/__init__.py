@@ -3,6 +3,7 @@
 from .module import (
     ModuleSupportsPipelining,
     PipelineStageInfo,
+    StageBoundary,
     TensorSpec,
     distribute_layers_for_pipeline_stage,
 )
@@ -15,6 +16,7 @@ __all__ = [
     "PipelineResultFn",
     "PipelineSchedule",
     "PipelineStageInfo",
+    "StageBoundary",
     "TensorSpec",
     "distribute_layers_for_pipeline_stage",
 ]
