@@ -145,12 +145,17 @@ class ModuleSupportsPipelining(typing.Protocol[TPipelineInput, TStageTransfer, T
         """
         ...
 
-    def stage_transfer_spec(self, pipeline_input: TPipelineInput, boundary: StageBoundary) -> PyTree[TensorSpec] | None:
+    def stage_transfer_spec(self, pipeline_input: TPipelineInput, boundary: StageBoundary) -> PyTree[TensorSpec]:
         """Describes the ``StageTransfer`` crossing the given boundary of this stage.
 
         The returned PyTree is structurally identical to the ``StageTransfer`` itself, with every
         tensor leaf replaced by its ``TensorSpec``. Shapes are derived by cheap arithmetic on
         ``pipeline_input``; the ``forward`` body is never executed.
+
+        The engine only calls this for boundaries that actually transfer, deciding terminality from
+        the pipeline topology — it is never called for the first stage's ``incoming`` edge nor the
+        last stage's ``outgoing`` edge. Implementations therefore do not need to special-case terminal
+        boundaries.
 
         Args:
             pipeline_input: A representative single microbatch of pipeline input. Only shapes and
@@ -159,7 +164,6 @@ class ModuleSupportsPipelining(typing.Protocol[TPipelineInput, TStageTransfer, T
                 next stage).
 
         Returns:
-            A PyTree of ``TensorSpec`` for the transfer crossing that boundary, or ``None`` when the
-            boundary is terminal (``incoming`` on the first stage, ``outgoing`` on the last stage).
+            A PyTree of ``TensorSpec`` for the transfer crossing that boundary.
         """
         ...
