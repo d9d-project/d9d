@@ -53,7 +53,7 @@ class PipelineCommunicationHandler:
         key = (stage_idx, microbatch_idx)
 
         if key in self._forward_receive_ops:
-            raise ValueError()
+            raise ValueError(f"A forward receive is already pending for S{stage_idx}B{microbatch_idx}")
 
         work = _schedule_batched_p2p(stage.get_fwd_recv_ops(microbatch_idx))
         self._forward_receive_ops[key] = work
@@ -73,7 +73,7 @@ class PipelineCommunicationHandler:
         key = (stage_idx, microbatch_idx)
 
         if key in self._backward_receive_ops:
-            raise ValueError()
+            raise ValueError(f"A backward receive is already pending for S{stage_idx}B{microbatch_idx}")
 
         work = _schedule_batched_p2p(stage.get_bwd_recv_ops(microbatch_idx))
 

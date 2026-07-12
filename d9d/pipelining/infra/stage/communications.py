@@ -1,150 +1,69 @@
 import dataclasses
+from typing import Any, Generic, cast
 
 import torch
 import torch.distributed as dist
 
-from d9d.core.types import TensorSpec
+from d9d.core import pytree
+from d9d.core.types import PyTree, TensorSpec
+from d9d.pipelining.api import TStageTransfer
 
 
-@dataclasses.dataclass(kw_only=True, slots=True)
-class ReceiveStageInput:
-    """Instruction to receive a specific tensor from a previous stage (or next stage during backward).
-
-    Attributes:
-        name: A unique identifier for the communication operation.
-        from_stage: The stage index sending the data.
-        spec: The shape/dtype/layout describing the tensor to receive.
-    """
-
-    name: str
-    from_stage: int
-    spec: TensorSpec
+def _is_spec(node: Any) -> bool:
+    return isinstance(node, TensorSpec)
 
 
-@dataclasses.dataclass
-class StartStageInput:
-    """Instruction indicating that the input for this stage does not come from communication.
-
-    (e.g., this is the first stage receiving data loader inputs).
-    """
-
-
-StageInput = ReceiveStageInput | StartStageInput
-
-
-@dataclasses.dataclass(kw_only=True, slots=True)
-class SendStageOutput:
-    """Instruction to send a specific tensor to a next stage (or previous if backward).
+@dataclasses.dataclass(frozen=True, slots=True)
+class _MicrobatchReceivePlan:
+    """How to receive and rebuild one microbatch's incoming transfer.
 
     Attributes:
-        to_stage: The stage index receiving the data.
+        leaf_specs: The specs of the ordered tensor leaves to receive, in transfer flatten order;
+            each sizes one receive buffer.
+        treespec: The structure spec that rebuilds the ``StageTransfer`` from the received leaves.
     """
 
-    to_stage: int
+    leaf_specs: list[TensorSpec]
+    treespec: pytree.PyTreeSpec
 
 
-@dataclasses.dataclass
-class EndStageOutput:
-    """Instruction indicating that the output of this stage is not sent anywhere.
+def _build_receive_plan(spec_per_microbatch: tuple[PyTree[TensorSpec], ...]) -> list[_MicrobatchReceivePlan]:
+    plan_per_microbatch: list[_MicrobatchReceivePlan] = []
 
-    (e.g., this is the last stage computing loss).
-    """
+    for pytree_specs in spec_per_microbatch:
+        # tree_flatten is guaranteed to be deterministic in order
+        leaf_specs, treespec = pytree.tree_flatten(pytree_specs, is_leaf=_is_spec)
+        plan_per_microbatch.append(_MicrobatchReceivePlan(leaf_specs=leaf_specs, treespec=treespec))
+
+    return plan_per_microbatch
 
 
-StageOutput = SendStageOutput | EndStageOutput
-
-
-class StageCommunicationHandler:
-    """Manages Point-to-Point (P2P) communication descriptors for a data flow direction within a pipeline stage.
-
-    This class handles the creation of P2P operations (send/recv) across multiple microbatches,
-    managing buffers and mapping logical stage indices to physical ranks.
-    """
+class StageReceiver(Generic[TStageTransfer]):
+    """Receives one stage's incoming ``StageTransfer`` from a single peer stage."""
 
     def __init__(
         self,
-        name: str,
-        stage_index: int,
-        input_stage_index: int | None,
-        input_args_per_microbatch: tuple[dict[str, TensorSpec], ...],
-        output_stage_index: int | None,
-        output_args: dict[str, TensorSpec],
-        stage_idx_to_host_rank: dict[int, int],
+        peer_global_rank: int,
+        spec_per_microbatch: tuple[PyTree[TensorSpec], ...],
         group: dist.ProcessGroup,
+        requires_grad: bool,
     ):
-        """Constructs a StageCommunicationHandler object.
+        """Constructs a StageReceiver object.
 
         Args:
-            name: Name prefix for this handler (e.g., 'fwd', 'bwd').
-            stage_index: The logical index of the current stage.
-            input_stage_index: The logical index of the stage providing inputs, or None if inputs are local.
-            input_args_per_microbatch: Per-microbatch input specs (shape/dtype/layout); the receive buffer for
-                microbatch ``i`` is sized from entry ``i``. The number of microbatches is its length.
-            output_stage_index: The logical index of the stage consuming outputs, or None if outputs are terminal.
-            output_args: Structural output specs (names). Send buffers are not pre-allocated — send ops read
-                the produced tensors directly — so only names matter here, not per-microbatch shapes.
-            stage_idx_to_host_rank: Mapping from logical stage indices to physical world ranks.
+            peer_global_rank: The global (world) rank of the peer stage sending the transfer.
+            spec_per_microbatch: The incoming transfer spec (a ``TensorSpec`` PyTree) for each
+                microbatch in the pack; the receive buffers for microbatch ``i`` are sized from
+                entry ``i``.
             group: The process group strictly for pipeline communication.
+            requires_grad: Whether receive buffers should require gradients (enables gradient flow
+                from backward stages to forward stages).
         """
-        self._input_handlers = self._build_inputs(
-            name=name,
-            stage_index=stage_index,
-            input_stage_index=input_stage_index,
-            input_args_per_microbatch=input_args_per_microbatch,
-        )
-        self._output_handlers = self._build_outputs(output_stage_index=output_stage_index, output_args=output_args)
-
-        self._stage_idx_to_host_rank = stage_idx_to_host_rank
+        self._peer_global_rank = peer_global_rank
         self._group = group
-
-        self._input_requires_grad = False
-        # Currently-allocated receive buffers, keyed by microbatch then input name. Populated lazily on
-        # receive/local-set and released (popped) when consumed by get_inputs, so only in-flight
-        # microbatches hold live buffers at any moment.
-        self._live_buffers: dict[int, dict[str, torch.Tensor]] = {}
-
-    @staticmethod
-    def _build_inputs(
-        name: str,
-        stage_index: int,
-        input_stage_index: int | None,
-        input_args_per_microbatch: tuple[dict[str, TensorSpec], ...],
-    ) -> dict[int, dict[str, StageInput]]:
-        handlers: dict[int, dict[str, StageInput]] = {}
-
-        for chunk_id, input_args in enumerate(input_args_per_microbatch):
-            handlers[chunk_id] = {}
-            for input_name, input_spec in input_args.items():
-                if input_stage_index is None:
-                    handlers[chunk_id][input_name] = StartStageInput()
-                else:
-                    handlers[chunk_id][input_name] = ReceiveStageInput(
-                        name=f"{name}_recv_from_{input_stage_index}_to_{stage_index}[{chunk_id}][{input_name}]",
-                        from_stage=input_stage_index,
-                        spec=input_spec,
-                    )
-        return handlers
-
-    @staticmethod
-    def _build_outputs(output_stage_index: int | None, output_args: dict[str, TensorSpec]) -> dict[str, StageOutput]:
-        handlers: dict[str, StageOutput] = {}
-
-        for output_name in output_args:
-            if output_stage_index is None:
-                handlers[output_name] = EndStageOutput()
-            else:
-                handlers[output_name] = SendStageOutput(to_stage=output_stage_index)
-        return handlers
-
-    def set_input_requires_grad_(self, requires_grad: bool):
-        """Records whether receive buffers should require gradients.
-
-        Typically used to enable gradient flow from backward stages to forward stages.
-
-        Args:
-            requires_grad: Whether the buffers should require gradients.
-        """
-        self._input_requires_grad = requires_grad
+        self._requires_grad = requires_grad
+        self._plan_per_microbatch = _build_receive_plan(spec_per_microbatch)
+        self._live_buffers: dict[int, list[torch.Tensor]] = {}
 
     def _allocate_buffer(self, spec: TensorSpec) -> torch.Tensor:
         return torch.empty(
@@ -152,118 +71,94 @@ class StageCommunicationHandler:
             dtype=spec.dtype,
             layout=spec.layout,
             device="cuda",  # force device
-            requires_grad=self._input_requires_grad,
+            requires_grad=self._requires_grad,
         )
 
-    def set_inputs_local(self, inputs: dict[str, torch.Tensor], microbatch_index: int):
-        """Manually fills the input buffer for a specific microbatch with local data.
+    def set_inputs_local(self, inputs: TStageTransfer, microbatch_index: int):
+        """Manually fills the input buffer for a specific microbatch with a local transfer.
 
-        This is used when the stage is the first in the pipeline or receives data
-        from a dataloader rather than via network communication.
+        Used for the V-shape schedulers, where the producing stage lives on the same rank and its
+        transfer is handed over directly rather than received via the network.
 
         Args:
-            inputs: Dictionary of input tensors.
+            inputs: The ``StageTransfer`` produced by the peer stage.
             microbatch_index: The microbatch identifier.
-
-        Raises:
-            RuntimeError: If tried to set a buffer for a no-receive stage input.
         """
-        live = self._live_buffers.setdefault(microbatch_index, {})
-        for input_name, input_value in inputs.items():
-            handler = self._input_handlers[microbatch_index][input_name]
-            if not isinstance(handler, ReceiveStageInput):
-                raise RuntimeError("Tried to set a buffer of no-receive stage input")
-            live[input_name] = input_value.detach().requires_grad_(self._input_requires_grad)
+        self._live_buffers[microbatch_index] = [
+            leaf.detach().requires_grad_(self._requires_grad) for leaf in pytree.tree_leaves(inputs)
+        ]
 
-    def get_inputs(self, microbatch_index: int) -> dict[str, torch.Tensor]:
-        """Retrieves and releases the input tensors for a specific microbatch.
+    def pop_inputs(self, microbatch_index: int) -> TStageTransfer:
+        """Retrieves and releases the input transfer for a specific microbatch.
 
-        Ownership of the buffers is transferred to the caller: the handler drops its references so the
-        memory can be freed once the caller (e.g. the forward/backward cache) releases it.
+        Consume-once: the buffers are removed from the handler, transferring ownership to the caller so
+        the memory can be freed once the caller (e.g. the forward/backward cache) releases it. Calling
+        this twice for the same microbatch raises ``KeyError``.
 
         Args:
             microbatch_index: The microbatch identifier.
 
         Returns:
-            Dictionary mapping input names to tensors.
+            The received ``StageTransfer``, reconstructed from the buffers.
 
         Raises:
-            RuntimeError: If tried to get a buffer for a no-receive stage input.
             KeyError: If no buffer has been allocated for the microbatch (never received or set).
         """
-        for input_info in self._input_handlers[microbatch_index].values():
-            if not isinstance(input_info, ReceiveStageInput):
-                raise RuntimeError("Tried to get a buffer of no receive stage input")
+        treespec = self._plan_per_microbatch[microbatch_index].treespec
+        buffers = self._live_buffers.pop(microbatch_index)
+        return cast(TStageTransfer, pytree.tree_unflatten(treespec, buffers))
 
-        return self._live_buffers.pop(microbatch_index)
+    def receive(self, microbatch_index: int) -> list[dist.P2POp]:
+        """Allocates the receive buffers for a microbatch and generates the P2P receive operations.
 
-    def create_receive_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """Generates the PyTorch P2P receive operations for a specific microbatch.
-
-        Allocates the receive buffers for the microbatch on demand and registers them as live until
-        consumed by :meth:`get_inputs`.
+        Allocates one buffer per transfer leaf (in flatten order) and registers them as live until
+        consumed by :meth:`pop_inputs`, then builds the ``dist.irecv`` ops that fill them.
 
         Args:
             microbatch_index: The microbatch identifier.
 
         Returns:
             A list of `dist.P2POp` objects configured for `dist.irecv`.
-
-        Raises:
-            ValueError: If an unknown input handler type is encountered.
         """
         ops = []
+        buffers = []
 
-        inputs = self._input_handlers[microbatch_index]
-        live = self._live_buffers.setdefault(microbatch_index, {})
-        # sort ops by parameter names to ensure receive ops are ordered the same for send and recv
-        for input_name, input_info in sorted(inputs.items(), key=lambda x: x[0]):
-            match input_info:
-                case StartStageInput():
-                    pass
-                case ReceiveStageInput():
-                    buffer = self._allocate_buffer(input_info.spec)
-                    live[input_name] = buffer
-                    peer_rank = self._stage_idx_to_host_rank[input_info.from_stage]
-                    peer_global_rank = dist.get_global_rank(self._group, peer_rank)
-                    op = dist.P2POp(dist.irecv, buffer, peer_global_rank, self._group)
-                    ops.append(op)
-                case _:
-                    raise ValueError()
+        for leaf_spec in self._plan_per_microbatch[microbatch_index].leaf_specs:
+            buffer = self._allocate_buffer(leaf_spec)
+            buffers.append(buffer)
+            ops.append(dist.P2POp(dist.irecv, buffer, self._peer_global_rank, self._group))
 
-        return ops
-
-    def create_send_ops(self, send_contents: dict[str, torch.Tensor]) -> list[dist.P2POp]:
-        """Generates the PyTorch P2P send operations for the provided tensors.
-
-        Args:
-            send_contents: Dictionary of tensors to send.
-
-        Returns:
-            A list of `dist.P2POp` objects configured for `dist.isend`.
-
-        Raises:
-            ValueError: If an unknown output handler type is encountered.
-        """
-        ops = []
-
-        # sort ops by parameter names to ensure receive ops are ordered the same for send and recv
-        for output_name, output_info in sorted(self._output_handlers.items(), key=lambda x: x[0]):
-            output_tensor = send_contents[output_name]
-
-            match output_info:
-                case EndStageOutput():
-                    pass
-                case SendStageOutput():
-                    peer_rank = self._stage_idx_to_host_rank[output_info.to_stage]
-                    peer_global_rank = dist.get_global_rank(self._group, peer_rank)
-                    op = dist.P2POp(dist.isend, output_tensor, peer_global_rank, self._group)
-                    ops.append(op)
-                case _:
-                    raise ValueError()
-
+        self._live_buffers[microbatch_index] = buffers
         return ops
 
     def reset(self):
         """Resets the internal state, releasing any live receive buffers."""
         self._live_buffers.clear()
+
+
+class StageSender(Generic[TStageTransfer]):
+    """Sends one stage's outgoing ``StageTransfer`` to a single peer stage."""
+
+    def __init__(self, peer_global_rank: int, group: dist.ProcessGroup):
+        """Constructs a StageSender object.
+
+        Args:
+            peer_global_rank: The global (world) rank of the peer stage consuming the transfer.
+            group: The process group strictly for pipeline communication.
+        """
+        self._peer_global_rank = peer_global_rank
+        self._group = group
+
+    def send(self, send_contents: TStageTransfer) -> list[dist.P2POp]:
+        """Generates the PyTorch P2P send operations for a transfer.
+
+        Args:
+            send_contents: The ``StageTransfer`` to send (only its tensor leaves are read).
+
+        Returns:
+            A list of `dist.P2POp` objects configured for `dist.isend`.
+        """
+        return [
+            dist.P2POp(dist.isend, leaf, self._peer_global_rank, self._group)
+            for leaf in pytree.tree_leaves(send_contents)
+        ]

@@ -1,9 +1,9 @@
 import dataclasses
 from typing import TYPE_CHECKING, Any
 
-import torch
 from torch.autograd.profiler import record_function
 
+from d9d.core import pytree
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import TensorSpec
 from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedule
@@ -20,24 +20,24 @@ if TYPE_CHECKING:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class _MicrobatchInputSpec:
-    """A hashable shape/dtype fingerprint of one microbatch's named input tensors."""
+    """A hashable shape/dtype fingerprint of one microbatch's ``PipelineInput`` tensor leaves."""
 
-    named_specs: tuple[tuple[str, TensorSpec], ...]
+    leaf_specs: tuple[TensorSpec, ...]
 
     @classmethod
-    def of(cls, microbatch: dict[str, torch.Tensor]) -> "_MicrobatchInputSpec":
-        """Builds a fingerprint from a single microbatch's inputs.
+    def of(cls, microbatch: Any) -> "_MicrobatchInputSpec":
+        """Builds a fingerprint from a single microbatch's ``PipelineInput``.
 
         Args:
-            microbatch: The microbatch's input tensors.
+            microbatch: The microbatch's ``PipelineInput`` PyTree.
 
         Returns:
-            A hashable fingerprint of its named tensor specs.
+            A hashable fingerprint of its tensor leaf specs, in flatten (leaf) order.
         """
         return cls(
-            named_specs=tuple(
-                (name, TensorSpec(shape=tuple(tensor.shape), dtype=tensor.dtype, layout=tensor.layout))
-                for name, tensor in sorted(microbatch.items())
+            leaf_specs=tuple(
+                TensorSpec(shape=tuple(tensor.shape), dtype=tensor.dtype, layout=tensor.layout)
+                for tensor in pytree.tree_leaves(microbatch)
             )
         )
 
@@ -53,11 +53,11 @@ class _BufferConfig:
     microbatches: tuple[_MicrobatchInputSpec, ...]
 
     @classmethod
-    def of(cls, inputs_microbatches: tuple[dict[str, torch.Tensor], ...]) -> "_BufferConfig":
+    def of(cls, inputs_microbatches: tuple[Any, ...]) -> "_BufferConfig":
         """Builds a buffer config from the per-microbatch inputs of a pack.
 
         Args:
-            inputs_microbatches: The per-microbatch input tensors whose shapes/dtypes size the buffers.
+            inputs_microbatches: The per-microbatch ``PipelineInput`` whose shapes/dtypes size buffers.
 
         Returns:
             A hashable buffer configuration key covering every microbatch.
@@ -65,7 +65,7 @@ class _BufferConfig:
         return cls(microbatches=tuple(_MicrobatchInputSpec.of(microbatch) for microbatch in inputs_microbatches))
 
 
-class PipelineScheduleExecutor(PipelineSchedule):
+class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
     """Executes a defined pipeline schedule by interpreting a sequence of actions."""
 
     def __init__(
@@ -88,7 +88,7 @@ class PipelineScheduleExecutor(PipelineSchedule):
 
         self._buffer_config: _BufferConfig | None = None
 
-    def _configure_buffers(self, inputs_microbatches: tuple[dict[str, torch.Tensor], ...], has_backward: bool):
+    def _configure_buffers(self, inputs_microbatches: tuple[Any, ...], has_backward: bool):
         config = _BufferConfig.of(inputs_microbatches)
         if config == self._buffer_config:
             return
@@ -103,19 +103,19 @@ class PipelineScheduleExecutor(PipelineSchedule):
 
     def step(
         self,
-        inputs_microbatches: tuple[dict[str, torch.Tensor], ...],
-        kwargs_microbatches: tuple[dict[str, Any], ...],
+        inputs_microbatches: tuple[Any, ...],
+        shared_microbatches: tuple[Any, ...],
         callback: PipelineLossFn | PipelineResultFn,
     ):
         num_microbatches = len(inputs_microbatches)
         if num_microbatches == 0:
             raise ValueError("Cannot run a pipeline step over an empty pack")
-        if len(kwargs_microbatches) != num_microbatches:
-            raise ValueError("inputs_microbatches and kwargs_microbatches must have the same length")
+        if len(shared_microbatches) != num_microbatches:
+            raise ValueError("inputs_microbatches and shared_microbatches must have the same length")
 
-        expected_names = inputs_microbatches[0].keys()
-        if any(microbatch.keys() != expected_names for microbatch in inputs_microbatches):
-            raise ValueError("All microbatches in a pack must have the same input names")
+        expected_structure = pytree.tree_flatten(inputs_microbatches[0])[1]
+        if any(pytree.tree_flatten(microbatch)[1] != expected_structure for microbatch in inputs_microbatches):
+            raise ValueError("All microbatches in a pack must share the same PipelineInput structure")
 
         program = self._programs.program_for(num_microbatches)
         self._configure_buffers(inputs_microbatches, program.has_backward)
@@ -127,19 +127,19 @@ class PipelineScheduleExecutor(PipelineSchedule):
         for stage in self._stages.values():
             stage.reset()
 
+        ctx = ActionContext(
+            callback=callback_fn,
+            stages=self._stages,
+            communications=self._comm_handler,
+            pipeline_inputs_microbatches=inputs_microbatches,
+            pipeline_shared_microbatches=shared_microbatches,
+        )
+
         for action in program.program_this_rank:
             with record_function(str(action)):
                 self._dist_ctx.logger.debug(f"Running pipeline action {action}")
-                action.apply(
-                    ActionContext(
-                        callback=callback_fn,
-                        stages=self._stages,
-                        communications=self._comm_handler,
-                        pipeline_inputs_microbatches=inputs_microbatches,
-                        pipeline_kwargs_microbatches=kwargs_microbatches,
-                    )
-                )
+                action.apply(ctx)
 
-        self._dist_ctx.logger.debug("Waiting for potentially hanging PP send comms")
-        self._comm_handler.wait_send_all()  # finalize just in case
+        self._dist_ctx.logger.debug("Waiting for pending PP send comms")
+        self._comm_handler.wait_send_all()
         self._dist_ctx.logger.debug("End pipeline step")

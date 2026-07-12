@@ -1,10 +1,9 @@
 import abc
 import dataclasses
 from enum import StrEnum
-from typing import Any
+from typing import Generic
 
-import torch
-
+from d9d.pipelining.api import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
 from d9d.pipelining.infra.stage import PipelineStage
 
 from .callback import PipelineLossHandler, PipelineResultHandler
@@ -12,23 +11,23 @@ from .communications import PipelineCommunicationHandler
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)
-class ActionContext:
+class ActionContext(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
     """Holds the runtime context required to execute a pipeline action.
 
     Attributes:
-        pipeline_inputs_microbatches: Per-microbatch input tensors, indexed by microbatch.
-        pipeline_kwargs_microbatches: Per-microbatch keyword arguments, indexed by microbatch.
+        pipeline_inputs_microbatches: Per-microbatch ``PipelineInput``, indexed by microbatch.
+        pipeline_shared_microbatches: Per-microbatch ``SharedInput``, indexed by microbatch.
         stages: A mapping of stage indices to their active PipelineStage instances.
         communications: The handler for P2P communications.
         callback: The handler for either loss computation or result processing.
     """
 
-    pipeline_inputs_microbatches: tuple[dict[str, torch.Tensor], ...]
-    pipeline_kwargs_microbatches: tuple[dict[str, Any], ...]
+    pipeline_inputs_microbatches: tuple[TPipelineInput, ...]
+    pipeline_shared_microbatches: tuple[TSharedInput, ...]
 
-    stages: dict[int, PipelineStage]
+    stages: dict[int, PipelineStage[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]]
     communications: PipelineCommunicationHandler
-    callback: PipelineLossHandler | PipelineResultHandler
+    callback: PipelineLossHandler[TPipelineOutput] | PipelineResultHandler[TPipelineOutput]
 
 
 class ActionWorkType(StrEnum):
@@ -51,7 +50,7 @@ class ActionBase(abc.ABC):
     """
 
     @abc.abstractmethod
-    def apply(self, ctx: ActionContext):
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         """Executes the action logic using the provided context.
 
         Args:
@@ -68,7 +67,7 @@ class ActionBase(abc.ABC):
     @property
     @abc.abstractmethod
     def has_backward_work(self) -> bool:
-        """Returns True if this action involves backward pass computations."""
+        """Returns True if this action is part of the backward pass."""
         ...
 
     @abc.abstractmethod
@@ -89,7 +88,7 @@ class ForwardSendAction(ActionBase):
     stage_idx: int
     microbatch_idx: int
 
-    def apply(self, ctx: ActionContext):
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         ctx.communications.schedule_fwd_send(self.stage_idx, self.microbatch_idx)
 
     @property
@@ -116,7 +115,7 @@ class BackwardSendAction(ActionBase):
     stage_idx: int
     microbatch_idx: int
 
-    def apply(self, ctx: ActionContext):
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         ctx.communications.schedule_bwd_send(self.stage_idx, self.microbatch_idx)
 
     @property
@@ -143,7 +142,7 @@ class ForwardReceiveAction(ActionBase):
     stage_idx: int
     microbatch_idx: int
 
-    def apply(self, ctx: ActionContext):
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         ctx.communications.schedule_fwd_recv(self.stage_idx, self.microbatch_idx)
 
     @property
@@ -152,7 +151,7 @@ class ForwardReceiveAction(ActionBase):
 
     @property
     def has_backward_work(self) -> bool:
-        return True
+        return False
 
     def __str__(self) -> str:
         return f"{self.stage_idx}RECV_F{self.microbatch_idx}"
@@ -170,7 +169,7 @@ class BackwardReceiveAction(ActionBase):
     stage_idx: int
     microbatch_idx: int
 
-    def apply(self, ctx: ActionContext):
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         ctx.communications.schedule_bwd_recv(self.stage_idx, self.microbatch_idx)
 
     @property
@@ -197,7 +196,7 @@ class ForwardComputeAction(ActionBase):
     stage_idx: int
     microbatch_idx: int
 
-    def apply(self, ctx: ActionContext):
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         stage = ctx.stages[self.stage_idx]
 
         if not stage.info.is_current_stage_first and self.stage_idx - 1 not in ctx.stages:
@@ -206,15 +205,15 @@ class ForwardComputeAction(ActionBase):
         stage.forward_one_chunk(
             microbatch_index=self.microbatch_idx,
             pipeline_inputs=ctx.pipeline_inputs_microbatches[self.microbatch_idx],
-            pipeline_kwargs=ctx.pipeline_kwargs_microbatches[self.microbatch_idx],
+            pipeline_shared=ctx.pipeline_shared_microbatches[self.microbatch_idx],
         )
-        result = stage.get_local_fwd_output(self.microbatch_idx)
 
         if stage.info.is_current_stage_last:
-            ctx.callback.trigger(result, self.microbatch_idx)
-
-        if not stage.info.is_current_stage_last and self.stage_idx + 1 in ctx.stages:
-            ctx.stages[self.stage_idx + 1].set_local_fwd_input(inputs=result, microbatch_index=self.microbatch_idx)
+            ctx.callback.trigger(stage.get_pipeline_output(self.microbatch_idx), self.microbatch_idx)
+        elif self.stage_idx + 1 in ctx.stages:
+            ctx.stages[self.stage_idx + 1].set_local_fwd_input(
+                inputs=stage.get_produced_transfer(self.microbatch_idx), microbatch_index=self.microbatch_idx
+            )
 
     @property
     def work_type(self) -> ActionWorkType:
@@ -244,7 +243,7 @@ class BackwardFullInputComputeAction(ActionBase):
     microbatch_idx: int
     full_backward: bool
 
-    def apply(self, ctx: ActionContext):
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         stage = ctx.stages[self.stage_idx]
 
         if not stage.info.is_current_stage_last and self.stage_idx + 1 not in ctx.stages:
@@ -287,7 +286,7 @@ class BackwardWeightComputeAction(ActionBase):
     stage_idx: int
     microbatch_idx: int
 
-    def apply(self, ctx: ActionContext):
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         stage = ctx.stages[self.stage_idx]
 
         stage.backward_weight_one_chunk(microbatch_index=self.microbatch_idx)
@@ -316,7 +315,7 @@ class ComposeAction(ActionBase):
 
     actions: tuple[ActionBase, ...]
 
-    def apply(self, ctx: ActionContext):
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         for act in self.actions:
             act.apply(ctx)
 
@@ -324,7 +323,7 @@ class ComposeAction(ActionBase):
     def work_type(self) -> ActionWorkType:
         sub_work_types = {x.work_type for x in self.actions}
         if len(sub_work_types) != 1:
-            raise ValueError("")
+            raise ValueError("A ComposeAction must group sub-actions of a single work type")
         return next(iter(sub_work_types))
 
     @property

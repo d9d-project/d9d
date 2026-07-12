@@ -1,12 +1,14 @@
+from typing import Generic
+
 import torch
 
-from d9d.pipelining.api import PipelineLossFn, PipelineResultFn
+from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, TPipelineOutput
 
 
-class PipelineResultHandler:
+class PipelineResultHandler(Generic[TPipelineOutput]):
     """Wraps a callback function to handle results from pipeline execution."""
 
-    def __init__(self, callback_fn: PipelineResultFn):
+    def __init__(self, callback_fn: PipelineResultFn[TPipelineOutput]):
         """Constructs PipelineResultHandler object.
 
         Args:
@@ -14,40 +16,44 @@ class PipelineResultHandler:
         """
         self._callback_fn = callback_fn
 
-    def trigger(self, forward_result: dict[str, torch.Tensor], microbatch_index: int):
+    def trigger(self, forward_result: TPipelineOutput, microbatch_index: int):
         """Invokes the underlying callback with the provided results.
 
         Args:
-            forward_result: Dictionary of output tensors from the pipeline.
+            forward_result: The ``PipelineOutput`` produced by the last stage.
             microbatch_index: The index of the current micro-batch.
         """
         self._callback_fn(forward_result, microbatch_index)
 
 
-class PipelineLossHandler:
+class PipelineLossHandler(Generic[TPipelineOutput]):
     """Manages loss computation and state caching across forward and backward passes."""
 
-    def __init__(self, loss_fn: PipelineLossFn):
+    def __init__(self, callback_fn: PipelineLossFn[TPipelineOutput]):
         """Constructs the loss handler.
 
         Args:
-            loss_fn: The callable that computes loss from model outputs.
+            callback_fn: The callable that computes loss from model outputs.
         """
-        self._loss_fn = loss_fn
+        self._callback_fn = callback_fn
         self._cached_values: dict[int, torch.Tensor] = {}
 
-    def trigger(self, forward_result: dict[str, torch.Tensor], microbatch_index: int):
+    def trigger(self, forward_result: TPipelineOutput, microbatch_index: int):
         """Computes loss for a given microbatch result and caches it.
 
         Args:
-            forward_result: The output from the last stage of the model.
+            forward_result: The ``PipelineOutput`` produced by the last stage.
             microbatch_index: The index of the microbatch being processed.
         """
-        result = self._loss_fn(forward_result, microbatch_index)
+        result = self._callback_fn(forward_result, microbatch_index)
         self._cached_values[microbatch_index] = result
 
     def acquire_loss(self, microbatch_index: int) -> torch.Tensor:
-        """Retrieves the cached loss tensor for the backward pass and removes it from the cache.
+        """Retrieves and releases the cached loss tensor for the backward pass.
+
+        Consume-once: the loss is removed from the cache, so the handler drops its reference to it.
+        The loss is triggered once and acquired once, so a second acquire for the same microbatch
+        raises.
 
         Args:
             microbatch_index: The index of the microbatch.
@@ -56,9 +62,9 @@ class PipelineLossHandler:
             The previously computed loss tensor.
 
         Raises:
-            ValueError: If the loss for this microbatch hasn't been computed yet.
+            ValueError: If the loss for this microbatch has not been computed (or was already acquired).
         """
         if microbatch_index not in self._cached_values:
-            raise ValueError()
+            raise ValueError(f"No cached loss for microbatch {microbatch_index}; it must be triggered before backward")
 
-        return self._cached_values[microbatch_index]
+        return self._cached_values.pop(microbatch_index)

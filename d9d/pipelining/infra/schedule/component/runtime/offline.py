@@ -6,7 +6,7 @@ from torch import nn
 from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedule
 
 
-class OfflinePipelineExecutor(PipelineSchedule):
+class OfflinePipelineExecutor(PipelineSchedule[Any, Any, Any]):
     """Executes the model immediately without pipeline parallelism.
 
     This schedule treats the execution as a single stage, running the forward and optionally backward
@@ -26,21 +26,21 @@ class OfflinePipelineExecutor(PipelineSchedule):
 
     def step(
         self,
-        inputs_microbatches: tuple[dict[str, torch.Tensor], ...],
-        kwargs_microbatches: tuple[dict[str, Any], ...],
+        inputs_microbatches: tuple[Any, ...],
+        shared_microbatches: tuple[Any, ...],
         callback: PipelineLossFn | PipelineResultFn,
     ):
         num_microbatches = len(inputs_microbatches)
         if num_microbatches == 0:
             raise ValueError("Cannot run a pipeline step over an empty pack")
-        if len(kwargs_microbatches) != num_microbatches:
-            raise ValueError("inputs_microbatches and kwargs_microbatches must have the same length")
+        if len(shared_microbatches) != num_microbatches:
+            raise ValueError("inputs_microbatches and shared_microbatches must have the same length")
 
         for microbatch_idx in range(num_microbatches):
             inputs = inputs_microbatches[microbatch_idx]
-            kwargs = kwargs_microbatches[microbatch_idx]
+            shared = shared_microbatches[microbatch_idx]
 
-            result = self._model(**inputs, **kwargs)
+            result = self._model(inputs, shared)
             processing_result = callback(result, microbatch_idx)
 
             if self._do_backward:

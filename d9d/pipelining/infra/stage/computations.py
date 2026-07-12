@@ -1,12 +1,13 @@
 import dataclasses
-from collections.abc import Iterator, Mapping
-from typing import Any, cast
+from collections.abc import Iterator
+from typing import Generic, cast
 
 import torch
 from torch import nn
 from torch.autograd.graph import Node
 
 from d9d.core import pytree
+from d9d.pipelining.api import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
 
 from .splitgrad import (
     ParamGroup,
@@ -20,14 +21,21 @@ from .splitgrad import (
 
 
 @dataclasses.dataclass(slots=True)
-class ForwardCache:
-    """Stores the inputs and outputs of a forward pass to be used later in the backward pass."""
+class ForwardCache(Generic[TPipelineInput, TStageTransfer, TPipelineOutput]):
+    """Stores the inputs and outputs of a forward pass to be used later in the backward pass.
 
-    inputs: dict[str, torch.Tensor]
-    outputs: dict[str, torch.Tensor]
+    Attributes:
+        inputs: The stage's incoming ``StageTransfer`` (or ``PipelineInput`` on the first stage) as a
+            PyTree.
+        outputs: The stage's produced ``StageTransfer`` (or ``PipelineOutput`` on the last stage) as a
+            PyTree.
+    """
+
+    inputs: TPipelineInput | TStageTransfer
+    outputs: TStageTransfer | TPipelineOutput
 
 
-class ForwardComputeHandler:
+class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
     """Handles the execution of the forward pass for a pipeline stage module.
 
     Maintains a cache of inputs and outputs indexed by microbatch ID.
@@ -43,45 +51,40 @@ class ForwardComputeHandler:
         self._stage_idx = stage_index
         self._module = module
 
-        self._cache: dict[int, ForwardCache] = {}
+        self._cache: dict[int, ForwardCache[TPipelineInput, TStageTransfer, TPipelineOutput]] = {}
 
-    def run(self, microbatch_index: int, inputs: dict[str, torch.Tensor], kwargs: dict[str, Any]):
+    def run(self, microbatch_index: int, inputs: TPipelineInput | TStageTransfer, shared: TSharedInput):
         """Executes the module's forward pass.
 
         Args:
             microbatch_index: Identifier for the current microbatch.
-            inputs: Dictionary of input tensors.
-            kwargs: Additional keyword arguments for the module.
+            inputs: The stage's ``PipelineInput`` (first stage) or incoming ``StageTransfer``.
+            shared: The ``SharedInput`` passed to every stage.
 
         Raises:
             RuntimeError: If the forward pass implementation fails.
-            ValueError: If the module output is not a dictionary.
         """
-        # Compute forward
         try:
-            output = self._module(**inputs, **kwargs)
+            output = self._module(inputs, shared)
         except Exception as e:
             raise RuntimeError(f"S{self._stage_idx}B{microbatch_index} failed to run forward") from e
 
-        if not isinstance(output, Mapping):
-            raise ValueError("Currently, pipelined models should output dict[str, torch.Tensor | None]")
-
-        output = {k: v for k, v in output.items() if v is not None}
-
         self._cache[microbatch_index] = ForwardCache(inputs=inputs, outputs=output)
 
-    def get_outputs(self, microbatch_index: int) -> dict[str, torch.Tensor]:
+    def get_outputs(self, microbatch_index: int) -> TStageTransfer | TPipelineOutput:
         """Retrieves cached outputs for a specific microbatch without removing them.
 
         Args:
             microbatch_index: Identifier for the microbatch.
 
         Returns:
-            Dictionary of output tensors.
+            The produced transfer/output PyTree.
         """
         return self._cache[microbatch_index].outputs
 
-    def pop_inputs_outputs(self, microbatch_index: int) -> tuple[dict[str, torch.Tensor], dict[str, torch.Tensor]]:
+    def pop_inputs_outputs(
+        self, microbatch_index: int
+    ) -> tuple[TPipelineInput | TStageTransfer, TStageTransfer | TPipelineOutput]:
         """Retrieves and removes the cached inputs and outputs for a specific microbatch.
 
         Typically called when initiating the backward pass.
@@ -97,64 +100,149 @@ class ForwardComputeHandler:
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)
-class BackwardCacheInputForWeight:
-    """State preserved after calculating input gradients, pending weight gradient calculation."""
+class _SendableInputGrads:
+    """Input gradients ready to send back to the previous stage.
 
-    inputs_grad: dict[str, torch.Tensor]
+    Attributes:
+        leaves: The input gradient tensor leaves, in the stage's input-transfer flatten order.
+        treespec: The structure spec that rebuilds the input ``StageTransfer`` from ``leaves``.
+    """
+
+    leaves: list[torch.Tensor | None]
+    treespec: pytree.PyTreeSpec
+
+
+@dataclasses.dataclass(kw_only=True, slots=True)
+class _DeferredFullBackward:
+    """A full backward to replay at weight time.
+
+    Used by the first stage, which cannot split input- and weight-gradient passes (it has no input
+    peer to send input grads to), so it stashes the flattened tensors and runs a full backward when
+    the weight phase arrives.
+
+    Attributes:
+        outputs: The output tensor leaves to backprop from.
+        output_grads: Their gradient leaves, or None to seed an implicit unit gradient.
+        inputs: The input tensor leaves the backward flows into.
+    """
+
+    outputs: list[torch.Tensor]
+    output_grads: list[torch.Tensor] | None
+    inputs: list[torch.Tensor]
+
+
+@dataclasses.dataclass(kw_only=True, slots=True)
+class _DeferredWeightBackward:
+    """A weight-gradient-only backward to replay from saved param groups (the ZB split optimization).
+
+    Attributes:
+        param_groups: The parameter groups whose weight gradients still need accumulating.
+        ownership_tokens: Autograd nodes kept alive to own the pending gradient graph.
+    """
+
     param_groups: list[ParamGroup]
     ownership_tokens: list[Node]
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)
-class BackwardCacheInputForFull:
-    stage_outputs_or_loss: list[torch.Tensor]
-    output_grads: list[torch.Tensor] | None
-    input_values: list[torch.Tensor]
+class _BackwardState:
+    """Per-microbatch backward state carried between the backward phases.
 
+    A single entry holds two orthogonal, independently-optional facts:
 
-@dataclasses.dataclass(kw_only=True, slots=True)
-class BackwardCacheFull:
-    """State preserved after calculating weight gradients."""
-
-    inputs_grad: dict[str, torch.Tensor | None]
-
-
-class BackwardComputeHandler:
-    """Handles the execution of backward passes for a pipeline stage.
-
-    Supports splitting the backward pass into input-gradients and weight-gradients
-    phases, which is necessary for schedules like ZB.
+    Attributes:
+        sendable_grads: The input gradients ready to send upstream, or None on the first stage.
+        pending_weight: The weight-gradient work still to run, or None after a full backward.
     """
 
-    def __init__(self, stage_index: int, module: nn.Module):
+    sendable_grads: _SendableInputGrads | None
+    pending_weight: _DeferredFullBackward | _DeferredWeightBackward | None
+
+
+@dataclasses.dataclass(slots=True)
+class BackwardSeedLoss:
+    """Backward seed for the last stage.
+
+    The produced output does not leave the pipeline, so backward is seeded directly from the scalar
+    loss with an implicit unit gradient.
+
+    Attributes:
+        loss: The scalar loss produced by the last stage.
+    """
+
+    loss: torch.Tensor
+
+
+@dataclasses.dataclass(slots=True)
+class BackwardSeedTransfer(Generic[TStageTransfer]):
+    """Backward seed for a non-last stage.
+
+    Backward propagates the gradients received from the next stage through the transfer this stage
+    produced in the forward pass.
+
+    Attributes:
+        outputs: The ``StageTransfer`` this stage produced in the forward pass.
+        output_grads: The gradients of the loss w.r.t. ``outputs``, received from the next stage.
+    """
+
+    outputs: TStageTransfer
+    output_grads: TStageTransfer
+
+
+BackwardSeed = BackwardSeedLoss | BackwardSeedTransfer[TStageTransfer]
+
+
+class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
+    """Handles the execution of backward passes for a pipeline stage.
+
+    Supports splitting the backward pass into input-gradients and weight-gradients phases, which is
+    necessary for schedules like ZB.
+    """
+
+    def __init__(self, stage_index: int, module: nn.Module, has_input_peer: bool):
         """Constructs a BackwardComputeHandler object.
 
         Args:
-            stage_index: Logical index of the stage.
+            stage_index: Logical index of the stage (used only in diagnostics).
             module: The PyTorch module to compute gradients for.
+            has_input_peer: Whether this stage has a previous stage to send input gradients to.
         """
         self._stage_idx = stage_index
         self._module = module
+        self._has_input_peer = has_input_peer
 
-        self._cache: dict[int, BackwardCacheInputForWeight | BackwardCacheInputForFull | BackwardCacheFull] = {}
+        self._cache: dict[int, _BackwardState] = {}
 
     def _parameters_with_grad(self) -> Iterator[nn.Parameter]:
         return (param for param in self._module.parameters() if param.requires_grad)
 
+    def _release_if_complete(self, microbatch_index: int):
+        state = self._cache[microbatch_index]
+        if state.sendable_grads is None and state.pending_weight is None:
+            del self._cache[microbatch_index]
+
+    @staticmethod
+    def _seed_leaves(seed: "BackwardSeed[TStageTransfer]") -> tuple[list[torch.Tensor], list[torch.Tensor] | None]:
+        match seed:
+            case BackwardSeedLoss():
+                return [seed.loss], None
+            case BackwardSeedTransfer():
+                return pytree.tree_leaves(seed.outputs), pytree.tree_leaves(seed.output_grads)
+            case _:
+                raise ValueError("Unknown backward seed type")
+
     def backward_full(
         self,
         microbatch_index: int,
-        inputs: dict[str, torch.Tensor],
-        outputs: dict[str, torch.Tensor],
-        outputs_grad: dict[str, torch.Tensor] | None,
+        inputs: TPipelineInput | TStageTransfer,
+        seed: "BackwardSeed[TStageTransfer]",
     ):
         """Performs a full backward pass (both inputs and weights).
 
         Args:
             microbatch_index: Identifier for the microbatch.
-            inputs: The inputs used in the forward pass.
-            outputs: The outputs produced by the forward pass.
-            outputs_grad: Gradients of the loss with respect to the outputs.
+            inputs: The input transfer used in the forward pass.
+            seed: The downstream backward seed (loss on the last stage, transfer + grads otherwise).
 
         Raises:
             ValueError: If a double backward is attempted for the same microbatch.
@@ -163,24 +251,23 @@ class BackwardComputeHandler:
             raise ValueError(f"S{self._stage_idx}B{microbatch_index} double backward")
 
         input_leaves, input_spec = pytree.tree_flatten(inputs)
+        output_leaves, output_grad_leaves = self._seed_leaves(seed)
 
         inputs_grad_linear = stage_backward_full(
-            outputs=pytree.tree_leaves(outputs),
-            output_grads=pytree.tree_leaves(outputs_grad) if outputs_grad is not None else None,
+            outputs=output_leaves,
+            output_grads=output_grad_leaves,
             inputs=input_leaves,
         )
 
-        if self._stage_idx != 0:
-            self._cache[microbatch_index] = BackwardCacheFull(
-                inputs_grad=cast(dict[str, torch.Tensor | None], pytree.tree_unflatten(input_spec, inputs_grad_linear))
-            )
+        sendable = _SendableInputGrads(leaves=inputs_grad_linear, treespec=input_spec) if self._has_input_peer else None
+        self._cache[microbatch_index] = _BackwardState(sendable_grads=sendable, pending_weight=None)
+        self._release_if_complete(microbatch_index)
 
     def backward_input(
         self,
         microbatch_index: int,
-        inputs: dict[str, torch.Tensor],
-        outputs: dict[str, torch.Tensor],
-        outputs_grad: dict[str, torch.Tensor] | None,
+        inputs: TPipelineInput | TStageTransfer,
+        seed: "BackwardSeed[TStageTransfer]",
     ):
         """Performs a partial backward pass to compute gradients with respect to inputs only.
 
@@ -188,40 +275,41 @@ class BackwardComputeHandler:
 
         Args:
             microbatch_index: Identifier for the microbatch.
-            inputs: The inputs used in the forward pass.
-            outputs: The outputs produced by the forward pass.
-            outputs_grad: Gradients of the loss with respect to the outputs.
+            inputs: The input transfer used in the forward pass.
+            seed: The downstream backward seed (loss on the last stage, transfer + grads otherwise).
 
         Raises:
             ValueError: If a double backward is attempted.
         """
         if microbatch_index in self._cache:
-            raise ValueError("Double backward pass")
+            raise ValueError(f"S{self._stage_idx}B{microbatch_index} double backward")
 
         input_leaves, input_spec = pytree.tree_flatten(inputs)
-        output_grad_leaves = pytree.tree_leaves(outputs_grad) if outputs_grad is not None else None
+        output_leaves, output_grad_leaves = self._seed_leaves(seed)
 
-        if self._stage_idx == 0:
-            self._cache[microbatch_index] = BackwardCacheInputForFull(
-                stage_outputs_or_loss=pytree.tree_leaves(outputs),
-                output_grads=output_grad_leaves,
-                input_values=input_leaves,
-            )
-        else:
+        if self._has_input_peer:
             results = stage_backward_input(
-                outputs=pytree.tree_leaves(outputs),
+                outputs=output_leaves,
                 output_grads=output_grad_leaves,
                 inputs=input_leaves,
                 weights=self._parameters_with_grad(),
             )
 
-            self._cache[microbatch_index] = BackwardCacheInputForWeight(
-                inputs_grad=cast(
-                    dict[str, torch.Tensor],
-                    pytree.tree_unflatten(input_spec, cast(list[torch.Tensor], results.input_grads)),
+            self._cache[microbatch_index] = _BackwardState(
+                sendable_grads=_SendableInputGrads(leaves=results.input_grads, treespec=input_spec),
+                pending_weight=_DeferredWeightBackward(
+                    param_groups=results.param_groups,
+                    ownership_tokens=results.grad_ownership_tokens,
                 ),
-                param_groups=results.param_groups,
-                ownership_tokens=results.grad_ownership_tokens,
+            )
+        else:
+            self._cache[microbatch_index] = _BackwardState(
+                sendable_grads=None,
+                pending_weight=_DeferredFullBackward(
+                    outputs=output_leaves,
+                    output_grads=output_grad_leaves,
+                    inputs=input_leaves,
+                ),
             )
 
     def backward_weight(self, microbatch_index: int):
@@ -238,44 +326,49 @@ class BackwardComputeHandler:
         if microbatch_index not in self._cache:
             raise ValueError(f"S{self._stage_idx}BW{microbatch_index} - weight backward with no input backward before")
 
-        prev_cache = self._cache.pop(microbatch_index)
+        state = self._cache[microbatch_index]
+        pending = state.pending_weight
 
-        match prev_cache:
-            case BackwardCacheInputForFull():
+        match pending:
+            case _DeferredFullBackward():
                 stage_backward_full(
-                    outputs=prev_cache.stage_outputs_or_loss,
-                    output_grads=prev_cache.output_grads,
-                    inputs=prev_cache.input_values,
+                    outputs=pending.outputs,
+                    output_grads=pending.output_grads,
+                    inputs=pending.inputs,
                 )
-            case BackwardCacheInputForWeight():
-                stage_backward_weight(weights=self._parameters_with_grad(), param_groups=prev_cache.param_groups)
-            case _:
-                raise ValueError("Previous backward was not input backward")
+            case _DeferredWeightBackward():
+                stage_backward_weight(weights=self._parameters_with_grad(), param_groups=pending.param_groups)
+            case None:
+                raise ValueError("Previous backward was a full backward, not an input backward")
 
-    def pop_for_sending(self, microbatch_index: int) -> dict[str, torch.Tensor]:
-        """Retrieves the calculated input gradients for a microbatch.
+        state.pending_weight = None
+        self._release_if_complete(microbatch_index)
+
+    def pop_for_sending(self, microbatch_index: int) -> TStageTransfer:
+        """Retrieves the calculated input gradients for a microbatch as a transfer PyTree.
 
         Args:
             microbatch_index: Identifier for the microbatch.
 
         Returns:
-            Dictionary of gradient tensors.
+            The input gradients, shaped like the stage's input transfer.
 
         Raises:
             ValueError: If the required backward pass was not performed or if gradients are missing.
         """
-        cached = self._cache[microbatch_index]
+        state = self._cache[microbatch_index]
 
-        match cached:
-            case BackwardCacheFull():
-                del self._cache[microbatch_index]
-            case BackwardCacheInputForWeight():
-                pass
-            case _:
-                raise ValueError("You should call either backward_full or backward_input before popping cached grad")
+        sendable = state.sendable_grads
+        if sendable is None:
+            raise ValueError("You should call either backward_full or backward_input before popping cached grad")
 
-        for grad_value in cached.inputs_grad.values():
+        for grad_value in sendable.leaves:
             if grad_value is None:
                 raise ValueError("Cannot pop null gradient for sending! Perhaps malformed schedule?")
 
-        return cast(dict[str, torch.Tensor], cached.inputs_grad)
+        full_tree = pytree.tree_unflatten(sendable.treespec, sendable.leaves)
+
+        state.sendable_grads = None
+        self._release_if_complete(microbatch_index)
+
+        return cast(TStageTransfer, full_tree)
