@@ -9,6 +9,8 @@ from d9d.pipelining.infra.stage.splitgrad import (
 )
 
 from d9d_test.pipelining.definitions import (
+    _Shared,
+    _Transfer,
     build_pp_inputs,
     build_pp_model,
     check_pp_hooks_ran,
@@ -27,7 +29,7 @@ def test_custom_backward_correctness():
 
     hook_state = register_pp_hooks(model)
 
-    loss = model(x, y)["x"].mean()
+    loss = model(_Transfer(x=x), _Shared(y=y)).x.mean()
 
     results = stage_backward_full(outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x, y])
 
@@ -54,7 +56,7 @@ def test_split_backward_correctness():
 
     orig_snapshot = do_standard_backward(model, x, y)
 
-    loss = model(x, y)["x"].mean()
+    loss = model(_Transfer(x=x), _Shared(y=y)).x.mean()
 
     hook_state = register_pp_hooks(model)
 

@@ -10,6 +10,8 @@ from d9d.pipelining.infra.schedule.component.runtime import OfflinePipelineExecu
 
 from d9d_test.pipelining.definitions import (
     PipelineModel,
+    _Shared,
+    _Transfer,
     build_pp_inputs,
     build_pp_model,
 )
@@ -19,7 +21,7 @@ def _do_standard_forward(stages: list[PipelineModel], x: torch.Tensor, y: torch.
     with torch.no_grad():
         x_in = x
         for stage in stages:
-            x_in = stage(x=x_in, y=y)["x"]
+            x_in = stage(_Transfer(x=x_in), _Shared(y=y)).x
     return x_in
 
 
@@ -63,8 +65,8 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
 
     collected_results: dict[int, torch.Tensor] = {}
 
-    def _result_fn(microbatch_outputs: dict[str, torch.Tensor], microbatch_idx: int):
-        collected_results[microbatch_idx] = microbatch_outputs["x"].detach().clone()
+    def _result_fn(microbatch_outputs: _Transfer, microbatch_idx: int):
+        collected_results[microbatch_idx] = microbatch_outputs.x.detach().clone()
 
     schedule_info, _ = build_schedule(
         dist_context=dist_ctx,
@@ -72,11 +74,11 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
         model_provider=_model_provider,
     )
 
-    inputs_microbatches = tuple({"x": x} for x in microbatch_xs)
-    kwargs_microbatches = tuple({"y": y} for y in microbatch_ys)
+    inputs_microbatches = tuple(_Transfer(x=x) for x in microbatch_xs)
+    shared_microbatches = tuple(_Shared(y=y) for y in microbatch_ys)
 
     schedule_info.schedule.step(
-        inputs_microbatches=inputs_microbatches, kwargs_microbatches=kwargs_microbatches, callback=_result_fn
+        inputs_microbatches=inputs_microbatches, shared_microbatches=shared_microbatches, callback=_result_fn
     )
 
     if pp_mesh.get_local_rank() == pp_mesh.size() - 1:
@@ -107,9 +109,9 @@ def test_inference_e2e_local(dist_ctx_factory):
 
     collected_results: dict[int, torch.Tensor] = {}
 
-    def _result_fn(microbatch_outputs: dict[str, torch.Tensor], microbatch_idx: int):
+    def _result_fn(microbatch_outputs: _Transfer, microbatch_idx: int):
         # Offline executor processes everything in one go, always index 0
-        collected_results[microbatch_idx] = microbatch_outputs["x"].detach().clone()
+        collected_results[microbatch_idx] = microbatch_outputs.x.detach().clone()
 
     schedule_info, _ = build_schedule(
         dist_context=dist_ctx,
@@ -119,7 +121,9 @@ def test_inference_e2e_local(dist_ctx_factory):
 
     assert isinstance(schedule_info.schedule, OfflinePipelineExecutor)
 
-    schedule_info.schedule.step(inputs_microbatches=({"x": x},), kwargs_microbatches=({"y": y},), callback=_result_fn)
+    schedule_info.schedule.step(
+        inputs_microbatches=(_Transfer(x=x),), shared_microbatches=(_Shared(y=y),), callback=_result_fn
+    )
 
     # trace should have exactly one result at index 0 because OfflineExecutor does not shard
     assert len(collected_results) == 1

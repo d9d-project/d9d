@@ -1,7 +1,19 @@
+import dataclasses
+
 import torch
 from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
-from d9d.pipelining.api import ModuleSupportsPipelining, TensorSpec
+from d9d.pipelining.api import ModuleSupportsPipelining, StageBoundary, TensorSpec
 from torch import nn
+
+
+@dataclasses.dataclass
+class _Transfer:
+    x: torch.Tensor
+
+
+@dataclasses.dataclass
+class _Shared:
+    y: torch.Tensor
 
 
 class CustomMatmul(torch.autograd.Function):
@@ -37,23 +49,16 @@ class PipelineModel(nn.Module, ModuleSupportsPipelining):
         self.w3 = nn.Parameter(torch.randn(8, 8) / 4)
         self.act = nn.GELU()
 
-    def forward(self, x: torch.Tensor, y: torch.Tensor):  # x is args (passed by), y is kwargs (inputs)
-        r = CustomMatmul.apply(x, self.w1, GradDirection.inputs, GradDirection.weight)
+    def forward(self, inputs: _Transfer, shared: _Shared) -> _Transfer:
+        r = CustomMatmul.apply(inputs.x, self.w1, GradDirection.inputs, GradDirection.weight)
         r = r * 1.05
         r = r @ self.w2
-        r = self.act(r) + y
+        r = self.act(r) + shared.y
         r = CustomMatmul.apply(r, self.w3, GradDirection.inputs, GradDirection.weight)
-        return {"x": r}
+        return _Transfer(x=r)
 
-    def infer_stage_inputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        return {"x": TensorSpec(shape=(microbatch_inputs["x"].shape[0], 8), dtype=torch.float32)}
-
-    def infer_stage_outputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        return {"x": TensorSpec(shape=(microbatch_inputs["x"].shape[0], 8), dtype=torch.float32)}
+    def stage_transfer_spec(self, pipeline_input: _Transfer, boundary: StageBoundary) -> _Transfer:
+        return _Transfer(x=TensorSpec(shape=(pipeline_input.x.shape[0], 8), dtype=torch.float32))
 
 
 def register_pp_hooks(model: PipelineModel) -> dict[str, int]:
@@ -101,7 +106,7 @@ def _snapshot_grad(model: PipelineModel, x: torch.Tensor, y: torch.Tensor) -> di
 
 
 def do_standard_backward(model: PipelineModel, x: torch.Tensor, y: torch.Tensor) -> dict[str, torch.Tensor]:
-    out = model(x, y)["x"]
+    out = model(_Transfer(x=x), _Shared(y=y)).x
     loss = out.mean()
     loss.backward()
     snapshot = _snapshot_grad(model, x, y)

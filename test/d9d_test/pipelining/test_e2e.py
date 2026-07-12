@@ -16,6 +16,8 @@ from d9d.pipelining.infra.stage import PipelineStage
 
 from d9d_test.pipelining.definitions import (
     PipelineModel,
+    _Shared,
+    _Transfer,
     build_pp_inputs,
     build_pp_model,
     check_pp_hooks_ran,
@@ -26,16 +28,16 @@ from d9d_test.pipelining.definitions import (
 
 def _assert_no_live_buffers(stage_object: PipelineStage):
     # P2P receive buffers are released once consumed, so none should linger after a step.
-    if stage_object._forward_comm is not None:
-        assert len(stage_object._forward_comm._live_buffers) == 0
-    if stage_object._backward_comm is not None:
-        assert len(stage_object._backward_comm._live_buffers) == 0
+    if stage_object._forward_receiver is not None:
+        assert len(stage_object._forward_receiver._live_buffers) == 0
+    if stage_object._backward_receiver is not None:
+        assert len(stage_object._backward_receiver._live_buffers) == 0
 
 
 def _do_standard_backward(stages: list[PipelineModel], x: torch.Tensor, y: torch.Tensor):
     x_in = x
     for stage in stages:
-        x_in = stage(x=x_in, y=y)["x"]
+        x_in = stage(_Transfer(x=x_in), _Shared(y=y)).x
     loss = x_in.sum()
     loss.backward()
     snapshot = [
@@ -97,9 +99,9 @@ def test_e2e(
 
     loss_seen_microbatches = []
 
-    def _loss_fn(microbatch: dict[str, torch.Tensor], microbatch_idx: int):
+    def _loss_fn(microbatch: _Transfer, microbatch_idx: int):
         loss_seen_microbatches.append(microbatch_idx)
-        return microbatch["x"].sum()
+        return microbatch.x.sum()
 
     schedule_info, _ = build_schedule(
         dist_context=dist_ctx,
@@ -109,11 +111,11 @@ def test_e2e(
 
     not_this_rank_stages = [i for i in range(len(full_stage_modules)) if i not in this_rank_stages]
 
-    inputs_microbatches = tuple({"x": x_mb} for x_mb in torch.tensor_split(x, n_microbatches, dim=0))
-    kwargs_microbatches = tuple({"y": y_mb} for y_mb in torch.tensor_split(y, n_microbatches, dim=0))
+    inputs_microbatches = tuple(_Transfer(x=x_mb) for x_mb in torch.tensor_split(x, n_microbatches, dim=0))
+    shared_microbatches = tuple(_Shared(y=y_mb) for y_mb in torch.tensor_split(y, n_microbatches, dim=0))
 
     schedule_info.schedule.step(
-        inputs_microbatches=inputs_microbatches, kwargs_microbatches=kwargs_microbatches, callback=_loss_fn
+        inputs_microbatches=inputs_microbatches, shared_microbatches=shared_microbatches, callback=_loss_fn
     )
 
     assert x.grad is None
@@ -165,9 +167,9 @@ def test_e2e_local(dist_ctx_factory, freeze_w1: bool):
         assert stage_info.current_stage == 0
         return model
 
-    def _loss_fn(result: dict[str, torch.Tensor], microbatch_idx: int):
+    def _loss_fn(result: _Transfer, microbatch_idx: int):
         assert microbatch_idx == 0
-        return result["x"].sum()
+        return result.x.sum()
 
     schedule_config = PipelineScheduleGPipeConfig()
 
@@ -183,7 +185,9 @@ def test_e2e_local(dist_ctx_factory, freeze_w1: bool):
     assert schedule_info.has_first_stage
     assert schedule_info.has_last_stage
 
-    schedule_info.schedule.step(inputs_microbatches=({"x": x},), kwargs_microbatches=({"y": y},), callback=_loss_fn)
+    schedule_info.schedule.step(
+        inputs_microbatches=(_Transfer(x=x),), shared_microbatches=(_Shared(y=y),), callback=_loss_fn
+    )
 
     if freeze_w1:
         assert model.w1.grad is None
