@@ -1,3 +1,7 @@
+from __future__ import annotations
+
+import typing
+
 import torch
 from torch import nn
 from torch.distributed import ProcessGroup
@@ -11,6 +15,9 @@ from .communications import (
 from .grouped_experts import GroupedSwiGLU
 from .router import RoutingResult, TopKRouter
 from .shared_expert import SharedExpertParameters, SharedSwiGLU
+
+if typing.TYPE_CHECKING:
+    from .replay import RouterReplayRecorder
 
 
 class MoELayer(nn.Module, ModuleLateInit):
@@ -64,6 +71,22 @@ class MoELayer(nn.Module, ModuleLateInit):
 
         self.tokens_per_expert = nn.Buffer(torch.empty((num_grouped_experts,), dtype=torch.int64), persistent=False)
 
+        # Set by a RouterReplayRecorder while it is installed; used to capture this layer's expert selection. The
+        # layer holds only an opaque reference and does not know its identity within the recorder.
+        self._replay_recorder: RouterReplayRecorder | None = None
+
+    def bind_replay_recorder(self, recorder: RouterReplayRecorder) -> None:
+        """Attaches a routing recorder to this layer so non-replay forwards capture their expert selection.
+
+        Args:
+            recorder: The recorder that will receive this layer's selection.
+        """
+        self._replay_recorder = recorder
+
+    def unbind_replay_recorder(self) -> None:
+        """Detaches any routing recorder previously attached via `bind_replay_recorder`."""
+        self._replay_recorder = None
+
     def enable_distributed_communicator(self, group: ProcessGroup):
         """Switches from local no-op communication to distributed DeepEP communication.
 
@@ -91,11 +114,13 @@ class MoELayer(nn.Module, ModuleLateInit):
         """Resets the expert load balancing counters."""
         self.tokens_per_expert.zero_()
 
-    def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor, replay_indices: torch.Tensor | None = None) -> torch.Tensor:
         """Routes tokens to experts, computes, and combines results.
 
         Args:
             hidden_states: Input tensor. Shape: `(batch_size, seq_len, hidden_dim)`.
+            replay_indices: Optional recorded expert indices to replay instead of recomputing the routing selection
+                (Expert Replay). Shape: `(batch_size, seq_len, top_k)`. When provided, recording is skipped.
 
         Returns:
             Output tensor combined from experts. Shape: `(batch_size, seq_len, hidden_dim)`.
@@ -103,15 +128,21 @@ class MoELayer(nn.Module, ModuleLateInit):
         old_shape = hidden_states.shape
         hidden_states = hidden_states.reshape(-1, hidden_states.shape[-1])
 
+        if replay_indices is not None:
+            replay_indices = replay_indices.reshape(-1, replay_indices.shape[-1])
+
         if self.shared_expert is not None:
             shared_expert_result = self.shared_expert(hidden_states)
         else:
             shared_expert_result = None
 
-        routing_result: RoutingResult = self.router(hidden_states)
+        routing_result: RoutingResult = self.router(hidden_states, replay_indices=replay_indices)
         expert_indices = routing_result.selected_expert_indices
         expert_scores = routing_result.selected_probabilities
         self._update_tokens_per_expert(expert_indices)
+
+        if self._replay_recorder is not None and replay_indices is None:
+            self._replay_recorder.capture(self, expert_indices.reshape(*old_shape[:-1], -1))
         hidden_states, expert_scores, expert_count = self._communicator.dispatch(
             hidden_states, expert_indices, expert_scores
         )

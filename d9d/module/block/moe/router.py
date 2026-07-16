@@ -60,11 +60,19 @@ class TopKRouter(nn.Module, ModuleLateInit):
         self._top_k = top_k
         self._renormalize_probabilities = renormalize_probabilities
 
-    def forward(self, hidden_states: torch.Tensor) -> RoutingResult:
+    def forward(self, hidden_states: torch.Tensor, replay_indices: torch.Tensor | None = None) -> RoutingResult:
         """Calculates routing decisions for the input tokens.
+
+        When `replay_indices` is provided (Expert Replay / Rollout Routing Replay), the top-k expert selection is
+        taken from the supplied indices instead of being recomputed, while the gating probabilities are still derived
+        from the current (training) router logits. This keeps the gradient flowing into the gate yet forces the
+        forward pass to use the exact experts a rollout engine selected, eliminating the train/inference routing
+        mismatch that destabilizes Mixture-of-Experts reinforcement learning.
 
         Args:
             hidden_states: Input tokens. Shape: `(num_tokens, dim)`.
+            replay_indices: Optional recorded expert indices to replay. Shape: `(num_tokens, top_k)`. When provided,
+                the router skips its own top-k selection and reuses these indices.
 
         Returns:
             The routing result containing the indices of the selected experts and their corresponding probabilities.
@@ -77,11 +85,16 @@ class TopKRouter(nn.Module, ModuleLateInit):
         # and now do softmax (before top-k to be able to apply expert bias)
         probs = F.softmax(scores, dim=-1, dtype=torch.float32)
 
-        # select top-k
-        if self.expert_bias is None:
-            selected_probs, selected_experts_indices = torch.topk(probs, k=self._top_k, dim=-1)
+        if replay_indices is None:
+            # select top-k
+            if self.expert_bias is None:
+                selected_probs, selected_experts_indices = torch.topk(probs, k=self._top_k, dim=-1)
+            else:
+                _, selected_experts_indices = torch.topk(probs + self.expert_bias, k=self._top_k, dim=-1)
+                selected_probs = probs.gather(dim=-1, index=selected_experts_indices)
         else:
-            _, selected_experts_indices = torch.topk(probs + self.expert_bias, k=self._top_k, dim=-1)
+            # replay the recorded selection, expert bias is moot since the selection is fixed
+            selected_experts_indices = self._validate_replay_indices(replay_indices, hidden_states.shape[0]).long()
             selected_probs = probs.gather(dim=-1, index=selected_experts_indices)
 
         # re-normalize scores
@@ -90,6 +103,15 @@ class TopKRouter(nn.Module, ModuleLateInit):
             selected_probs = selected_probs / denominator
 
         return RoutingResult(selected_expert_indices=selected_experts_indices, selected_probabilities=selected_probs)
+
+    def _validate_replay_indices(self, replay_indices: torch.Tensor, num_tokens: int) -> torch.Tensor:
+        # Shape is validated cheaply on every call, the value range is intentionally not checked here to avoid a
+        # per-step device synchronization in the training hot loop (out-of-range indices are a producer-side bug).
+        if replay_indices.shape != (num_tokens, self._top_k):
+            raise ValueError(
+                f"replay_indices must have shape {(num_tokens, self._top_k)}, got {tuple(replay_indices.shape)}"
+            )
+        return replay_indices
 
     def reset_parameters(self) -> None:
         """Resets module parameters."""

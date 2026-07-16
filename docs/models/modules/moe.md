@@ -40,6 +40,33 @@ Uses efficient fused SiLU-Mul kernel.
 
 A shared expert processes all tokens passing through the MoE layer regardless of the router's sparse choices, providing a dense computational backbone. It is configured using `SharedExpertParameters` and includes an optionally enabled linear gating mechanism to dynamically scale the shared expert's output.
 
+### Expert Replay
+
+When post-training an MoE policy with reinforcement learning, the rollout engine (e.g. vLLM, SGLang) and the trainer route the same token to *different* experts because their routing kernels differ numerically. The resulting train/inference mismatch corrupts the importance ratio and destabilizes training. **Expert Replay** (an implementation of [Rollout Routing Replay](https://arxiv.org/abs/2510.11370)) removes the mismatch: the expert selection produced during rollout is recorded and *replayed* in the training forward pass, while the gating weights are still recomputed from the training router's logits so the gate keeps learning.
+
+The selection is passed to the model as the optional `replay_indices` input — a mapping from each MoE layer's module name (e.g. `"layers.5.mlp"`) to a `(batch, seq_len, top_k)` tensor of expert ids. Keying by name (rather than packing every layer into one positional tensor) keeps the interface robust to non-sequential layer topologies, and each per-layer tensor is micro-batched by the pipeline independently. When omitted, routing behaves exactly as in standard training. Supply it from your `TrainTask.build_forward_inputs` (alongside `position_ids`) using the per-layer expert ids reported by your rollout engine:
+
+```python
+return BuildForwardInputsResult(
+    inputs={"input_ids": batch.input_ids},
+    kwargs={"position_ids": batch.position_ids, "replay_indices": batch.rollout_expert_indices},
+)
+```
+
+When d9d itself samples the rollout, `RouterReplayRecorder` captures the selection of every MoE layer during a forward pass. Install it on the module whose `forward` will consume the tape (for the Qwen3-MoE wrappers, that is the backbone `model.model`, so the recorded names line up with the keys the backbone looks up). `tape()` returns **one mapping per micro-batch** (a list parallel to the data pack), so micro-batches with different sequence lengths — sequence packing, dynamic token budgets — are kept separate:
+
+```python
+from d9d.module.block.moe import RouterReplayRecorder
+
+backbone = model.model
+with RouterReplayRecorder().install(backbone) as recorder, torch.no_grad():
+    model(input_ids=ids, position_ids=pos)
+    tape = recorder.tape()  # [{"layers.0.mlp": ..., "layers.1.mlp": ...}, ...]  (one entry per micro-batch)
+
+# a single recorded forward is one micro-batch -> replay its mapping
+model(input_ids=ids, position_ids=pos, labels=labels, replay_indices=tape[0])
+```
+
 ::: d9d.module.block.moe
 
 ::: d9d.module.block.moe.communications
