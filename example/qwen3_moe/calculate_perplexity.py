@@ -29,6 +29,7 @@ from d9d.loop.run import InferenceConfigurator
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
 from d9d.module.block.head import LM_IGNORE_INDEX
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
+from d9d.module.model.io import SequenceCausalLMOutput, SequenceCausalLMShared, SequenceInput, SequenceShared
 from d9d.module.model.qwen3_moe import Qwen3MoEForCausalLM, Qwen3MoEForCausalLMParameters
 from d9d.module.parallelism.model.qwen3_moe import parallelize_qwen3_moe_for_causal_lm
 from pydantic import BaseModel
@@ -211,30 +212,32 @@ class PerplexityState(TypedDict):
     labels: torch.Tensor
 
 
-class PerplexityTask(InferenceTask[dict[str, torch.Tensor], PerplexityState]):
+class PerplexityTask(
+    InferenceTask[
+        dict[str, torch.Tensor], SequenceInput, SequenceCausalLMShared, SequenceCausalLMOutput, PerplexityState
+    ]
+):
     def __init__(self, dist_ctx: DistributedContext):
         self._dist_ctx = dist_ctx
         self._cache: list[torch.Tensor] = []
 
-    def build_forward_inputs(self, ctx: BuildForwardInputsContext) -> BuildForwardInputsResult[PerplexityState]:
+    def build_forward_inputs(
+        self, ctx: BuildForwardInputsContext
+    ) -> BuildForwardInputsResult[SequenceInput, SequenceCausalLMShared, PerplexityState]:
         # ctx.batch contains the output of the Collator.
 
-        # Return inputs for model.forward() plus the typed side-data for output processing.
-        # inputs are only for the first pipeline stage
-        # kwargs are the same for all the pipeline stages
+        # Return the pipeline input (first stage only) plus the shared input (every stage) and the
+        # typed side-data carried to output processing.
         return BuildForwardInputsResult(
-            inputs={
-                "input_ids": ctx.batch["input_ids"],
-            },
-            kwargs={
-                "labels": ctx.batch["labels"],
-                "position_ids": ctx.batch["position_ids"],
-            },
+            input=SequenceInput(input_ids=ctx.batch["input_ids"]),
+            shared=SequenceCausalLMShared(
+                sequence=SequenceShared(position_ids=ctx.batch["position_ids"]), labels=ctx.batch["labels"]
+            ),
             state=PerplexityState(labels=ctx.batch["labels"]),
         )
 
-    def process_outputs(self, ctx: ProcessOutputsContext[PerplexityState]):
-        logps = ctx.pipeline_results["logps"]
+    def process_outputs(self, ctx: ProcessOutputsContext[SequenceCausalLMOutput, PerplexityState]):
+        logps = ctx.pipeline_results.logps
 
         # Calculate number of valid tokens (ignoring the -100 padding)
         # This is crucial for variable length batches.
