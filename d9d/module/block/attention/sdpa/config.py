@@ -81,8 +81,12 @@ class SdpaParameters:
         needs_attention_mask: Whether the layer will pass an explicit attention
             mask tensor to the backend at runtime. When ``True``, auto-detection
             excludes backends that cannot accept explicit masks.
+        needs_varlen: Whether the layer will pass a ``SequencePacking`` descriptor to the backend at
+            runtime (sequence packing / block-diagonal attention). When ``True``, auto-detection
+            prefers a variable-length-capable backend.
     """
 
     num_sinks: int | None
     window_size: tuple[int | None, int | None] = (None, None)
     needs_attention_mask: bool = False
+    needs_varlen: bool = False

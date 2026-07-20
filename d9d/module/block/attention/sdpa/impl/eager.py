@@ -2,6 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from ...types import SequencePacking
 from ..config import EagerSdpaBackendConfig, SdpaParameters
 from ..protocol import SdpaBackend
 
@@ -26,24 +27,32 @@ class EagerSdpa(nn.Module, SdpaBackend):
         self,
         seq_len: int,
         is_causal: bool,
+        packing: SequencePacking | None,
         device: torch.device,
     ) -> torch.Tensor | None:
         """Builds a boolean mask of disallowed positions, shape ``(seq_len, seq_len)``.
 
-        ``True`` marks positions that must be masked out.
+        ``True`` marks positions that must be masked out:
+
+        - future positions, when ``is_causal`` is set;
+        - positions outside the sliding window, when a window is configured;
+        - keys in a different packed segment (block-diagonal attention), when ``packing`` is set.
+
+        This dense ``(seq_len, seq_len)`` mask is the O(seq_len^2) correctness fallback for sequence
+        packing; the flash varlen backend is the efficient path.
 
         Returns:
-            A boolean mask tensor, or ``None`` when neither causal masking nor a
-            sliding window is requested.
+            A boolean mask tensor, or ``None`` when no masking is requested.
         """
         left, right = self._window_size
         has_window = left is not None or right is not None
 
-        if not is_causal and not has_window:
+        if not is_causal and not has_window and packing is None:
             return None
 
-        row = torch.arange(seq_len, device=device).unsqueeze(1)
-        col = torch.arange(seq_len, device=device).unsqueeze(0)
+        positions = torch.arange(seq_len, device=device)
+        row = positions.unsqueeze(1)
+        col = positions.unsqueeze(0)
         diff = row - col
 
         mask = torch.zeros(seq_len, seq_len, dtype=torch.bool, device=device)
@@ -57,6 +66,11 @@ class EagerSdpa(nn.Module, SdpaBackend):
         if right is not None:
             mask = mask | (-diff > right)
 
+        if packing is not None:
+            boundaries = packing.cu_seqlens[1:-1].to(device)
+            segment_id = torch.bucketize(positions, boundaries, right=True)
+            mask = mask | (segment_id.unsqueeze(1) != segment_id.unsqueeze(0))
+
         return mask
 
     def forward(
@@ -65,6 +79,7 @@ class EagerSdpa(nn.Module, SdpaBackend):
         key_states: torch.Tensor,
         value_states: torch.Tensor,
         attention_mask: torch.Tensor | None,
+        packing: SequencePacking | None,
         is_causal: bool,
         scale: float,
     ) -> torch.Tensor:
@@ -79,7 +94,7 @@ class EagerSdpa(nn.Module, SdpaBackend):
 
         logits = torch.matmul(query, key.transpose(2, 3)) * scale
 
-        mask = self._build_mask(seq_len, is_causal, query.device)
+        mask = self._build_mask(seq_len, is_causal, packing, query.device)
         if mask is not None:
             logits = logits.masked_fill(mask[None, None, :], float("-inf"))
 
