@@ -43,14 +43,23 @@ It is designed to handle the **forward-only** flow, processing the raw tensors s
 
 You may note that `batch` is only accessible in `build_forward_inputs(...)`, but not in the later stages. Don't worry!
 
-Each task declares a **state** type (`TState`, the second type parameter of `TrainTask` / `InferenceTask`) — a PyTree, typically a `TypedDict`, carrying any side-data from `build_forward_inputs` to the later stages of the **same microbatch** (labels, masks, token counts, …). `build_forward_inputs` returns it; `compute_loss` / `process_outputs` / `update_metrics` read it back, fully typed. Tasks that carry nothing use `None`.
+The **state** carries side-data from `build_forward_inputs` to the later stages of the **same microbatch** — labels, masks, token counts, or anything else the model forward does not return but the loss or metrics need.
+
+It is declared by `TState`, the last type parameter of `TrainTask` / `InferenceTask`. `TState` is any PyTree, so you can use whatever shape fits:
+
+* a **dataclass** — when you want attribute access and strict typing;
+* a **`TypedDict`** — when you prefer dict access but still want keys checked;
+* a **plain `dict`** — for quick, untyped side-data;
+* **`None`** — for tasks that carry nothing.
+
+`build_forward_inputs` returns the state; `compute_loss` / `process_outputs` / `update_metrics` read it back, fully typed.
 
 ```python
 class MyState(TypedDict):
     target: torch.Tensor
 
 # in build_forward_inputs:
-return BuildForwardInputsResult(inputs=..., kwargs=..., state=MyState(target=ctx.batch["target"]))
+return BuildForwardInputsResult(input=..., shared=..., state=MyState(target=ctx.batch["target"]))
 
 # later, in update_metrics / compute_loss:
 metrics["accuracy"].update(ctx.state["target"])  # ctx.state is typed as MyState
@@ -60,6 +69,17 @@ Tensors stored in the state are detached from the autograd graph automatically, 
 
 ## Example Implementation
 
+A task's IO is typed by the same four PyTree roles the model pipeline uses (see [Pipeline
+Parallelism](../models/pipeline_parallelism.md)). `TrainTask` is generic over
+`[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]`:
+
+* `TPipelineInput` — the `PipelineInput` fed to the **first** stage (built here).
+* `TSharedInput` — the `SharedInput` broadcast to **every** stage.
+* `TPipelineOutput` — the `PipelineOutput` produced by the **last** stage; read by attribute in `compute_loss`.
+
+`build_forward_inputs` returns a `BuildForwardInputsResult` with `input` / `shared` / `state`
+fields — no dict keys.
+
 ```python
 import torch
 from typing import TypedDict
@@ -67,40 +87,42 @@ from typing import TypedDict
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import ScalarTree
 from d9d.module.block.head import LM_IGNORE_INDEX
+from d9d.module.model.io import SequenceCausalLMOutput, SequenceCausalLMShared, SequenceInput, SequenceShared
 from d9d.loop.control import *
 
 
-class SFTState(TypedDict):
+class SFTState(TypedDict):  # it also could be a dataclass
     labels: torch.Tensor
 
 
-class SFTTask(TrainTask[dict[str, torch.Tensor], SFTState]):
+class SFTTask(
+    TrainTask[dict[str, torch.Tensor], SequenceInput, SequenceCausalLMShared, SequenceCausalLMOutput, SFTState]
+):
     def __init__(self, dist_ctx: DistributedContext):
         self._dist_ctx = dist_ctx
 
-    def build_forward_inputs(self, ctx: BuildForwardInputsContext) -> BuildForwardInputsResult[SFTState]:
+    def build_forward_inputs(
+        self, ctx: BuildForwardInputsContext
+    ) -> BuildForwardInputsResult[SequenceInput, SequenceCausalLMShared, SFTState]:
         # ctx.batch contains the output of the Collator.
 
-        # Return inputs for model.forward() plus the typed side-data for later stages.
-        # inputs are only for the first pipeline stage
-        # kwargs are the same for all the pipeline stages
+        # Return the PipelineInput, the SharedInput and the typed
+        # side-data carried to loss computation for this same microbatch.
         return BuildForwardInputsResult(
-            inputs={
-                "input_ids": ctx.batch["input_ids"]
-            },
-            kwargs={
-                "labels": ctx.batch["labels"],
-                "position_ids": ctx.batch["position_ids"]
-            },
+            input=SequenceInput(input_ids=ctx.batch["input_ids"]),
+            shared=SequenceCausalLMShared(
+                sequence=SequenceShared(position_ids=ctx.batch["position_ids"]),
+                labels=ctx.batch["labels"],
+            ),
             state=SFTState(labels=ctx.batch["labels"]),
         )
 
     def dump_hparams(self) -> ScalarTree:
         return super().dump_hparams()
 
-    def compute_loss(self, ctx: ComputeLossContext[SFTState]) -> ComputeLossResult:
+    def compute_loss(self, ctx: ComputeLossContext[SequenceCausalLMOutput, SFTState]) -> ComputeLossResult:
         # Retrieve log_probs calculated by the model pipeline
-        logps = ctx.pipeline_results["logps"]
+        logps = ctx.pipeline_results.logps
 
         # Calculate number of valid tokens (ignoring the -100 padding)
         # This is crucial for variable length batches.
