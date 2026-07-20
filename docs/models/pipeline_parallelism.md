@@ -6,7 +6,7 @@ d9d implements a modern, highly modular pipelining engine designed for performan
 
 ### Dynamic Shapes & Algorithmic Shape Inference
 
-To run P2P (Point-to-Point) communication, the receiver must know the shape of the incoming tensor to pre-allocate buffers. d9d asks your model to implement a lightweight protocol (`ModuleSupportsPipelining`) to calculate stage input and output shapes from batch input shapes mathematically, without performing a heavy forward pass or doing a distributed graph tracing.
+To run P2P (Point-to-Point) communication, the receiver must know the shape of the incoming tensor to pre-allocate buffers. d9d asks your model to implement a lightweight protocol (`ModuleSupportsPipelining`) to calculate the shape of the payload transferred between stages mathematically, without performing a heavy forward pass or doing a distributed graph tracing.
 
 This allows supporting **Dynamic Shapes** (e.g., varying sequence lengths) efficiently across runs.
 
@@ -23,101 +23,131 @@ In d9d, models are **Pipeline-Aware**. Each pipeline rank constructs **only** th
 
 ## Making Models Compatible
 
+### The Four IO Roles
+
+A pipelined model moves data across stage boundaries as four **explicitly-named, generic PyTree
+types** (dataclasses are the recommended form):
+
+| Role             | Meaning                                                     | Crosses P2P? |
+|------------------|-------------------------------------------------------------|--------------|
+| `PipelineInput`  | Input to the **first** stage (built by the task)            | no           |
+| `StageTransfer`  | Payload between adjacent stages (out of *N* == in of *N+1*) | **yes**      |
+| `PipelineOutput` | Output of the **last** stage (to loss / result callback)    | no           |
+| `SharedInput`    | Value passed to **every** stage, rebuilt locally per rank   | no           |
+
+Only `StageTransfer` crosses the wire, so it is the only role that needs a `TensorSpec`.
+
 ### The Protocol
 
-**Implementing the Protocol**
+To use Pipeline Parallelism, your model implements
+`d9d.pipelining.api.ModuleSupportsPipelining[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]`:
 
-To use Pipeline Parallelism in d9d, your model must implement the `d9d.pipelining.api.ModuleSupportsPipelining` protocol to allow the framework to manage memory and buffer allocations.
+* **`forward(inputs, shared)`** — `inputs` is the `PipelineInput` on the first stage and the incoming
+  `StageTransfer` otherwise; it returns the outgoing `StageTransfer` on non-last stages and the
+  `PipelineOutput` on the last stage. The stage knows its position from the `PipelineStageInfo` it
+  received at construction, so it branches on `is_current_stage_first` / `is_current_stage_last`
+  explicitly.
+* **`stage_transfer_spec(pipeline_input, boundary)`** — returns a PyTree **structurally identical to
+  `StageTransfer`** with every tensor leaf replaced by a `TensorSpec`. The `boundary`
+  (`StageBoundary.incoming` / `outgoing`) selects which inter-stage edge to size.
 
-**Forward Compatibility**
-
-* Pipelined models currently only support **outputting a dictionary** (`dict[str, torch.Tensor]`). However, we plan to support arbitrary PyTrees in further releases. The keys in the dictionary returned by your `forward` method must strictly match the keys in the dictionary calculated by `infer_stage_outputs_from_pipeline_inputs`. 
-* The named arguments accepted by your `forward` method must strictly match the `infer_stage_inputs_from_pipeline_inputs`. 
-
-This allows the communication handler to map tensor names to P2P buffers deterministically.
+Because stage *N*'s `outgoing` transfer and stage *N+1*'s `incoming` transfer are the **same
+dataclass type**, `pytree.tree_flatten` yields identical leaf orderings on both ends. Sender and
+receiver therefore agree on the wire order **by construction** — no name/shape handshake is needed.
 
 ### Example
 
 Below is a skeleton of a Transformer-like model implemented for d9d pipelining.
 
 ```python
+import dataclasses
 import torch
 from torch import nn
-from d9d.pipelining.api import PipelineStageInfo, TensorSpec, distribute_layers_for_pipeline_stage
+from d9d.pipelining.api import (
+    ModuleSupportsPipelining,
+    PipelineStageInfo,
+    StageBoundary,
+    TensorSpec,
+    distribute_layers_for_pipeline_stage,
+)
 
-class MyModelChunk(nn.Module):
+
+@dataclasses.dataclass
+class MyInput:              # PipelineInput
+    input_ids: torch.Tensor
+
+
+@dataclasses.dataclass
+class MyTransfer:           # StageTransfer (the only role crossing P2P)
+    hidden_states: torch.Tensor
+
+
+@dataclasses.dataclass
+class MyShared:             # SharedInput (broadcast to every stage)
+    position_ids: torch.Tensor
+
+
+@dataclasses.dataclass
+class MyOutput:             # PipelineOutput
+    logits: torch.Tensor
+
+
+class MyModelChunk(
+    nn.Module,
+    ModuleSupportsPipelining[MyInput, MyTransfer, MyShared, MyOutput],
+):
     def __init__(self, stage: PipelineStageInfo, config):
         super().__init__()
         self.stage = stage
         self.config = config
-        
+
         # 1. Determine what layers live here
         self.start_layer, self.end_layer = distribute_layers_for_pipeline_stage(
             config.n_layers, num_virtual_layers_pre=1, num_virtual_layers_post=1, stage=stage
         )
-        
+
         # 2. Build sub-modules (using ModuleDict - for compatibility)
         self.layers = nn.ModuleDict({
-            str(layer): TransformerBlock(...) 
+            str(layer): TransformerBlock(...)
             for layer in range(self.start_layer, self.end_layer)
         })
-        
+
         # Only build embeddings on first stage
         if stage.is_current_stage_first:
             self.embed = nn.Embedding(...)
-            
+
         # Only build head on last stage
         if stage.is_current_stage_last:
             self.head = nn.Linear(...)
 
-    def forward(self, input_ids=None, hidden_states=None):        
-        # Run embeddings only on first stage
+    def forward(self, inputs: MyInput | MyTransfer, shared: MyShared) -> MyTransfer | MyOutput:
+        # Branch on the stage position, never on which argument is None.
         if self.stage.is_current_stage_first:
-            x = self.embed(input_ids)
+            x = self.embed(inputs.input_ids)
         else:
-            x = hidden_states
-            
+            x = inputs.hidden_states
+
         # Run local layers
         for layer_idx in range(self.start_layer, self.end_layer):
             x = self.layers[str(layer_idx)](x)
-        
-        outputs = {
-            "hidden_states": x
-        }
-        
-        # Last stage logic
+
+        # Last stage produces the PipelineOutput; everyone else produces a StageTransfer.
         if self.stage.is_current_stage_last:
-            logits = self.head(x)
-            outputs['logits'] = logits
-        
-        return outputs
+            return MyOutput(logits=self.head(x))
+        return MyTransfer(hidden_states=x)
 
     # --- Protocol Implementation ---
-    # These receive a single representative microbatch (not a global batch), so shapes are used as-is,
-    # and return TensorSpec descriptors (shape/dtype/layout) — no tensors are allocated.
-
-    def infer_stage_inputs_from_pipeline_inputs(self, microbatch_inputs: dict[str, torch.Tensor]):
-        micro_batch_size = microbatch_inputs['input_ids'].shape[0]
-        seq_len = microbatch_inputs['input_ids'].shape[1]
-        
-        if self.stage.is_current_stage_first:
-            # First stage receives raw input IDs
-            return {"input_ids": TensorSpec(shape=(micro_batch_size, seq_len), dtype=torch.long)}
-        else:
-            # Intermediate stages receive hidden states from previous stage
-            return {"hidden_states": TensorSpec(shape=(micro_batch_size, seq_len, self.hidden_dim), dtype=torch.bfloat16)}
-
-    def infer_stage_outputs_from_pipeline_inputs(self, microbatch_inputs: dict[str, torch.Tensor]):
-        micro_batch_size = microbatch_inputs['input_ids'].shape[0]
-        seq_len = microbatch_inputs['input_ids'].shape[1]
-        
-        outputs = {"hidden_states": TensorSpec(shape=(micro_batch_size, seq_len, self.config.hidden_dim), dtype=torch.bfloat16)}
-        
-        if self.stage.is_current_stage_last:
-            # Last stage outputs logits too
-            outputs["logits"] = TensorSpec(shape=(micro_batch_size, seq_len, self.config.vocab_size), dtype=torch.bfloat16)
-        
-        return outputs
+    # Receives a single representative microbatch of PipelineInput (not a global batch), so shapes are
+    # used as-is, and returns a StageTransfer of TensorSpec descriptors — no tensors are allocated.
+    # The engine never calls this for the first stage's `incoming` nor the last stage's `outgoing`
+    # edge, so terminal boundaries need no special-casing.
+    def stage_transfer_spec(self, pipeline_input: MyInput, boundary: StageBoundary) -> MyTransfer:
+        micro_batch_size, seq_len = pipeline_input.input_ids.shape
+        return MyTransfer(
+            hidden_states=TensorSpec(
+                shape=(micro_batch_size, seq_len, self.config.hidden_dim), dtype=torch.bfloat16
+            )
+        )
 ```
 
 ## Using the Pipeline
@@ -159,15 +189,16 @@ from d9d.core.dist_context import DistributedContext
 from d9d.pipelining.factory import build_schedule, PipelineSchedule1F1BConfig
 
 
-# 0. Define an object that manages loss calculation per microbatch
-class PipelineLossHandler:
+# 0. Define an object that manages loss calculation per microbatch. It receives the PipelineOutput
+#    produced by the last stage and reads its fields by attribute.
+class MyLossHandler:
     def __init__(self, targets_microbatches: list[Tensor]):
         self._targets = targets_microbatches
 
-    def compute_loss(self, outputs: dict[str, Tensor], microbatch_idx: int):
+    def compute_loss(self, outputs: MyOutput, microbatch_idx: int):
         # Implement any custom logic here
         current_target = self._targets[microbatch_idx]
-        return F.cross_entropy(outputs['logits'].view(-1, outputs['logits'].shape[-1]), current_target.view(-1))
+        return F.cross_entropy(outputs.logits.view(-1, outputs.logits.shape[-1]), current_target.view(-1))
 
 
 # 1. Define configuration
@@ -178,13 +209,14 @@ schedule_config = PipelineSchedule1F1BConfig(
     zero_bubble=True  # Enable ZB1P optimization
 )
 
-# 2. Build the per-microbatch inputs (the "pack"). The number of microbatches is decided here, per step.
-inputs_microbatches = tuple({"input_ids": mb} for mb in my_input_microbatches)
-kwargs_microbatches = tuple({} for _ in inputs_microbatches)
+# 2. Build the per-microbatch inputs (the "pack"). The number of microbatches is decided here, per
+#    step. Each stage receives one PipelineInput and one SharedInput per microbatch.
+inputs_microbatches = tuple(MyInput(input_ids=mb) for mb in my_input_microbatches)
+shared_microbatches = tuple(MyShared(position_ids=pos) for pos in my_position_microbatches)
 targets_microbatches = [...]  # one target tensor per microbatch
 
 # 3. Build the schedule and model shards (the callback is supplied per step, not here)
-loss_handler = PipelineLossHandler(targets_microbatches)
+loss_handler = MyLossHandler(targets_microbatches)
 schedule_info, modules = build_schedule(
     dist_context=dist_context,
     schedule_config=schedule_config,
@@ -195,7 +227,7 @@ schedule_info, modules = build_schedule(
 # The callback is passed to each step, so it can close over per-step data (here, the targets).
 schedule_info.schedule.step(
     inputs_microbatches=inputs_microbatches,
-    kwargs_microbatches=kwargs_microbatches,
+    shared_microbatches=shared_microbatches,
     callback=loss_handler.compute_loss,
 )
 ```
