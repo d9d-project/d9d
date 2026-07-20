@@ -1,7 +1,9 @@
+import typing
+
 import torch
 
 from d9d.core.dist_context import DistributedContext
-from d9d.core.types import MicrobatchPack
+from d9d.core.types import MicrobatchPack, PyTree
 from d9d.loop.control import ComputeLossContext, TrainTask, UpdateMetricsContext
 from d9d.metric.impl.container import ComposeMetric
 from d9d.pipelining.factory.factory import PipelineScheduleInfo
@@ -11,8 +13,14 @@ from ..job_schedule import JobSchedule
 from ..pipeline_state import PipelineStateHandler
 from .common import build_pipeline_microbatch_inputs
 
+TBatch = typing.TypeVar("TBatch", bound=PyTree)
+TPipelineInput = typing.TypeVar("TPipelineInput")
+TSharedInput = typing.TypeVar("TSharedInput")
+TPipelineOutput = typing.TypeVar("TPipelineOutput")
+TState = typing.TypeVar("TState", bound=PyTree)
 
-class LossComputer:
+
+class LossComputer(typing.Generic[TPipelineOutput, TState]):
     """Computes and accumulates the training loss for each microbatch of a step.
 
     This component bridges the raw outputs of the model pipeline and the user-defined training task.
@@ -20,8 +28,8 @@ class LossComputer:
 
     def __init__(
         self,
-        state: PipelineStateHandler,
-        task: TrainTask,
+        state: PipelineStateHandler[TState],
+        task: TrainTask[typing.Any, typing.Any, typing.Any, TPipelineOutput, TState],
         schedule: JobSchedule,
         gradient_manager: GradientManager,
         metrics: ComposeMetric,
@@ -41,11 +49,11 @@ class LossComputer:
         self._gradient_manager = gradient_manager
         self._metrics = metrics
 
-    def __call__(self, pipeline_outputs: dict[str, torch.Tensor], microbatch_idx: int) -> torch.Tensor:
+    def __call__(self, pipeline_outputs: TPipelineOutput, microbatch_idx: int) -> torch.Tensor:
         """Computes the weighted loss for a microbatch and accumulates its loss/weight and metrics.
 
         Args:
-            pipeline_outputs: Dictionary containing model output tensors.
+            pipeline_outputs: The ``PipelineOutput`` produced by the last stage.
             microbatch_idx: Index of the current microbatch within the step's pack.
 
         Returns:
@@ -67,7 +75,7 @@ class LossComputer:
         return loss * loss_weight
 
 
-class TrainTaskOperator:
+class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]):
     """Orchestrates the forward and backward passes for a training task over one pack.
 
     It builds the per-microbatch inputs, reconfigures the pipeline schedule for the pack length, and
@@ -77,9 +85,9 @@ class TrainTaskOperator:
     def __init__(
         self,
         dist_context: DistributedContext,
-        task: TrainTask,
-        pipeline: PipelineScheduleInfo,
-        pipeline_state: PipelineStateHandler,
+        task: TrainTask[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState],
+        pipeline: PipelineScheduleInfo[TPipelineInput, TSharedInput, TPipelineOutput],
+        pipeline_state: PipelineStateHandler[TState],
         gradient_manager: GradientManager,
         job_schedule: JobSchedule,
         metrics: ComposeMetric,
@@ -103,20 +111,20 @@ class TrainTaskOperator:
         self._job_schedule = job_schedule
         self._metrics = metrics
 
-    def forward_backward(self, pack: MicrobatchPack) -> None:
+    def forward_backward(self, pack: MicrobatchPack[TBatch]) -> None:
         """Executes the forward and backward passes for one pack of microbatches.
 
         Args:
             pack: The step's pack of raw microbatches.
         """
         try:
-            inputs_microbatches, kwargs_microbatches = build_pipeline_microbatch_inputs(
+            inputs_microbatches, shared_microbatches = build_pipeline_microbatch_inputs(
                 self._task, self._pipeline_state, pack
             )
             self._gradient_manager.set_required_accumulations(len(pack))
             self._pipeline.schedule.step(
                 inputs_microbatches=inputs_microbatches,
-                kwargs_microbatches=kwargs_microbatches,
+                shared_microbatches=shared_microbatches,
                 callback=LossComputer(
                     state=self._pipeline_state,
                     task=self._task,

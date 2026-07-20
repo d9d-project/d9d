@@ -1,10 +1,12 @@
 import dataclasses
+import typing
 from collections.abc import Callable
 
 from torch import nn
 
 from ...core.dist_context import REGULAR_DOMAIN, DistributedContext
 from ..api import PipelineSchedule, PipelineStageInfo
+from ..api.types import TPipelineInput, TPipelineOutput, TSharedInput
 from ..infra.schedule.component.program import (
     build_stage_to_host_rank_topology,
     invert_stage_to_host_rank_topology,
@@ -19,10 +21,10 @@ from .registry import PIPELINE_PROGRAM_REGISTRY
 
 
 @dataclasses.dataclass(kw_only=True)
-class PipelineScheduleInfo:
+class PipelineScheduleInfo(typing.Generic[TPipelineInput, TSharedInput, TPipelineOutput]):
     """Contains the built pipeline schedule and rank-specific metadata."""
 
-    schedule: PipelineSchedule
+    schedule: PipelineSchedule[TPipelineInput, TSharedInput, TPipelineOutput]
     has_first_stage: bool
     has_last_stage: bool
 

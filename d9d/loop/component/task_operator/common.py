@@ -1,12 +1,21 @@
-from d9d.core.types import MicrobatchPack
+import typing
+
+from d9d.core.types import MicrobatchPack, PyTree
 from d9d.loop.control import BaseTask, BuildForwardInputsContext
 
 from ..pipeline_state import PipelineStateHandler
 
+TBatch = typing.TypeVar("TBatch", bound=PyTree)
+TPipelineInput = typing.TypeVar("TPipelineInput")
+TSharedInput = typing.TypeVar("TSharedInput")
+TState = typing.TypeVar("TState", bound=PyTree)
+
 
 def build_pipeline_microbatch_inputs(
-    task: BaseTask, pipeline_state: PipelineStateHandler, pack: MicrobatchPack
-) -> tuple[tuple[dict, ...], tuple[dict, ...]]:
+    task: BaseTask[TBatch, TPipelineInput, TSharedInput, TState],
+    pipeline_state: PipelineStateHandler[TState],
+    pack: MicrobatchPack,
+) -> tuple[tuple[TPipelineInput, ...], tuple[TSharedInput, ...]]:
     """Builds the per-microbatch model inputs for a whole pack, storing each microbatch's side-data.
 
     Args:
@@ -15,15 +24,15 @@ def build_pipeline_microbatch_inputs(
         pack: The step's pack of raw microbatches.
 
     Returns:
-        A tuple of per-microbatch input dicts and a tuple of per-microbatch kwarg dicts.
+        A tuple of per-microbatch ``PipelineInput`` and a tuple of per-microbatch ``SharedInput``.
     """
     inputs_microbatches = []
-    kwargs_microbatches = []
+    shared_microbatches = []
 
     for microbatch_idx, microbatch in enumerate(pack):
         model_inputs = task.build_forward_inputs(BuildForwardInputsContext(batch=microbatch))
         pipeline_state.store(microbatch_idx, model_inputs.state)
-        inputs_microbatches.append(model_inputs.inputs)
-        kwargs_microbatches.append(model_inputs.kwargs)
+        inputs_microbatches.append(model_inputs.input)
+        shared_microbatches.append(model_inputs.shared)
 
-    return tuple(inputs_microbatches), tuple(kwargs_microbatches)
+    return tuple(inputs_microbatches), tuple(shared_microbatches)
