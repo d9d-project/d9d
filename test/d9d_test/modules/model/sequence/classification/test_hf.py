@@ -1,6 +1,7 @@
 import pytest
 import torch
 import torch.nn.functional as F
+from d9d.module.model.io import SequenceInput, SequencePoolingShared, SequenceShared
 from d9d.pipelining.api import PipelineStageInfo
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.testing import assert_close
@@ -47,9 +48,12 @@ def test_consistent_to_hf(model_type: ModelCatalogue, model_factory_d9d):
     clone_module_weights(from_module=model_hf, to_module=model_d9d, map_with=HF_TO_D9D_MAPPER_CLS[model_type])
 
     outputs_d9d = model_d9d(
-        input_ids=batch.sequence.input_ids, position_ids=batch.sequence.position_ids, pooling_mask=batch.pooling_mask
+        SequenceInput(input_ids=batch.sequence.input_ids),
+        SequencePoolingShared(
+            sequence=SequenceShared(position_ids=batch.sequence.position_ids), pooling_mask=batch.pooling_mask
+        ),
     )
-    scores = outputs_d9d["scores"]
+    scores = outputs_d9d.scores
     assert scores.dtype == torch.float32
 
     assert_kl_div_close_logits(scores.bfloat16(), outputs_hf.logits, threshold=1e-3)

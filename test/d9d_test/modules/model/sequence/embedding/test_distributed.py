@@ -1,6 +1,7 @@
 import pytest
 import torch
 from d9d.core.dist_context import DeviceMeshParameters
+from d9d.module.model.io import SequenceEmbeddingOutput, SequenceInput, SequencePoolingShared, SequenceShared
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import PipelineScheduleGPipeConfig, build_schedule
 from torch import nn
@@ -46,18 +47,20 @@ def test_consistent_to_itself_dist(
     # Create Global Model and its Outputs
     model_global = model_factory_d9d(stage_global)
     outputs_global = model_global(
-        input_ids=batch_global.sequence.input_ids,
-        position_ids=batch_global.sequence.position_ids,
-        pooling_mask=batch_global.pooling_mask,
+        SequenceInput(input_ids=batch_global.sequence.input_ids),
+        SequencePoolingShared(
+            sequence=SequenceShared(position_ids=batch_global.sequence.position_ids),
+            pooling_mask=batch_global.pooling_mask,
+        ),
     )
 
     # Use MSE-style dummy loss for embedding gradient tests
-    loss_global = outputs_global["embeddings"].mean()
+    loss_global = outputs_global.embeddings.mean()
     loss_global.backward()
 
     # Create Local Model and PP Schedule
-    def _callback(outputs: dict[str, torch.Tensor], microbatch_idx: int) -> torch.Tensor:
-        loss_value = outputs["embeddings"].sum() / batch_global.pooling_mask.sum() / outputs["embeddings"].shape[1]
+    def _callback(outputs: SequenceEmbeddingOutput, microbatch_idx: int) -> torch.Tensor:
+        loss_value = outputs.embeddings.sum() / batch_global.pooling_mask.sum() / outputs.embeddings.shape[1]
         dist_loss_accum.append(loss_value.detach())
         return loss_value
 
@@ -75,20 +78,24 @@ def test_consistent_to_itself_dist(
 
     # Run Local Model
     inputs_microbatches = tuple(
-        {"input_ids": microbatch_slice(batch_dist.sequence.input_ids, microbatch_idx=i, n_microbatches=_N_MICROBATCHES)}
+        SequenceInput(
+            input_ids=microbatch_slice(batch_dist.sequence.input_ids, microbatch_idx=i, n_microbatches=_N_MICROBATCHES)
+        )
         for i in range(_N_MICROBATCHES)
     )
-    kwargs_microbatches = tuple(
-        {
-            "position_ids": microbatch_slice(
-                batch_dist.sequence.position_ids, microbatch_idx=i, n_microbatches=_N_MICROBATCHES
+    shared_microbatches = tuple(
+        SequencePoolingShared(
+            sequence=SequenceShared(
+                position_ids=microbatch_slice(
+                    batch_dist.sequence.position_ids, microbatch_idx=i, n_microbatches=_N_MICROBATCHES
+                )
             ),
-            "pooling_mask": microbatch_slice(batch_dist.pooling_mask, microbatch_idx=i, n_microbatches=_N_MICROBATCHES),
-        }
+            pooling_mask=microbatch_slice(batch_dist.pooling_mask, microbatch_idx=i, n_microbatches=_N_MICROBATCHES),
+        )
         for i in range(_N_MICROBATCHES)
     )
     schedule_info.schedule.step(
-        inputs_microbatches=inputs_microbatches, kwargs_microbatches=kwargs_microbatches, callback=_callback
+        inputs_microbatches=inputs_microbatches, shared_microbatches=shared_microbatches, callback=_callback
     )
 
     # Compare Loss & Grads

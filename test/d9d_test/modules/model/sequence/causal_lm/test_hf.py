@@ -1,4 +1,5 @@
 import pytest
+from d9d.module.model.io import SequenceCausalLMShared, SequenceInput, SequenceShared
 from d9d.pipelining.api import PipelineStageInfo
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.testing import assert_close
@@ -46,11 +47,12 @@ def test_consistent_to_hf(model_type: ModelCatalogue, model_factory_d9d):
     clone_module_weights(from_module=model_hf, to_module=model_d9d, map_with=HF_TO_D9D_MAPPER_CAUSAL_LM[model_type])
 
     outputs_d9d = model_d9d(
-        input_ids=batch.sequence.input_ids[:, :-1],
-        position_ids=batch.sequence.position_ids[:, :-1],
-        labels=labels_shift,
+        SequenceInput(input_ids=batch.sequence.input_ids[:, :-1]),
+        SequenceCausalLMShared(
+            sequence=SequenceShared(position_ids=batch.sequence.position_ids[:, :-1]), labels=labels_shift
+        ),
     )
-    loss_d9d = outputs_d9d["logps"][labels_shift != -100].mean()
+    loss_d9d = outputs_d9d.logps[labels_shift != -100].mean()
     loss_d9d.backward()
 
     assert_close(loss_d9d, outputs_hf.loss, atol=1e-4, rtol=0.001)

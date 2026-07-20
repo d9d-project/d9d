@@ -1,5 +1,6 @@
 import pytest
 import torch
+from d9d.module.model.io import SequenceInput, SequencePoolingShared, SequenceShared
 from d9d.pipelining.api import PipelineStageInfo
 from torch.nn.attention import SDPBackend, sdpa_kernel
 
@@ -50,11 +51,12 @@ def test_consistent_to_hf(model_type: ModelCatalogue, model_factory_d9d) -> None
     clone_module_weights(from_module=model_hf, to_module=model_d9d, map_with=HF_TO_D9D_MAPPER_EMBEDDING[model_type])
 
     outputs_d9d = model_d9d(
-        input_ids=batch.sequence.input_ids,
-        position_ids=batch.sequence.position_ids,
-        pooling_mask=batch.pooling_mask,
+        SequenceInput(input_ids=batch.sequence.input_ids),
+        SequencePoolingShared(
+            sequence=SequenceShared(position_ids=batch.sequence.position_ids), pooling_mask=batch.pooling_mask
+        ),
     )
-    embeddings = outputs_d9d["embeddings"]
+    embeddings = outputs_d9d.embeddings
     assert embeddings.dtype == torch.float32
 
     assert_angle_and_norm_close(

@@ -106,11 +106,9 @@ def test_execution_exceptions():
         ),
         # Case 3: Multilabel Micro Accuracy
         MetricCase(
-            factory_fn=lambda: confusion_matrix_metric()
-            .multilabel(num_classes=3, threshold=0.5)
-            .with_accuracy()
-            .micro()
-            .build(),
+            factory_fn=lambda: (
+                confusion_matrix_metric().multilabel(num_classes=3, threshold=0.5).with_accuracy().micro().build()
+            ),
             initial_expect=torch.tensor(torch.nan),
             steps=[
                 MetricStep(
@@ -279,11 +277,13 @@ def test_execution_exceptions():
         ),
         # Case 10: Extensibility - Custom Statistic Calculation
         MetricCase(
-            factory_fn=lambda: confusion_matrix_metric()
-            .multiclass(num_classes=3)
-            .with_statistic(lambda m: m.tp.float())
-            .per_class()
-            .build(),
+            factory_fn=lambda: (
+                confusion_matrix_metric()
+                .multiclass(num_classes=3)
+                .with_statistic(lambda m: m.tp.float())
+                .per_class()
+                .build()
+            ),
             initial_expect=torch.tensor([0.0, 0.0, 0.0]),
             steps=[
                 MetricStep(
