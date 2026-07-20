@@ -12,9 +12,20 @@ from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLangua
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode, create_hidden_states_aggregator
 from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingProvider, RotaryEmbeddingStyle
+from d9d.module.model.io import (
+    SequenceCausalLMOutput,
+    SequenceCausalLMShared,
+    SequenceClassificationOutput,
+    SequenceEmbeddingOutput,
+    SequenceInput,
+    SequencePoolingShared,
+    SequenceShared,
+    SequenceTransfer,
+)
 from d9d.pipelining.api import (
     ModuleSupportsPipelining,
     PipelineStageInfo,
+    StageBoundary,
     distribute_layers_for_pipeline_stage,
 )
 
@@ -27,7 +38,13 @@ from .params import (
 )
 
 
-class Qwen3DenseModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
+class Qwen3DenseModel(
+    nn.Module,
+    ModuleLateInit,
+    ModuleSupportsPipelining[
+        SequenceInput, SequenceTransfer[torch.Tensor], SequenceShared, SequenceTransfer[torch.Tensor]
+    ],
+):
     """The Qwen3 Dense Transformer Decoder backbone.
 
     It is designed to be split across multiple pipeline stages.
@@ -98,40 +115,35 @@ class Qwen3DenseModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
 
     def forward(
         self,
-        input_ids: torch.Tensor | None = None,
-        hidden_states: torch.Tensor | None = None,
-        position_ids: torch.Tensor | None = None,
-        hidden_states_snapshot: torch.Tensor | None = None,
-        hidden_states_agg_mask: torch.Tensor | None = None,
-    ) -> dict[str, torch.Tensor | None]:
-        """Executes the forward pass for the current pipeline stage.
+        inputs: SequenceInput | SequenceTransfer[torch.Tensor],
+        shared: SequenceShared,
+    ) -> SequenceTransfer[torch.Tensor]:
+        """Executes the backbone forward pass for the current pipeline stage.
 
         Args:
-            input_ids: Indices of input sequence tokens. Required if this is the
-                first pipeline stage.
-            hidden_states: Hidden states from the previous pipeline stage. Required
-                if this is not the first pipeline stage.
-            position_ids: Indices of positions of each input sequence tokens in the
-                position embeddings.
-            hidden_states_snapshot: Accumulated tensor of aggregated hidden states
-                from previous stages. Used if snapshotting is enabled.
-            hidden_states_agg_mask: Mask used to aggregate hidden states for
-                snapshots.
+            inputs: ``SequenceInput`` (token ids) on the first stage; the incoming
+                ``SequenceTransfer`` otherwise.
+            shared: The backbone shared input (position ids and, if snapshotting is enabled, the
+                aggregation mask).
 
         Returns:
-            A dictionary containing:
-                *   'hidden_states': The output of the last layer in this stage.
-                *   'hidden_states_snapshot': (Optional) The updated snapshot tensor.
+            The produced ``SequenceTransfer`` (hidden states and, optionally, the updated snapshot).
         """
-        state_aggregator = create_hidden_states_aggregator(self._hidden_states_snapshot_mode, hidden_states_agg_mask)
+        state_aggregator = create_hidden_states_aggregator(
+            self._hidden_states_snapshot_mode, shared.hidden_states_agg_mask
+        )
 
-        if input_ids is not None:
-            last_hidden_states = self.embed_tokens(input_ids)
+        if self._stage.is_current_stage_first:
+            first_inputs = cast(SequenceInput, inputs)
+            last_hidden_states = self.embed_tokens(first_inputs.input_ids)
+            hidden_states_snapshot = None
             state_aggregator.add_hidden_states(last_hidden_states)
         else:
-            last_hidden_states = hidden_states
+            transfer_inputs = cast(SequenceTransfer[torch.Tensor], inputs)
+            last_hidden_states = transfer_inputs.hidden_states
+            hidden_states_snapshot = transfer_inputs.hidden_states_snapshot
 
-        rope_params = self.rope_provider(position_ids)
+        rope_params = self.rope_provider(shared.position_ids)
 
         for decoder_layer_name in self._layers_iter:
             decoder_layer = self.layers[decoder_layer_name]
@@ -146,10 +158,10 @@ class Qwen3DenseModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         if self._stage.is_current_stage_last:
             last_hidden_states = self.norm(last_hidden_states)
 
-        return {
-            "hidden_states": last_hidden_states,
-            "hidden_states_snapshot": state_aggregator.pack_with_snapshot(hidden_states_snapshot),
-        }
+        return SequenceTransfer(
+            hidden_states=last_hidden_states,
+            hidden_states_snapshot=state_aggregator.pack_with_snapshot(hidden_states_snapshot),
+        )
 
     def reset_parameters(self):
         """Resets module parameters."""
@@ -165,51 +177,42 @@ class Qwen3DenseModel(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
         if self._stage.is_current_stage_last:
             self.norm.reset_parameters()
 
-    def infer_stage_inputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        input_ids = microbatch_inputs["input_ids"]
+    def stage_transfer_spec(
+        self, pipeline_input: SequenceInput, boundary: StageBoundary
+    ) -> SequenceTransfer[TensorSpec]:
+        """Describes the ``SequenceTransfer`` crossing the given boundary of this stage.
 
-        pp_inputs = {}
+        Args:
+            pipeline_input: A representative ``SequenceInput`` microbatch; only shapes are read.
+            boundary: Which inter-stage edge to describe.
 
-        # for calculation - input ids or prev hidden state
-        if self._stage.is_current_stage_first:
-            pp_inputs["input_ids"] = TensorSpec(shape=(input_ids.shape[0], input_ids.shape[1]), dtype=torch.long)
-        else:
-            pp_inputs["hidden_states"] = TensorSpec(
-                shape=(input_ids.shape[0], input_ids.shape[1], self._hidden_size), dtype=self.output_dtype()
-            )
-            if self._hidden_states_snapshot_mode != HiddenStatesAggregationMode.no:
-                num_layers_before = self._num_layers_before + 1  # 1 for embedding
-                pp_inputs["hidden_states_snapshot"] = TensorSpec(
-                    shape=(num_layers_before, input_ids.shape[0], self._hidden_size), dtype=self.output_dtype()
-                )
+        Returns:
+            A ``SequenceTransfer`` of ``TensorSpec``.
+        """
+        batch, seq = pipeline_input.input_ids.shape[0], pipeline_input.input_ids.shape[1]
 
-        return pp_inputs
-
-    def infer_stage_outputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        input_ids = microbatch_inputs["input_ids"]
-
-        pp_outputs = {
-            "hidden_states": TensorSpec(
-                shape=(input_ids.shape[0], input_ids.shape[1], self._hidden_size), dtype=self.output_dtype()
-            )
-        }
-
+        snapshot_spec = None
         if self._hidden_states_snapshot_mode != HiddenStatesAggregationMode.no:
-            num_layers_before = self._num_layers_before + 1
-            num_layers_current = len(self.layers)
-            num_layers_after = num_layers_before + num_layers_current
-            pp_outputs["hidden_states_snapshot"] = TensorSpec(
-                shape=(num_layers_after, input_ids.shape[0], self._hidden_size), dtype=self.output_dtype()
-            )
+            num_layers_before = self._num_layers_before + 1  # 1 for embedding
+            if boundary is StageBoundary.outgoing:
+                num_layers = num_layers_before + len(self.layers)
+            else:
+                num_layers = num_layers_before
+            snapshot_spec = TensorSpec(shape=(num_layers, batch, self._hidden_size), dtype=self.output_dtype())
 
-        return pp_outputs
+        return SequenceTransfer(
+            hidden_states=TensorSpec(shape=(batch, seq, self._hidden_size), dtype=self.output_dtype()),
+            hidden_states_snapshot=snapshot_spec,
+        )
 
 
-class Qwen3DenseForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
+class Qwen3DenseForCausalLM(
+    nn.Module,
+    ModuleLateInit,
+    ModuleSupportsPipelining[
+        SequenceInput, SequenceTransfer[torch.Tensor], SequenceCausalLMShared, SequenceCausalLMOutput
+    ],
+):
     """A Qwen3 Dense model wrapped with a Causal Language Modeling head.
 
     It is designed to be split across multiple pipeline stages.
@@ -251,40 +254,27 @@ class Qwen3DenseForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining)
 
     def forward(
         self,
-        input_ids: torch.Tensor | None = None,
-        hidden_states: torch.Tensor | None = None,
-        position_ids: torch.Tensor | None = None,
-        hidden_states_snapshot: torch.Tensor | None = None,
-        hidden_states_agg_mask: torch.Tensor | None = None,
-        labels: torch.Tensor | None = None,
-    ) -> dict[str, torch.Tensor]:
+        inputs: SequenceInput | SequenceTransfer[torch.Tensor],
+        shared: SequenceCausalLMShared,
+    ) -> SequenceTransfer[torch.Tensor] | SequenceCausalLMOutput:
         """Executes the model forward pass.
 
-        If this is the last stage, it expects `labels` to be provided and computes
-        the cross-entropy loss (returned as 'logps' typically representing per-token loss).
+        If this is the last stage, it expects ``shared.labels`` to be provided and computes the
+        cross-entropy loss (returned as per-token ``logps``).
 
         Args:
-            input_ids: Input token IDS (for Stage 0).
-            hidden_states: Hidden states from previous stage (for Stage > 0).
-            position_ids: Positional indices for RoPE.
-            hidden_states_snapshot: Intermediate state collector.
-            hidden_states_agg_mask: Mask for state aggregation.
-            labels: Target tokens for loss computation (Last Stage).
+            inputs: ``SequenceInput`` on the first stage; incoming ``SequenceTransfer`` otherwise.
+            shared: The shared input (position ids, aggregation mask, labels).
 
         Returns:
-            Dictionary containing 'hidden_states', optionally 'hidden_states_snapshot',
-            and per-token 'logps' if on the last stage.
+            The produced ``SequenceTransfer`` on non-last stages, or the ``CausalLMOutput`` on the
+            last stage.
         """
-        model_outputs = self.model(
-            input_ids=input_ids,
-            hidden_states=hidden_states,
-            position_ids=position_ids,
-            hidden_states_snapshot=hidden_states_snapshot,
-            hidden_states_agg_mask=hidden_states_agg_mask,
-        )
+        model_outputs = self.model(inputs, shared.sequence)
         if self._stage.is_current_stage_last:
-            lm_out = self.lm_head(hidden_states=model_outputs["hidden_states"], labels=labels)
-            model_outputs["logps"] = lm_out
+            return SequenceCausalLMOutput(
+                logps=self.lm_head(hidden_states=model_outputs.hidden_states, labels=shared.labels)
+            )
         return model_outputs
 
     def reset_parameters(self):
@@ -294,23 +284,19 @@ class Qwen3DenseForCausalLM(nn.Module, ModuleLateInit, ModuleSupportsPipelining)
         if self._stage.is_current_stage_last:
             self.lm_head.reset_parameters()
 
-    def infer_stage_inputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        return self.model.infer_stage_inputs_from_pipeline_inputs(microbatch_inputs)
-
-    def infer_stage_outputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(microbatch_inputs)
-
-        if self._stage.is_current_stage_last:
-            pp_outputs["logps"] = TensorSpec(shape=tuple(microbatch_inputs["input_ids"].shape), dtype=torch.float32)
-
-        return pp_outputs
+    def stage_transfer_spec(
+        self, pipeline_input: SequenceInput, boundary: StageBoundary
+    ) -> SequenceTransfer[TensorSpec]:
+        return self.model.stage_transfer_spec(pipeline_input, boundary)
 
 
-class Qwen3DenseForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
+class Qwen3DenseForClassification(
+    nn.Module,
+    ModuleLateInit,
+    ModuleSupportsPipelining[
+        SequenceInput, SequenceTransfer[torch.Tensor], SequencePoolingShared, SequenceClassificationOutput
+    ],
+):
     """A Qwen3 Dense model wrapped with a Sequence/Token Classification head.
 
     It is designed to be split across multiple pipeline stages.
@@ -353,39 +339,23 @@ class Qwen3DenseForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipel
 
     def forward(
         self,
-        input_ids: torch.Tensor | None = None,
-        hidden_states: torch.Tensor | None = None,
-        position_ids: torch.Tensor | None = None,
-        hidden_states_snapshot: torch.Tensor | None = None,
-        hidden_states_agg_mask: torch.Tensor | None = None,
-        pooling_mask: torch.Tensor | None = None,
-    ) -> dict[str, torch.Tensor]:
+        inputs: SequenceInput | SequenceTransfer[torch.Tensor],
+        shared: SequencePoolingShared,
+    ) -> SequenceTransfer[torch.Tensor] | SequenceClassificationOutput:
         """Executes the classification model forward pass.
 
         Args:
-            input_ids: Input token IDS (for Stage 0).
-            hidden_states: Hidden states from previous stage (for Stage > 0).
-            position_ids: Positional indices for RoPE.
-            hidden_states_snapshot: Intermediate state collector.
-            hidden_states_agg_mask: Mask for state aggregation.
-            pooling_mask: Binary mask indicating which token(s) to pool for classification.
-                Note: you can use `d9d.dataset.token_pooling_mask_from_attention_mask`
-                in your Dataset to preallocate the pooling mask from attention mask.
+            inputs: ``SequenceInput`` on the first stage; incoming ``SequenceTransfer`` otherwise.
+            shared: The shared input (position ids, aggregation mask, pooling mask).
 
         Returns:
-            Dictionary containing 'hidden_states', optionally 'hidden_states_snapshot'.
-                If on the last stage, also contains 'scores' (logits) of shape [batch, num_labels].
+            The produced ``SequenceTransfer`` on non-last stages, or the ``ClassificationOutput`` on
+            the last stage.
         """
-        model_outputs = self.model(
-            input_ids=input_ids,
-            hidden_states=hidden_states,
-            position_ids=position_ids,
-            hidden_states_snapshot=hidden_states_snapshot,
-            hidden_states_agg_mask=hidden_states_agg_mask,
-        )
+        model_outputs = self.model(inputs, shared.sequence)
         if self._stage.is_current_stage_last:
-            model_outputs["scores"] = self.cls_head(
-                hidden_states=model_outputs["hidden_states"], pooling_mask=pooling_mask
+            return SequenceClassificationOutput(
+                scores=self.cls_head(hidden_states=model_outputs.hidden_states, pooling_mask=shared.pooling_mask)
             )
         return model_outputs
 
@@ -396,24 +366,19 @@ class Qwen3DenseForClassification(nn.Module, ModuleLateInit, ModuleSupportsPipel
         if self._stage.is_current_stage_last:
             self.cls_head.reset_parameters()
 
-    def infer_stage_inputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        return self.model.infer_stage_inputs_from_pipeline_inputs(microbatch_inputs)
-
-    def infer_stage_outputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(microbatch_inputs)
-
-        if self._stage.is_current_stage_last:
-            batch_size = microbatch_inputs["input_ids"].shape[0]
-            pp_outputs["scores"] = TensorSpec(shape=(batch_size, self._num_labels), dtype=torch.float32)
-
-        return pp_outputs
+    def stage_transfer_spec(
+        self, pipeline_input: SequenceInput, boundary: StageBoundary
+    ) -> SequenceTransfer[TensorSpec]:
+        return self.model.stage_transfer_spec(pipeline_input, boundary)
 
 
-class Qwen3DenseForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining):
+class Qwen3DenseForEmbedding(
+    nn.Module,
+    ModuleLateInit,
+    ModuleSupportsPipelining[
+        SequenceInput, SequenceTransfer[torch.Tensor], SequencePoolingShared, SequenceEmbeddingOutput
+    ],
+):
     """A Qwen3 Dense model wrapped with an Embedding head.
 
     It is designed to be split across multiple pipeline stages.
@@ -457,37 +422,25 @@ class Qwen3DenseForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining
 
     def forward(
         self,
-        input_ids: torch.Tensor | None = None,
-        hidden_states: torch.Tensor | None = None,
-        position_ids: torch.Tensor | None = None,
-        hidden_states_snapshot: torch.Tensor | None = None,
-        hidden_states_agg_mask: torch.Tensor | None = None,
-        pooling_mask: torch.Tensor | None = None,
-    ) -> dict[str, torch.Tensor]:
+        inputs: SequenceInput | SequenceTransfer[torch.Tensor],
+        shared: SequencePoolingShared,
+    ) -> SequenceTransfer[torch.Tensor] | SequenceEmbeddingOutput:
         """Executes the embedding model forward pass.
 
         Args:
-            input_ids: Input token IDS (for Stage 0).
-            hidden_states: Hidden states from previous stage (for Stage > 0).
-            position_ids: Positional indices for RoPE.
-            hidden_states_snapshot: Intermediate state collector.
-            hidden_states_agg_mask: Mask for state aggregation.
-            pooling_mask: Binary mask indicating which token(s) to pool for embedding extraction.
+            inputs: ``SequenceInput`` on the first stage; incoming ``SequenceTransfer`` otherwise.
+            shared: The shared input (position ids, aggregation mask, pooling mask).
 
         Returns:
-            Dictionary containing 'hidden_states', optionally 'hidden_states_snapshot'.
-                If on the last stage, also contains 'embeddings'.
+            The produced ``SequenceTransfer`` on non-last stages, or the ``EmbeddingOutput`` on the
+            last stage.
         """
-        model_outputs = self.model(
-            input_ids=input_ids,
-            hidden_states=hidden_states,
-            position_ids=position_ids,
-            hidden_states_snapshot=hidden_states_snapshot,
-            hidden_states_agg_mask=hidden_states_agg_mask,
-        )
+        model_outputs = self.model(inputs, shared.sequence)
         if self._stage.is_current_stage_last:
-            model_outputs["embeddings"] = self.embedding_head(
-                hidden_states=model_outputs["hidden_states"], pooling_mask=pooling_mask
+            return SequenceEmbeddingOutput(
+                embeddings=self.embedding_head(
+                    hidden_states=model_outputs.hidden_states, pooling_mask=shared.pooling_mask
+                )
             )
         return model_outputs
 
@@ -498,18 +451,7 @@ class Qwen3DenseForEmbedding(nn.Module, ModuleLateInit, ModuleSupportsPipelining
         if self._stage.is_current_stage_last:
             self.embedding_head.reset_parameters()
 
-    def infer_stage_inputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        return self.model.infer_stage_inputs_from_pipeline_inputs(microbatch_inputs)
-
-    def infer_stage_outputs_from_pipeline_inputs(
-        self, microbatch_inputs: dict[str, torch.Tensor]
-    ) -> dict[str, TensorSpec]:
-        pp_outputs = self.model.infer_stage_outputs_from_pipeline_inputs(microbatch_inputs)
-
-        if self._stage.is_current_stage_last:
-            batch_size = microbatch_inputs["input_ids"].shape[0]
-            pp_outputs["embeddings"] = TensorSpec(shape=(batch_size, self._embedding_dim), dtype=torch.float32)
-
-        return pp_outputs
+    def stage_transfer_spec(
+        self, pipeline_input: SequenceInput, boundary: StageBoundary
+    ) -> SequenceTransfer[TensorSpec]:
+        return self.model.stage_transfer_spec(pipeline_input, boundary)
