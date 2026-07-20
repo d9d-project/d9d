@@ -18,6 +18,9 @@ if typing.TYPE_CHECKING:
 
 TBatch = typing.TypeVar("TBatch", bound=PyTree)
 TState = typing.TypeVar("TState", bound=PyTree)
+TPipelineInput = typing.TypeVar("TPipelineInput")
+TSharedInput = typing.TypeVar("TSharedInput")
+TPipelineOutput = typing.TypeVar("TPipelineOutput")
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -32,19 +35,19 @@ class BuildForwardInputsContext(typing.Generic[TBatch]):
 
 
 @dataclasses.dataclass(kw_only=True)
-class BuildForwardInputsResult(typing.Generic[TState]):
+class BuildForwardInputsResult(typing.Generic[TPipelineInput, TSharedInput, TState]):
     """The result of processing one raw microbatch into model inputs.
 
     Attributes:
-        inputs: A dictionary of inputs that are passed to model pipeline as input data
+        input: The ``PipelineInput`` passed to the model pipeline as input data
             (first stage only if using pipeline parallelism).
-        kwargs: A dictionary of keyword arguments passed to each pipeline stage.
+        shared: The ``SharedInput`` passed to every pipeline stage.
         state: Side-data (a PyTree, e.g. a TypedDict) carried to loss/output processing for this same
             microbatch — labels, masks, anything the model forward does not return but the loss needs.
     """
 
-    inputs: dict[str, torch.Tensor]
-    kwargs: dict[str, Any]
+    input: TPipelineInput
+    shared: TSharedInput
     state: TState
 
 
@@ -66,17 +69,21 @@ class FinalizeContext:
     """Context data provided when the task is being finalized."""
 
 
-class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch, TState]):
+class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch, TPipelineInput, TSharedInput, TState]):
     """Abstract base class representing a unit of work (Task) in the training/inference loop.
 
     Type parameters:
         TBatch: The raw microbatch type produced by the data stream.
+        TPipelineInput: The ``PipelineInput`` fed to the first pipeline stage.
+        TSharedInput: The ``SharedInput`` fed to every pipeline stage.
         TState: The per-microbatch side-data carried from input building to loss/output processing.
             Tasks that carry nothing use ``None``.
     """
 
     @abc.abstractmethod
-    def build_forward_inputs(self, ctx: BuildForwardInputsContext[TBatch]) -> BuildForwardInputsResult[TState]:
+    def build_forward_inputs(
+        self, ctx: BuildForwardInputsContext[TBatch]
+    ) -> BuildForwardInputsResult[TPipelineInput, TSharedInput, TState]:
         """Transforms one raw microbatch into arguments for the model.
 
         Called once per microbatch in the step's pack.
@@ -122,16 +129,16 @@ class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch, TState]):
 
 
 @dataclasses.dataclass(kw_only=True)
-class ComputeLossContext(typing.Generic[TState]):
+class ComputeLossContext(typing.Generic[TPipelineOutput, TState]):
     """Context data provided to calculate the loss during training.
 
     Attributes:
-        pipeline_results: The outputs returned by the model's forward pass.
+        pipeline_results: The ``PipelineOutput`` returned by the model's forward pass.
         state: The side-data this microbatch's ``build_forward_inputs`` returned.
         schedule: Component tracking the current step.
     """
 
-    pipeline_results: Mapping[str, torch.Tensor]
+    pipeline_results: TPipelineOutput
     state: TState
     schedule: "JobSchedule"
 
@@ -179,11 +186,15 @@ class UpdateMetricsContext(typing.Generic[TState]):
     metrics: Mapping[str, "Metric"]
 
 
-class TrainTask(BaseTask[TBatch, TState], abc.ABC, typing.Generic[TBatch, TState]):
+class TrainTask(
+    BaseTask[TBatch, TPipelineInput, TSharedInput, TState],
+    abc.ABC,
+    typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState],
+):
     """Abstract base class for defining training-specific logic."""
 
     @abc.abstractmethod
-    def compute_loss(self, ctx: ComputeLossContext[TState]) -> ComputeLossResult:
+    def compute_loss(self, ctx: ComputeLossContext[TPipelineOutput, TState]) -> ComputeLossResult:
         """Calculates the loss based on model outputs.
 
         Args:
@@ -249,23 +260,27 @@ class TrainTaskProvider(Protocol):
 
 
 @dataclasses.dataclass(kw_only=True)
-class ProcessOutputsContext(typing.Generic[TState]):
+class ProcessOutputsContext(typing.Generic[TPipelineOutput, TState]):
     """Context data provided to process outputs during inference.
 
     Attributes:
-        pipeline_results: The outputs returned by the model's forward pass.
+        pipeline_results: The ``PipelineOutput`` returned by the model's forward pass.
         state: The side-data this microbatch's ``build_forward_inputs`` returned.
     """
 
-    pipeline_results: dict[str, torch.Tensor]
+    pipeline_results: TPipelineOutput
     state: TState
 
 
-class InferenceTask(BaseTask[TBatch, TState], abc.ABC, typing.Generic[TBatch, TState]):
+class InferenceTask(
+    BaseTask[TBatch, TPipelineInput, TSharedInput, TState],
+    abc.ABC,
+    typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState],
+):
     """Abstract base class for defining inference-specific logic."""
 
     @abc.abstractmethod
-    def process_outputs(self, ctx: ProcessOutputsContext[TState]):
+    def process_outputs(self, ctx: ProcessOutputsContext[TPipelineOutput, TState]):
         """Processes the model outputs (e.g. saving to disk, decoding tokens).
 
         Args:
