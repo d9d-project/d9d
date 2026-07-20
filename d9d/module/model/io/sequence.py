@@ -3,6 +3,8 @@ from typing import Generic, TypeVar
 
 import torch
 
+from d9d.module.block.attention import SequencePacking
+
 TLeaf = TypeVar("TLeaf")
 
 
@@ -38,10 +40,14 @@ class SequenceShared:
     Attributes:
         position_ids: Indices of positions of each token in the position embeddings.
         hidden_states_agg_mask: Mask used to aggregate hidden states for snapshots, if enabled.
+        packing: When set, the batch is a single
+            packed row and attention is computed block-diagonally over its segments; ``None`` gives
+            the dense causal path.
     """
 
     position_ids: torch.Tensor
     hidden_states_agg_mask: torch.Tensor | None = None
+    packing: SequencePacking | None = None
 
 
 @dataclasses.dataclass

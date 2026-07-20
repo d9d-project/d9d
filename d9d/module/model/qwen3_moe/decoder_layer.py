@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from d9d.module.base import ModuleLateInit
-from d9d.module.block.attention import GroupedQueryAttention
+from d9d.module.block.attention import GroupedQueryAttention, SequencePacking
 from d9d.module.block.moe import MoELayer
 from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingStyle
@@ -33,6 +33,7 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
             qk_norm_eps=params.rms_norm_eps,
             head_dim=params.head_dim,
             rope_style=RotaryEmbeddingStyle.HALF,
+            enable_packing=True,
         )
 
         self.mlp = MoELayer(
@@ -47,13 +48,17 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         self.post_attention_layernorm = RMSNorm(params.hidden_size, eps=params.rms_norm_eps)
 
     def forward(
-        self, hidden_states: torch.Tensor, position_embeddings: tuple[torch.Tensor, torch.Tensor]
+        self,
+        hidden_states: torch.Tensor,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        packing: SequencePacking | None = None,
     ) -> torch.Tensor:
         """Performs the forward pass of the MoE layer.
 
         Args:
             hidden_states: Input tensor of shape `(batch, seq_len, hidden_dim)`.
             position_embeddings: Tuple containing RoPE precomputed embeddings (cos, sin).
+            packing: Optional block-diagonal segmentation for sequence packing.
 
         Returns:
             Output tensor after attention and MoE blocks, shape `(batch, seq_len, hidden_dim)`.
@@ -65,7 +70,8 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         hidden_states = self.self_attn(
             hidden_states=hidden_states,
             position_embeddings=position_embeddings,
-            attention_mask=None,  # no mask for moe decoder
+            attention_mask=None,
+            packing=packing,
         )
         hidden_states = residual + hidden_states
 
