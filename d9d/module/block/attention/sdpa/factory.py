@@ -18,23 +18,27 @@ _ENV_VAR = "D9D_BACKEND_AUTO_SDPA"
 
 def _auto_detect_sdpa_backend(params: SdpaParameters) -> AnySdpaBackendConfig:
     forced = os.environ.get(_ENV_VAR)
-
     if forced is not None:
         return TypeAdapter(AnySdpaBackendConfig).validate_json(forced)
 
     has_sinks = params.num_sinks is not None
     has_window = params.window_size[0] is not None or params.window_size[1] is not None
-    needs_mask = params.needs_attention_mask
+    has_fa4 = importlib.util.find_spec("flash_attn.cute") is not None
+    has_fa2 = importlib.util.find_spec("flash_attn") is not None
 
-    if not needs_mask and importlib.util.find_spec("flash_attn.cute") is not None:
+    # FA4: no explicit mask, but supports sinks, windows and packing.
+    if has_fa4 and not params.needs_attention_mask:
         return FlashAttention4SdpaBackendConfig()
 
-    if not needs_mask and not has_sinks and importlib.util.find_spec("flash_attn") is not None:
+    # FA2: no explicit mask and no sinks, but supports windows and packing.
+    if has_fa2 and not params.needs_attention_mask and not has_sinks:
         return FlashAttention2SdpaBackendConfig()
 
-    if not has_sinks and not has_window:
+    # Torch SDPA: supports explicit masks, but no sinks, windows or packing.
+    if not has_sinks and not has_window and not params.needs_varlen:
         return TorchSdpaBackendConfig()
 
+    # Eager: the portable fallback that serves every capability.
     return EagerSdpaBackendConfig()
 
 
