@@ -1,4 +1,5 @@
 import torch
+from d9d.module.block.attention import SequencePacking
 from d9d.module.block.attention.sdpa.config import EagerSdpaBackendConfig, SdpaParameters
 from d9d.module.block.attention.sdpa.impl.eager import EagerSdpa
 from d9d.module.block.attention.sdpa.protocol import SdpaBackend
@@ -14,6 +15,12 @@ def build_qkv(batch, seq_len, num_q_heads, num_kv_heads, head_dim, dtype):
     k = torch.randn(batch, seq_len, num_kv_heads, head_dim, device=DEVICE, dtype=dtype)
     v = torch.randn(batch, seq_len, num_kv_heads, head_dim, device=DEVICE, dtype=dtype)
     return q, k, v
+
+
+def build_packing(segment_lengths: list[int]) -> SequencePacking:
+    """Builds a ``SequencePacking`` descriptor from a list of per-segment lengths."""
+    cu_seqlens = torch.tensor([0, *segment_lengths], device=DEVICE, dtype=torch.int32).cumsum(0).to(torch.int32)
+    return SequencePacking(cu_seqlens=cu_seqlens, max_seqlen=max(segment_lengths))
 
 
 def assert_matches_eager(
@@ -32,12 +39,17 @@ def assert_matches_eager(
     check_contiguous: bool = False,
     batch: int = 2,
     seq_len: int = 128,
+    segment_lengths: list[int] | None = None,
 ) -> None:
     """Asserts a backend matches the eager reference in forward and backward.
 
     Builds matching inputs for ``backend`` (run in ``dtype``) and an `EagerSdpa`
     reference (run in float32), then compares the forward output and the
     gradients of query, key, value, and the learnable sink (when present).
+
+    When ``segment_lengths`` is given, a single packed row of shape ``(1, total, heads, dim)`` is
+    built instead (``total`` being the sum of the segment lengths) and the matching
+    ``SequencePacking`` descriptor is fed to both backends, exercising the block-diagonal varlen path.
 
     Args:
         backend: The backend under test. Must already be on ``DEVICE`` with the
@@ -53,10 +65,19 @@ def assert_matches_eager(
         window_size: Sliding-window size as ``(left, right)``.
         use_mask: If True, feed a random additive attention mask to both backends.
         check_contiguous: If True, assert the backend output is contiguous.
-        batch: Batch size.
-        seq_len: Sequence length.
+        batch: Batch size. Forced to 1 when ``segment_lengths`` is given.
+        seq_len: Sequence length. Overridden by the packed total when ``segment_lengths`` is given.
+        segment_lengths: Per-segment token counts for the packed (varlen) path, or ``None`` for a
+            dense row.
     """
     scale = head_dim**-0.5
+
+    packing = None
+    if segment_lengths is not None:
+        batch = 1
+        seq_len = sum(segment_lengths)
+        packing = build_packing(segment_lengths)
+
     q, k, v = build_qkv(batch, seq_len, num_q_heads, num_kv_heads, head_dim, dtype)
 
     eager = EagerSdpa(
@@ -82,13 +103,13 @@ def assert_matches_eager(
     q_be = q.clone().requires_grad_(True)
     k_be = k.clone().requires_grad_(True)
     v_be = v.clone().requires_grad_(True)
-    out = backend(q_be, k_be, v_be, attention_mask=mask, is_causal=is_causal, scale=scale)
+    out = backend(q_be, k_be, v_be, attention_mask=mask, packing=packing, is_causal=is_causal, scale=scale)
 
     # Eager reference, run in float32 for precision.
     q_ref = q.float().requires_grad_(True)
     k_ref = k.float().requires_grad_(True)
     v_ref = v.float().requires_grad_(True)
-    ref = eager(q_ref, k_ref, v_ref, attention_mask=mask_ref, is_causal=is_causal, scale=scale)
+    ref = eager(q_ref, k_ref, v_ref, attention_mask=mask_ref, packing=packing, is_causal=is_causal, scale=scale)
 
     assert out.shape == (batch, seq_len, num_q_heads, head_dim)
     if check_contiguous:
