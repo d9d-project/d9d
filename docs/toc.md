@@ -37,6 +37,7 @@ Building blocks for modern LLMs.
 *   **[Model Catalogue](./models/model_catalogue/index.md)**: Models available directly in d9d.
 *   **[Model Design](./models/model_design.md)**: Principles for creating compatible models.
 *   **[Modules](./models/modules/index.md)**: Building blocks for implementing compatible models.
+*   **[Multimodality](./models/multimodality.md)**: Media IO types, modality encoders, and the merge convention.
 
 ## ⚡ Parallelism
 Strategies for distributing computations.

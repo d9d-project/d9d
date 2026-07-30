@@ -7,8 +7,8 @@ from .config import (
     TorchSdpaBackendConfig,
     TorchSdpaBackendType,
 )
-from .factory import build_sdpa_backend
-from .protocol import SdpaBackend
+from .factory import build_sdpa_backend, build_varlen_sdpa_backend
+from .protocol import SdpaBackend, VarlenSdpaBackend
 
 __all__ = [
     "AnySdpaBackendConfig",
@@ -19,5 +19,7 @@ __all__ = [
     "SdpaParameters",
     "TorchSdpaBackendConfig",
     "TorchSdpaBackendType",
+    "VarlenSdpaBackend",
     "build_sdpa_backend",
+    "build_varlen_sdpa_backend",
 ]

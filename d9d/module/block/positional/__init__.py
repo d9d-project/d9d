@@ -1,5 +1,6 @@
 """Provides modules for positional embeddings, such as Rotary Positional Embeddings."""
 
+from .mrope import MultimodalRotaryEmbeddingProvider
 from .rope import (
     RotaryEmbeddingApplicator,
     RotaryEmbeddingProvider,
@@ -15,6 +16,7 @@ from .rope_scaling import (
 
 __all__ = [
     "LinearRopeScaling",
+    "MultimodalRotaryEmbeddingProvider",
     "NoRopeScaling",
     "NtkRopeScaling",
     "RopeScaling",
