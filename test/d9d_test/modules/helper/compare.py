@@ -22,7 +22,9 @@ def assert_angle_and_norm_close(
     actual_fp32 = _as_2d(actual.detach().float())
     expected_fp32 = _as_2d(expected.detach().float())
 
-    both_zero = (actual_fp32.abs().sum(dim=-1) == 0) & (expected_fp32.abs().sum(dim=-1) == 0)
+    # The direction of a vector below the norm noise floor is meaningless; such rows are excluded
+    # from the angle check (their norms are still compared below).
+    both_zero = (actual_fp32.norm(dim=-1) <= tol.tol_norm_abs) & (expected_fp32.norm(dim=-1) <= tol.tol_norm_abs)
     actual_fp32 = actual_fp32[~both_zero]
     expected_fp32 = expected_fp32[~both_zero]
 
