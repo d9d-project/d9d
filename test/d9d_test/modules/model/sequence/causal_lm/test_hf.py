@@ -11,6 +11,7 @@ from d9d_test.modules.model.sequence.causal_lm.batch import build_causal_lm_batc
 from d9d_test.modules.model.sequence.causal_lm.catalogue import (
     D9D_MODEL_FACTORIES_CAUSAL_LM,
     D9D_TO_HF_MAPPER_CAUSAL_LM,
+    HF_GRAD_TOLERANCES_CAUSAL_LM,
     HF_MODEL_FACTORY_CAUSAL_LM,
     HF_TO_D9D_MAPPER_CAUSAL_LM,
 )
@@ -59,5 +60,8 @@ def test_consistent_to_hf(model_type: ModelCatalogue, model_factory_d9d):
 
     assert_close(loss_d9d, outputs_hf.loss, atol=1e-4, rtol=0.001)
     assert_mapped_gradients_close(
-        from_module=model_d9d, to_module=model_hf, map_with=D9D_TO_HF_MAPPER_CAUSAL_LM[model_type]
+        from_module=model_d9d,
+        to_module=model_hf,
+        map_with=D9D_TO_HF_MAPPER_CAUSAL_LM[model_type],
+        tolerances=HF_GRAD_TOLERANCES_CAUSAL_LM[model_type],
     )

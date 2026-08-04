@@ -43,7 +43,9 @@ nav = [
         { "Model Catalogue" = [
             "models/model_catalogue/index.md",
             "models/model_catalogue/qwen3_moe.md",
-            "models/model_catalogue/qwen3_dense.md"
+            "models/model_catalogue/qwen3_dense.md",
+            "models/model_catalogue/qwen3_5_moe.md",
+            "models/model_catalogue/qwen3_5.md"
         ] },
         { "Modules" = [
             "models/modules/index.md",
