@@ -35,11 +35,6 @@ with `RotaryEmbeddingApplicator` in the `HALF` style.
 a pluggable [variable-length SDPA backend](./attention.md#scaled-dot-product-attention-backends).
 Segment boundaries are provided as cumulative sequence lengths (see `segment_cu_seqlens`).
 
-### Vision Block
-
-`VisionBlock` is the standard pre-norm ViT residual block: `LayerNorm -> PackedVisionAttention`
-and `LayerNorm -> GeluMLP`.
-
 ### Spatial Patch Merger
 
 `SpatialPatchMerger` merges `spatial_merge_size**2` neighboring patch embeddings into one media
