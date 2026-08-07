@@ -16,9 +16,9 @@ Uses efficient SiLU-Mul kernel.
 
 ![](./benchmark/silu_mul_bf16.png)
 
-### GeluMLP
+### GELUMLP
 
-`GeluMLP` is a standard two-layer MLP with tanh-approximated GELU activation, as used in Vision
+`GELUMLP` is a standard two-layer MLP with tanh-approximated GELU activation, as used in Vision
 Transformer blocks.
 
 ::: d9d.module.block.ffn

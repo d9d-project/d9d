@@ -5,7 +5,7 @@ from torch import nn
 from d9d.module.base import ModuleLateInit
 
 
-class GeluMLP(nn.Module, ModuleLateInit):
+class GELUMLP(nn.Module, ModuleLateInit):
     """Implements a two-layer Feed-Forward Network (FFN) with GELU activation.
 
     This module applies `fc2(GELU(fc1(x)))` using the tanh approximation of GELU.
@@ -13,7 +13,7 @@ class GeluMLP(nn.Module, ModuleLateInit):
     """
 
     def __init__(self, hidden_size: int, intermediate_size: int, bias: bool = True):
-        """Constructs a GeluMLP object.
+        """Constructs a GELUMLP object.
 
         Args:
             hidden_size: The hidden dim size.

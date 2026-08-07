@@ -1,7 +1,7 @@
-from .gelu_mlp import GeluMLP
+from .gelu_mlp import GELUMLP
 from .swiglu import SwiGLU
 
 __all__ = [
-    "GeluMLP",
+    "GELUMLP",
     "SwiGLU",
 ]
