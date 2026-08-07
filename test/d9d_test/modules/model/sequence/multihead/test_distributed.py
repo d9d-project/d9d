@@ -2,12 +2,16 @@ import pytest
 import torch
 import torch.nn.functional as F
 from d9d.core.dist_context import DeviceMeshParameters
-from d9d.module.model.io import (
+from d9d.module.block.head import (
     SequenceCausalLMHeadShared,
+    SequenceCausalLMOutput,
+    SequenceClassificationOutput,
+    SequencePoolingHeadShared,
+)
+from d9d.module.model.io import (
     SequenceHeadsOutput,
     SequenceHeadsShared,
     SequenceInput,
-    SequencePoolingHeadShared,
     SequenceShared,
 )
 from d9d.pipelining.api import PipelineStageInfo
@@ -57,7 +61,11 @@ def test_multihead_consistent_to_itself_dist(
 
     dist_loss_accum: list[torch.Tensor] = []
 
-    def _combined_loss(outputs: SequenceHeadsOutput, lm_labels: torch.Tensor, cls_labels: torch.Tensor):
+    def _combined_loss(
+        outputs: SequenceHeadsOutput[SequenceCausalLMOutput | SequenceClassificationOutput],
+        lm_labels: torch.Tensor,
+        cls_labels: torch.Tensor,
+    ):
         lm_loss = outputs[HEAD_NAME_LM].logps[lm_labels != -100].sum() / lm_delimiter
         cls_loss = F.cross_entropy(outputs[HEAD_NAME_CLS].scores, cls_labels, reduction="sum") / total_cls
         return lm_loss + cls_loss
@@ -85,7 +93,9 @@ def test_multihead_consistent_to_itself_dist(
     loss_global.backward()
 
     # Create Local Model and PP Schedule
-    def _callback(outputs: SequenceHeadsOutput, microbatch_idx: int) -> torch.Tensor:
+    def _callback(
+        outputs: SequenceHeadsOutput[SequenceCausalLMOutput | SequenceClassificationOutput], microbatch_idx: int
+    ) -> torch.Tensor:
         lm_labels_mb = microbatch_slice(
             batch_dist.lm_labels, microbatch_idx=microbatch_idx, n_microbatches=_N_MICROBATCHES
         )

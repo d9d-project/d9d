@@ -6,7 +6,7 @@ from torch import nn
 
 from d9d.kernel.cce import linear_cross_entropy
 from d9d.module.block.head.base import TaskHead
-from d9d.module.model.io import SequenceCausalLMHeadShared, SequenceCausalLMOutput
+from d9d.module.block.head.io import SequenceCausalLMHeadShared, SequenceCausalLMOutput
 
 LM_IGNORE_INDEX = -100
 """Index ignored by LM head while calculating logps"""
@@ -26,7 +26,7 @@ class SplitLanguageModellingHead(TaskHead[SequenceCausalLMHeadShared, SequenceCa
     consistency with the global vocabulary indices.
     """
 
-    def __init__(self, split_vocab_size: dict[str, int], split_order: Sequence[str], hidden_size: int):
+    def __init__(self, split_vocab_size: Mapping[str, int], split_order: Sequence[str], hidden_size: int):
         """Constructs the SplitLanguageModellingHead object.
 
         Args:

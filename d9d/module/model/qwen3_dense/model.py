@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import cast
 
 import torch
@@ -89,10 +89,25 @@ class Qwen3DenseModel(
         self._hidden_states_snapshot_mode = hidden_states_snapshot_mode
         self._enable_checkpointing = enable_checkpointing
 
-        # public backbone-shared dimensions the composed task heads derive from
-        self.hidden_size = params.layer.hidden_size
-        self.split_vocab_size = params.split_vocab_size
-        self.split_vocab_order = params.split_vocab_order
+        # backbone-shared dimensions the composed task heads derive from
+        self._hidden_size = params.layer.hidden_size
+        self._split_vocab_size = params.split_vocab_size
+        self._split_vocab_order = params.split_vocab_order
+
+    @property
+    def hidden_size(self) -> int:
+        """Dimensionality of the backbone hidden states."""
+        return self._hidden_size
+
+    @property
+    def split_vocab_size(self) -> Mapping[str, int]:
+        """Mapping of vocabulary segment names to their sizes."""
+        return self._split_vocab_size
+
+    @property
+    def split_vocab_order(self) -> Sequence[str]:
+        """The order in which vocabulary segments are concatenated."""
+        return self._split_vocab_order
 
     def output_dtype(self) -> torch.dtype:
         """Returns the data type of the model output hidden states.

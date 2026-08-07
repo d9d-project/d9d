@@ -1,28 +1,33 @@
 import copy
 
 import transformers as tr
-from d9d.model_state.mapper import ModelStateMapper
-from d9d.model_state.mapper.compose import ModelStateMapperParallel, ModelStateMapperPrefixScope
-from d9d.module.block.head import (
+from d9d.module.model import (
+    DEFAULT_HEAD_NAME_CLASSIFICATION,
     ClassificationHeadConfig,
-    hf_mapper_from_huggingface_cls_head,
-    hf_mapper_to_huggingface_cls_head,
+    DecoderForClassification,
+)
+from d9d.module.model.qwen3_dense import (
+    mapper_from_huggingface_qwen3_dense_for_classification,
+    mapper_to_huggingface_qwen3_dense_for_classification,
+)
+from d9d.module.model.qwen3_moe import (
+    mapper_from_huggingface_qwen3_moe_for_classification,
+    mapper_to_huggingface_qwen3_moe_for_classification,
 )
 
 from d9d_test.modules.model.sequence.catalogue import (
     HF_MODEL_PARAMETERS,
+    MOE_EXPERTS_FORMAT,
+    QWEN3_DENSE_PARAMETERS,
+    QWEN3_MOE_PARAMETERS,
     ModelCatalogue,
-    backbone_from_hf_mapper,
-    backbone_to_hf_mapper,
-    build_head_for,
     hf_model_factory,
     make_d9d_model_factory,
 )
 
 NUM_LABELS_CLS = 3
 
-HEAD_NAME_CLS = "cls"
-_HEAD_PREFIX = f"heads.{HEAD_NAME_CLS}."
+HEAD_NAME_CLS = DEFAULT_HEAD_NAME_CLASSIFICATION
 
 
 def _hf_config_for(catalogue: ModelCatalogue):
@@ -53,7 +58,7 @@ D9D_MODEL_FACTORIES_CLS = {
     model_type: [
         make_d9d_model_factory(
             model_type,
-            heads={HEAD_NAME_CLS: _head_config()},
+            compose=lambda backbone, stage: DecoderForClassification(backbone, _head_config(), stage),
             enable_checkpointing=enable_checkpointing,
         )
         for enable_checkpointing in (True, False)
@@ -62,27 +67,16 @@ D9D_MODEL_FACTORIES_CLS = {
 }
 
 
-def _from_hf_mapper(model_type: ModelCatalogue) -> ModelStateMapper:
-    return ModelStateMapperParallel(
-        [
-            ModelStateMapperPrefixScope(
-                backbone_from_hf_mapper(model_type), source_prefix="model.", target_prefix="model."
-            ),
-            hf_mapper_from_huggingface_cls_head(build_head_for(model_type, _head_config()), prefix=_HEAD_PREFIX),
-        ]
-    )
+HF_TO_D9D_MAPPER_CLS = {
+    ModelCatalogue.QWEN3_MOE: mapper_from_huggingface_qwen3_moe_for_classification(
+        QWEN3_MOE_PARAMETERS, experts_format=MOE_EXPERTS_FORMAT
+    ),
+    ModelCatalogue.QWEN3_DENSE: mapper_from_huggingface_qwen3_dense_for_classification(QWEN3_DENSE_PARAMETERS),
+}
 
-
-def _to_hf_mapper(model_type: ModelCatalogue) -> ModelStateMapper:
-    return ModelStateMapperParallel(
-        [
-            ModelStateMapperPrefixScope(
-                backbone_to_hf_mapper(model_type), source_prefix="model.", target_prefix="model."
-            ),
-            hf_mapper_to_huggingface_cls_head(build_head_for(model_type, _head_config()), prefix=_HEAD_PREFIX),
-        ]
-    )
-
-
-HF_TO_D9D_MAPPER_CLS = {model_type: _from_hf_mapper(model_type) for model_type in ModelCatalogue}
-D9D_TO_HF_MAPPER_CLS = {model_type: _to_hf_mapper(model_type) for model_type in ModelCatalogue}
+D9D_TO_HF_MAPPER_CLS = {
+    ModelCatalogue.QWEN3_MOE: mapper_to_huggingface_qwen3_moe_for_classification(
+        QWEN3_MOE_PARAMETERS, experts_format=MOE_EXPERTS_FORMAT
+    ),
+    ModelCatalogue.QWEN3_DENSE: mapper_to_huggingface_qwen3_dense_for_classification(QWEN3_DENSE_PARAMETERS),
+}

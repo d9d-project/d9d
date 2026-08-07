@@ -1,11 +1,10 @@
 import pytest
 import torch
 import torch.nn.functional as F
+from d9d.module.block.head import SequenceCausalLMHeadShared, SequencePoolingHeadShared
 from d9d.module.model.io import (
-    SequenceCausalLMHeadShared,
     SequenceHeadsShared,
     SequenceInput,
-    SequencePoolingHeadShared,
     SequenceShared,
 )
 from d9d.pipelining.api import PipelineStageInfo

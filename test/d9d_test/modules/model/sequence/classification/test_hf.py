@@ -1,7 +1,8 @@
 import pytest
 import torch
 import torch.nn.functional as F
-from d9d.module.model.io import SequenceHeadsShared, SequenceInput, SequencePoolingHeadShared, SequenceShared
+from d9d.module.block.head import SequencePoolingHeadShared
+from d9d.module.model.io import SequenceHeadsShared, SequenceInput, SequenceShared
 from d9d.pipelining.api import PipelineStageInfo
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.testing import assert_close

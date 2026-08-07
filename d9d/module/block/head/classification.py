@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from d9d.module.block.head.base import TaskHead
-from d9d.module.model.io import SequenceClassificationOutput, SequencePoolingHeadShared
+from d9d.module.block.head.io import SequenceClassificationOutput, SequencePoolingHeadShared
 
 
 class ClassificationHead(TaskHead[SequencePoolingHeadShared, SequenceClassificationOutput]):

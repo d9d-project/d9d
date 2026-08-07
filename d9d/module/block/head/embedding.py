@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from d9d.module.block.head.base import TaskHead
-from d9d.module.model.io import SequenceEmbeddingOutput, SequencePoolingHeadShared
+from d9d.module.block.head.io import SequenceEmbeddingOutput, SequencePoolingHeadShared
 
 
 class EmbeddingHead(TaskHead[SequencePoolingHeadShared, SequenceEmbeddingOutput]):

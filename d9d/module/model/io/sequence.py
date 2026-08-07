@@ -1,10 +1,12 @@
 import dataclasses
 from collections.abc import Mapping
-from typing import Any, Generic, TypeAlias, TypeVar
+from typing import Generic, TypeAlias, TypeVar
 
 import torch
 
 TLeaf = TypeVar("TLeaf")
+THeadShared = TypeVar("THeadShared")
+THeadOutput = TypeVar("THeadOutput")
 
 
 @dataclasses.dataclass
@@ -46,31 +48,15 @@ class SequenceShared:
 
 
 @dataclasses.dataclass
-class SequenceCausalLMHeadShared:
-    """The shared input a causal language modeling head consumes.
-
-    Attributes:
-        labels: Target tokens for the loss computation.
-    """
-
-    labels: torch.Tensor
-
-
-@dataclasses.dataclass
-class SequencePoolingHeadShared:
-    """The shared input a pooled head (classification/embedding) consumes.
-
-    Attributes:
-        pooling_mask: Binary mask indicating which token(s) to pool. You can use
-            ``d9d.dataset.token_pooling_mask_from_attention_mask`` to build it from an attention mask.
-    """
-
-    pooling_mask: torch.Tensor | None = None
-
-
-@dataclasses.dataclass
-class SequenceHeadsShared:
+class SequenceHeadsShared(Generic[THeadShared]):
     """The shared input a backbone composed with named task heads consumes on every stage.
+
+    The parameter is the head shared input the composed heads accept: a single type for a model
+    with one kind of head (e.g. ``SequenceHeadsShared[SequenceCausalLMHeadShared]``), or their
+    union for a model composed of several kinds.
+
+    Type parameters:
+        THeadShared: The shared input accepted by the composed heads.
 
     Attributes:
         sequence: The backbone shared input.
@@ -79,48 +65,15 @@ class SequenceHeadsShared:
     """
 
     sequence: SequenceShared
-    heads: Mapping[str, Any]
+    heads: Mapping[str, THeadShared]
 
 
-SequenceHeadsOutput: TypeAlias = Mapping[str, Any]
+SequenceHeadsOutput: TypeAlias = Mapping[str, THeadOutput]
 """
 The output of a backbone composed with named task heads: each head's output, keyed by head name.
 
 The key is the name the head was composed under, so two heads of the same type simply take
-different keys and cannot collide.
+different keys and cannot collide. The parameter is the output the composed heads produce: a single
+type for a model with one kind of head (e.g. ``SequenceHeadsOutput[SequenceCausalLMOutput]``), or
+their union for a model composed of several kinds.
 """
-
-
-@dataclasses.dataclass
-class SequenceCausalLMOutput:
-    """The output of a causal language modeling head.
-
-    Attributes:
-        logps: Per-token log-probabilities / loss, shape ``[batch, seq]``.
-    """
-
-    logps: torch.Tensor
-
-
-@dataclasses.dataclass
-class SequenceClassificationOutput:
-    """The output of a classification head.
-
-    Attributes:
-        scores: Classification logits, shape ``[num_pooled_tokens, num_labels]`` when a pooling mask
-            selects tokens, or ``[batch, seq, num_labels]`` when no pooling mask is used.
-    """
-
-    scores: torch.Tensor
-
-
-@dataclasses.dataclass
-class SequenceEmbeddingOutput:
-    """The output of an embedding head.
-
-    Attributes:
-        embeddings: Pooled embeddings, shape ``[num_pooled_tokens, embedding_dim]`` when a pooling mask
-            selects tokens, or ``[batch, seq, embedding_dim]`` when no pooling mask is used.
-    """
-
-    embeddings: torch.Tensor

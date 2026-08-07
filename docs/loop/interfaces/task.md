@@ -86,9 +86,8 @@ from typing import TypedDict
 
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import ScalarTree
-from d9d.module.block.head import LM_IGNORE_INDEX
+from d9d.module.block.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
 from d9d.module.model.io import (
-    SequenceCausalLMHeadShared,
     SequenceHeadsOutput,
     SequenceHeadsShared,
     SequenceInput,
@@ -102,14 +101,20 @@ class SFTState(TypedDict):  # it also could be a dataclass
 
 
 class SFTTask(
-    TrainTask[dict[str, torch.Tensor], SequenceInput, SequenceHeadsShared, SequenceHeadsOutput, SFTState]
+    TrainTask[
+        dict[str, torch.Tensor],
+        SequenceInput,
+        SequenceHeadsShared[SequenceCausalLMHeadShared],
+        SequenceHeadsOutput[SequenceCausalLMOutput],
+        SFTState,
+    ]
 ):
     def __init__(self, dist_ctx: DistributedContext):
         self._dist_ctx = dist_ctx
 
     def build_forward_inputs(
         self, ctx: BuildForwardInputsContext
-    ) -> BuildForwardInputsResult[SequenceInput, SequenceHeadsShared, SFTState]:
+    ) -> BuildForwardInputsResult[SequenceInput, SequenceHeadsShared[SequenceCausalLMHeadShared], SFTState]:
         # ctx.batch contains the output of the Collator.
 
         # Return the PipelineInput, the SharedInput and the typed
@@ -127,7 +132,9 @@ class SFTTask(
     def dump_hparams(self) -> ScalarTree:
         return super().dump_hparams()
 
-    def compute_loss(self, ctx: ComputeLossContext[SequenceHeadsOutput, SFTState]) -> ComputeLossResult:
+    def compute_loss(
+        self, ctx: ComputeLossContext[SequenceHeadsOutput[SequenceCausalLMOutput], SFTState]
+    ) -> ComputeLossResult:
         # Retrieve log_probs calculated by the model pipeline, keyed by the "lm" head name
         logps = ctx.pipeline_results["lm"].logps
 

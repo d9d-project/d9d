@@ -39,23 +39,22 @@ from d9d.loop.control import (
 from d9d.loop.run import TrainingConfigurator
 from d9d.metric.impl.aggregation import SumMetric
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
-from d9d.module.block.head import LM_IGNORE_INDEX, CausalLMHeadConfig, build_head
+from d9d.module.block.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.module.model import DecoderWithHeads
+from d9d.module.model import DEFAULT_HEAD_NAME_CAUSAL_LM, DecoderForCausalLM
 from d9d.module.model.io import (
-    SequenceCausalLMHeadShared,
     SequenceHeadsOutput,
     SequenceHeadsShared,
     SequenceInput,
     SequenceShared,
 )
 from d9d.module.model.qwen3_moe import Qwen3MoEModel, Qwen3MoEParameters
-from d9d.module.parallelism.model import parallelize_qwen3_moe_model, parallelize_task_head
+from d9d.module.parallelism.model import parallelize_causal_lm_head, parallelize_qwen3_moe_model
 from pydantic import BaseModel
 from tokenizers import Tokenizer
 from torch.utils.data import Dataset
 
-LM_HEAD_NAME = "lm"  # the name the causal LM head is composed under; the task reads its output by it
+LM_HEAD_NAME = DEFAULT_HEAD_NAME_CAUSAL_LM  # the name the head is composed under; the task reads its output by it
 
 # -----------------------------------
 # Configuration Schema using Pydantic
@@ -180,7 +179,7 @@ def build_dataset(config: DataConfig, dist_context: DistributedContext) -> Datas
 # --------------
 
 
-class ProjectModelProvider(ModelProvider[DecoderWithHeads[Qwen3MoEModel]]):
+class ProjectModelProvider(ModelProvider[DecoderForCausalLM[Qwen3MoEModel]]):
     def __init__(self, config: ModelProviderConfig):
         self._config = config
 
@@ -193,8 +192,7 @@ class ProjectModelProvider(ModelProvider[DecoderWithHeads[Qwen3MoEModel]]):
             hidden_states_snapshot_mode=HiddenStatesAggregationMode.no,
             enable_checkpointing=self._config.checkpointing,
         )
-        heads = {LM_HEAD_NAME: build_head(CausalLMHeadConfig(), backbone=backbone, stage=context.stage)}
-        model = DecoderWithHeads(backbone, heads, context.stage).bfloat16()
+        model = DecoderForCausalLM(backbone, context.stage, head_name=LM_HEAD_NAME).bfloat16()
 
         return InitializeModelStageResult(
             model=model,
@@ -207,8 +205,7 @@ class ProjectModelProvider(ModelProvider[DecoderWithHeads[Qwen3MoEModel]]):
         # You can apply your own horizontal parallelism strategy here.
         parallelize_qwen3_moe_model(context.dist_context, context.model.model, context.stage)
         if context.stage.is_current_stage_last:
-            for head in context.model.heads.values():
-                parallelize_task_head(head, context.dist_context)
+            parallelize_causal_lm_head(context.model.head, context.dist_context)
 
     def prepare_export_model_stage(self, context: PrepareExportModelStageContext) -> PrepareExportModelStageResult:
         # When exporting, save model weights as-is
@@ -230,13 +227,21 @@ class SFTState(TypedDict):
     num_tokens: torch.Tensor
 
 
-class SFTTask(TrainTask[dict[str, torch.Tensor], SequenceInput, SequenceHeadsShared, SequenceHeadsOutput, SFTState]):
+class SFTTask(
+    TrainTask[
+        dict[str, torch.Tensor],
+        SequenceInput,
+        SequenceHeadsShared[SequenceCausalLMHeadShared],
+        SequenceHeadsOutput[SequenceCausalLMOutput],
+        SFTState,
+    ]
+):
     def __init__(self, dist_ctx: DistributedContext):
         self._dist_ctx = dist_ctx
 
     def build_forward_inputs(
         self, ctx: BuildForwardInputsContext
-    ) -> BuildForwardInputsResult[SequenceInput, SequenceHeadsShared, SFTState]:
+    ) -> BuildForwardInputsResult[SequenceInput, SequenceHeadsShared[SequenceCausalLMHeadShared], SFTState]:
         # ctx.batch contains the output of the Collator.
 
         labels = ctx.batch["labels"]
@@ -269,7 +274,9 @@ class SFTTask(TrainTask[dict[str, torch.Tensor], SequenceInput, SequenceHeadsSha
     def update_metrics(self, ctx: UpdateMetricsContext[SFTState]):
         ctx.metrics["num_tokens"].update(ctx.state["num_tokens"])
 
-    def compute_loss(self, ctx: ComputeLossContext[SequenceHeadsOutput, SFTState]) -> ComputeLossResult:
+    def compute_loss(
+        self, ctx: ComputeLossContext[SequenceHeadsOutput[SequenceCausalLMOutput], SFTState]
+    ) -> ComputeLossResult:
         # Retrieve log_probs calculated by the model pipeline, keyed by the "lm" head name
         logps = ctx.pipeline_results[LM_HEAD_NAME].logps
 

@@ -1,17 +1,18 @@
-from __future__ import annotations
-
-from typing import TYPE_CHECKING, Annotated, Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
 
-from d9d.module.block.head.base import TaskHead
-from d9d.module.block.head.classification import ClassificationHead
-from d9d.module.block.head.embedding import EmbeddingHead
-from d9d.module.block.head.language_modelling import SplitLanguageModellingHead
+from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead, TaskHead
+from d9d.module.model.backbone import DecoderBackbone
 
-if TYPE_CHECKING:
-    from d9d.module.model.decoder import DecoderBackbone
-    from d9d.pipelining.api import PipelineStageInfo
+DEFAULT_HEAD_NAME_CAUSAL_LM = "lm"
+"""The name a causal language modeling head is composed under unless the user picks another."""
+
+DEFAULT_HEAD_NAME_CLASSIFICATION = "cls"
+"""The name a classification head is composed under unless the user picks another."""
+
+DEFAULT_HEAD_NAME_EMBEDDING = "embedding"
+"""The name an embedding head is composed under unless the user picks another."""
 
 
 class CausalLMHeadConfig(BaseModel):
@@ -62,17 +63,17 @@ AnyHeadConfig = Annotated[
 """Closed, discriminated union of the built-in head configurations."""
 
 
-def build_head(config: AnyHeadConfig, *, backbone: DecoderBackbone, stage: PipelineStageInfo) -> TaskHead:
-    """Builds a task head from its configuration and the backbone it attaches to.
+def build_decoder_head(config: AnyHeadConfig, *, backbone: DecoderBackbone) -> TaskHead:
+    """Builds a task head from its configuration and the decoder backbone it attaches to.
 
     Backbone-shared dimensions (``hidden_size``, the LM split-vocab layout) are derived from the
-    backbone. A bespoke head a user writes for their own model is a :class:`TaskHead` instance
-    passed directly to the decoder, bypassing this union entirely.
+    backbone, so a config carries only task-specific fields. A bespoke head a user writes for their
+    own model is a :class:`TaskHead` instance passed directly to the decoder, bypassing this union
+    entirely.
 
     Args:
         config: Task head configuration selecting the head type and its task-specific fields.
         backbone: The decoder backbone the head attaches to; provides shared dimensions.
-        stage: Pipeline stage information for the head's decoder.
 
     Returns:
         An instantiated task head.

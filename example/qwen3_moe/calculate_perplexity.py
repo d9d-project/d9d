@@ -27,23 +27,22 @@ from d9d.loop.control import (
 )
 from d9d.loop.run import InferenceConfigurator
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
-from d9d.module.block.head import LM_IGNORE_INDEX, CausalLMHeadConfig, build_head
+from d9d.module.block.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.module.model import DecoderWithHeads
+from d9d.module.model import DEFAULT_HEAD_NAME_CAUSAL_LM, DecoderForCausalLM
 from d9d.module.model.io import (
-    SequenceCausalLMHeadShared,
     SequenceHeadsOutput,
     SequenceHeadsShared,
     SequenceInput,
     SequenceShared,
 )
 from d9d.module.model.qwen3_moe import Qwen3MoEModel, Qwen3MoEParameters
-from d9d.module.parallelism.model import parallelize_qwen3_moe_model, parallelize_task_head
+from d9d.module.parallelism.model import parallelize_causal_lm_head, parallelize_qwen3_moe_model
 from pydantic import BaseModel
 from tokenizers import Tokenizer
 from torch.utils.data import Dataset
 
-LM_HEAD_NAME = "lm"  # the name the causal LM head is composed under; the task reads its output by it
+LM_HEAD_NAME = DEFAULT_HEAD_NAME_CAUSAL_LM  # the name the head is composed under; the task reads its output by it
 
 # -----------------------------------
 # Configuration Schema using Pydantic
@@ -178,7 +177,7 @@ def build_dataset(config: DataConfig, dist_context: DistributedContext) -> Datas
 # --------------
 
 
-class ProjectModelProvider(ModelProvider[DecoderWithHeads[Qwen3MoEModel]]):
+class ProjectModelProvider(ModelProvider[DecoderForCausalLM[Qwen3MoEModel]]):
     def __init__(self, config: ModelProviderConfig):
         self._config = config
 
@@ -191,8 +190,7 @@ class ProjectModelProvider(ModelProvider[DecoderWithHeads[Qwen3MoEModel]]):
             hidden_states_snapshot_mode=HiddenStatesAggregationMode.no,
             enable_checkpointing=self._config.checkpointing,
         )
-        heads = {LM_HEAD_NAME: build_head(CausalLMHeadConfig(), backbone=backbone, stage=context.stage)}
-        model = DecoderWithHeads(backbone, heads, context.stage).bfloat16()
+        model = DecoderForCausalLM(backbone, context.stage, head_name=LM_HEAD_NAME).bfloat16()
 
         return InitializeModelStageResult(
             model=model,
@@ -205,8 +203,7 @@ class ProjectModelProvider(ModelProvider[DecoderWithHeads[Qwen3MoEModel]]):
         # You can apply your own horizontal parallelism strategy here.
         parallelize_qwen3_moe_model(context.dist_context, context.model.model, context.stage)
         if context.stage.is_current_stage_last:
-            for head in context.model.heads.values():
-                parallelize_task_head(head, context.dist_context)
+            parallelize_causal_lm_head(context.model.head, context.dist_context)
 
     def prepare_export_model_stage(self, context: PrepareExportModelStageContext) -> PrepareExportModelStageResult:
         # When exporting, save model weights as-is
@@ -228,7 +225,13 @@ class PerplexityState(TypedDict):
 
 
 class PerplexityTask(
-    InferenceTask[dict[str, torch.Tensor], SequenceInput, SequenceHeadsShared, SequenceHeadsOutput, PerplexityState]
+    InferenceTask[
+        dict[str, torch.Tensor],
+        SequenceInput,
+        SequenceHeadsShared[SequenceCausalLMHeadShared],
+        SequenceHeadsOutput[SequenceCausalLMOutput],
+        PerplexityState,
+    ]
 ):
     def __init__(self, dist_ctx: DistributedContext):
         self._dist_ctx = dist_ctx
@@ -236,7 +239,7 @@ class PerplexityTask(
 
     def build_forward_inputs(
         self, ctx: BuildForwardInputsContext
-    ) -> BuildForwardInputsResult[SequenceInput, SequenceHeadsShared, PerplexityState]:
+    ) -> BuildForwardInputsResult[SequenceInput, SequenceHeadsShared[SequenceCausalLMHeadShared], PerplexityState]:
         # ctx.batch contains the output of the Collator.
 
         # Return the pipeline input (first stage only) plus the shared input (every stage) and the
@@ -251,7 +254,7 @@ class PerplexityTask(
             state=PerplexityState(labels=ctx.batch["labels"]),
         )
 
-    def process_outputs(self, ctx: ProcessOutputsContext[SequenceHeadsOutput, PerplexityState]):
+    def process_outputs(self, ctx: ProcessOutputsContext[SequenceHeadsOutput[SequenceCausalLMOutput], PerplexityState]):
         logps = ctx.pipeline_results[LM_HEAD_NAME].logps
 
         # Calculate number of valid tokens (ignoring the -100 padding)

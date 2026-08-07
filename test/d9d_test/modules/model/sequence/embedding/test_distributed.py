@@ -1,11 +1,11 @@
 import pytest
 import torch
 from d9d.core.dist_context import DeviceMeshParameters
+from d9d.module.block.head import SequenceEmbeddingOutput, SequencePoolingHeadShared
 from d9d.module.model.io import (
     SequenceHeadsOutput,
     SequenceHeadsShared,
     SequenceInput,
-    SequencePoolingHeadShared,
     SequenceShared,
 )
 from d9d.pipelining.api import PipelineStageInfo
@@ -65,7 +65,7 @@ def test_consistent_to_itself_dist(
     loss_global.backward()
 
     # Create Local Model and PP Schedule
-    def _callback(outputs: SequenceHeadsOutput, microbatch_idx: int) -> torch.Tensor:
+    def _callback(outputs: SequenceHeadsOutput[SequenceEmbeddingOutput], microbatch_idx: int) -> torch.Tensor:
         embeddings = outputs[HEAD_NAME_EMBEDDING].embeddings
         loss_value = embeddings.sum() / batch_global.pooling_mask.sum() / embeddings.shape[1]
         dist_loss_accum.append(loss_value.detach())

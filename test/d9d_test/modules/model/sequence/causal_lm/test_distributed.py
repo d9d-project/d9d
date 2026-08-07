@@ -1,8 +1,8 @@
 import pytest
 import torch
 from d9d.core.dist_context import DeviceMeshParameters
+from d9d.module.block.head import SequenceCausalLMHeadShared, SequenceCausalLMOutput
 from d9d.module.model.io import (
-    SequenceCausalLMHeadShared,
     SequenceHeadsOutput,
     SequenceHeadsShared,
     SequenceInput,
@@ -64,7 +64,7 @@ def test_consistent_to_itself_dist(
     loss_global.backward()
 
     # Create Local Model and PP Schedule
-    def _callback(outputs: SequenceHeadsOutput, microbatch_idx: int) -> torch.Tensor:
+    def _callback(outputs: SequenceHeadsOutput[SequenceCausalLMOutput], microbatch_idx: int) -> torch.Tensor:
         labels_mb = microbatch_slice(batch_dist.labels, microbatch_idx=microbatch_idx, n_microbatches=_N_MICROBATCHES)
         loss_value = outputs[HEAD_NAME_LM].logps[labels_mb != -100].sum() / loss_delimiter
         dist_loss_accum.append(loss_value.detach())

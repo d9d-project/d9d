@@ -1,7 +1,13 @@
 from .decoder_layer import Qwen3DenseLayer
 from .huggingface import (
     mapper_from_huggingface_qwen3_dense,
+    mapper_from_huggingface_qwen3_dense_for_causal_lm,
+    mapper_from_huggingface_qwen3_dense_for_classification,
+    mapper_from_huggingface_qwen3_dense_for_embedding,
     mapper_to_huggingface_qwen3_dense,
+    mapper_to_huggingface_qwen3_dense_for_causal_lm,
+    mapper_to_huggingface_qwen3_dense_for_classification,
+    mapper_to_huggingface_qwen3_dense_for_embedding,
 )
 from .model import Qwen3DenseModel
 from .params import (
@@ -15,5 +21,11 @@ __all__ = [
     "Qwen3DenseModel",
     "Qwen3DenseParameters",
     "mapper_from_huggingface_qwen3_dense",
+    "mapper_from_huggingface_qwen3_dense_for_causal_lm",
+    "mapper_from_huggingface_qwen3_dense_for_classification",
+    "mapper_from_huggingface_qwen3_dense_for_embedding",
     "mapper_to_huggingface_qwen3_dense",
+    "mapper_to_huggingface_qwen3_dense_for_causal_lm",
+    "mapper_to_huggingface_qwen3_dense_for_classification",
+    "mapper_to_huggingface_qwen3_dense_for_embedding",
 ]

@@ -2,11 +2,11 @@ import pytest
 import torch
 import torch.nn.functional as F
 from d9d.core.dist_context import DeviceMeshParameters
+from d9d.module.block.head import SequenceClassificationOutput, SequencePoolingHeadShared
 from d9d.module.model.io import (
     SequenceHeadsOutput,
     SequenceHeadsShared,
     SequenceInput,
-    SequencePoolingHeadShared,
     SequenceShared,
 )
 from d9d.pipelining.api import PipelineStageInfo
@@ -64,7 +64,7 @@ def test_consistent_to_itself_dist(
     loss_global.backward()
 
     # Create Local Model and PP Schedule
-    def _callback(outputs: SequenceHeadsOutput, microbatch_idx: int) -> torch.Tensor:
+    def _callback(outputs: SequenceHeadsOutput[SequenceClassificationOutput], microbatch_idx: int) -> torch.Tensor:
         labels_mb = microbatch_slice(batch_dist.labels, microbatch_idx=microbatch_idx, n_microbatches=_N_MICROBATCHES)
         loss_value = (
             F.cross_entropy(outputs[HEAD_NAME_CLS].scores, labels_mb, reduction="sum") / batch_global.labels.numel()
