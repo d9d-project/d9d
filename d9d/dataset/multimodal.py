@@ -11,10 +11,15 @@ def compute_multimodal_position_ids(
 ) -> torch.Tensor:
     """Computes 3D (temporal, height, width) position ids for a multimodal token sequence.
 
-    Text tokens advance all three position planes together. Each media segment occupies a 3D
-    block: the temporal plane is constant per frame, and the height/width planes enumerate the
-    post-merge feature grid. After a media segment, text positions continue from the maximum
-    position the segment used plus one.
+    Text tokens advance all three position planes together. Each media frame occupies a 3D
+    block: the temporal plane is constant, and the height/width planes enumerate the post-merge
+    feature grid. After a frame, positions continue from the maximum position it used plus one.
+
+    Qwen3.5-style models encode video time with interleaved text timestamps rather than the
+    temporal position plane (``<t1> <vision_start> <frame1> <vision_end> <t2> ...``), so
+    multi-frame segments (``t > 1``) are split into per-frame grids before assigning positions,
+    mirroring the reference ``get_rope_index``. Each frame therefore starts its own position
+    block, whether or not timestamp text separates the frames in the token sequence.
 
     This is CPU-side index arithmetic intended to be called from the collator, one sample at a
     time.
@@ -36,9 +41,11 @@ def compute_multimodal_position_ids(
     seq_len = input_ids.shape[0]
 
     mask_list = media_token_mask.tolist()
-    grids = grid_thw.tolist()
+    # split multi-frame (video) segments into per-frame grids, mirroring the reference
+    # implementation: the temporal plane never advances, frames are separate position blocks
+    grids = [(1, h, w) for t, h, w in grid_thw.tolist() for _ in range(t)]
 
-    expected_media_tokens = sum(t * (h // spatial_merge_size) * (w // spatial_merge_size) for t, h, w in grids)
+    expected_media_tokens = sum((h // spatial_merge_size) * (w // spatial_merge_size) for _, h, w in grids)
     actual_media_tokens = sum(mask_list)
     if expected_media_tokens != actual_media_tokens:
         raise ValueError(
@@ -59,16 +66,15 @@ def compute_multimodal_position_ids(
             token_idx += 1
             continue
 
-        t, h, w = next(grid_iter)
+        _, h, w = next(grid_iter)
         merged_h = h // spatial_merge_size
         merged_w = w // spatial_merge_size
-        num_tokens = t * merged_h * merged_w
+        num_tokens = merged_h * merged_w
 
-        pos_t = torch.full((num_tokens,), current_pos, dtype=torch.long)
-        pos_h = current_pos + torch.arange(merged_h).repeat_interleave(merged_w).repeat(t)
-        pos_w = current_pos + torch.arange(merged_w).repeat(merged_h * t)
+        pos_h = current_pos + torch.arange(merged_h).repeat_interleave(merged_w)
+        pos_w = current_pos + torch.arange(merged_w).repeat(merged_h)
 
-        position_ids[0, token_idx : token_idx + num_tokens] = pos_t
+        position_ids[0, token_idx : token_idx + num_tokens] = current_pos
         position_ids[1, token_idx : token_idx + num_tokens] = pos_h
         position_ids[2, token_idx : token_idx + num_tokens] = pos_w
 

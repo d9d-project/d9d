@@ -39,18 +39,38 @@ def test_position_ids_single_image():
 
 
 @pytest.mark.local
-def test_position_ids_video_advances_temporal_plane():
-    # video with 2 frames of 2x2 grid -> 1x1 media token per frame
-    grid_thw = torch.tensor([[2, 2, 2]])
-    mask = torch.tensor([True, True, False])
+def test_position_ids_video_splits_frames_into_blocks():
+    # video with 2 frames of 4x4 grid -> 2x2 media tokens per frame, no text between frames
+    grid_thw = torch.tensor([[2, 4, 4]])
+    mask = torch.tensor([True] * 8 + [False])
     input_ids = torch.zeros(mask.shape[0], dtype=torch.long)
 
     position_ids = compute_multimodal_position_ids(input_ids, mask, grid_thw, spatial_merge_size=_MERGE)
 
-    # both frames share spatial positions; temporal plane is constant per Qwen3.5 timestamp design
-    torch.testing.assert_close(position_ids[:, :2], torch.zeros(3, 2, dtype=torch.long))
-    # text resumes after the media block
-    torch.testing.assert_close(position_ids[:, 2], torch.ones(3, dtype=torch.long))
+    # frame 1 block starts at 0
+    torch.testing.assert_close(position_ids[0, :4], torch.zeros(4, dtype=torch.long))
+    torch.testing.assert_close(position_ids[1, :4], torch.tensor([0, 0, 1, 1]))
+    torch.testing.assert_close(position_ids[2, :4], torch.tensor([0, 1, 0, 1]))
+    # frame 2 is a separate block starting at 0 + max(2, 2) = 2
+    torch.testing.assert_close(position_ids[0, 4:8], torch.full((4,), 2))
+    torch.testing.assert_close(position_ids[1, 4:8], torch.tensor([2, 2, 3, 3]))
+    torch.testing.assert_close(position_ids[2, 4:8], torch.tensor([2, 3, 2, 3]))
+    # text resumes at max(3, 3) + 1 = 4
+    torch.testing.assert_close(position_ids[:, 8], torch.full((3,), 4))
+
+
+@pytest.mark.local
+def test_position_ids_video_with_timestamp_text_between_frames():
+    # Qwen3.5-style pre-split video: <t1> <frame1: 2x2 grid -> 1 token> <t2> <frame2> <text>
+    grid_thw = torch.tensor([[1, 2, 2], [1, 2, 2]])
+    mask = torch.tensor([False, True, False, True, False])
+    input_ids = torch.zeros(mask.shape[0], dtype=torch.long)
+
+    position_ids = compute_multimodal_position_ids(input_ids, mask, grid_thw, spatial_merge_size=_MERGE)
+
+    # timestamp text at 0, frame1 block at 1, timestamp text at 2, frame2 block at 3, text at 4
+    expected = torch.tensor([0, 1, 2, 3, 4]).view(1, -1).expand(3, -1)
+    torch.testing.assert_close(position_ids, expected)
 
 
 @pytest.mark.local
