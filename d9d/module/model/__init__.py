@@ -1,9 +1,13 @@
 from .backbone import DecoderBackbone
-from .decoder import DecoderForCausalLM, DecoderForClassification, DecoderForEmbedding, DecoderWithHeads
+from .decoder import (
+    SINGLE_HEAD_PREFIX,
+    DecoderForCausalLM,
+    DecoderForClassification,
+    DecoderForEmbedding,
+    DecoderWithHead,
+    DecoderWithHeads,
+)
 from .head import (
-    DEFAULT_HEAD_NAME_CAUSAL_LM,
-    DEFAULT_HEAD_NAME_CLASSIFICATION,
-    DEFAULT_HEAD_NAME_EMBEDDING,
     AnyHeadConfig,
     CausalLMHeadConfig,
     ClassificationHeadConfig,
@@ -12,9 +16,7 @@ from .head import (
 )
 
 __all__ = [
-    "DEFAULT_HEAD_NAME_CAUSAL_LM",
-    "DEFAULT_HEAD_NAME_CLASSIFICATION",
-    "DEFAULT_HEAD_NAME_EMBEDDING",
+    "SINGLE_HEAD_PREFIX",
     "AnyHeadConfig",
     "CausalLMHeadConfig",
     "ClassificationHeadConfig",
@@ -22,6 +24,7 @@ __all__ = [
     "DecoderForCausalLM",
     "DecoderForClassification",
     "DecoderForEmbedding",
+    "DecoderWithHead",
     "DecoderWithHeads",
     "EmbeddingHeadConfig",
     "build_decoder_head",

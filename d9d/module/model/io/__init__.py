@@ -1,6 +1,7 @@
 """Typed pipeline IO dataclasses for the model catalogue."""
 
 from .sequence import (
+    SequenceHeadShared,
     SequenceHeadsOutput,
     SequenceHeadsShared,
     SequenceInput,
@@ -9,6 +10,7 @@ from .sequence import (
 )
 
 __all__ = [
+    "SequenceHeadShared",
     "SequenceHeadsOutput",
     "SequenceHeadsShared",
     "SequenceInput",

@@ -26,7 +26,7 @@ from d9d_test.modules.helper import (
     sync_grads_manually,
 )
 from d9d_test.modules.model.meshes import MESHES_FOR_MODEL_TESTS
-from d9d_test.modules.model.sequence.catalogue import ModelCatalogue, parallelize_decoder_with_heads
+from d9d_test.modules.model.sequence.catalogue import ModelCatalogue, parallelize_decoder
 from d9d_test.modules.model.sequence.multihead.batch import build_multihead_batch, shard_multihead_batch
 from d9d_test.modules.model.sequence.multihead.catalogue import (
     D9D_MODEL_FACTORIES_MULTIHEAD,
@@ -108,7 +108,7 @@ def test_multihead_consistent_to_itself_dist(
 
     def _model_provider(dist_stage: PipelineStageInfo) -> nn.Module:
         model_dist = model_factory_d9d(dist_stage)
-        parallelize_decoder_with_heads(model_dist, model_type, dist_ctx, dist_stage)
+        parallelize_decoder(model_dist, model_type, dist_ctx, dist_stage)
         copy_params_local_to_dist(model_global, model_dist)
         return model_dist
 

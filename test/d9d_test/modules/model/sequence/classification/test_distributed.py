@@ -3,12 +3,7 @@ import torch
 import torch.nn.functional as F
 from d9d.core.dist_context import DeviceMeshParameters
 from d9d.module.block.head import SequenceClassificationOutput, SequencePoolingHeadShared
-from d9d.module.model.io import (
-    SequenceHeadsOutput,
-    SequenceHeadsShared,
-    SequenceInput,
-    SequenceShared,
-)
+from d9d.module.model.io import SequenceHeadShared, SequenceInput, SequenceShared
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import PipelineScheduleGPipeConfig, build_schedule
 from torch import nn
@@ -21,9 +16,9 @@ from d9d_test.modules.helper import (
     sync_grads_manually,
 )
 from d9d_test.modules.model.meshes import MESHES_FOR_MODEL_TESTS
-from d9d_test.modules.model.sequence.catalogue import ModelCatalogue, parallelize_decoder_with_heads
+from d9d_test.modules.model.sequence.catalogue import ModelCatalogue, parallelize_decoder
 from d9d_test.modules.model.sequence.classification.batch import build_classification_batch, shard_classification_batch
-from d9d_test.modules.model.sequence.classification.catalogue import D9D_MODEL_FACTORIES_CLS, HEAD_NAME_CLS
+from d9d_test.modules.model.sequence.classification.catalogue import D9D_MODEL_FACTORIES_CLS
 
 _N_MICROBATCHES = 2
 
@@ -55,26 +50,24 @@ def test_consistent_to_itself_dist(
     model_global = model_factory_d9d(stage_global)
     outputs_global = model_global(
         SequenceInput(input_ids=batch_global.sequence.input_ids),
-        SequenceHeadsShared(
+        SequenceHeadShared(
             sequence=SequenceShared(position_ids=batch_global.sequence.position_ids),
-            heads={HEAD_NAME_CLS: SequencePoolingHeadShared(pooling_mask=batch_global.pooling_mask)},
+            head=SequencePoolingHeadShared(pooling_mask=batch_global.pooling_mask),
         ),
     )
-    loss_global = F.cross_entropy(outputs_global[HEAD_NAME_CLS].scores, batch_global.labels)
+    loss_global = F.cross_entropy(outputs_global.scores, batch_global.labels)
     loss_global.backward()
 
     # Create Local Model and PP Schedule
-    def _callback(outputs: SequenceHeadsOutput[SequenceClassificationOutput], microbatch_idx: int) -> torch.Tensor:
+    def _callback(outputs: SequenceClassificationOutput, microbatch_idx: int) -> torch.Tensor:
         labels_mb = microbatch_slice(batch_dist.labels, microbatch_idx=microbatch_idx, n_microbatches=_N_MICROBATCHES)
-        loss_value = (
-            F.cross_entropy(outputs[HEAD_NAME_CLS].scores, labels_mb, reduction="sum") / batch_global.labels.numel()
-        )
+        loss_value = F.cross_entropy(outputs.scores, labels_mb, reduction="sum") / batch_global.labels.numel()
         dist_loss_accum.append(loss_value.detach())
         return loss_value
 
     def _model_provider(dist_stage: PipelineStageInfo) -> nn.Module:
         model_dist = model_factory_d9d(dist_stage)
-        parallelize_decoder_with_heads(model_dist, model_type, dist_ctx, dist_stage)
+        parallelize_decoder(model_dist, model_type, dist_ctx, dist_stage)
         copy_params_local_to_dist(model_global, model_dist)
         return model_dist
 
@@ -92,19 +85,15 @@ def test_consistent_to_itself_dist(
         for i in range(_N_MICROBATCHES)
     )
     shared_microbatches = tuple(
-        SequenceHeadsShared(
+        SequenceHeadShared(
             sequence=SequenceShared(
                 position_ids=microbatch_slice(
                     batch_dist.sequence.position_ids, microbatch_idx=i, n_microbatches=_N_MICROBATCHES
                 )
             ),
-            heads={
-                HEAD_NAME_CLS: SequencePoolingHeadShared(
-                    pooling_mask=microbatch_slice(
-                        batch_dist.pooling_mask, microbatch_idx=i, n_microbatches=_N_MICROBATCHES
-                    )
-                )
-            },
+            head=SequencePoolingHeadShared(
+                pooling_mask=microbatch_slice(batch_dist.pooling_mask, microbatch_idx=i, n_microbatches=_N_MICROBATCHES)
+            ),
         )
         for i in range(_N_MICROBATCHES)
     )

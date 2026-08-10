@@ -1,9 +1,5 @@
 import transformers as tr
-from d9d.module.model import (
-    DEFAULT_HEAD_NAME_EMBEDDING,
-    DecoderForEmbedding,
-    EmbeddingHeadConfig,
-)
+from d9d.module.model import DecoderForEmbedding, EmbeddingHeadConfig
 from d9d.module.model.qwen3_dense import (
     mapper_from_huggingface_qwen3_dense_for_embedding,
     mapper_to_huggingface_qwen3_dense_for_embedding,
@@ -22,9 +18,6 @@ from d9d_test.modules.model.sequence.catalogue import (
     hf_model_factory,
     make_d9d_model_factory,
 )
-
-HEAD_NAME_EMBEDDING = DEFAULT_HEAD_NAME_EMBEDDING
-
 
 HF_MODEL_FACTORY_EMBEDDING = {
     ModelCatalogue.QWEN3_MOE: hf_model_factory(

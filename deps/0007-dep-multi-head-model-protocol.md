@@ -17,12 +17,12 @@ duplication scales as `3 × N`, and the *same* `3 × N` is mirrored in the `para
 mappers. Each wrapper also hard-binds *exactly one* head, so a model with two heads (multi-task, or a reward head beside
 an LM head) cannot be expressed at all.
 
-This proposal replaces the wrappers with one composition primitive: a `DecoderBackbone` protocol, a `TaskHead` contract
-confined to head *compute* — parallelization and checkpoint mapping live elsewhere, as separate concerns — and a single
-generic `DecoderWithHeads` that composes one backbone with a *mapping* of prebuilt named heads, plus a thin
-single-head subclass per built-in head for the common case. Heads come from a closed, discriminated union via a free
+This proposal replaces the wrappers with head-generic composition: a `DecoderBackbone` protocol, a `TaskHead` contract
+confined to head *compute* — parallelization and checkpoint mapping live elsewhere, as separate concerns — and two
+generic composition classes, `DecoderWithHead` for one head and `DecoderWithHeads` for a *mapping* of named heads, with
+one thin subclass per built-in head over the former. Heads come from a closed, discriminated union via a free
 `build_decoder_head` factory, or are passed in directly. The `3 × N` model-wrapper grid collapses to `N` backbones plus
-three head-generic classes; `parallelize_*` and the HF mappers keep one entry *per head type* so each stays free to
+those head-generic classes; `parallelize_*` and the HF mappers keep one entry *per head type*, so each stays free to
 diverge. A new architecture writes its backbone once and is usable with any head, or several. Because we are pre-1.0,
 this **intentionally breaks** parameter FQNs and the `*For*` class names.
 
@@ -119,10 +119,10 @@ AnyHeadConfig = Annotated[
 ]
 ```
 
-A bespoke head a user writes for their own model is a `TaskHead` instance passed directly to `DecoderWithHeads`,
-bypassing the union entirely.
+A bespoke head a user writes for their own model is a `TaskHead` instance passed directly to `DecoderWithHead` or
+`DecoderWithHeads`, bypassing the union entirely.
 
-### The model
+### The multi-head model
 
 One generic class composes a backbone with a mapping of *prebuilt* heads, generic over the backbone type so the backbone
 keeps its precise type for `parallelize_*`, and over the head IO so the composition's own IO stays typed. It does not
@@ -171,26 +171,53 @@ SequenceHeadsOutput: TypeAlias = Mapping[str, THeadOutput]
 heads only run on the last stage, whose outgoing edge never transfers. The backbone (`self.model`) and the heads
 (`self.heads`) are public, so a provider parallelizes each independently.
 
-### Single-head shorthands
+### The single-head model
 
-Attaching one head is the common case, and spelling it as a one-entry mapping makes the caller name the head twice
-(once to build it, once to key it) and leaves the IO parameters to be filled in by hand. One subclass per built-in head
-closes that gap — it builds its head, defaults its name, pins the IO, and exposes the head at its concrete type so the
-per-head-type `parallelize_*` accepts it directly:
+Attaching one head is the common case, and with one head every part of the multi-head machinery is dead weight: there
+is nothing to key, so a name has to be invented, threaded through the FQNs, and repeated by the task on both the input
+and the output — `shared.heads["lm"]`, `results["lm"].logps` — to address the only head there is. That is a *different*
+contract, not a specialization of the mapping one, so it gets its own class rather than a subclass of
+`DecoderWithHeads`:
 
 ```python
-class DecoderForCausalLM(DecoderWithHeads[TBackbone, SequenceCausalLMHeadShared, SequenceCausalLMOutput]):
-    def __init__(self, backbone: TBackbone, stage: PipelineStageInfo, *, head_name: str = DEFAULT_HEAD_NAME_CAUSAL_LM):
-        super().__init__(backbone, {head_name: build_decoder_head(CausalLMHeadConfig(), backbone=backbone)}, stage)
-        self._head_name = head_name
+class DecoderWithHead(
+    nn.Module,
+    ModuleLateInit,
+    ModuleSupportsPipelining[
+        SequenceInput, SequenceTransfer[torch.Tensor], SequenceHeadShared[THeadShared], THeadOutput,
+    ],
+    Generic[TBackbone, THead, THeadShared, THeadOutput],
+):
+    def __init__(self, backbone: TBackbone, head: THead, stage: PipelineStageInfo):
+        self.model = backbone                                   # FQN: model.*
+        self._stage = stage
+        if stage.is_current_stage_last:
+            self.head = head                                    # FQN: head.*
 
-    @property
-    def head(self) -> SplitLanguageModellingHead: ...
+    def forward(self, inputs, shared: SequenceHeadShared[THeadShared]):
+        model_outputs = self.model(inputs, shared.sequence)
+        if not self._stage.is_current_stage_last:
+            return model_outputs
+        return self.head(model_outputs.hidden_states, shared.head)
+```
+
+The head is reached as `self.head`, its shared input arrives as `shared.head`, and the `PipelineOutput` *is* the head's
+output — `ctx.pipeline_results.logps`, no key. `THead` is a parameter so `self.head` keeps its concrete type and the
+per-head-type `parallelize_*_head` accepts it directly.
+
+Three subclasses fix the head and build it, so composing the common model is one call:
+
+```python
+class DecoderForCausalLM(
+    DecoderWithHead[TBackbone, SplitLanguageModellingHead, SequenceCausalLMHeadShared, SequenceCausalLMOutput]
+):
+    def __init__(self, backbone: TBackbone, stage: PipelineStageInfo):
+        super().__init__(backbone, build_decoder_head(CausalLMHeadConfig(), backbone=backbone), stage)
 ```
 
 `DecoderForClassification` and `DecoderForEmbedding` are the same shape, taking their head's config (`num_labels`,
-`embedding_dim`, …) as a second positional argument. A multi-head model, or one with a bespoke head, uses
-`DecoderWithHeads` directly — the shorthands add no capability, only brevity and type precision.
+`embedding_dim`, …) as a second positional argument. A model with two heads, or one that names its heads for its own
+reasons, uses `DecoderWithHeads`.
 
 ### Multi-head semantics
 
@@ -228,32 +255,38 @@ expected to diverge (vocab parallelism for an LM head, say):
 
 * **Mapping is per-family *and* per-head-type** — a HuggingFace checkpoint carries exactly one head, whose parameter
   names are that HF architecture's own, so the mapper cannot be assembled from a family half and a head half. The
-  existing hard-coded converter per (family, head) stays; what it gains is a `head_name`, telling it which of the
-  composed model's heads receives the HF head:
+  existing hard-coded converter per (family, head) stays; what it gains is a `head_prefix`, telling it where in the
+  composed model the HF head lands:
 
   ```python
   # d9d/module/model/qwen3_dense/huggingface.py
-  def mapper_from_huggingface_qwen3_dense_for_causal_lm(params, *, head_name=DEFAULT_HEAD_NAME_CAUSAL_LM): ...
-  def mapper_from_huggingface_qwen3_dense_for_classification(params, *, head_name=DEFAULT_HEAD_NAME_CLASSIFICATION): ...
-  def mapper_from_huggingface_qwen3_dense_for_embedding(params): ...   # bare backbone: no head weights to name
+  def mapper_from_huggingface_qwen3_dense_for_causal_lm(params, *, head_prefix=SINGLE_HEAD_PREFIX): ...
+  def mapper_from_huggingface_qwen3_dense_for_classification(params, *, head_prefix=SINGLE_HEAD_PREFIX): ...
+  def mapper_from_huggingface_qwen3_dense_for_embedding(params): ...   # bare backbone: no head weights to place
   ```
 
-  That parameter is what makes the multi-head use case work: a user initializing a two-head model from a single-head
-  HuggingFace checkpoint points `head_name` at the head that should receive it, and the others keep their
-  initialization.
+  The default (`head.`) targets a single-head decoder. That parameter is what makes the multi-head use case work: a
+  user initializing a two-head model from a single-head HuggingFace checkpoint passes the receiving head's prefix
+  (`f"heads.{name}."`), and the others keep their initialization.
 
-Because `DecoderWithHeads` exposes the backbone (`self.model`) and the heads (`self.heads`), a provider drives each
-independently — the per-family backbone routine on the backbone, then each head's own routine:
+Because both composition classes expose the backbone (`self.model`) and the head(s) (`self.head` / `self.heads`), a
+provider drives each independently — the per-family backbone routine on the backbone, then each head's own routine:
 
 ```python
-def parallelize_model_stage(self, ctx):
-    parallelize_qwen3_moe_model(ctx.dist_context, ctx.model.model, ctx.stage)   # backbone
+def parallelize_model_stage(self, ctx):                                          # DecoderForCausalLM
+    parallelize_qwen3_moe_model(ctx.dist_context, ctx.model.model, ctx.stage)    # backbone
     if ctx.stage.is_current_stage_last:
-        parallelize_causal_lm_head(ctx.model.head, ctx.dist_context)            # head
+        parallelize_causal_lm_head(ctx.model.head, ctx.dist_context)             # head
+
+def parallelize_model_stage(self, ctx):                                          # DecoderWithHeads
+    parallelize_qwen3_moe_model(ctx.dist_context, ctx.model.model, ctx.stage)
+    if ctx.stage.is_current_stage_last:
+        parallelize_causal_lm_head(ctx.model.heads["lm"], ctx.dist_context)
+        parallelize_classification_head(ctx.model.heads["cls"], ctx.dist_context)
 ```
 
-The model-wrapper grid drops to `N` backbone routines plus three head-generic classes; sharding and mapping keep one
-entry per head type, which is what lets each evolve on its own.
+The model-wrapper grid drops to `N` backbone routines plus the head-generic compositions; sharding and mapping keep
+one entry per head type, which is what lets each evolve on its own.
 
 ## Usage
 
@@ -264,7 +297,8 @@ backbone = Qwen3MoEModel(cfg.model, stage, hidden_states_snapshot_mode=..., enab
 model = DecoderForCausalLM(backbone, stage)
 ```
 
-A second head means dropping to `DecoderWithHeads` and naming both; the task then reads both keys:
+The task reads that head's output directly — `ctx.pipeline_results.logps`. A second head means dropping to
+`DecoderWithHeads` and naming both; the task then reads both keys:
 
 ```python
 heads = {
@@ -285,16 +319,20 @@ model = DecoderWithHeads(backbone, heads, stage)
 A deliberate, pre-1.0 break; every cost is one-time and mechanical:
 
 - **Classes & functions.** The `*For*` models and their `*For*Parameters` are removed, along with the per-head
-  `parallelize_*_for_*` functions; providers compose `DecoderWithHeads` or one of its single-head subclasses, and head
-  sharding moves to the per-head-type `parallelize_*_head`. The `mapper_*_for_*` HuggingFace converters keep their
-  names and gain a `head_name`. The backbone exposes `hidden_size` and its split-vocab layout as read-only properties;
-  backbone params, its `forward`, and the per-family backbone `parallelize`/`mapper` routines are otherwise unchanged.
-- **Parameter FQNs.** Heads move `lm_head.* → heads.lm.*` (etc.); the backbone stays `model.*`. Existing checkpoints
-  need a one-pass key remap; the HuggingFace renames update accordingly.
+  `parallelize_*_for_*` functions; providers compose a `DecoderFor*` subclass (or `DecoderWithHead`) for one head and
+  `DecoderWithHeads` for several, and head sharding moves to the per-head-type `parallelize_*_head`. The
+  `mapper_*_for_*` HuggingFace converters keep their names and gain a `head_prefix`. The backbone exposes
+  `hidden_size` and its split-vocab layout as read-only properties; backbone params, its `forward`, and the
+  per-family backbone `parallelize`/`mapper` routines are otherwise unchanged.
+- **Parameter FQNs.** The backbone stays `model.*`; a single head moves `lm_head.* → head.*` (etc.) and heads of a
+  multi-head model live under `heads.<name>.*`. Existing checkpoints need a one-pass key remap; the HuggingFace
+  renames update accordingly.
 - **IO types.** `SequenceCausalLMShared` / `SequencePoolingShared` (a backbone shared input bundled with one head's
-  payload) are replaced by `SequenceHeadsShared` plus the per-head `SequenceCausalLMHeadShared` /
-  `SequencePoolingHeadShared`. The `PipelineOutput` becomes a mapping keyed by head name, so `results.logps` becomes
-  `results["lm"].logps`; the per-head output dataclasses themselves are unchanged.
+  payload) are replaced by `SequenceHeadShared` / `SequenceHeadsShared` plus the per-head
+  `SequenceCausalLMHeadShared` / `SequencePoolingHeadShared`. A single-head model's `PipelineOutput` is still that
+  head's output dataclass, so `results.logps` keeps working; a multi-head model's is a mapping keyed by head name
+  (`results["lm"].logps`). The per-head output dataclasses themselves are unchanged, but move to
+  `d9d.module.block.head` alongside the heads that produce them.
 - **Tests.** The suites under `test/d9d_test/modules/model/sequence/` (HF parity + state-dict round-trip across both
   families × all heads) update to the new construction and are the regression gate.
 
@@ -305,12 +343,20 @@ into three generic base classes each subclassed in ~6 lines. *Rejected:* cheaper
 (in all three axes) and a multi-head model still cannot be expressed. Its byte-stable-FQN requirement is what forced the
 per-family subclass; lifting it (pre-1.0) is what unlocks composition.
 
+**Single-head models as subclasses of `DecoderWithHeads`.** Express `DecoderForCausalLM` as a `DecoderWithHeads`
+holding a one-entry mapping, defaulting the key to `"lm"`. *Rejected:* the composition would still be a mapping
+everywhere it is observed — a `heads.lm.*` FQN, `shared.heads["lm"]` on the way in, `results["lm"]` on the way out —
+so every caller pays for a name that exists only because the container needs one, and the substitution is unsound
+anyway (the base promises a mapping output; a single-head model that returned one would defeat the purpose).
+`DecoderWithHead` is a sibling, not a specialization: one head, no key, and the head's own output as the
+`PipelineOutput`.
+
 **A generic class that builds its own heads (`from_configs`).** Give `DecoderWithHeads` a classmethod that constructs an
 arbitrary head mapping from a config mapping. *Rejected:* it couples the *generic* composition class to the head-config
 union while buying nothing a caller cannot write in one line; `DecoderWithHeads` stays a pure composition of prebuilt
-modules, so custom heads come in on equal footing. The single-head subclasses take the opposite trade deliberately:
-each is bound to exactly one config type already, and building the head is what lets them pin the IO parameters and
-default the head name.
+modules, so custom heads come in on equal footing. `DecoderWithHead` keeps that property; only its three subclasses
+take the opposite trade, deliberately — each is bound to exactly one config type already, and building the head is
+what makes composing the common model a single call.
 
 **Universal head sharding (`parallelize_task_head`).** One function covering every head, since all of them are HSDP on
 the dense mesh today. *Rejected:* the uniformity is a coincidence of the current head set, not a property of heads —
@@ -321,7 +367,7 @@ breaks. Three two-line functions cost nothing and pin the extension point where 
 `mapper_*_qwen3_dense` and a standalone `hf_mapper_for_lm_head(head, prefix)`. *Rejected:* it reads as though HF head
 parameters were family-independent, which they are not — each HF architecture names its own head — and it makes every
 call site re-derive a composition that has exactly one correct form. The hard-coded converter per (family, head) stays;
-`head_name` is the only degree of freedom callers actually need.
+`head_prefix` is the only degree of freedom callers actually need.
 
 **A flat `dict[str, torch.Tensor]` with `"<head>/<key>"` keys.** Keep the model's IO a single flat bag and simulate
 hierarchy in the key strings, with a `HeadInputs: Mapping[str, torch.Tensor | None]` for the inputs and a matching

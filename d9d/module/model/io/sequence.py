@@ -48,6 +48,25 @@ class SequenceShared:
 
 
 @dataclasses.dataclass
+class SequenceHeadShared(Generic[THeadShared]):
+    """The shared input a backbone composed with exactly one task head consumes on every stage.
+
+    The single-head counterpart of :class:`SequenceHeadsShared`: the head is reached by field, not
+    by name, and the model's output is that head's output unwrapped.
+
+    Type parameters:
+        THeadShared: The shared input accepted by the composed head.
+
+    Attributes:
+        sequence: The backbone shared input.
+        head: The head's own shared input (read on the last stage).
+    """
+
+    sequence: SequenceShared
+    head: THeadShared
+
+
+@dataclasses.dataclass
 class SequenceHeadsShared(Generic[THeadShared]):
     """The shared input a backbone composed with named task heads consumes on every stage.
 

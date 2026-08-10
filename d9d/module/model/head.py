@@ -5,15 +5,6 @@ from pydantic import BaseModel, Field
 from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead, TaskHead
 from d9d.module.model.backbone import DecoderBackbone
 
-DEFAULT_HEAD_NAME_CAUSAL_LM = "lm"
-"""The name a causal language modeling head is composed under unless the user picks another."""
-
-DEFAULT_HEAD_NAME_CLASSIFICATION = "cls"
-"""The name a classification head is composed under unless the user picks another."""
-
-DEFAULT_HEAD_NAME_EMBEDDING = "embedding"
-"""The name an embedding head is composed under unless the user picks another."""
-
 
 class CausalLMHeadConfig(BaseModel):
     """Configuration for a causal language modeling head.

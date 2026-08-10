@@ -1,5 +1,5 @@
 import transformers as tr
-from d9d.module.model import DEFAULT_HEAD_NAME_CAUSAL_LM, DecoderForCausalLM
+from d9d.module.model import DecoderForCausalLM
 from d9d.module.model.qwen3_dense import (
     mapper_from_huggingface_qwen3_dense_for_causal_lm,
     mapper_to_huggingface_qwen3_dense_for_causal_lm,
@@ -18,9 +18,6 @@ from d9d_test.modules.model.sequence.catalogue import (
     hf_model_factory,
     make_d9d_model_factory,
 )
-
-HEAD_NAME_LM = DEFAULT_HEAD_NAME_CAUSAL_LM
-
 
 HF_MODEL_FACTORY_CAUSAL_LM = {
     ModelCatalogue.QWEN3_MOE: hf_model_factory(

@@ -4,7 +4,7 @@ from enum import StrEnum, auto
 from d9d.core.dist_context import DistributedContext
 from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.module.model import DecoderBackbone, DecoderWithHeads
+from d9d.module.model import DecoderBackbone, DecoderWithHead, DecoderWithHeads
 from d9d.module.model.qwen3_dense import (
     Qwen3DenseLayerParameters,
     Qwen3DenseModel,
@@ -179,7 +179,7 @@ def hf_model_factory(
     return _build_fn
 
 
-ComposeDecoder = Callable[[DecoderBackbone, PipelineStageInfo], DecoderWithHeads]
+ComposeDecoder = Callable[[DecoderBackbone, PipelineStageInfo], DecoderWithHead | DecoderWithHeads]
 """Composes a freshly built backbone with the head(s) a suite exercises."""
 
 
@@ -187,10 +187,10 @@ def make_d9d_model_factory(
     model_type: ModelCatalogue,
     compose: ComposeDecoder,
     enable_checkpointing: bool,
-) -> Callable[[PipelineStageInfo], DecoderWithHeads]:
+) -> Callable[[PipelineStageInfo], DecoderWithHead | DecoderWithHeads]:
     """Builds a factory that composes the backbone with the suite's heads on the target device."""
 
-    def _build_fn(stage: PipelineStageInfo) -> DecoderWithHeads:
+    def _build_fn(stage: PipelineStageInfo) -> DecoderWithHead | DecoderWithHeads:
         with torch_seed(_D9D_INIT_SEED):
             backbone = BACKBONE_CLASSES[model_type](
                 D9D_MODEL_PARAMETERS[model_type],
@@ -205,8 +205,8 @@ def make_d9d_model_factory(
     return _build_fn
 
 
-def parallelize_decoder_with_heads(
-    model: DecoderWithHeads,
+def parallelize_decoder(
+    model: DecoderWithHead | DecoderWithHeads,
     model_type: ModelCatalogue,
     dist_context: DistributedContext,
     stage: PipelineStageInfo,
@@ -217,7 +217,9 @@ def parallelize_decoder_with_heads(
     if not stage.is_current_stage_last:
         return
 
-    for head in model.heads.values():
+    heads = [model.head] if isinstance(model, DecoderWithHead) else list(model.heads.values())
+
+    for head in heads:
         match head:
             case SplitLanguageModellingHead():
                 parallelize_causal_lm_head(head, dist_context)

@@ -1,11 +1,7 @@
 import copy
 
 import transformers as tr
-from d9d.module.model import (
-    DEFAULT_HEAD_NAME_CLASSIFICATION,
-    ClassificationHeadConfig,
-    DecoderForClassification,
-)
+from d9d.module.model import ClassificationHeadConfig, DecoderForClassification
 from d9d.module.model.qwen3_dense import (
     mapper_from_huggingface_qwen3_dense_for_classification,
     mapper_to_huggingface_qwen3_dense_for_classification,
@@ -26,8 +22,6 @@ from d9d_test.modules.model.sequence.catalogue import (
 )
 
 NUM_LABELS_CLS = 3
-
-HEAD_NAME_CLS = DEFAULT_HEAD_NAME_CLASSIFICATION
 
 
 def _hf_config_for(catalogue: ModelCatalogue):

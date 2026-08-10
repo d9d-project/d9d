@@ -15,10 +15,7 @@ from d9d.model_state.mapper.leaf import (
     ModelStateMapperTranspose,
     ModelStateMapperUnstackTensors,
 )
-from d9d.module.model import (
-    DEFAULT_HEAD_NAME_CAUSAL_LM,
-    DEFAULT_HEAD_NAME_CLASSIFICATION,
-)
+from d9d.module.model import SINGLE_HEAD_PREFIX
 
 from .params import (
     Qwen3MoELayerParameters,
@@ -152,19 +149,19 @@ def mapper_from_huggingface_qwen3_moe_for_causal_lm(
     params: Qwen3MoEParameters,
     experts_format: Qwen3MoEExpertsFormat,
     *,
-    head_name: str = DEFAULT_HEAD_NAME_CAUSAL_LM,
+    head_prefix: str = SINGLE_HEAD_PREFIX,
 ) -> ModelStateMapper:
     """Creates a state mapper translating Qwen3 MoE Causal LM HuggingFace keys into the d9d format.
 
-    HuggingFace models carry exactly one head, so the mapper needs to know which of the composed
-    model's heads receives it. Loading a single-head HuggingFace checkpoint into a multi-head model
-    is therefore a matter of pointing ``head_name`` at the right head; the remaining heads keep
-    their initialization.
+    HuggingFace models carry exactly one head, so the mapper needs to know where in the composed
+    model it lands. The default targets a single-head decoder; loading the same checkpoint into a
+    multi-head model is a matter of passing that head's prefix (``f"heads.{name}."``) instead, and
+    the remaining heads keep their initialization.
 
     Args:
         params: Base model parameters.
         experts_format: Format of the MoE experts storage.
-        head_name: The name the causal LM head is composed under in the target d9d model.
+        head_prefix: FQN prefix of the head that receives the HuggingFace head in the target d9d model.
 
     Returns:
         A composite state mapper.
@@ -177,9 +174,7 @@ def mapper_from_huggingface_qwen3_moe_for_causal_lm(
                 source_prefix="model.",
                 target_prefix="model.",
             ),
-            ModelStateMapperRename(
-                name_from="lm_head.weight", name_to=f"heads.{head_name}.lm_head.{vocab_name}.weight"
-            ),
+            ModelStateMapperRename(name_from="lm_head.weight", name_to=f"{head_prefix}lm_head.{vocab_name}.weight"),
         ]
     )
 
@@ -188,14 +183,14 @@ def mapper_from_huggingface_qwen3_moe_for_classification(
     params: Qwen3MoEParameters,
     experts_format: Qwen3MoEExpertsFormat,
     *,
-    head_name: str = DEFAULT_HEAD_NAME_CLASSIFICATION,
+    head_prefix: str = SINGLE_HEAD_PREFIX,
 ) -> ModelStateMapper:
     """Creates a state mapper translating Qwen3 MoE classification HuggingFace keys into the d9d format.
 
     Args:
         params: Base model parameters.
         experts_format: Format of the MoE experts storage.
-        head_name: The name the classification head is composed under in the target d9d model.
+        head_prefix: FQN prefix of the head that receives the HuggingFace head in the target d9d model.
 
     Returns:
         A composite state mapper.
@@ -207,7 +202,7 @@ def mapper_from_huggingface_qwen3_moe_for_classification(
                 source_prefix="model.",
                 target_prefix="model.",
             ),
-            ModelStateMapperRename(name_from="score.weight", name_to=f"heads.{head_name}.score.weight"),
+            ModelStateMapperRename(name_from="score.weight", name_to=f"{head_prefix}score.weight"),
         ]
     )
 
@@ -339,14 +334,14 @@ def mapper_to_huggingface_qwen3_moe_for_causal_lm(
     params: Qwen3MoEParameters,
     experts_format: Qwen3MoEExpertsFormat,
     *,
-    head_name: str = DEFAULT_HEAD_NAME_CAUSAL_LM,
+    head_prefix: str = SINGLE_HEAD_PREFIX,
 ) -> ModelStateMapper:
     """Creates a state mapper translating Qwen3 MoE Causal LM d9d keys back into the HuggingFace format.
 
     Args:
         params: Base model parameters.
         experts_format: Format of the MoE experts storage.
-        head_name: The name the causal LM head is composed under in the source d9d model.
+        head_prefix: FQN prefix of the head holding the causal LM weights in the source d9d model.
 
     Returns:
         A composite state mapper.
@@ -359,9 +354,7 @@ def mapper_to_huggingface_qwen3_moe_for_causal_lm(
                 source_prefix="model.",
                 target_prefix="model.",
             ),
-            ModelStateMapperRename(
-                name_from=f"heads.{head_name}.lm_head.{vocab_name}.weight", name_to="lm_head.weight"
-            ),
+            ModelStateMapperRename(name_from=f"{head_prefix}lm_head.{vocab_name}.weight", name_to="lm_head.weight"),
         ]
     )
 
@@ -370,14 +363,14 @@ def mapper_to_huggingface_qwen3_moe_for_classification(
     params: Qwen3MoEParameters,
     experts_format: Qwen3MoEExpertsFormat,
     *,
-    head_name: str = DEFAULT_HEAD_NAME_CLASSIFICATION,
+    head_prefix: str = SINGLE_HEAD_PREFIX,
 ) -> ModelStateMapper:
     """Creates a state mapper translating Qwen3 MoE classification d9d keys back into the HuggingFace format.
 
     Args:
         params: Base model parameters.
         experts_format: Format of the MoE experts storage.
-        head_name: The name the classification head is composed under in the source d9d model.
+        head_prefix: FQN prefix of the head holding the classification weights in the source d9d model.
 
     Returns:
         A composite state mapper.
@@ -389,7 +382,7 @@ def mapper_to_huggingface_qwen3_moe_for_classification(
                 source_prefix="model.",
                 target_prefix="model.",
             ),
-            ModelStateMapperRename(name_from=f"heads.{head_name}.score.weight", name_to="score.weight"),
+            ModelStateMapperRename(name_from=f"{head_prefix}score.weight", name_to="score.weight"),
         ]
     )
 

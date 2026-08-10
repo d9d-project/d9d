@@ -55,7 +55,7 @@ class ProjectModelProvider(ModelProvider[DecoderForCausalLM[Qwen3MoEModel]]):
         self._config = config
 
     def initialize_model_stage(self, context: InitializeModelStageContext) -> InitializeModelStageResult:
-        # Compose the Qwen3 MoE backbone with a single causal LM head, named "lm" by default.
+        # Compose the Qwen3 MoE backbone with a single causal LM head.
         backbone = Qwen3MoEModel(
             params=self._config.model,
             stage=context.stage,
