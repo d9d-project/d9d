@@ -1,5 +1,7 @@
 """Typed pipeline IO dataclasses for the model catalogue."""
 
+from d9d.module.block.attention import SequencePacking
+
 from .sequence import (
     SequenceCausalLMOutput,
     SequenceCausalLMShared,
@@ -17,6 +19,7 @@ __all__ = [
     "SequenceClassificationOutput",
     "SequenceEmbeddingOutput",
     "SequenceInput",
+    "SequencePacking",
     "SequencePoolingShared",
     "SequenceShared",
     "SequenceTransfer",

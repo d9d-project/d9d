@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch.nn.attention import SDPBackend
 
+from ...types import SequencePacking
 from ..config import SdpaParameters, TorchSdpaBackendConfig, TorchSdpaBackendType
 from ..protocol import SdpaBackend
 
@@ -49,9 +50,13 @@ class TorchSdpa(nn.Module, SdpaBackend):
         key_states: torch.Tensor,
         value_states: torch.Tensor,
         attention_mask: torch.Tensor | None,
+        packing: SequencePacking | None,
         is_causal: bool,
         scale: float,
     ) -> torch.Tensor:
+        if packing is not None:
+            raise ValueError("PyTorch SDPA backend does not support sequence packing.")
+
         query_states = query_states.transpose(1, 2)
         key_states = key_states.transpose(1, 2)
         value_states = value_states.transpose(1, 2)

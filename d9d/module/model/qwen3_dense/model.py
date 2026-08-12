@@ -144,14 +144,17 @@ class Qwen3DenseModel(
             hidden_states_snapshot = transfer_inputs.hidden_states_snapshot
 
         rope_params = self.rope_provider(shared.position_ids)
+        packing = shared.packing
 
         for decoder_layer_name in self._layers_iter:
             decoder_layer = self.layers[decoder_layer_name]
 
             if self._enable_checkpointing:
-                last_hidden_states = checkpoint(decoder_layer, last_hidden_states, rope_params, use_reentrant=False)
+                last_hidden_states = checkpoint(
+                    decoder_layer, last_hidden_states, rope_params, packing, use_reentrant=False
+                )
             else:
-                last_hidden_states = decoder_layer(last_hidden_states, rope_params)
+                last_hidden_states = decoder_layer(last_hidden_states, rope_params, packing)
 
             state_aggregator.add_hidden_states(last_hidden_states)
 

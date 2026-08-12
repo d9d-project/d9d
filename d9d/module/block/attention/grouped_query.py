@@ -2,7 +2,13 @@ import torch
 from torch import nn
 
 from d9d.module.base import ModuleLateInit
-from d9d.module.block.attention.sdpa import AnySdpaBackendConfig, SdpaBackend, SdpaParameters, build_sdpa_backend
+from d9d.module.block.attention.sdpa import (
+    AnySdpaBackendConfig,
+    SdpaBackend,
+    SdpaParameters,
+    build_sdpa_backend,
+)
+from d9d.module.block.attention.types import SequencePacking
 from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddingStyle
 
@@ -31,6 +37,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         rope_dim: int | None = None,
         enable_output_gate: bool = False,
         qk_norm_zero_centered: bool = False,
+        enable_packing: bool = False,
         sdpa_backend: AnySdpaBackendConfig | None = None,
     ) -> None:
         """Constructs the GroupedQueryAttention layer.
@@ -47,6 +54,8 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             enable_output_gate: If True, enables sigmoid output gating (Qwen 3.5 style).
             qk_norm_zero_centered: If True, utilizes zero-centered scaling weights for the optional Q and K
                 RMSNorm layers (DeepSeek V3 style).
+            enable_packing: If True, the layer accepts a ``SequencePacking`` descriptor at runtime and
+                the backend is selected to support variable-length (block-diagonal) attention.
             sdpa_backend: Configuration for the Scaled Dot-Product Attention backend. If ``None``,
                 the backend will be auto-detected via `build_sdpa_backend()`.
         """
@@ -83,7 +92,9 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
 
         self.rope = RotaryEmbeddingApplicator(style=rope_style)
         self.kernel: SdpaBackend = build_sdpa_backend(
-            params=SdpaParameters(num_sinks=None, window_size=(None, None), needs_attention_mask=False),
+            params=SdpaParameters(
+                num_sinks=None, window_size=(None, None), needs_attention_mask=False, needs_varlen=enable_packing
+            ),
             backend_config=sdpa_backend,
         )
         self._is_causal = is_causal
@@ -107,6 +118,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         hidden_states: torch.Tensor,
         attention_mask: torch.Tensor | None,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        packing: SequencePacking | None = None,
     ) -> torch.Tensor:
         """Computes the attention operation.
 
@@ -116,6 +128,8 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             position_embeddings: Tuple of `(cos, sin)` tensors for RoPE application.
                 Each tensor should be of shape `(batch, seq_len, rope_dim)` when partial RoPE is used,
                 or `(batch, seq_len, head_dim)` otherwise.
+            packing: Optional block-diagonal segmentation for sequence packing. When set, the input is
+                a single packed row and attention is computed block-diagonally over its segments.
 
         Returns:
             The attention output tensor. Shape: `(batch, seq_len, hidden_size)`.
@@ -141,6 +155,7 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             key_states,
             value_states,
             attention_mask=attention_mask,
+            packing=packing,
             is_causal=self._is_causal,
             scale=self._scaling,
         )
