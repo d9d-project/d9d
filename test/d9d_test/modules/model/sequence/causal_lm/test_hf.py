@@ -1,5 +1,6 @@
 import pytest
-from d9d.module.model.io import SequenceCausalLMShared, SequenceInput, SequenceShared
+from d9d.module.block.head import SequenceCausalLMHeadShared
+from d9d.module.model.io import SequenceHeadShared, SequenceInput, SequenceShared
 from d9d.pipelining.api import PipelineStageInfo
 from torch.nn.attention import SDPBackend, sdpa_kernel
 from torch.testing import assert_close
@@ -48,8 +49,9 @@ def test_consistent_to_hf(model_type: ModelCatalogue, model_factory_d9d):
 
     outputs_d9d = model_d9d(
         SequenceInput(input_ids=batch.sequence.input_ids[:, :-1]),
-        SequenceCausalLMShared(
-            sequence=SequenceShared(position_ids=batch.sequence.position_ids[:, :-1]), labels=labels_shift
+        SequenceHeadShared(
+            sequence=SequenceShared(position_ids=batch.sequence.position_ids[:, :-1]),
+            head=SequenceCausalLMHeadShared(labels=labels_shift),
         ),
     )
     loss_d9d = outputs_d9d.logps[labels_shift != -100].mean()

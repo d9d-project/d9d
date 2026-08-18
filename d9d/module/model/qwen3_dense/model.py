@@ -1,4 +1,4 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import cast
 
 import torch
@@ -8,20 +8,10 @@ from torch.utils.checkpoint import checkpoint
 from d9d.core.types import TensorSpec
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.embedding import SplitTokenEmbeddings
-from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode, create_hidden_states_aggregator
 from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingProvider, RotaryEmbeddingStyle
-from d9d.module.model.io import (
-    SequenceCausalLMOutput,
-    SequenceCausalLMShared,
-    SequenceClassificationOutput,
-    SequenceEmbeddingOutput,
-    SequenceInput,
-    SequencePoolingShared,
-    SequenceShared,
-    SequenceTransfer,
-)
+from d9d.module.model.io import SequenceInput, SequenceShared, SequenceTransfer
 from d9d.pipelining.api import (
     ModuleSupportsPipelining,
     PipelineStageInfo,
@@ -30,12 +20,7 @@ from d9d.pipelining.api import (
 )
 
 from .decoder_layer import Qwen3DenseLayer
-from .params import (
-    Qwen3DenseForCausalLMParameters,
-    Qwen3DenseForClassificationParameters,
-    Qwen3DenseForEmbeddingParameters,
-    Qwen3DenseParameters,
-)
+from .params import Qwen3DenseParameters
 
 
 class Qwen3DenseModel(
@@ -102,8 +87,27 @@ class Qwen3DenseModel(
 
         self._stage = stage
         self._hidden_states_snapshot_mode = hidden_states_snapshot_mode
-        self._hidden_size = params.layer.hidden_size
         self._enable_checkpointing = enable_checkpointing
+
+        # backbone-shared dimensions the composed task heads derive from
+        self._hidden_size = params.layer.hidden_size
+        self._split_vocab_size = params.split_vocab_size
+        self._split_vocab_order = params.split_vocab_order
+
+    @property
+    def hidden_size(self) -> int:
+        """Dimensionality of the backbone hidden states."""
+        return self._hidden_size
+
+    @property
+    def split_vocab_size(self) -> Mapping[str, int]:
+        """Mapping of vocabulary segment names to their sizes."""
+        return self._split_vocab_size
+
+    @property
+    def split_vocab_order(self) -> Sequence[str]:
+        """The order in which vocabulary segments are concatenated."""
+        return self._split_vocab_order
 
     def output_dtype(self) -> torch.dtype:
         """Returns the data type of the model output hidden states.
@@ -198,260 +202,9 @@ class Qwen3DenseModel(
                 num_layers = num_layers_before + len(self.layers)
             else:
                 num_layers = num_layers_before
-            snapshot_spec = TensorSpec(shape=(num_layers, batch, self._hidden_size), dtype=self.output_dtype())
+            snapshot_spec = TensorSpec(shape=(num_layers, batch, self.hidden_size), dtype=self.output_dtype())
 
         return SequenceTransfer(
-            hidden_states=TensorSpec(shape=(batch, seq, self._hidden_size), dtype=self.output_dtype()),
+            hidden_states=TensorSpec(shape=(batch, seq, self.hidden_size), dtype=self.output_dtype()),
             hidden_states_snapshot=snapshot_spec,
         )
-
-
-class Qwen3DenseForCausalLM(
-    nn.Module,
-    ModuleLateInit,
-    ModuleSupportsPipelining[
-        SequenceInput, SequenceTransfer[torch.Tensor], SequenceCausalLMShared, SequenceCausalLMOutput
-    ],
-):
-    """A Qwen3 Dense model wrapped with a Causal Language Modeling head.
-
-    It is designed to be split across multiple pipeline stages.
-    """
-
-    def __init__(
-        self,
-        params: Qwen3DenseForCausalLMParameters,
-        stage: PipelineStageInfo,
-        hidden_states_snapshot_mode: HiddenStatesAggregationMode,
-        enable_checkpointing: bool,
-    ):
-        """Constructs the Qwen3DenseForCausalLM object.
-
-        Args:
-            params: Full model configuration parameters.
-            stage: Pipeline stage information for this instance.
-            hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode.
-            enable_checkpointing: Whether to enable activation checkpointing.
-        """
-        super().__init__()
-
-        self.model = Qwen3DenseModel(
-            params.model,
-            stage,
-            hidden_states_snapshot_mode=hidden_states_snapshot_mode,
-            enable_checkpointing=enable_checkpointing,
-        )
-
-        if stage.is_current_stage_last:
-            self.lm_head = SplitLanguageModellingHead(
-                split_vocab_size=params.model.split_vocab_size,
-                split_order=params.model.split_vocab_order,
-                hidden_size=params.model.layer.hidden_size,
-            )
-
-        self._stage = stage
-        self._hidden_size = params.model.layer.hidden_size
-
-    def forward(
-        self,
-        inputs: SequenceInput | SequenceTransfer[torch.Tensor],
-        shared: SequenceCausalLMShared,
-    ) -> SequenceTransfer[torch.Tensor] | SequenceCausalLMOutput:
-        """Executes the model forward pass.
-
-        If this is the last stage, it expects ``shared.labels`` to be provided and computes the
-        cross-entropy loss (returned as per-token ``logps``).
-
-        Args:
-            inputs: ``SequenceInput`` on the first stage; incoming ``SequenceTransfer`` otherwise.
-            shared: The shared input (position ids, aggregation mask, labels).
-
-        Returns:
-            The produced ``SequenceTransfer`` on non-last stages, or the ``CausalLMOutput`` on the
-            last stage.
-        """
-        model_outputs = self.model(inputs, shared.sequence)
-        if self._stage.is_current_stage_last:
-            return SequenceCausalLMOutput(
-                logps=self.lm_head(hidden_states=model_outputs.hidden_states, labels=shared.labels)
-            )
-        return model_outputs
-
-    def reset_parameters(self):
-        """Resets module parameters."""
-        self.model.reset_parameters()
-
-        if self._stage.is_current_stage_last:
-            self.lm_head.reset_parameters()
-
-    def stage_transfer_spec(
-        self, pipeline_input: SequenceInput, boundary: StageBoundary
-    ) -> SequenceTransfer[TensorSpec]:
-        return self.model.stage_transfer_spec(pipeline_input, boundary)
-
-
-class Qwen3DenseForClassification(
-    nn.Module,
-    ModuleLateInit,
-    ModuleSupportsPipelining[
-        SequenceInput, SequenceTransfer[torch.Tensor], SequencePoolingShared, SequenceClassificationOutput
-    ],
-):
-    """A Qwen3 Dense model wrapped with a Sequence/Token Classification head.
-
-    It is designed to be split across multiple pipeline stages.
-    """
-
-    def __init__(
-        self,
-        params: Qwen3DenseForClassificationParameters,
-        stage: PipelineStageInfo,
-        hidden_states_snapshot_mode: HiddenStatesAggregationMode,
-        enable_checkpointing: bool,
-    ):
-        """Constructs the Qwen3DenseForClassification object.
-
-        Args:
-            params: Full model configuration parameters.
-            stage: Pipeline stage information for this instance.
-            hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode.
-            enable_checkpointing: Whether to enable activation checkpointing.
-        """
-        super().__init__()
-
-        self.model = Qwen3DenseModel(
-            params.model,
-            stage,
-            hidden_states_snapshot_mode=hidden_states_snapshot_mode,
-            enable_checkpointing=enable_checkpointing,
-        )
-
-        if stage.is_current_stage_last:
-            self.cls_head = ClassificationHead(
-                hidden_size=params.model.layer.hidden_size,
-                num_labels=params.num_labels,
-                dropout=params.classifier_dropout,
-            )
-
-        self._stage = stage
-        self._hidden_size = params.model.layer.hidden_size
-        self._num_labels = params.num_labels
-
-    def forward(
-        self,
-        inputs: SequenceInput | SequenceTransfer[torch.Tensor],
-        shared: SequencePoolingShared,
-    ) -> SequenceTransfer[torch.Tensor] | SequenceClassificationOutput:
-        """Executes the classification model forward pass.
-
-        Args:
-            inputs: ``SequenceInput`` on the first stage; incoming ``SequenceTransfer`` otherwise.
-            shared: The shared input (position ids, aggregation mask, pooling mask).
-
-        Returns:
-            The produced ``SequenceTransfer`` on non-last stages, or the ``ClassificationOutput`` on
-            the last stage.
-        """
-        model_outputs = self.model(inputs, shared.sequence)
-        if self._stage.is_current_stage_last:
-            return SequenceClassificationOutput(
-                scores=self.cls_head(hidden_states=model_outputs.hidden_states, pooling_mask=shared.pooling_mask)
-            )
-        return model_outputs
-
-    def reset_parameters(self):
-        """Resets module parameters."""
-        self.model.reset_parameters()
-
-        if self._stage.is_current_stage_last:
-            self.cls_head.reset_parameters()
-
-    def stage_transfer_spec(
-        self, pipeline_input: SequenceInput, boundary: StageBoundary
-    ) -> SequenceTransfer[TensorSpec]:
-        return self.model.stage_transfer_spec(pipeline_input, boundary)
-
-
-class Qwen3DenseForEmbedding(
-    nn.Module,
-    ModuleLateInit,
-    ModuleSupportsPipelining[
-        SequenceInput, SequenceTransfer[torch.Tensor], SequencePoolingShared, SequenceEmbeddingOutput
-    ],
-):
-    """A Qwen3 Dense model wrapped with an Embedding head.
-
-    It is designed to be split across multiple pipeline stages.
-    """
-
-    def __init__(
-        self,
-        params: Qwen3DenseForEmbeddingParameters,
-        stage: PipelineStageInfo,
-        hidden_states_snapshot_mode: HiddenStatesAggregationMode,
-        enable_checkpointing: bool,
-    ):
-        """Constructs the Qwen3DenseForEmbedding object.
-
-        Args:
-            params: Full model configuration parameters.
-            stage: Pipeline stage information for this instance.
-            hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode.
-            enable_checkpointing: Whether to enable activation checkpointing.
-        """
-        super().__init__()
-
-        self.model = Qwen3DenseModel(
-            params.model,
-            stage,
-            hidden_states_snapshot_mode=hidden_states_snapshot_mode,
-            enable_checkpointing=enable_checkpointing,
-        )
-
-        if stage.is_current_stage_last:
-            self.embedding_head = EmbeddingHead(
-                hidden_size=params.model.layer.hidden_size,
-                embedding_dim=params.embedding_dim,
-                normalize=params.normalize,
-            )
-
-        self._stage = stage
-        self._embedding_dim = (
-            params.embedding_dim if params.embedding_dim is not None else params.model.layer.hidden_size
-        )
-
-    def forward(
-        self,
-        inputs: SequenceInput | SequenceTransfer[torch.Tensor],
-        shared: SequencePoolingShared,
-    ) -> SequenceTransfer[torch.Tensor] | SequenceEmbeddingOutput:
-        """Executes the embedding model forward pass.
-
-        Args:
-            inputs: ``SequenceInput`` on the first stage; incoming ``SequenceTransfer`` otherwise.
-            shared: The shared input (position ids, aggregation mask, pooling mask).
-
-        Returns:
-            The produced ``SequenceTransfer`` on non-last stages, or the ``EmbeddingOutput`` on the
-            last stage.
-        """
-        model_outputs = self.model(inputs, shared.sequence)
-        if self._stage.is_current_stage_last:
-            return SequenceEmbeddingOutput(
-                embeddings=self.embedding_head(
-                    hidden_states=model_outputs.hidden_states, pooling_mask=shared.pooling_mask
-                )
-            )
-        return model_outputs
-
-    def reset_parameters(self):
-        """Resets module parameters."""
-        self.model.reset_parameters()
-
-        if self._stage.is_current_stage_last:
-            self.embedding_head.reset_parameters()
-
-    def stage_transfer_spec(
-        self, pipeline_input: SequenceInput, boundary: StageBoundary
-    ) -> SequenceTransfer[TensorSpec]:
-        return self.model.stage_transfer_spec(pipeline_input, boundary)

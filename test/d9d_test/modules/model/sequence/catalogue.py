@@ -1,9 +1,28 @@
 from collections.abc import Callable
 from enum import StrEnum, auto
-from typing import TypeVar
 
-from d9d.module.model.qwen3_dense import Qwen3DenseLayerParameters, Qwen3DenseParameters
-from d9d.module.model.qwen3_moe import Qwen3MoELayerParameters, Qwen3MoEParameters
+from d9d.core.dist_context import DistributedContext
+from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead
+from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
+from d9d.module.model import DecoderBackbone, DecoderWithHead, DecoderWithHeads
+from d9d.module.model.qwen3_dense import (
+    Qwen3DenseLayerParameters,
+    Qwen3DenseModel,
+    Qwen3DenseParameters,
+)
+from d9d.module.model.qwen3_moe import (
+    Qwen3MoEExpertsFormat,
+    Qwen3MoELayerParameters,
+    Qwen3MoEModel,
+    Qwen3MoEParameters,
+)
+from d9d.module.parallelism.model import (
+    parallelize_causal_lm_head,
+    parallelize_classification_head,
+    parallelize_embedding_head,
+    parallelize_qwen3_dense_model,
+    parallelize_qwen3_moe_model,
+)
 from d9d.pipelining.api import PipelineStageInfo
 from transformers import PretrainedConfig, PreTrainedModel, Qwen3Config, Qwen3MoeConfig
 
@@ -35,43 +54,51 @@ _VOCAB_MERGED = 100
 _PAD_TOKEN_ID = 99
 
 
-D9D_MODEL_PARAMETERS = {
-    ModelCatalogue.QWEN3_MOE: Qwen3MoEParameters(
-        layer=Qwen3MoELayerParameters(
-            hidden_size=_HIDDEN_SIZE,
-            intermediate_size=_INTERMEDIATE_SIZE_MOE,
-            num_experts=_NUM_EXPERTS_MOE,
-            experts_top_k=_EXPERTS_TOP_K_MOE,
-            num_attention_heads=_NUM_ATTENTION_HEADS,
-            num_key_value_heads=_NUM_KV_HEADS,
-            rms_norm_eps=_RMS_NORM_EPS,
-            head_dim=_HEAD_DIM,
-        ),
-        rope_base=_ROPE_BASE,
-        max_position_ids=_MAX_POS_ID,
-        num_hidden_layers=_NUM_LAYERS,
-        split_vocab_size=_VOCAB_SPLIT_SIZE,
-        split_vocab_order=_VOCAB_SPLIT_ORDER,
+# HuggingFace experts layout the d9d MoE mappers translate from/to in these tests.
+MOE_EXPERTS_FORMAT = Qwen3MoEExpertsFormat.FUSED
+
+
+QWEN3_MOE_PARAMETERS = Qwen3MoEParameters(
+    layer=Qwen3MoELayerParameters(
+        hidden_size=_HIDDEN_SIZE,
+        intermediate_size=_INTERMEDIATE_SIZE_MOE,
+        num_experts=_NUM_EXPERTS_MOE,
+        experts_top_k=_EXPERTS_TOP_K_MOE,
+        num_attention_heads=_NUM_ATTENTION_HEADS,
+        num_key_value_heads=_NUM_KV_HEADS,
+        rms_norm_eps=_RMS_NORM_EPS,
+        head_dim=_HEAD_DIM,
     ),
-    ModelCatalogue.QWEN3_DENSE: Qwen3DenseParameters(
-        layer=Qwen3DenseLayerParameters(
-            hidden_size=_HIDDEN_SIZE,
-            intermediate_size=_INTERMEDIATE_SIZE_DENSE,
-            num_attention_heads=_NUM_ATTENTION_HEADS,
-            num_key_value_heads=_NUM_KV_HEADS,
-            rms_norm_eps=_RMS_NORM_EPS,
-            head_dim=_HEAD_DIM,
-        ),
-        rope_base=_ROPE_BASE,
-        max_position_ids=_MAX_POS_ID,
-        num_hidden_layers=_NUM_LAYERS,
-        split_vocab_size=_VOCAB_SPLIT_SIZE,
-        split_vocab_order=_VOCAB_SPLIT_ORDER,
+    rope_base=_ROPE_BASE,
+    max_position_ids=_MAX_POS_ID,
+    num_hidden_layers=_NUM_LAYERS,
+    split_vocab_size=_VOCAB_SPLIT_SIZE,
+    split_vocab_order=_VOCAB_SPLIT_ORDER,
+)
+
+QWEN3_DENSE_PARAMETERS = Qwen3DenseParameters(
+    layer=Qwen3DenseLayerParameters(
+        hidden_size=_HIDDEN_SIZE,
+        intermediate_size=_INTERMEDIATE_SIZE_DENSE,
+        num_attention_heads=_NUM_ATTENTION_HEADS,
+        num_key_value_heads=_NUM_KV_HEADS,
+        rms_norm_eps=_RMS_NORM_EPS,
+        head_dim=_HEAD_DIM,
     ),
+    rope_base=_ROPE_BASE,
+    max_position_ids=_MAX_POS_ID,
+    num_hidden_layers=_NUM_LAYERS,
+    split_vocab_size=_VOCAB_SPLIT_SIZE,
+    split_vocab_order=_VOCAB_SPLIT_ORDER,
+)
+
+D9D_MODEL_PARAMETERS: dict[ModelCatalogue, Qwen3MoEParameters | Qwen3DenseParameters] = {
+    ModelCatalogue.QWEN3_MOE: QWEN3_MOE_PARAMETERS,
+    ModelCatalogue.QWEN3_DENSE: QWEN3_DENSE_PARAMETERS,
 }
 
 
-HF_MODEL_PARAMETERS = {
+HF_MODEL_PARAMETERS: dict[ModelCatalogue, PretrainedConfig] = {
     ModelCatalogue.QWEN3_MOE: Qwen3MoeConfig(
         vocab_size=_VOCAB_MERGED,
         num_hidden_layers=_NUM_LAYERS,
@@ -120,6 +147,17 @@ HF_MODEL_PARAMETERS = {
 }
 
 
+BACKBONE_CLASSES: dict[ModelCatalogue, type[Qwen3MoEModel] | type[Qwen3DenseModel]] = {
+    ModelCatalogue.QWEN3_MOE: Qwen3MoEModel,
+    ModelCatalogue.QWEN3_DENSE: Qwen3DenseModel,
+}
+
+BACKBONE_PARALLELIZE_FN: dict[ModelCatalogue, Callable[..., None]] = {
+    ModelCatalogue.QWEN3_MOE: parallelize_qwen3_moe_model,
+    ModelCatalogue.QWEN3_DENSE: parallelize_qwen3_dense_model,
+}
+
+
 _HF_INIT_SEED = 131232
 _D9D_INIT_SEED = 123213
 
@@ -141,17 +179,53 @@ def hf_model_factory(
     return _build_fn
 
 
-TModel = TypeVar("TModel")
+ComposeDecoder = Callable[[DecoderBackbone, PipelineStageInfo], DecoderWithHead | DecoderWithHeads]
+"""Composes a freshly built backbone with the head(s) a suite exercises."""
 
 
-def d9d_model_factory(
-    model_class: type[TModel],
-    **model_kwargs,
-) -> Callable[[PipelineStageInfo], TModel]:
-    def _build_fn(stage: PipelineStageInfo):
+def make_d9d_model_factory(
+    model_type: ModelCatalogue,
+    compose: ComposeDecoder,
+    enable_checkpointing: bool,
+) -> Callable[[PipelineStageInfo], DecoderWithHead | DecoderWithHeads]:
+    """Builds a factory that composes the backbone with the suite's heads on the target device."""
+
+    def _build_fn(stage: PipelineStageInfo) -> DecoderWithHead | DecoderWithHeads:
         with torch_seed(_D9D_INIT_SEED):
-            model = model_class(**model_kwargs, stage=stage).cuda().bfloat16()
+            backbone = BACKBONE_CLASSES[model_type](
+                D9D_MODEL_PARAMETERS[model_type],
+                stage,
+                hidden_states_snapshot_mode=HiddenStatesAggregationMode.no,
+                enable_checkpointing=enable_checkpointing,
+            )
+            model = compose(backbone, stage).cuda().bfloat16()
             model.reset_parameters()
             return model
 
     return _build_fn
+
+
+def parallelize_decoder(
+    model: DecoderWithHead | DecoderWithHeads,
+    model_type: ModelCatalogue,
+    dist_context: DistributedContext,
+    stage: PipelineStageInfo,
+) -> None:
+    """Parallelizes a composed decoder: the per-family backbone routine, then each head by its type."""
+    BACKBONE_PARALLELIZE_FN[model_type](dist_context, model.model, stage)
+
+    if not stage.is_current_stage_last:
+        return
+
+    heads = [model.head] if isinstance(model, DecoderWithHead) else list(model.heads.values())
+
+    for head in heads:
+        match head:
+            case SplitLanguageModellingHead():
+                parallelize_causal_lm_head(head, dist_context)
+            case ClassificationHead():
+                parallelize_classification_head(head, dist_context)
+            case EmbeddingHead():
+                parallelize_embedding_head(head, dist_context)
+            case _:
+                raise ValueError(f"Unknown head type: {type(head)}")

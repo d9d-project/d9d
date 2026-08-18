@@ -10,23 +10,14 @@ from .huggingface import (
     mapper_to_huggingface_qwen3_moe_for_classification,
     mapper_to_huggingface_qwen3_moe_for_embedding,
 )
-from .model import Qwen3MoEForCausalLM, Qwen3MoEForClassification, Qwen3MoEForEmbedding, Qwen3MoEModel
+from .model import Qwen3MoEModel
 from .params import (
-    Qwen3MoEForCausalLMParameters,
-    Qwen3MoEForClassificationParameters,
-    Qwen3MoEForEmbeddingParameters,
     Qwen3MoELayerParameters,
     Qwen3MoEParameters,
 )
 
 __all__ = [
     "Qwen3MoEExpertsFormat",
-    "Qwen3MoEForCausalLM",
-    "Qwen3MoEForCausalLMParameters",
-    "Qwen3MoEForClassification",
-    "Qwen3MoEForClassificationParameters",
-    "Qwen3MoEForEmbedding",
-    "Qwen3MoEForEmbeddingParameters",
     "Qwen3MoELayer",
     "Qwen3MoELayerParameters",
     "Qwen3MoEModel",

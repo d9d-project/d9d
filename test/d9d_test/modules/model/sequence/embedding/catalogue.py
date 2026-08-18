@@ -1,27 +1,22 @@
 import transformers as tr
-from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
+from d9d.module.model import DecoderForEmbedding, EmbeddingHeadConfig
 from d9d.module.model.qwen3_dense import (
-    Qwen3DenseForEmbedding,
-    Qwen3DenseForEmbeddingParameters,
     mapper_from_huggingface_qwen3_dense_for_embedding,
     mapper_to_huggingface_qwen3_dense_for_embedding,
 )
 from d9d.module.model.qwen3_moe import (
-    Qwen3MoEExpertsFormat,
-    Qwen3MoEForEmbedding,
-    Qwen3MoEForEmbeddingParameters,
     mapper_from_huggingface_qwen3_moe_for_embedding,
     mapper_to_huggingface_qwen3_moe_for_embedding,
 )
-from d9d.module.parallelism.model.qwen3_dense import parallelize_qwen3_dense_for_embedding
-from d9d.module.parallelism.model.qwen3_moe import parallelize_qwen3_moe_for_embedding
 
 from d9d_test.modules.model.sequence.catalogue import (
-    D9D_MODEL_PARAMETERS,
     HF_MODEL_PARAMETERS,
+    MOE_EXPERTS_FORMAT,
+    QWEN3_DENSE_PARAMETERS,
+    QWEN3_MOE_PARAMETERS,
     ModelCatalogue,
-    d9d_model_factory,
     hf_model_factory,
+    make_d9d_model_factory,
 )
 
 HF_MODEL_FACTORY_EMBEDDING = {
@@ -38,65 +33,34 @@ HF_MODEL_FACTORY_EMBEDDING = {
 }
 
 
-_D9D_PARAMS = {
-    ModelCatalogue.QWEN3_MOE: Qwen3MoEForEmbeddingParameters(
-        model=D9D_MODEL_PARAMETERS[ModelCatalogue.QWEN3_MOE],
-        embedding_dim=None,
-        normalize=False,
-    ),
-    ModelCatalogue.QWEN3_DENSE: Qwen3DenseForEmbeddingParameters(
-        model=D9D_MODEL_PARAMETERS[ModelCatalogue.QWEN3_DENSE],
-        embedding_dim=None,
-        normalize=False,
-    ),
-}
+def _head_config() -> EmbeddingHeadConfig:
+    return EmbeddingHeadConfig(embedding_dim=None, normalize=False)
 
 
 D9D_MODEL_FACTORIES_EMBEDDING = {
-    ModelCatalogue.QWEN3_MOE: [
-        d9d_model_factory(
-            Qwen3MoEForEmbedding,
-            params=_D9D_PARAMS[ModelCatalogue.QWEN3_MOE],
-            hidden_states_snapshot_mode=HiddenStatesAggregationMode.no,
+    model_type: [
+        make_d9d_model_factory(
+            model_type,
+            compose=lambda backbone, stage: DecoderForEmbedding(backbone, _head_config(), stage),
             enable_checkpointing=enable_checkpointing,
         )
         for enable_checkpointing in (True, False)
-    ],
-    ModelCatalogue.QWEN3_DENSE: [
-        d9d_model_factory(
-            Qwen3DenseForEmbedding,
-            params=_D9D_PARAMS[ModelCatalogue.QWEN3_DENSE],
-            hidden_states_snapshot_mode=HiddenStatesAggregationMode.no,
-            enable_checkpointing=enable_checkpointing,
-        )
-        for enable_checkpointing in (True, False)
-    ],
+    ]
+    for model_type in ModelCatalogue
 }
 
 
+# The HuggingFace embedding reference is the bare backbone (no "model." prefix, no head weights).
 HF_TO_D9D_MAPPER_EMBEDDING = {
     ModelCatalogue.QWEN3_MOE: mapper_from_huggingface_qwen3_moe_for_embedding(
-        _D9D_PARAMS[ModelCatalogue.QWEN3_MOE],
-        experts_format=Qwen3MoEExpertsFormat.FUSED,
+        QWEN3_MOE_PARAMETERS, experts_format=MOE_EXPERTS_FORMAT
     ),
-    ModelCatalogue.QWEN3_DENSE: mapper_from_huggingface_qwen3_dense_for_embedding(
-        _D9D_PARAMS[ModelCatalogue.QWEN3_DENSE]
-    ),
+    ModelCatalogue.QWEN3_DENSE: mapper_from_huggingface_qwen3_dense_for_embedding(QWEN3_DENSE_PARAMETERS),
 }
-
 
 D9D_TO_HF_MAPPER_EMBEDDING = {
     ModelCatalogue.QWEN3_MOE: mapper_to_huggingface_qwen3_moe_for_embedding(
-        _D9D_PARAMS[ModelCatalogue.QWEN3_MOE],
-        experts_format=Qwen3MoEExpertsFormat.FUSED,
+        QWEN3_MOE_PARAMETERS, experts_format=MOE_EXPERTS_FORMAT
     ),
-    ModelCatalogue.QWEN3_DENSE: mapper_to_huggingface_qwen3_dense_for_embedding(
-        _D9D_PARAMS[ModelCatalogue.QWEN3_DENSE]
-    ),
-}
-
-
-D9D_PARALLELIZE_FN = {
-    ModelCatalogue.QWEN3_MOE: parallelize_qwen3_moe_for_embedding,
-    ModelCatalogue.QWEN3_DENSE: parallelize_qwen3_dense_for_embedding,
+    ModelCatalogue.QWEN3_DENSE: mapper_to_huggingface_qwen3_dense_for_embedding(QWEN3_DENSE_PARAMETERS),
 }
