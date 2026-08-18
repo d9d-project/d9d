@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.19.0 (2026-08-18)
+
+### Features
+
+- Introduce multi-head models
+  ([`bd7b09e`](https://github.com/d9d-project/d9d/commit/bd7b09edd869e1f7aab0289075cac4dbcca1f082))
+
+
 ## v0.18.0 (2026-07-20)
 
 ### Features
