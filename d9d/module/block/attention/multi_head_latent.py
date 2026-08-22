@@ -150,22 +150,28 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         """Rank of the Q low-rank path, or ``None`` if Q is projected directly."""
         return self._q_lora_rank
 
-    def forward(
+    @property
+    def scaling(self) -> float:
+        """Softmax scaling factor applied to the attention logits."""
+        return self._scaling
+
+    def project_query_key_value(
         self,
         hidden_states: torch.Tensor,
-        attention_mask: torch.Tensor | None,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
-    ) -> torch.Tensor:
-        """Computes Multi-Head Latent Attention.
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Projects the inputs into the query, key and value states consumed by the attention kernel.
+
+        The latent compression and RoPE are already applied to the returned states; the decoupled
+        RoPE key sub-vector is shared across all heads (MQA-style), so keys carry a full head axis.
 
         Args:
             hidden_states: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.
-            attention_mask: Optional attention mask.
             position_embeddings: Tuple ``(cos, sin)`` for the RoPE sub-vectors.
-                Each tensor shape: ``(batch, seq_len, qk_rope_head_dim)``.
 
         Returns:
-            Output tensor. Shape: ``(batch, seq_len, hidden_size)``.
+            A tuple of query, key and value states. Shapes: ``(batch, seq_len, n_heads, qk_head_dim)``
+            for the queries and keys, and ``(batch, seq_len, n_heads, v_head_dim)`` for the values.
         """
         b, s, _ = hidden_states.shape
         cos, sin = position_embeddings
@@ -190,6 +196,29 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         k_rope = k_rope.unsqueeze(2).expand(-1, -1, self._n_heads, -1).contiguous()
         _, k_rope = self.rope(k_rope, k_rope, cos, sin)
         k = torch.cat([k_nope, k_rope], dim=-1)
+
+        return q, k, v
+
+    def forward(
+        self,
+        hidden_states: torch.Tensor,
+        attention_mask: torch.Tensor | None,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+    ) -> torch.Tensor:
+        """Computes Multi-Head Latent Attention.
+
+        Args:
+            hidden_states: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.
+            attention_mask: Optional attention mask.
+            position_embeddings: Tuple ``(cos, sin)`` for the RoPE sub-vectors.
+                Each tensor shape: ``(batch, seq_len, qk_rope_head_dim)``.
+
+        Returns:
+            Output tensor. Shape: ``(batch, seq_len, hidden_size)``.
+        """
+        b, s, _ = hidden_states.shape
+
+        q, k, v = self.project_query_key_value(hidden_states, position_embeddings)
 
         # --- Attention ---
         # torch.nn.functional.scaled_dot_product_attention with SDPBackend.FLASH_ATTENTION
