@@ -4,8 +4,9 @@
 
 A multimodal model in d9d is the explicit composition of three parts: a **modality encoder** (e.g.
 a vision tower), the **merge** of media embeddings into the token sequence, and the regular
-**language backbone**. There is no generic "multimodal model" base class — each model package
-assembles the pieces explicitly, following the [model design](./model_design.md) principles.
+**language backbone**. There is no generic "multimodal model" base class — a model package supplies
+the encoder and the backbone, and `MultimodalBackbone` composes them, following the
+[model design](./model_design.md) principles.
 
 Everything modality-specific happens strictly on the **first pipeline stage**. After the merge,
 the payload crossing stage boundaries is the ordinary `SequenceTransfer` — pipelining schedules
@@ -47,6 +48,40 @@ A modality encoder is any module satisfying the `ModalityEncoder` protocol: it c
 `MediaSegments` and returns `(total_media_tokens, hidden_size)` embeddings. The merge is performed
 by `merge_media_embeddings` (`d9d.module.block.embedding`), which validates that the placeholder
 count matches the media token count and scatters the embeddings in.
+
+## Composing a Multimodal Model
+
+`MultimodalBackbone` (`d9d.module.model`) wraps a text-only backbone with a modality encoder and is
+itself a `DecoderBackbone`, so the task heads attach to it exactly as to a text-only backbone:
+
+```python
+from d9d.module.model import DecoderForCausalLM, MultimodalBackbone
+
+backbone = MultimodalBackbone(
+    Qwen3DenseModel(params.model, stage, ...),   # any DecoderBackbone[SequenceInput]
+    MyVisionTower(params.vision),                # any ModalityEncoder
+    stage,
+)
+model = DecoderForCausalLM(backbone, stage)
+```
+
+On the first stage it embeds the tokens, runs the encoder, merges the media embeddings into the
+placeholder positions, and hands the result to the wrapped backbone. Later stages are delegated
+unchanged.
+
+The wrapped backbone needs no multimodal awareness — it only has to honour
+`SequenceInput.inputs_embeds`, which is how it receives the merged embeddings instead of doing its
+own lookup:
+
+```python
+if first_inputs.inputs_embeds is not None:
+    hidden_states = first_inputs.inputs_embeds
+else:
+    hidden_states = self.embed_tokens(first_inputs.input_ids)
+```
+
+The encoder is reached as `model.model.encoder` and the language backbone as `model.model.model`,
+so each is parallelized and checkpoint-mapped independently.
 
 ## Multimodal Positions (MRoPE)
 

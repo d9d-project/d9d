@@ -28,8 +28,13 @@ class ModalityEncoder(Protocol):
 
     This acts as a structural trait for modality encoder modules (e.g. a vision tower). Any
     encoder must provide a ``__call__`` method with this signature since PyTorch modules are
-    invoked directly.
+    invoked directly, plus ``reset_parameters`` so the composing model can initialize it under
+    late init.
     """
+
+    def reset_parameters(self) -> None:
+        """Resets the encoder's parameters."""
+        ...
 
     def __call__(self, media: MediaSegments) -> torch.Tensor:
         """Encodes packed media segments.
