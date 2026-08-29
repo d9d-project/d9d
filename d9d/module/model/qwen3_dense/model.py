@@ -139,7 +139,10 @@ class Qwen3DenseModel(
 
         if self._stage.is_current_stage_first:
             first_inputs = cast(SequenceInput, inputs)
-            last_hidden_states = self.embed_tokens(first_inputs.input_ids)
+            if first_inputs.inputs_embeds is not None:
+                last_hidden_states = first_inputs.inputs_embeds
+            else:
+                last_hidden_states = self.embed_tokens(first_inputs.input_ids)
             hidden_states_snapshot = None
             state_aggregator.add_hidden_states(last_hidden_states)
         else:
