@@ -173,6 +173,32 @@ We use [Semantic Release](https://python-semantic-release.readthedocs.io/en/late
 *   `fix(checkpoint): fix async dcp`
 *   `docs: update contributing guide`
 
+### PR Descriptions
+
+The diff already says *what* changed - the description says *why*, and it should be as short as the
+change allows. A one-file fix gets two or three sentences; a new subsystem gets sections. When in
+doubt, cut.
+
+Write down, in this order, only the parts that apply:
+
+*   **The problem.** What was broken, missing or slow, and under which configuration it showed up
+    (topology, parallelism degrees, hardware). Skip it only when the title is already the whole story.
+*   **The approach.** The decision a reviewer cannot read off the diff: why *this* solution, and what
+    you rejected. If a DEP covers it, link the DEP instead of re-arguing it here.
+
+Do not restate the diff file by file, do not paste `make lint` output, and do not describe code you
+did not write. Do not walk the reviewer through the behaviour you just wrote - on a small change the
+*why* is the entire description. Behaviour changes that users must react to (renamed config keys,
+new required arguments, dropped defaults) belong in the description even when everything else is
+obvious.
+
+### Attribution
+
+Commit messages and PR descriptions carry no tooling attribution. Do not add `Co-Authored-By`
+trailers for AI assistants, and do not append "Generated with ..." footers - this applies to
+agents working in this repository as well. The human who opens the PR is its author and owns the
+change; a tool credit only blurs who is accountable for the code.
+
 ## Pull Request Checklist
 
 Before submitting a PR, ensure you have:
@@ -182,6 +208,7 @@ Before submitting a PR, ensure you have:
 3.  [ ] Ran `make lint` to fix formatting, imports and check for typing issues.
 4.  [ ] Ran `make test` to ensure no regressions.
 5.  [ ] Used a Conventional Commit title for your PR.
+6.  [ ] Written a description that explains the problem and the approach (see above).
 
 ---
 
