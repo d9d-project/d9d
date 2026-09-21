@@ -63,7 +63,8 @@ def load_model_state(
     model state without changing it.
 
     Args:
-        src_dir: Directory containing .safetensors and index files.
+        src_dir: Directory containing the checkpoint: either sharded .safetensors files described by a
+            `model.safetensors.index.json` file, or a single unindexed `model.safetensors` file.
         mapper: The topology defining how mapping from disk keys to model keys works.
         device: The device to load tensors onto (usually "cpu" or "cuda").
         model: The model instance to load weights into.

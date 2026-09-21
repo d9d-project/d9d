@@ -6,7 +6,7 @@ import torch
 from safetensors import safe_open
 from tqdm import tqdm
 
-from d9d.model_state.io.dto import MODEL_STATE_INDEX_FILE_NAME, ModelStateIndex
+from d9d.model_state.io.dto import MODEL_STATE_INDEX_FILE_NAME, MODEL_STATE_SINGLE_FILE_NAME, ModelStateIndex
 from d9d.model_state.mapper import ModelStateMapper
 
 
@@ -21,12 +21,12 @@ class _StateLoadingFlow:
         self._device = device
 
         # I/O in constructor!
-        self._index = self._load_index()
+        self._weight_map = self._load_weight_map()
         self._groups_to_process = set(mapper.state_dependency_groups())
 
         self._stored_states: dict[str, torch.Tensor] = {}
 
-        self._check_index()
+        self._check_weight_map()
 
         desc = f"Loading Model States [{position}]" if position is not None else "Loading Model States"
         self._pbar = tqdm(
@@ -37,18 +37,39 @@ class _StateLoadingFlow:
             leave=True,
         )
 
-    def _load_index(self) -> ModelStateIndex:
+    def _load_weight_map(self) -> dict[str, str]:
         index_file = self._src_dir / MODEL_STATE_INDEX_FILE_NAME
+        if not index_file.is_file():
+            return self._load_single_file_weight_map()
         index_data = index_file.read_text(encoding="utf-8")
         index = ModelStateIndex.model_validate_json(index_data)
-        return index
+        return index.weight_map
 
-    def _check_index(self):
+    def _load_single_file_weight_map(self) -> dict[str, str]:
+        """Builds the weight map out of a single-file checkpoint, which carries no index.
+
+        Returns:
+            Mapping from state name to the name of the .safetensors file holding it.
+
+        Raises:
+            FileNotFoundError: If the source directory carries neither an index nor a single-file checkpoint.
+        """
+        single_file = self._src_dir / MODEL_STATE_SINGLE_FILE_NAME
+        if not single_file.is_file():
+            raise FileNotFoundError(
+                f"Cannot run state loading: {self._src_dir} contains neither {MODEL_STATE_INDEX_FILE_NAME} "
+                f"nor {MODEL_STATE_SINGLE_FILE_NAME}!"
+            )
+
+        with safe_open(str(single_file), framework="pt") as st:
+            return dict.fromkeys(st.keys(), MODEL_STATE_SINGLE_FILE_NAME)
+
+    def _check_weight_map(self):
         will_process_inputs: set[str] = set()
         for group in self._groups_to_process:
             will_process_inputs.update(group.inputs)
 
-        on_disk_inputs = set(self._index.weight_map.keys())
+        on_disk_inputs = set(self._weight_map.keys())
 
         missing_inputs = will_process_inputs.difference(on_disk_inputs)
 
@@ -78,7 +99,7 @@ class _StateLoadingFlow:
         plan = defaultdict(set)
         for group in self._mapper.state_dependency_groups():
             for key in group.inputs:
-                require_file = self._index.weight_map[key]
+                require_file = self._weight_map[key]
                 plan[require_file].add(key)
         return plan
 
@@ -99,7 +120,8 @@ def read_model_state(
     after the mapper processes them.
 
     Args:
-        src_dir: The directory containing .safetensors files and `model.safetensors.index.json` file.
+        src_dir: The directory containing the checkpoint: either sharded .safetensors files described by a
+            `model.safetensors.index.json` file, or a single unindexed `model.safetensors` file.
         mapper: The transformation graph defining how to map on-disk keys to output keys.
         device: The device to load tensors onto (e.g., "cpu", "cuda:0").
         show_progress: Whether to display a progress bar.
