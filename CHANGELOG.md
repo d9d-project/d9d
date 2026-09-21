@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.19.1 (2026-09-21)
+
+### Bug Fixes
+
+- **loop**: Export model state when no parallelism is configured
+  ([`b3f7049`](https://github.com/d9d-project/d9d/commit/b3f7049bf35d3d977e3a8ed13370bad1c3f5b0dd))
+
+
 ## v0.19.0 (2026-08-18)
 
 ### Features
