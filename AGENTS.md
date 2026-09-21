@@ -6,19 +6,19 @@ Guidance for AI agents working in the **d9d** repository.
 
 Most conventions are already documented. Always read relevant files (especially `CONTRIBUTING.md` before solving any task).
 
-- `README.md` - project purpose, philosophy, and what d9d is/isn't.
-- `CONTRIBUTING.md` - the canonical reference. It covers:
+- @README.md - project purpose, philosophy, and what d9d is/isn't.
+- @CONTRIBUTING.md - the canonical reference. It covers:
   - Development setup.
   - The `Makefile` workflow.
   - Design Principles. Treat these as hard rules when writing or changing code.
   - Linting (`ruff`), type checking (`ty`), testing tiers, and docstring style.
   - The DEP process for major changes.
   - Conventional Commits format and the PR checklist.
-- `deps/0001-dep-process.md` - when and how to write a D9D Enhancement Proposal.
+- @deps/0001-dep-process.md - when and how to write a D9D Enhancement Proposal.
 - `pyproject.toml` - authoritative source for enabled `ruff` rules, `ty` config, and dependencies.
 - `docs/` - user-facing documentation, mirrors the package layout in `d9d/`.
-  - `docs/index.md` - user-facing intro.
-  - `docs/toc.md` - annotated map of every subsystem and its docs page.
+  - @docs/index.md - user-facing intro.
+  - @docs/toc.md - annotated map of every subsystem and its docs page.
 
 ## Where things live
 
