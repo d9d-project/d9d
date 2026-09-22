@@ -58,7 +58,8 @@ from d9d.model_state.mapper.adapters import identity_mapper_from_module
 mapper = identity_mapper_from_module(model)
 
 # Start the stream
-# 'src_dir' must contain safetensors files and model.safetensors.index.json
+# 'src_dir' must contain either sharded safetensors files along with
+# model.safetensors.index.json, or a single unindexed model.safetensors
 loader_stream = read_model_state(
     src_dir=Path("./checkpoint"),
     mapper=mapper,

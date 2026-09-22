@@ -1,4 +1,5 @@
 import json
+import re
 
 import pytest
 import torch
@@ -13,6 +14,7 @@ from d9d.model_state.mapper import ModelStateMapper, StateGroup
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
 from d9d.model_state.mapper.compose import ModelStateMapperSequential
 from d9d.model_state.mapper.leaf import ModelStateMapperRename, ModelStateMapperStackTensors
+from safetensors.torch import save_file
 from torch import nn
 
 
@@ -142,3 +144,37 @@ def test_sharding_enforcement(tmp_path, device):
     files = {x.name for x in dest.iterdir()}
     expect_files = {MODEL_STATE_INDEX_FILE_NAME, "model-00001-of-00002.safetensors", "model-00002-of-00002.safetensors"}
     assert files == expect_files
+
+
+@pytest.mark.local
+@pytest.mark.parametrize("device", ["cpu", "cuda"])
+def test_model_load_single_file_without_index(tmp_path, device):
+    model = SimpleModel().to(device)
+    with torch.no_grad():
+        model.fc.weight.fill_(2.5)
+        model.fc.bias.fill_(-0.5)
+
+    save_dir = tmp_path / "hf_single_file_ckpt"
+    mapper = identity_mapper_from_module(model)
+    save_model_state(dest_dir=save_dir, mapper=mapper, model=model, show_progress=False)
+
+    # Emulate a HF checkpoint published as a plain model.safetensors without an index
+    (save_dir / MODEL_STATE_INDEX_FILE_NAME).unlink()
+    (save_dir / "model-00001-of-00001.safetensors").rename(save_dir / "model.safetensors")
+    assert {x.name for x in save_dir.iterdir()} == {"model.safetensors"}
+
+    new_model = SimpleModel().to(device)
+    load_model_state(src_dir=save_dir, mapper=mapper, device=device, model=new_model, show_progress=False)
+
+    assert torch.equal(new_model.fc.weight, model.fc.weight)
+    assert torch.equal(new_model.fc.bias, model.fc.bias)
+
+
+@pytest.mark.local
+def test_read_without_index_and_single_file_raises(tmp_path):
+    src_dir = tmp_path / "no_index"
+    src_dir.mkdir()
+    save_file({"t1": torch.ones(4)}, str(src_dir / "model-00001-of-00001.safetensors"))
+
+    with pytest.raises(FileNotFoundError, match=re.escape("neither model.safetensors.index.json")):
+        dict(read_model_state(src_dir, ModelStateMapperRename("t1", "t1"), device="cpu", show_progress=False))

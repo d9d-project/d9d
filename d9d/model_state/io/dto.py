@@ -26,3 +26,4 @@ class ModelStateIndex(BaseModel):
 
 
 MODEL_STATE_INDEX_FILE_NAME = "model.safetensors.index.json"
+MODEL_STATE_SINGLE_FILE_NAME = "model.safetensors"
