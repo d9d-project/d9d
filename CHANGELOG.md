@@ -2,6 +2,19 @@
 
 <!-- version list -->
 
+## v0.19.2 (2026-09-22)
+
+### Bug Fixes
+
+- **model_state**: Load checkpoints without a safetensors index
+  ([`dc2c794`](https://github.com/d9d-project/d9d/commit/dc2c7945c114731df39585f819bb5f1189d015d2))
+
+### Documentation
+
+- Add CLAUDE.md so agent guidance actually gets read
+  ([`2d51b73`](https://github.com/d9d-project/d9d/commit/2d51b73b213ba6c6e6af49d7b614ba759ebc8162))
+
+
 ## v0.19.1 (2026-09-21)
 
 ### Bug Fixes
