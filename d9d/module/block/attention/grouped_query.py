@@ -88,6 +88,11 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         )
         self._is_causal = is_causal
 
+    @property
+    def scaling(self) -> float:
+        """Softmax scaling factor applied to the attention logits."""
+        return self._scaling
+
     def _apply_rope(
         self,
         query_states: torch.Tensor,
@@ -101,6 +106,40 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             q_rope, k_rope = self.rope(q_rope, k_rope, cos, sin)
             return torch.cat([q_rope, q_nope], dim=-1), torch.cat([k_rope, k_nope], dim=-1)
         return self.rope(query_states, key_states, cos, sin)
+
+    def project_query_key_value(
+        self,
+        hidden_states: torch.Tensor,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor],
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Projects the inputs into the query, key and value states consumed by the attention kernel.
+
+        The optional QK-Norm and RoPE are already applied to the returned states.
+
+        Args:
+            hidden_states: Input tensor. Shape: `(batch, seq_len, hidden_size)`.
+            position_embeddings: Tuple of `(cos, sin)` tensors for RoPE application.
+
+        Returns:
+            A tuple of query, key and value states. Shapes: `(batch, seq_len, n_q_heads, head_dim)`
+            for the queries and `(batch, seq_len, n_kv_heads, head_dim)` for the keys and values.
+        """
+        hidden_shape = (*hidden_states.shape[:-1], -1, self._head_dim)
+
+        query_states = self.q_proj(hidden_states).view(hidden_shape)
+        if self.q_norm is not None:
+            query_states = self.q_norm(query_states)
+
+        key_states = self.k_proj(hidden_states).view(hidden_shape)
+        if self.k_norm is not None:
+            key_states = self.k_norm(key_states)
+
+        value_states = self.v_proj(hidden_states).view(hidden_shape)
+
+        cos, sin = position_embeddings
+        query_states, key_states = self._apply_rope(query_states, key_states, cos, sin)
+
+        return query_states, key_states, value_states
 
     def forward(
         self,
@@ -121,20 +160,8 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
             The attention output tensor. Shape: `(batch, seq_len, hidden_size)`.
         """
         input_shape = hidden_states.shape[:-1]
-        hidden_shape = (*input_shape, -1, self._head_dim)
 
-        query_states = self.q_proj(hidden_states).view(hidden_shape)
-        if self.q_norm is not None:
-            query_states = self.q_norm(query_states)
-
-        key_states = self.k_proj(hidden_states).view(hidden_shape)
-        if self.k_norm is not None:
-            key_states = self.k_norm(key_states)
-
-        value_states = self.v_proj(hidden_states).view(hidden_shape)
-
-        cos, sin = position_embeddings
-        query_states, key_states = self._apply_rope(query_states, key_states, cos, sin)
+        query_states, key_states, value_states = self.project_query_key_value(hidden_states, position_embeddings)
 
         outputs = self.kernel(
             query_states,
