@@ -27,9 +27,7 @@ class ModelStageExporter:
         alone = not self._dist_context.mesh_params.is_distributed
         stages = self._modules.modules
         if alone and len(stages) != 1:
-            raise ValueError(
-                f"a run without parallelism holds one model stage, but this one holds {len(stages)}"
-            )
+            raise ValueError(f"a run without parallelism holds one model stage, but this one holds {len(stages)}")
 
         mappers = []
         for stage in stages:
