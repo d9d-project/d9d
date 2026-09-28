@@ -26,7 +26,6 @@ Most conventions are already documented. Always read relevant files (especially 
 - `test/d9d_test/` - tests. `-m local` (single process) and `-m distributed` (require `torchrun`).
 - `deps/` - enhancement proposals.
 - `example/` - runnable training examples.
-- `packages/` - manually-built optional dependencies (see `compat-local-overrides` in [CONTRIBUTING.md](./CONTRIBUTING.md)).
 
 ### Source layout (`d9d/`)
 
