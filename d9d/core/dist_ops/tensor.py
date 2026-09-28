@@ -32,7 +32,7 @@ def gather(
     work = dist.gather(tensor, save_list, group=group, group_dst=group_dst, async_op=async_op)
 
     if async_op:
-        return save_list, work
+        return save_list, cast(dist.Work, work)
     else:
         return save_list
 
@@ -58,7 +58,7 @@ def all_gather(
     save_list = [torch.empty_like(tensor) for _ in range(group.size())]
     work = dist.all_gather(save_list, tensor, group=group, async_op=async_op)
     if async_op:
-        return save_list, work
+        return save_list, cast(dist.Work, work)
     else:
         return save_list
 
@@ -105,7 +105,7 @@ def all_gather_variadic_shape(
     all_result = [torch.empty(tuple(shape), dtype=tensor.dtype, device=tensor.device) for shape in all_shape]
     all_result_wait = dist.all_gather(all_result, tensor, group=group, async_op=async_op)
     if async_op:
-        return all_result, all_result_wait
+        return all_result, cast(dist.Work, all_result_wait)
     else:
         return all_result
 

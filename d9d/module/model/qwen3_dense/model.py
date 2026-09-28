@@ -153,7 +153,9 @@ class Qwen3DenseModel(
             decoder_layer = self.layers[decoder_layer_name]
 
             if self._enable_checkpointing:
-                last_hidden_states = checkpoint(decoder_layer, last_hidden_states, rope_params, use_reentrant=False)
+                last_hidden_states = cast(
+                    torch.Tensor, checkpoint(decoder_layer, last_hidden_states, rope_params, use_reentrant=False)
+                )
             else:
                 last_hidden_states = decoder_layer(last_hidden_states, rope_params)
 

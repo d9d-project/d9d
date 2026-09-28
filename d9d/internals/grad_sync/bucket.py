@@ -202,7 +202,8 @@ class SyncGradientBucket(AbstractGradientBucket):
             param: The parameter that finished backward pass.
 
         Raises:
-            ValueError: If the bucket is already ready to sync but hasn't been synced yet.
+            ValueError: If the bucket is already ready to sync but hasn't been synced yet,
+                or if the buffer is not initialized (call bind first).
         """
         self._accum_counter.update(param)
 
@@ -212,6 +213,10 @@ class SyncGradientBucket(AbstractGradientBucket):
         if self._ready_to_sync:
             raise ValueError("Tried to accumulate, but synchronization was not performed")
 
+        buffer = self._buffer
+        if buffer is None:
+            raise ValueError("Buffer is not initialized")
+
         with record_function("Gradient Sync"):
             # wait for backward operation is complete
             self._communicate_stream.wait_stream(torch.cuda.current_stream())
@@ -219,7 +224,7 @@ class SyncGradientBucket(AbstractGradientBucket):
             # data safety), but in a DIFFERENT stream
             with torch.cuda.stream(self._communicate_stream):
                 for group in self._reduce_groups:
-                    dist.all_reduce(self._buffer, op=dist.ReduceOp.SUM, group=group)
+                    dist.all_reduce(buffer, op=dist.ReduceOp.SUM, group=group)
             self._ready_to_sync = True
 
     def _bind_hooks(self):
