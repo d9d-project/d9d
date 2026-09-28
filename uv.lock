@@ -1049,7 +1049,7 @@ wheels = [
 
 [[package]]
 name = "d9d"
-version = "0.19.2"
+version = "0.19.3"
 source = { editable = "." }
 dependencies = [
     { name = "optree" },

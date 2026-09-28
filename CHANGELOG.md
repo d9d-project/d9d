@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.19.3 (2026-09-28)
+
+### Bug Fixes
+
+- Repair FA4 backend and typing after torch 2.14 bump
+  ([`c4bff1d`](https://github.com/d9d-project/d9d/commit/c4bff1dbce6f83c9649a3ff6134e2e101d3b0246))
+
+
 ## v0.19.2 (2026-09-22)
 
 ### Bug Fixes
