@@ -1,8 +1,7 @@
 import torch
 import torch.nn.functional as F
+from flash_attn.cute import flash_attn_func
 from torch import nn
-
-from d9d.kernel.flash_attn import flash_attn_func
 
 from ..config import FlashAttention4SdpaBackendConfig, SdpaParameters
 from ..protocol import SdpaBackend
