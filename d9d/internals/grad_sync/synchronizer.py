@@ -224,8 +224,16 @@ class GradientSynchronizer:
         self._communicate_stream = None
 
     def wait(self):
-        """Waits for all bucket operations (async reductions) to complete."""
-        torch.cuda.current_stream().wait_stream(self._communicate_stream)
+        """Waits for all bucket operations (async reductions) to complete.
+
+        Raises:
+            ValueError: If the synchronizer is not bound (call bind first).
+        """
+        stream = self._communicate_stream
+        if stream is None:
+            raise ValueError("Synchronizer is not bound")
+
+        torch.cuda.current_stream().wait_stream(stream)
 
         for bucket in self._buckets:
             bucket.mark_sync()
