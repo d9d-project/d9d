@@ -1118,7 +1118,7 @@ requires-dist = [
     { name = "deep-ep", marker = "extra == 'moe'", git = "https://github.com/deepseek-ai/DeepEP?rev=9af0e0d0e74f3577af1979c9b9e1ac2cad0104ee" },
     { name = "fla-core", marker = "extra == 'linear-attention'", specifier = ">=0.4.2" },
     { name = "flash-attn", marker = "extra == 'backend-sdpa-flash-attention-2'", git = "https://github.com/Dao-AILab/flash-attention?rev=edb5c76ee329b18ed95d1f7ea9aa522a1331ab7d" },
-    { name = "flash-attn-4", marker = "extra == 'backend-sdpa-flash-attention-4'", specifier = ">=4.0.0b32" },
+    { name = "flash-attn-4", marker = "extra == 'backend-sdpa-flash-attention-4'", specifier = ">=4.0.0b16" },
     { name = "nv-grouped-gemm", marker = "extra == 'moe'", specifier = ">=1.1.4" },
     { name = "optree", specifier = ">=0.19.0" },
     { name = "plotly", marker = "extra == 'visualization'", specifier = ">=6.0.0" },

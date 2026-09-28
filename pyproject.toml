@@ -54,7 +54,7 @@ backend-sdpa-flash-attention-2 = [
     "flash-attn>=2.0.0",  # SDPA Backend, https://github.com/Dao-AILab/flash-attention
 ]
 backend-sdpa-flash-attention-4 = [
-    "flash-attn-4>=4.0.0b32",  # SDPA Backend, https://github.com/Dao-AILab/flash-attention
+    "flash-attn-4>=4.0.0b16",  # SDPA Backend, https://github.com/Dao-AILab/flash-attention
 ]
 
 [project.urls]
