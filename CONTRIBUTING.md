@@ -10,7 +10,7 @@ Before starting work on a major feature, we highly recommend jumping into our [D
 
 ## Development Setup
 
-**d9d** uses [Poetry](https://python-poetry.org/) for dependency management and packaging. You will need Python 3.11+.
+**d9d** uses [uv](https://docs.astral.sh/uv/) for dependency management and packaging. You will need Python 3.11+.
 
 1.  **Clone the repository:**
     ```bash
@@ -20,21 +20,24 @@ Before starting work on a major feature, we highly recommend jumping into our [D
 
 2.  **Install dependencies:**
     ```bash
-    # Install all dependencies but optional ones requiring manual builds
-    poetry install --without compat-local-overrides
-    
+    # Create .venv and install the project with all dependency groups (dev, test, docs, examples), without extras
+    uv sync
+
     # Install pre-commit hooks
-    poetry run pre-commit install
+    uv run pre-commit install
     ```
 
-3. **(Optional) Install dependencies requiring manual builds:**
-   ```bash
-    # If you want to develop functional requiring optional dependencies
-    # that have to be built manually - just build the optional packages
-    # (you may find them in pyproject.toml), put into `./packages` directory
-    # and run this:
-    poetry install --with compat-local-overrides
+3.  **(Optional) Install extras:**
+    ```bash
+    # All extras at once, or pick specific ones with `--extra <name>`
+    uv sync --all-extras
     ```
+    Some extras (`moe`, `backend-sdpa-flash-attention-2`) contain CUDA extensions without usable prebuilt wheels,
+    so uv builds them from source against the locked `torch` (pinned revisions live in `[tool.uv.sources]` of
+    `pyproject.toml`). This requires the CUDA 13 toolkit installed at `/usr/local/cuda`, and the first build takes a while.
+
+    `uv sync` removes packages that were not requested, so pass the same `--extra`/`--all-extras` flags on every
+    subsequent sync. `uv run` (used by the `Makefile`) does not remove them.
 
 ## Development Workflow
 
