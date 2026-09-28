@@ -10,7 +10,7 @@ Before starting work on a major feature, we highly recommend jumping into our [D
 
 ## Development Setup
 
-**d9d** uses [Poetry](https://python-poetry.org/) for dependency management and packaging. You will need Python 3.11+.
+**d9d** uses [uv](https://docs.astral.sh/uv/) for dependency management and packaging. You will need Python 3.11+.
 
 1.  **Clone the repository:**
     ```bash
@@ -20,20 +20,11 @@ Before starting work on a major feature, we highly recommend jumping into our [D
 
 2.  **Install dependencies:**
     ```bash
-    # Install all dependencies but optional ones requiring manual builds
-    poetry install --without compat-local-overrides
-    
-    # Install pre-commit hooks
-    poetry run pre-commit install
-    ```
+    # Create .venv and install the project with all extras and dependency groups (dev, test, docs, examples)
+    uv sync --all-extras
 
-3. **(Optional) Install dependencies requiring manual builds:**
-   ```bash
-    # If you want to develop functional requiring optional dependencies
-    # that have to be built manually - just build the optional packages
-    # (you may find them in pyproject.toml), put into `./packages` directory
-    # and run this:
-    poetry install --with compat-local-overrides
+    # Install pre-commit hooks
+    uv run pre-commit install
     ```
 
 ## Development Workflow

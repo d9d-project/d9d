@@ -20,13 +20,11 @@ jobs:
         run: |
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-      - uses: actions/setup-python@v6
+      - uses: astral-sh/setup-uv@v10
         with:
           python-version: 3.11
-      - name: Install poetry
-        run: pipx install poetry
-      - run: poetry install --only docs
-      - run: poetry run zensical build --clean
+      - run: uv sync --locked --only-group docs
+      - run: uv run --no-sync zensical build --clean
       - uses: actions/upload-pages-artifact@v4
         with:
           path: site
