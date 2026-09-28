@@ -340,6 +340,12 @@ include = [
 ]
 rules = { all = "ignore" }
 
+# since triton 3.8, `JITFunction.__call__`/`ConstexprFunction.__call__` are typed with a `self: JITFunction[Callable[P, R]]`
+# self-type that ty fails to match, so every call of a triton function inside a kernel is reported
+[[tool.ty.overrides]]
+include = ["d9d/kernel/**"]
+rules = { invalid-argument-type = "ignore" }
+
 [tool.semantic_release]
 allow_zero_version = true
 major_on_zero = true
