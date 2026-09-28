@@ -141,7 +141,7 @@ class DistributedContext:
                 groups.append(mesh.get_group(dim))
 
         for group in groups:
-            torch.distributed.distributed_c10d._set_pg_timeout(datetime.timedelta(seconds=timeout_seconds), group)  # noqa: SLF001
+            torch.distributed.set_timeout(datetime.timedelta(seconds=timeout_seconds), group)
 
     @contextmanager
     def local_main_process_first(self):
