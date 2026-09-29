@@ -3,14 +3,16 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from d9d.core.dist_context import DeviceMeshParameters
+from d9d.core.dist_context import DeviceMeshParameters, DistributedContext
 from d9d.core.offload import DEFAULT_SLEEP_TAGS, SleepTag
 from d9d.internals.determinism import set_seeds
 from d9d.loop.component import (
+    ConfigurationMemorySnapshotter,
     DataParallelMicrobatchPackStream,
     GradientClipper,
     GradientManager,
     JobLogger,
+    JobMemorySnapshotter,
     JobProfiler,
     JobSchedule,
     ManualGarbageCollector,
@@ -109,6 +111,13 @@ class TrainingConfigurator:
     def _build_new_training_state(self) -> TrainJobState:
         dist_context = self._mesh.build()
 
+        configuration_snapshotter = ConfigurationMemorySnapshotter(
+            dist_context=dist_context, config=self._parameters.memory_snapshot
+        )
+        with configuration_snapshotter.record():
+            return self._build_training_state(dist_context)
+
+    def _build_training_state(self, dist_context: DistributedContext) -> TrainJobState:
         set_seeds(dist_context, seed=self._parameters.determinism.base_seed)
 
         timeout_manager = TimeoutManager(dist_context=dist_context, config=self._parameters.timeout)
@@ -192,6 +201,10 @@ class TrainingConfigurator:
 
         profiler = JobProfiler(dist_context=dist_context, schedule=schedule, config=self._parameters.profiling)
 
+        memory_snapshotter = JobMemorySnapshotter(
+            dist_context=dist_context, schedule=schedule, config=self._parameters.memory_snapshot
+        )
+
         exporter = ModelStageExporter(model_provider=self._model_provider, dist_context=dist_context, modules=modules)
 
         job_logger = JobLogger(
@@ -215,6 +228,7 @@ class TrainingConfigurator:
             lr_scheduler=scheduler,
             gradient_clipper=grad_clipper,
             profiler=profiler,
+            memory_snapshotter=memory_snapshotter,
             exporter=exporter,
             metrics=metrics,
             logger=job_logger,
@@ -286,6 +300,7 @@ class Trainer:
             self._state.logger.new_run() as run,
             self._state.garbage_collector as gc,
             self._state.profiler.open() as profiler,
+            self._state.memory_snapshotter.open(),
             self._state.gradient_manager.install(),
             self._state.gradient_clipper.install(),
             self._state.logger.install(),
@@ -336,6 +351,8 @@ class Trainer:
 
                 if profiler:
                     profiler.step()
+
+                self._state.memory_snapshotter.step()
 
                 self._state.timeout_manager.set_periodic()
 

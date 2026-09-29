@@ -10,6 +10,7 @@ from d9d.loop.component import (
     GradientManager,
     InferenceTaskOperator,
     JobLogger,
+    JobMemorySnapshotter,
     JobProfiler,
     JobSchedule,
     ManualGarbageCollector,
@@ -38,6 +39,7 @@ class JobState(Stateful):
         garbage_collector: Component for manual control of Python garbage collection.
         checkpointer: Component responsible for saving and loading execution states.
         profiler: Component for performance profiling.
+        memory_snapshotter: Component for memory snapshots of the loop steps.
         tracked_modules: Container holding the model (or model parts) being executed.
         microbatch_pack_stream: The microbatch pack stream feeding the loop.
         timeout_manager: Component for checking and refreshing distributed timeouts.
@@ -49,6 +51,7 @@ class JobState(Stateful):
     garbage_collector: ManualGarbageCollector
     checkpointer: StateCheckpointer
     profiler: JobProfiler
+    memory_snapshotter: JobMemorySnapshotter
 
     tracked_modules: TrackedModules
 

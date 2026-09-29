@@ -1,11 +1,13 @@
 import torch
 from tqdm import tqdm
 
-from d9d.core.dist_context import DeviceMeshParameters
+from d9d.core.dist_context import DeviceMeshParameters, DistributedContext
 from d9d.internals.determinism import set_seeds
 from d9d.loop.component import (
+    ConfigurationMemorySnapshotter,
     DataParallelMicrobatchPackStream,
     InferenceTaskOperator,
+    JobMemorySnapshotter,
     JobProfiler,
     JobSchedule,
     ManualGarbageCollector,
@@ -87,6 +89,13 @@ class InferenceConfigurator:
     def _build_new_state(self) -> InferenceJobState:
         dist_context = self._mesh.build()
 
+        configuration_snapshotter = ConfigurationMemorySnapshotter(
+            dist_context=dist_context, config=self._parameters.memory_snapshot
+        )
+        with configuration_snapshotter.record():
+            return self._build_state(dist_context)
+
+    def _build_state(self, dist_context: DistributedContext) -> InferenceJobState:
         pipelining_config = PipeliningConfig(schedule=PipelineScheduleInferenceConfig())
 
         set_seeds(dist_context, seed=self._parameters.determinism.base_seed)
@@ -137,6 +146,10 @@ class InferenceConfigurator:
 
         profiler = JobProfiler(dist_context=dist_context, schedule=schedule, config=self._parameters.profiling)
 
+        memory_snapshotter = JobMemorySnapshotter(
+            dist_context=dist_context, schedule=schedule, config=self._parameters.memory_snapshot
+        )
+
         return InferenceJobState(
             dist_context=dist_context,
             microbatch_pack_stream=checkpointable_stream,
@@ -146,6 +159,7 @@ class InferenceConfigurator:
             checkpointer=checkpointer,
             task=task,
             profiler=profiler,
+            memory_snapshotter=memory_snapshotter,
             timeout_manager=timeout_manager,
             task_operator=task_operator,
             event_bus=event_bus,
@@ -221,6 +235,7 @@ class Inference:
                 ) as bar,
                 self._state.garbage_collector as gc,
                 self._state.profiler.open() as profiler,
+                self._state.memory_snapshotter.open(),
             ):
                 self._state.event_bus.trigger(EVENT_INFERENCE_READY, EventInferenceReadyContext())
 
@@ -238,6 +253,8 @@ class Inference:
 
                     if profiler:
                         profiler.step()
+
+                    self._state.memory_snapshotter.step()
 
                     self._state.timeout_manager.set_periodic()
 

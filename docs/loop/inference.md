@@ -41,6 +41,7 @@ The `InferenceConfigurator.configure()` method performs a setup sequence similar
 
 1. **Distributed Context Initialization**:
     *   Constructs the global [DistributedContext](../core/dist_context.md).
+    *   If the `configure` memory snapshot is enabled, starts recording the rest of the configuration. [More info](../internals/profiling.md#memory-snapshots).
 
 2. **Seeding**:
     *   Sets distributed seeds. Determinism is crucial in inference for reproducible sampling or validation splits.
@@ -89,7 +90,7 @@ Before the loop starts:
     *   The `StateCheckpointer` loads the model weights from the specified checkpoint.
     *   If the job was interrupted previously, it also restores the `JobSchedule` and `MicrobatchPackStream` state to resume exactly where it left off.
 3.  **Context Entry**:
-    *   Enters UI, Garbage Collector, and Profiler contexts.
+    *   Enters UI, Garbage Collector, Profiler, and Memory Snapshotter contexts.
 4.  **Ready Hook Trigger**: `EVENT_INFERENCE_READY` is fired to mark initialization completion.
 
 #### 2. The Step Loop
@@ -106,6 +107,7 @@ For every step:
 
 3. **Maintenance**:
     *   **GC**: `ManualGarbageCollector` runs periodically to ensure peak memory usage is controlled.
+    *   **Memory Snapshots**: The `JobMemorySnapshotter` advances the memory snapshot windows.
     *   **Event-Based Logic**: Triggers `EVENT_INFERENCE_STEP_POST` event.
     *   **Advance**: The `JobSchedule` increments.
 

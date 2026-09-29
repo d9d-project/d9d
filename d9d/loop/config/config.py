@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import Self
 
-from pydantic import BaseModel
+from pydantic import BaseModel, PositiveInt, model_validator
 
 from d9d.pipelining.factory import AnyPipelineScheduleConfig
 from d9d.tracker import AnyTrackerConfig, RunConfig
@@ -112,6 +113,48 @@ class ProfilingConfig(BaseModel):
     active_steps: int
 
 
+class MemorySnapshotStepsConfig(BaseModel):
+    """Configuration for periodic memory snapshots of the job loop steps.
+
+    The first `active_steps` steps of every `period_steps`-long cycle are recorded into a single
+    snapshot. Cycles are aligned to the global step, so the very first step of the job - where
+    optimizer states and gradient buffers are allocated - is always recorded.
+
+    Attributes:
+        period_steps: Total length of a snapshotting cycle.
+        active_steps: Number of steps recorded at the beginning of each cycle.
+    """
+
+    period_steps: PositiveInt
+    active_steps: PositiveInt
+
+    @model_validator(mode="after")
+    def _validate_active_steps(self) -> Self:
+        if self.active_steps > self.period_steps:
+            raise ValueError("active_steps must not exceed period_steps")
+        return self
+
+
+class MemorySnapshotConfig(BaseModel):
+    """Configuration for CUDA caching allocator memory snapshots.
+
+    Attributes:
+        enabled: Whether to record memory snapshots.
+        snapshots_dir: Directory where snapshot files will be saved.
+        max_entries: Maximum number of allocator events kept in the recorded history of a single snapshot.
+        configure: Whether to snapshot the job configuration phase.
+        steps: Periodic snapshotting of the job loop steps. If None, steps are not snapshotted.
+    """
+
+    enabled: bool
+
+    snapshots_dir: Path
+    max_entries: PositiveInt
+
+    configure: bool
+    steps: MemorySnapshotStepsConfig | None
+
+
 class JobLoggerConfig(BaseModel):
     """Configuration for experiment tracking and logging.
 
@@ -163,6 +206,7 @@ class TrainerConfig(BaseModel):
         checkpointing: Checkpoint saving settings.
         gradient_clipping: Gradient clipping settings.
         profiling: Profiler settings.
+        memory_snapshot: Memory snapshot settings. If None, memory snapshots are disabled.
         gradient_manager: Gradient Synchronization Settings.
         timeout: Distributed timeout settings.
     """
@@ -177,6 +221,7 @@ class TrainerConfig(BaseModel):
     checkpointing: CheckpointingConfig
     gradient_clipping: GradientClippingConfig
     profiling: ProfilingConfig | None
+    memory_snapshot: MemorySnapshotConfig | None = None
     gradient_manager: GradientManagerConfig
     timeout: TimeoutConfig
 
@@ -191,6 +236,7 @@ class InferenceConfig(BaseModel):
         gc: Garbage collection settings.
         checkpointing: Checkpointing settings.
         profiling: Profiler settings.
+        memory_snapshot: Memory snapshot settings. If None, memory snapshots are disabled.
         timeout: Distributed timeout settings.
     """
 
@@ -200,4 +246,5 @@ class InferenceConfig(BaseModel):
     gc: GarbageCollectionConfig
     checkpointing: CheckpointingConfig
     profiling: ProfilingConfig | None
+    memory_snapshot: MemorySnapshotConfig | None = None
     timeout: TimeoutConfig

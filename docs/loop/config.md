@@ -28,6 +28,14 @@ The `d9d.loop.config` package defines the structure for configuring the training
     options:
       heading_level: 3
 
+::: d9d.loop.config.MemorySnapshotConfig
+    options:
+      heading_level: 3
+
+::: d9d.loop.config.MemorySnapshotStepsConfig
+    options:
+      heading_level: 3
+
 ::: d9d.loop.config.DeterminismConfig
     options:
       heading_level: 3

@@ -52,6 +52,7 @@ The `TrainingConfigurator.configure()` method does:
 
 1. **Distributed Context Initialization**:
     *   Constructs the global [DistributedContext](../core/dist_context.md), therefore initializing all the required NCCL process groups and `DeviceMesh`es.
+    *   If the `configure` memory snapshot is enabled, starts recording the CUDA allocator history. The rest of the configuration is recorded and the snapshot is saved once it finishes (or fails). [More info](../internals/profiling.md#memory-snapshots).
 
 2. **Seeding**:
     *   Sets distributed seeds using the configured `base_seed`. This ensures model initialization and other initial states are deterministic. [More info](../internals/determinism.md).
@@ -112,6 +113,7 @@ Before the loop starts:
     *   **Logging**: Initiates a new run in selected experiment tracker and dumps run hyperparameters there. [More info](../internals/tracker_integration.md).
     *   **Garbage Collector**: Disables automatic Python garbage collection.
     *   **Profiler**: Starts `torch.profiler` hooks. [More info](../internals/profiling.md).
+    *   **Memory Snapshotter**: Starts recording the CUDA allocator history if the current step belongs to a memory snapshot window. [More info](../internals/profiling.md#memory-snapshots).
     *   **Gradient Manager**: Sets up backward hooks for synchronizing gradient states by all-reduce.
     *   **Gradient Clipper**: Looks for model parameters which gradients will be registered for clipping.
 4.  **Ready Hook Trigger**: `EVENT_TRAIN_READY` is fired to mark the start of the primary train sequence.
@@ -152,6 +154,7 @@ For every global step (`step`), the trainer performs the following actions in st
 7. **Logging & Maintenance**
     *   **Log**: Metrics are finalized and written to the tracker.
     *   **GC**: `ManualGarbageCollector` runs if the current step matches the GC period.
+    *   **Memory Snapshots**: The `JobMemorySnapshotter` saves the step memory snapshot if the step closes a window and starts recording if the next step opens one.
     *   **Event-Based Logic**: Triggers `EVENT_TRAIN_STEP_POST` event.
     *   **Advance**: The `JobSchedule` increments the step count.
 

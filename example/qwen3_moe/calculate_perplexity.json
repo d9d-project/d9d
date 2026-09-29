@@ -82,6 +82,16 @@
       "warmup_steps": 5,
       "active_steps": 1
     },
+    "memory_snapshot": {
+      "enabled": false,
+      "snapshots_dir": "../../example_data/memory_snapshots",
+      "max_entries": 100000,
+      "configure": true,
+      "steps": {
+        "period_steps": 100,
+        "active_steps": 2
+      }
+    },
     "timeout": {
       "init_timeout": 10000,
       "step_timeout": 100

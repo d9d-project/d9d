@@ -106,6 +106,16 @@
       "warmup_steps": 5,
       "active_steps": 1
     },
+    "memory_snapshot": {
+      "enabled": false,
+      "snapshots_dir": "../../example_data/memory_snapshots",
+      "max_entries": 100000,
+      "configure": true,
+      "steps": {
+        "period_steps": 100,
+        "active_steps": 2
+      }
+    },
     "gradient_manager": {
       "grad_dtype": "float32",
       "bucket_size_mb": 32

@@ -1,11 +1,12 @@
-import tarfile
 import time
 from contextlib import contextmanager
 from pathlib import Path
 
 import torch.profiler as tprof
 
-from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
+from d9d.core.dist_context import DistributedContext
+
+from ._artifact import archive_artifact, rank_artifact_path
 
 
 class Profiler:
@@ -35,29 +36,15 @@ class Profiler:
         self._active = active_steps
         self._dist_context = dist_context
 
-    def _get_save_file_name(self) -> str:
-        if self._dist_context.mesh_params.is_distributed:
-            mesh_regular = self._dist_context.mesh_for(REGULAR_DOMAIN)
-            coord = mesh_regular.get_coordinate()
-            if coord is None:
-                raise RuntimeError("Invalid mesh")
-            coord_str = "-".join(str(x) for x in coord)
-            rank = mesh_regular.get_rank()
-            return f"rank-{rank}-coord-{coord_str}-trace.json"
-        else:
-            return "trace.json"
-
     def _dump_trace(self, prof: tprof.profile):
         save_dir = self._save_dir / f"step_{prof.step_num}"
         save_dir.mkdir(parents=True, exist_ok=True)
-        save_file = save_dir / self._get_save_file_name()
+        save_file = rank_artifact_path(save_dir, self._dist_context, kind="trace")
 
         begin = time.monotonic()
 
         prof.export_chrome_trace(str(save_file))
-        with tarfile.open(save_file.with_suffix(".tar.gz"), "w:gz") as tar:
-            tar.add(save_file, arcname=save_file.name)
-        save_file.unlink()
+        archive_artifact(save_file)
 
         end = time.monotonic()
 
