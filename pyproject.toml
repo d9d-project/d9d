@@ -112,6 +112,7 @@ deep-ep = [
     { requirement = "torch", match-runtime = true },
     { requirement = "nvidia-nvshmem-cu13", match-runtime = true },
     "ninja",
+    "numpy"
 ]
 nv-grouped-gemm = [
     { requirement = "torch", match-runtime = true },
@@ -129,8 +130,9 @@ flash-attn = [
 # DeepEP 1.x compiles deep_ep.cpp with the host compiler, which does not see the CCCL headers moved to include/cccl in CUDA 13
 deep-ep = { CPLUS_INCLUDE_PATH = "/usr/local/cuda/include/cccl" }
 # Always compile against the locked torch instead of downloading a prebuilt wheel guessed from torch/CUDA/Python versions.
-# Its setup.py hardcodes -std=c++17 for nvcc, but torch headers require C++20; nvcc keeps the last -std it sees
-nv-grouped-gemm = { GROUPED_GEMM_FORCE_BUILD = "TRUE", NVCC_APPEND_FLAGS = "-std=c++20" }
+# Its setup.py hardcodes -std=c++17 for nvcc, but torch headers require C++20; nvcc keeps the last -std it sees.
+# Its vendored CUTLASS has a typo (set_slice3x3) in an uninstantiated template, which GCC >= 14 rejects via -Wtemplate-body
+nv-grouped-gemm = { GROUPED_GEMM_FORCE_BUILD = "TRUE", NVCC_APPEND_FLAGS = "-std=c++20 -Xcompiler -Wno-template-body" }
 # Same prebuilt-wheel guessing as nv-grouped-gemm
 flash-attn = { FLASH_ATTENTION_FORCE_BUILD = "TRUE" }
 
