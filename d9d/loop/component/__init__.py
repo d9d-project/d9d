@@ -1,5 +1,11 @@
 from .checkpointer import StateCheckpointer
 from .data_parallel_stream import DataParallelMicrobatchPackStream
+from .device_pack_stream import (
+    DevicePackStream,
+    DirectDevicePackStream,
+    PrefetchingDevicePackStream,
+    build_device_pack_stream,
+)
 from .garbage_collector import ManualGarbageCollector
 from .gradient_clipper import GradientClipper
 from .gradient_manager import GradientManager
@@ -16,6 +22,8 @@ from .train_sleeper import TrainSleeper
 
 __all__ = [
     "DataParallelMicrobatchPackStream",
+    "DevicePackStream",
+    "DirectDevicePackStream",
     "GradientClipper",
     "GradientManager",
     "InferenceTaskOperator",
@@ -27,9 +35,11 @@ __all__ = [
     "ModelStageFactory",
     "OptimizerFactory",
     "PipelineStateHandler",
+    "PrefetchingDevicePackStream",
     "StateCheckpointer",
     "TimeoutManager",
     "TrackedModules",
     "TrainSleeper",
     "TrainTaskOperator",
+    "build_device_pack_stream",
 ]
