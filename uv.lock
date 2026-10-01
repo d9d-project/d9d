@@ -16,8 +16,6 @@ resolution-markers = [
     "python_full_version < '3.12' and sys_platform != 'emscripten' and sys_platform != 'win32'",
 ]
 
-[manifest]
-
 [[manifest.dependency-metadata]]
 name = "deep-ep"
 version = "1.2.1+9af0e0d"
@@ -1049,7 +1047,7 @@ wheels = [
 
 [[package]]
 name = "d9d"
-version = "0.19.3"
+version = "0.19.4"
 source = { editable = "." }
 dependencies = [
     { name = "optree" },

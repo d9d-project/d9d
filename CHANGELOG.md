@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.19.4 (2026-10-01)
+
+### Bug Fixes
+
+- **moe**: Use 64-bit row offsets in permute kernels
+  ([`f0b85c6`](https://github.com/d9d-project/d9d/commit/f0b85c6a9fd6367019ce6b46f7428751668da21e))
+
+
 ## v0.19.3 (2026-09-28)
 
 ### Bug Fixes
