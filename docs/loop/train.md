@@ -123,7 +123,7 @@ For every global step (`step`), the trainer performs the following actions in st
 1. Triggers `EVENT_TRAIN_STEP_PRE` event.
 2. **Microbatch Execution**
     * Triggers `EVENT_TRAIN_FORWARD_BACKWARD_PRE` event.
-    * The `MicrobatchPackStream` yields a **pack** containing $N$ microbatches (one step's worth); the loop moves it to the device.
+    * The `DevicePackStream` hands out a **pack** containing $N$ microbatches (one step's worth), already on the device (see [Data Prefetching](#data-prefetching)).
     * We delegate to the `TrainTask` for mapping each microbatch before feeding it into the model.
     * The gradients are **accumulated locally** by running the pipeline program over the pack's microbatches (a single-stage program when pipeline parallelism is disabled) via our internal [pipelining API](../internals/pipelining.md). We delegate to `TrainTask` to compute loss values between forward and backward passes.
     * Last gradient accumulation triggers all-reduce synchronization. Communications may start overlapping here.
@@ -163,6 +163,14 @@ For every global step (`step`), the trainer performs the following actions in st
 1. **Event-specific**: The system triggers `EVENT_TRAIN_FINISHED` event.
 2. **Task-specific**: We delegate to the `TrainTask` to do its specific finalization work.
 
+### Data Prefetching
+
+While a step runs, the next `data_prefetch.prefetch_factor` packs are already being copied to the device on a side CUDA stream, so host-to-device transfers overlap with compute.
+
+* **Pinned memory** keeps the copies from blocking the host: set `pin_memory` in `AutoDataConfig`, or wrap a custom stream in `PinMemoryMicrobatchPackStream`.
+* **Memory**: every prefetched pack occupies device memory. `prefetch_factor: 0` disables prefetching.
+* **Checkpoints** save the data position of the last completed step: packs prefetched but not yet consumed are read again after a restart. Checkpoints load with any `prefetch_factor`.
+
 ## Sleep & Wake (Colocated RL)
 
 In **colocated RL**, a rollout/inference engine shares the same physical GPUs as the Trainer. The two cannot occupy the device at once, so the Trainer must temporarily hand the GPU back. The `Trainer.sleep()` / `Trainer.wake()` pair does exactly this: `sleep()` releases the training state to host memory and frees the device cache; `wake()` restores it. The underlying mechanism is the [State Offloading](../core/offload.md) subsystem.
@@ -183,6 +191,8 @@ A `sleep()` selects subsystems via [`SleepTag`](../core/offload.md#sleep-tags). 
 * **Model** parameters and buffers (`TrackedModules`),
 * **Optimizer** state (`PipelinedOptimizer`),
 * **Gradient** buckets and the residual loss accumulator (`GradientManager`).
+
+Data packs are not offloaded: the pack of the finished step and up to `prefetch_factor` [prefetched](#data-prefetching) packs stay on the device.
 
 `SleepTag.COMMS` (NCCL process groups) is reserved but **not yet implemented** - requesting it raises `NotImplementedError`.
 

@@ -8,12 +8,14 @@ The `DataProvider` is the factory you supply to the train/eval loop — exactly 
 
 - A **pack** is one step's worth of data: a sequence of microbatches. `len(pack)` is the number of
   microbatches within that step (the gradient-accumulation factor) and may vary from step to step. The
-  loop moves each pack to the device and hands it to the task operator.
+  loop copies packs to the device, ahead of their steps (see [Data Prefetching](../train.md#data-prefetching)),
+  and hands them to the task operator.
 - **`total_steps`** is the number of steps the stream will yield, or `None` when that cannot be known
   ahead of time (streaming / data-dependent batching). `JobSchedule` uses it to resolve the job
   duration, falling back to `JobScheduleConfig.total_steps` when it is `None`.
 - The stream is the single **checkpoint boundary** for the data: it saves and restores its own position
-  (per data-parallel rank) so resumption is exact.
+  (per data-parallel rank) so resumption is exact. Prefetching may call `state_dict()` after every pack,
+  so keep it lightweight and do not return objects that further iteration mutates.
 
 There are two ways to obtain a `DataProvider`: use the shipped `AutoDataProvider` for the common case, or
 write your own for full control.
@@ -24,7 +26,8 @@ write your own for full control.
 you. You supply only the two non-serializable pieces — a `dataset_factory` and a `collator` — plus an
 `AutoDataConfig` for the serializable knobs (`global_batch_size`, `microbatch_size`,
 `shard_indexing_mode`, `drop_last`, and `DataLoader` settings such as `shuffle` / `num_workers` /
-`pin_memory` / `prefetch_factor`).
+`pin_memory` / `prefetch_factor`). Pinning is done by a `PinMemoryMicrobatchPackStream`, which, unlike the
+`DataLoader` option, also pins tensors nested in dataclasses.
 
 It **shards the dataset across data-parallel ranks for you**, builds the loader, derives the
 gradient-accumulation factor, and returns the stream — so your factory returns the *unsharded* dataset.
@@ -87,6 +90,9 @@ A custom provider composes the same default stack by hand, which is two layers (
    pack, reproducing gradient accumulation (`drop_last` controls whether a short trailing pack is
    dropped — training drops it, evaluation keeps it). The accumulation factor `k` is derived with the
    helper `num_microbatches_for_global_batch`.
+
+Wrap the packer in a `PinMemoryMicrobatchPackStream` to pin the packs, so the loop copies them to the
+device asynchronously.
 
 Unlike `AutoDataProvider`, **you own the data-parallel sharding**: shard the dataset yourself (e.g. with
 `shard_dataset_data_parallel`) before building
