@@ -313,7 +313,7 @@ def _permute_kernel(
     PERMUTE_SCALE: tl.constexpr,
     BLOCK_SIZE: tl.constexpr,
 ):
-    pid_t = tl.program_id(0)
+    pid_t = tl.program_id(0).to(tl.int64)
     pid_h = tl.program_id(1)
     cur_off = pid_h * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     mask = cur_off < hidden_size
@@ -332,6 +332,7 @@ def _permute_kernel(
         dst_row = tl.load(
             row_id_map_ptr + pid_t * stride_row_id_map_token + idx * stride_row_id_map_expert
         )
+        dst_row = dst_row.to(tl.int64)
         output_off = dst_row * stride_output_token + cur_off * stride_output_hidden
         if PERMUTE_SCALE:
             permuted_scale_off = (
@@ -488,7 +489,7 @@ def _unpermute_kernel(
     data_type = input_ptr.dtype.element_ty
     compute_type = tl.float32
 
-    pid_t = tl.program_id(0)
+    pid_t = tl.program_id(0).to(tl.int64)
     pid_h = tl.program_id(1)
     current_offset = pid_h * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     mask = current_offset < hidden_size
@@ -513,6 +514,7 @@ def _unpermute_kernel(
         src_row = tl.load(
             row_id_map_ptr + pid_t * stride_row_id_map_token + idx * stride_row_id_map_expert
         )
+        src_row = src_row.to(tl.int64)
         input_off = src_row * stride_input_token + current_offset * stride_input_hidden
         inp = tl.load(input_ptr + input_off, mask=mask)
         inp = inp.to(compute_type)
@@ -773,7 +775,7 @@ def _unpermute_bwd_with_merging_probs_kernel(
     data_type = fwd_output_grad_ptr.dtype.element_ty
     compute_type = tl.float32
 
-    pid = tl.program_id(0)
+    pid = tl.program_id(0).to(tl.int64)
     map_load_off = tl.arange(0, PROBS_LOAD_WIDTH)
     token_probs_grad_off = (
         pid * stride_merging_probs_grad_token + stride_merging_probs_grad_expert * map_load_off
@@ -786,6 +788,7 @@ def _unpermute_bwd_with_merging_probs_kernel(
         dst_row = tl.load(
             row_id_map_ptr + pid * stride_row_id_map_token + idx * stride_row_id_map_expert
         )
+        dst_row = dst_row.to(tl.int64)
         expert_idx = tl.load(
             row_id_map_ptr
             + pid * stride_row_id_map_token
