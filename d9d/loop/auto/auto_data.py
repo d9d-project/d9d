@@ -9,6 +9,7 @@ from d9d.core.protocol import MicrobatchPackStream
 from d9d.core.types import CollateFn
 from d9d.dataset import (
     FixedCountMicrobatchPacker,
+    PinMemoryMicrobatchPackStream,
     ShardIndexingMode,
     num_microbatches_for_global_batch,
     shard_dataset_data_parallel,
@@ -54,8 +55,9 @@ class AutoDataProvider(DataProvider):
     """DataProvider that wires the default stack: shard the dataset, load microbatches, pack them per step.
 
     It shards the dataset across data-parallel ranks, wraps it in a stateful loader at the microbatch size,
-    derives the gradient-accumulation factor from the global batch size, and groups the microbatches with a
-    ``FixedCountMicrobatchPacker``. Users who need a non-default stack should write their own ``DataProvider``.
+    derives the gradient-accumulation factor from the global batch size, groups the microbatches with a
+    ``FixedCountMicrobatchPacker`` and, if enabled, pins the packs with a ``PinMemoryMicrobatchPackStream``.
+    Users who need a non-default stack should write their own ``DataProvider``.
     """
 
     def __init__(self, dataset_factory: DatasetFactory, collator: CollateFn, config: AutoDataConfig):
@@ -82,7 +84,8 @@ class AutoDataProvider(DataProvider):
             collate_fn=self._collator,
             shuffle=self._config.shuffle,
             num_workers=self._config.num_workers,
-            pin_memory=self._config.pin_memory,
+            # the loader's own pinning does not traverse dataclasses; packs are pinned by the stream below
+            pin_memory=False,
             persistent_workers=self._config.persistent_workers,
             prefetch_factor=self._config.prefetch_factor,
             timeout=self._config.timeout,
@@ -93,6 +96,11 @@ class AutoDataProvider(DataProvider):
             context.dist_context, self._config.global_batch_size, self._config.microbatch_size
         )
 
-        return FixedCountMicrobatchPacker(
+        stream: MicrobatchPackStream = FixedCountMicrobatchPacker(
             loader, microbatches_per_step=microbatches_per_step, drop_last=self._config.drop_last
         )
+
+        if self._config.pin_memory:
+            stream = PinMemoryMicrobatchPackStream(stream)
+
+        return stream
