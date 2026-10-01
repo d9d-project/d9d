@@ -1,7 +1,12 @@
 import pytest
 import torch
 from d9d.core.dist_context import DeviceMeshParameters
-from d9d.dataset import FixedCountMicrobatchPacker, ShardedDataset, ShardIndexingMode
+from d9d.dataset import (
+    FixedCountMicrobatchPacker,
+    PinMemoryMicrobatchPackStream,
+    ShardedDataset,
+    ShardIndexingMode,
+)
 from d9d.loop.auto import AutoDataConfig, AutoDataProvider
 from d9d.loop.control import InitializeDataProviderContext
 from torch.utils.data import Dataset, SequentialSampler
@@ -80,13 +85,17 @@ def test_auto_data_provider_wires_config_into_loader(context, config):
     # not that torch acts on them.
     provider = AutoDataProvider(dataset_factory=lambda _ctx: SimpleDataset(12), collator=simple_collate, config=config)
 
-    loader = provider(context)._loader
+    stream = provider(context)
+    # pinning is done by the stream wrapper, which traverses dataclasses, not by the loader
+    assert isinstance(stream, PinMemoryMicrobatchPackStream) == config.pin_memory
+    packer = stream._inner if isinstance(stream, PinMemoryMicrobatchPackStream) else stream
+    loader = packer._loader
 
     assert isinstance(loader, StatefulDataLoader)
     assert loader.batch_size == config.microbatch_size
     assert loader.collate_fn is simple_collate
     assert loader.num_workers == config.num_workers
-    assert loader.pin_memory == config.pin_memory
+    assert loader.pin_memory is False
     assert loader.persistent_workers == config.persistent_workers
     assert loader.prefetch_factor == config.prefetch_factor
     assert loader.timeout == config.timeout
