@@ -3,7 +3,13 @@ import torch.nn.functional as F
 from torch import nn
 
 from d9d.module.base import ModuleLateInit
-from d9d.module.block.attention.sdpa import AnySdpaBackendConfig, SdpaBackend, SdpaParameters, build_sdpa_backend
+from d9d.module.block.attention.sdpa import (
+    AnySdpaBackendConfig,
+    SdpaBackend,
+    SdpaParameters,
+    build_sdpa_backend,
+)
+from d9d.module.block.attention.types import SequencePacking
 from d9d.module.block.normalization import RMSNorm
 from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddingStyle
 
@@ -70,6 +76,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         qk_down_norm_eps: float,
         is_causal: bool,
         rope_style: RotaryEmbeddingStyle,
+        enable_packing: bool = False,
         sdpa_backend: AnySdpaBackendConfig | None = None,
     ):
         """Constructs the MultiHeadLatentAttention layer.
@@ -85,6 +92,8 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
             qk_down_norm_eps: Epsilon for the RMSNorm applied to the KV and Q latent representations.
             is_causal: Whether to apply a causal mask (auto-regressive).
             rope_style: Rotary embedding layout style alignment.
+            enable_packing: If True, the layer accepts a ``SequencePacking`` descriptor at runtime and
+                the backend is selected to support variable-length (block-diagonal) attention.
             sdpa_backend: Configuration for the Scaled Dot-Product Attention backend. If ``None``,
                 the backend will be auto-detected via `build_sdpa_backend()`.
 
@@ -141,6 +150,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
                 num_sinks=None,
                 window_size=(None, None),
                 needs_attention_mask=False,
+                needs_varlen=enable_packing,
             ),
             backend_config=sdpa_backend,
         )
@@ -155,6 +165,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
         hidden_states: torch.Tensor,
         attention_mask: torch.Tensor | None,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
+        packing: SequencePacking | None = None,
     ) -> torch.Tensor:
         """Computes Multi-Head Latent Attention.
 
@@ -163,6 +174,8 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
             attention_mask: Optional attention mask.
             position_embeddings: Tuple ``(cos, sin)`` for the RoPE sub-vectors.
                 Each tensor shape: ``(batch, seq_len, qk_rope_head_dim)``.
+            packing: Optional block-diagonal segmentation for sequence packing. When set, the input is
+                a single packed row and attention is computed block-diagonally over its segments.
 
         Returns:
             Output tensor. Shape: ``(batch, seq_len, hidden_size)``.
@@ -205,6 +218,7 @@ class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
             k,
             v,
             attention_mask=attention_mask,
+            packing=packing,
             is_causal=self._is_causal,
             scale=self._scaling,
         )

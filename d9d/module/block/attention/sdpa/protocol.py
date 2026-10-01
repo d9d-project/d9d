@@ -2,6 +2,8 @@ from typing import Protocol
 
 import torch
 
+from ..types import SequencePacking
+
 
 class SdpaBackend(Protocol):
     """Protocol for Scaled Dot-Product Attention backends.
@@ -17,6 +19,7 @@ class SdpaBackend(Protocol):
         key_states: torch.Tensor,
         value_states: torch.Tensor,
         attention_mask: torch.Tensor | None,
+        packing: SequencePacking | None,
         is_causal: bool,
         scale: float,
     ) -> torch.Tensor:
@@ -27,6 +30,7 @@ class SdpaBackend(Protocol):
             key_states: Key tensor. Shape: ``(batch, seq_len, n_kv_heads, head_dim)``.
             value_states: Value tensor. Shape: ``(batch, seq_len, n_kv_heads, head_dim)``.
             attention_mask: Mask tensor or None.
+            packing: Block-diagonal segmentation for sequence packing, or ``None``.
             is_causal: If True, applies an auto-regressive causal mask.
             scale: Softmax scaling factor.
 
