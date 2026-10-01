@@ -80,6 +80,9 @@ class MicrobatchPackStream(Protocol):
     def state_dict(self) -> dict[str, Any]:
         """Returns the stream's checkpointable state.
 
+        It may be used for prefetching, so keep it lightweight and do not return objects that
+        further iteration mutates.
+
         Returns:
             A dictionary representing the stream's state.
         """
