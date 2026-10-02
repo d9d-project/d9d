@@ -14,8 +14,9 @@ The `DataProvider` is the factory you supply to the train/eval loop — exactly 
   ahead of time (streaming / data-dependent batching). `JobSchedule` uses it to resolve the job
   duration, falling back to `JobScheduleConfig.total_steps` when it is `None`.
 - The stream is the single **checkpoint boundary** for the data: it saves and restores its own position
-  (per data-parallel rank) so resumption is exact. Prefetching may call `state_dict()` after every pack,
-  so keep it lightweight and do not return objects that further iteration mutates.
+  (per data-parallel rank) so resumption is exact. Prefetching iterates the stream on a background thread
+  and may call `state_dict()` after every pack, so keep it lightweight and do not return objects that
+  further iteration mutates.
 
 There are two ways to obtain a `DataProvider`: use the shipped `AutoDataProvider` for the common case, or
 write your own for full control.

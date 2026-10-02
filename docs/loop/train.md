@@ -165,9 +165,10 @@ For every global step (`step`), the trainer performs the following actions in st
 
 ### Data Prefetching
 
-While a step runs, the next `data_prefetch.prefetch_factor` packs are already being copied to the device on a side CUDA stream, so host-to-device transfers overlap with compute.
+While a step runs, a background thread already loads the next `data_prefetch.prefetch_factor` packs, pins them and copies them to the device on a side CUDA stream, so all of it overlaps with compute.
 
-* **Pinned memory** keeps the copies from blocking the host: set `pin_memory` in `AutoDataConfig`, or wrap a custom stream in `PinMemoryMicrobatchPackStream`.
+* **Background thread**: the data stream is iterated there, including the dataset and collator code when the loader has no workers (`num_workers: 0`).
+* **Pinned memory** makes the copies asynchronous: set `pin_memory` in `AutoDataConfig`, or wrap a custom stream in `PinMemoryMicrobatchPackStream`. Without prefetching, pinning only adds a host-side copy.
 * **Memory**: every prefetched pack occupies device memory. `prefetch_factor: 0` disables prefetching.
 * **Checkpoints** save the data position of the last completed step: packs prefetched but not yet consumed are read again after a restart. Checkpoints load with any `prefetch_factor`.
 
