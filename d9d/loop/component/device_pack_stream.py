@@ -2,7 +2,7 @@ import abc
 import dataclasses
 import queue
 import threading
-from collections.abc import Iterator
+from collections.abc import Generator, Iterator
 from typing import Any, Generic, TypeVar
 
 import torch
@@ -25,8 +25,11 @@ class DevicePackStream(abc.ABC, Stateful):
     """Hands the packs of a microbatch pack stream to the loop on the device; the data checkpoint boundary."""
 
     @abc.abstractmethod
-    def __iter__(self) -> Iterator[MicrobatchPack]:
-        """Yields the stream's packs on the device, ready for use on the current CUDA stream."""
+    def __iter__(self) -> Generator[MicrobatchPack, None, None]:  # noqa: PYI058 - the loop closes it
+        """Yields the stream's packs on the device, ready for use on the current CUDA stream.
+
+        Closing the generator stops any work done ahead and releases the packs prepared for later steps.
+        """
 
 
 class DirectDevicePackStream(DevicePackStream):
@@ -42,7 +45,7 @@ class DirectDevicePackStream(DevicePackStream):
         self._stream = stream
         self._device = device
 
-    def __iter__(self) -> Iterator[MicrobatchPack]:
+    def __iter__(self) -> Generator[MicrobatchPack, None, None]:
         for pack in self._stream:
             yield _copy_pack_to_device(pack, self._device)
 
@@ -163,7 +166,7 @@ class PrefetchingDevicePackStream(DevicePackStream):
         self._handed_out_state = prefetched.stream_state
         return prefetched.pack
 
-    def __iter__(self) -> Iterator[MicrobatchPack]:
+    def __iter__(self) -> Generator[MicrobatchPack, None, None]:
         # nothing is pulled yet, so the stream's own state is exact
         self._handed_out_state = self._stream.state_dict()
 

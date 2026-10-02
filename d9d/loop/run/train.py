@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -268,7 +269,11 @@ class Trainer:
         )
 
     def train(self):
-        """Executes the full training workflow."""
+        """Executes the full training workflow.
+
+        Raises:
+            RuntimeError: If the data stream ends before ``total_steps``.
+        """
         self._state.dist_context.wait_world()
         self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
         self._state.checkpointer.load_last_checkpoint(self._state)
@@ -294,13 +299,21 @@ class Trainer:
             self._state.gradient_manager.install(),
             self._state.gradient_clipper.install(),
             self._state.logger.install(),
+            contextlib.closing(iter(self._state.microbatch_pack_stream)) as packs,
         ):
             run.set_context({"stage": "train"})
             self._state.event_bus.trigger(EVENT_TRAIN_READY, EventTrainReadyContext(run=run))
 
-            for device_pack in self._state.microbatch_pack_stream:
+            while self._state.schedule.current_step < self._state.schedule.total_steps:
                 run.set_step(self._state.schedule.current_step)
                 self._state.event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
+
+                device_pack = next(packs, None)
+                if device_pack is None:
+                    raise RuntimeError(
+                        f"The data stream ended at step {self._state.schedule.current_step}, "
+                        f"before total_steps={self._state.schedule.total_steps}"
+                    )
 
                 with self._state.event_bus.bounded(
                     EVENT_TRAIN_FORWARD_BACKWARD_PRE, EVENT_TRAIN_FORWARD_BACKWARD_POST, step_ctx
