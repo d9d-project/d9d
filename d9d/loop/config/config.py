@@ -113,6 +113,8 @@ class ProfilingConfig(BaseModel):
         period_steps: Total length of a profiling cycle (wait + warmup + active).
         warmup_steps: Number of steps to ignore before recording to allow for warming-up.
         active_steps: Number of steps to actively record traces.
+        record_shapes: Whether to record the input shapes of operators.
+        with_stack: Whether to record the Python call stacks of operators. They make up most of a trace.
     """
 
     enabled: bool
@@ -122,6 +124,9 @@ class ProfilingConfig(BaseModel):
     period_steps: int
     warmup_steps: int
     active_steps: int
+
+    record_shapes: bool = True
+    with_stack: bool = True
 
 
 class JobLoggerConfig(BaseModel):
