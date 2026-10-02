@@ -1,6 +1,7 @@
 import typing
 
 import torch
+from torch.profiler import record_function
 
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import MicrobatchPack, PyTree
@@ -60,9 +61,10 @@ class LossComputer(typing.Generic[TPipelineOutput, TState]):
             The calculated loss multiplied by its weight.
         """
         with self._state.scope(microbatch_idx) as state:
-            computation = self._task.compute_loss(
-                ComputeLossContext(pipeline_results=pipeline_outputs, state=state, schedule=self._schedule)
-            )
+            with record_function("Compute Loss"):
+                computation = self._task.compute_loss(
+                    ComputeLossContext(pipeline_results=pipeline_outputs, state=state, schedule=self._schedule)
+                )
 
             loss = computation.loss
             loss_weight = computation.loss_weight
@@ -70,7 +72,8 @@ class LossComputer(typing.Generic[TPipelineOutput, TState]):
                 loss_weight = torch.ones_like(loss)
 
             self._gradient_manager.add_loss_with_weight(loss.detach(), loss_weight.detach())
-            self._task.update_metrics(UpdateMetricsContext(state=state, metrics=self._metrics.children))
+            with record_function("Update Metrics"):
+                self._task.update_metrics(UpdateMetricsContext(state=state, metrics=self._metrics.children))
 
         return loss * loss_weight
 
@@ -117,21 +120,22 @@ class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPi
         Args:
             pack: The step's pack of raw microbatches.
         """
-        try:
-            inputs_microbatches, shared_microbatches = build_pipeline_microbatch_inputs(
-                self._task, self._pipeline_state, pack
-            )
-            self._gradient_manager.set_required_accumulations(len(pack))
-            self._pipeline.schedule.step(
-                inputs_microbatches=inputs_microbatches,
-                shared_microbatches=shared_microbatches,
-                callback=LossComputer(
-                    state=self._pipeline_state,
-                    task=self._task,
-                    schedule=self._job_schedule,
-                    gradient_manager=self._gradient_manager,
-                    metrics=self._metrics,
-                ),
-            )
-        finally:
-            self._pipeline_state.reset()
+        with record_function("Forward & Backward"):
+            try:
+                inputs_microbatches, shared_microbatches = build_pipeline_microbatch_inputs(
+                    self._task, self._pipeline_state, pack
+                )
+                self._gradient_manager.set_required_accumulations(len(pack))
+                self._pipeline.schedule.step(
+                    inputs_microbatches=inputs_microbatches,
+                    shared_microbatches=shared_microbatches,
+                    callback=LossComputer(
+                        state=self._pipeline_state,
+                        task=self._task,
+                        schedule=self._job_schedule,
+                        gradient_manager=self._gradient_manager,
+                        metrics=self._metrics,
+                    ),
+                )
+            finally:
+                self._pipeline_state.reset()

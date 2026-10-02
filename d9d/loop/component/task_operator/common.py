@@ -1,5 +1,7 @@
 import typing
 
+from torch.profiler import record_function
+
 from d9d.core.types import MicrobatchPack, PyTree
 from d9d.loop.control import BaseTask, BuildForwardInputsContext
 
@@ -30,7 +32,8 @@ def build_pipeline_microbatch_inputs(
     shared_microbatches = []
 
     for microbatch_idx, microbatch in enumerate(pack):
-        model_inputs = task.build_forward_inputs(BuildForwardInputsContext(batch=microbatch))
+        with record_function("Build Forward Inputs"):
+            model_inputs = task.build_forward_inputs(BuildForwardInputsContext(batch=microbatch))
         pipeline_state.store(microbatch_idx, model_inputs.state)
         inputs_microbatches.append(model_inputs.input)
         shared_microbatches.append(model_inputs.shared)

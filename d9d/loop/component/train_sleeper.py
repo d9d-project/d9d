@@ -2,6 +2,7 @@ from collections.abc import Iterable
 from typing import cast
 
 import torch
+from torch.profiler import record_function
 
 from d9d.core.dist_context import DistributedContext
 from d9d.core.offload import DEFAULT_SLEEP_TAGS, Offloadable, OffloadContext, OnloadContext, SleepTag
@@ -64,34 +65,35 @@ class TrainSleeper:
             NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
             RuntimeError: If called during an in-flight gradient accumulation.
         """
-        requested = frozenset(tags)
-        if SleepTag.COMMS in requested:
-            raise NotImplementedError(
-                "SleepTag.COMMS is not yet implemented. Only SleepTag.TENSOR_STATES is supported."
-            )
-        if SleepTag.TENSOR_STATES not in requested or self.is_sleeping(SleepTag.TENSOR_STATES):
-            return
+        with record_function("Sleep"):
+            requested = frozenset(tags)
+            if SleepTag.COMMS in requested:
+                raise NotImplementedError(
+                    "SleepTag.COMMS is not yet implemented. Only SleepTag.TENSOR_STATES is supported."
+                )
+            if SleepTag.TENSOR_STATES not in requested or self.is_sleeping(SleepTag.TENSOR_STATES):
+                return
 
-        if self._gradient_manager.has_in_flight_gradients:
-            raise RuntimeError(
-                "Trainer.sleep() was called during an in-flight gradient accumulation. "
-                "Sleep is only legal between steps, e.g. from an EVENT_TRAIN_STEP_POST handler."
-            )
+            if self._gradient_manager.has_in_flight_gradients:
+                raise RuntimeError(
+                    "Trainer.sleep() was called during an in-flight gradient accumulation. "
+                    "Sleep is only legal between steps, e.g. from an EVENT_TRAIN_STEP_POST handler."
+                )
 
-        event_context = EventSleepContext(tags=requested)
-        self._event_bus.trigger(EVENT_TRAIN_SLEEP_PRE, event_context)
-        self._dist_context.wait_world()
+            event_context = EventSleepContext(tags=requested)
+            self._event_bus.trigger(EVENT_TRAIN_SLEEP_PRE, event_context)
+            self._dist_context.wait_world()
 
-        offload_context = OffloadContext(dist_context=self._dist_context, pin_memory=False)
-        self._gradient_manager.offload(offload_context)
-        cast(Offloadable, self._optimizer).offload(offload_context)
-        self._tracked_modules.offload(offload_context)
+            offload_context = OffloadContext(dist_context=self._dist_context, pin_memory=False)
+            self._gradient_manager.offload(offload_context)
+            cast(Offloadable, self._optimizer).offload(offload_context)
+            self._tracked_modules.offload(offload_context)
 
-        torch.cuda.synchronize(self._dist_context.current_device)
-        torch.cuda.empty_cache()
+            torch.cuda.synchronize(self._dist_context.current_device)
+            torch.cuda.empty_cache()
 
-        self._dist_context.wait_world()
-        self._event_bus.trigger(EVENT_TRAIN_SLEEP_POST, event_context)
+            self._dist_context.wait_world()
+            self._event_bus.trigger(EVENT_TRAIN_SLEEP_POST, event_context)
 
     def wake(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
         """Restores GPU residency of the training state previously released by "sleep".
@@ -105,25 +107,26 @@ class TrainSleeper:
         Raises:
             NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
         """
-        requested = frozenset(tags)
-        if SleepTag.COMMS in requested:
-            raise NotImplementedError(
-                "SleepTag.COMMS is not yet implemented. Only SleepTag.TENSOR_STATES is supported."
-            )
-        if SleepTag.TENSOR_STATES not in requested or not self.is_sleeping(SleepTag.TENSOR_STATES):
-            return
+        with record_function("Wake"):
+            requested = frozenset(tags)
+            if SleepTag.COMMS in requested:
+                raise NotImplementedError(
+                    "SleepTag.COMMS is not yet implemented. Only SleepTag.TENSOR_STATES is supported."
+                )
+            if SleepTag.TENSOR_STATES not in requested or not self.is_sleeping(SleepTag.TENSOR_STATES):
+                return
 
-        event_context = EventSleepContext(tags=requested)
-        self._event_bus.trigger(EVENT_TRAIN_WAKE_PRE, event_context)
-        self._dist_context.wait_world()
+            event_context = EventSleepContext(tags=requested)
+            self._event_bus.trigger(EVENT_TRAIN_WAKE_PRE, event_context)
+            self._dist_context.wait_world()
 
-        onload_context = OnloadContext(dist_context=self._dist_context)
-        self._tracked_modules.onload(onload_context)
-        cast(Offloadable, self._optimizer).onload(onload_context)
-        self._gradient_manager.onload(onload_context)
+            onload_context = OnloadContext(dist_context=self._dist_context)
+            self._tracked_modules.onload(onload_context)
+            cast(Offloadable, self._optimizer).onload(onload_context)
+            self._gradient_manager.onload(onload_context)
 
-        self._dist_context.wait_world()
-        self._event_bus.trigger(EVENT_TRAIN_WAKE_POST, event_context)
+            self._dist_context.wait_world()
+            self._event_bus.trigger(EVENT_TRAIN_WAKE_POST, event_context)
 
     def is_sleeping(self, tag: SleepTag) -> bool:
         """Reports whether the subsystem identified by "tag" is currently offloaded.

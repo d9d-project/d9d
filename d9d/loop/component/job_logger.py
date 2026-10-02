@@ -4,6 +4,7 @@ from typing import Any
 
 import torch
 from torch.distributed.checkpoint.stateful import Stateful
+from torch.profiler import record_function
 
 from d9d.core import pytree
 from d9d.core.dist_context import DistributedContext
@@ -117,16 +118,17 @@ class JobLogger(Stateful):
             run: The active tracker run interface for sending data.
             loss_value: Tensor containing the scalar loss for the current step.
         """
-        run.scalar("loss", loss_value.item())
+        with record_function("Logging"):
+            run.scalar("loss", loss_value.item())
 
-        if not self._schedule.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
-            return
+            if not self._schedule.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
+                return
 
-        results_tree = self._metric_collector.collect_results()
-        results_flat = _flatten_pytree_for_metrics(results_tree)
+            results_tree = self._metric_collector.collect_results()
+            results_flat = _flatten_pytree_for_metrics(results_tree)
 
-        for name, value in results_flat.items():
-            run.scalar(name, value)
+            for name, value in results_flat.items():
+                run.scalar(name, value)
 
     def state_dict(self) -> dict[str, Any]:
         return {

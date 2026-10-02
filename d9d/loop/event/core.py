@@ -4,6 +4,8 @@ from collections import defaultdict
 from collections.abc import Callable, Generator
 from typing import Any, Generic, TypeVar
 
+from torch.profiler import record_function
+
 TContext = TypeVar("TContext")
 
 
@@ -49,8 +51,12 @@ class EventBus:
             event: The event descriptor to trigger.
             context: The data associated with the event to pass to the handlers.
         """
-        for handler in self._handlers[event]:
-            handler(context)
+        handlers = self._handlers[event]
+        if not handlers:
+            return
+        with record_function(f"Event {event.id}"):
+            for handler in handlers:
+                handler(context)
 
     @contextlib.contextmanager
     def bounded(
