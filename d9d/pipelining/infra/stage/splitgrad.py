@@ -200,6 +200,15 @@ def _make_capture_hook(group: ParamGroup, idx: int) -> Callable[[tuple[torch.Ten
     return _hook
 
 
+def _make_clamp_hook(
+    grads: tuple[torch.Tensor | None, ...],
+) -> Callable[[tuple[torch.Tensor | None, ...]], tuple[torch.Tensor | None, ...]]:
+    def _hook(grad_in: tuple[torch.Tensor | None, ...]) -> tuple[torch.Tensor | None, ...]:
+        return grads
+
+    return _hook
+
+
 @dataclass
 class BackwardInputResult:
     """Container for the results of the input backward phase.
@@ -319,12 +328,14 @@ def stage_backward_weight(  # noqa: C901
     for group in param_groups:
         valid_edges = []
         valid_grad_outputs: list[torch.Tensor] = []
+        captured: list[tuple[Node, tuple[torch.Tensor | None, ...]]] = []
 
         # Ensure we have data
         if group.grads and group.intermediates:
             for grads_tuple, intermediate in zip(group.grads, group.intermediates, strict=True):
                 if grads_tuple is None:
                     raise ValueError("Trying to do backward_weight with to intermediate grads")
+                captured.append((intermediate, grads_tuple))
                 # one edge per output: a multi-output node must get each gradient back on the output it belongs to
                 for output_nr, grad in enumerate(grads_tuple):
                     if grad is not None:
@@ -341,13 +352,24 @@ def stage_backward_weight(  # noqa: C901
                     inputs_for_backward.append(grad_acc_to_weight[node])
 
             if inputs_for_backward:
-                with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.weight):
-                    torch.autograd.backward(
-                        tensors=valid_edges,
-                        grad_tensors=valid_grad_outputs,
-                        retain_graph=retain_graph,
-                        inputs=inputs_for_backward,
-                    )
+                # an intermediate may lie downstream of another one (a weight reused on its own output), and then
+                # its gradient flows into the upstream intermediate on top of the captured gradient already replayed
+                # there; pin every intermediate to its captured gradient so nothing is counted twice
+                clamp_handles = []
+                if len(captured) > 1:
+                    for intermediate, grads_tuple in captured:
+                        clamp_handles.append(intermediate.register_prehook(_make_clamp_hook(grads_tuple)))
+                try:
+                    with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.weight):
+                        torch.autograd.backward(
+                            tensors=valid_edges,
+                            grad_tensors=valid_grad_outputs,
+                            retain_graph=retain_graph,
+                            inputs=inputs_for_backward,
+                        )
+                finally:
+                    for handle in clamp_handles:
+                        handle.remove()
 
         # Break Cycle: Grads
         group.grads = None
