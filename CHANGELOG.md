@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.21.0 (2026-10-02)
+
+### Features
+
+- **profiling**: Annotate step phases and profile the prefetch thread
+  ([`1df1809`](https://github.com/d9d-project/d9d/commit/1df180975d1e4994dcc167813140950d28310d16))
+
+
 ## v0.20.1 (2026-10-02)
 
 ### Bug Fixes
