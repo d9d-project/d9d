@@ -11,8 +11,10 @@ The `DataProvider` is the factory you supply to the train/eval loop — exactly 
   loop copies packs to the device, ahead of their steps (see [Data Prefetching](../train.md#data-prefetching)),
   and hands them to the task operator.
 - **`total_steps`** is the number of steps the stream will yield, or `None` when that cannot be known
-  ahead of time (streaming / data-dependent batching). `JobSchedule` uses it to resolve the job
-  duration, falling back to `JobScheduleConfig.total_steps` when it is `None`.
+  ahead of time (streaming / data-dependent batching). `JobSchedule` resolves the job duration from
+  `JobScheduleConfig.total_steps` when it is set (it must not exceed the stream's length), and from the
+  stream's `total_steps` otherwise. The loop runs exactly that many steps: a longer stream is cut short,
+  and a stream that ends earlier raises an error.
 - The stream is the single **checkpoint boundary** for the data: it saves and restores its own position
   (per data-parallel rank) so resumption is exact. Prefetching iterates the stream on a background thread
   and may call `state_dict()` after every pack, so keep it lightweight and do not return objects that

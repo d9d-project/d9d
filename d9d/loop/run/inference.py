@@ -1,3 +1,5 @@
+import contextlib
+
 import torch
 from tqdm import tqdm
 
@@ -201,6 +203,9 @@ class Inference:
         4. Executes the pipeline forward pass for every batch.
         5. Handles periodic garbage collection and profiling.
         6. Finalizes the task upon completion.
+
+        Raises:
+            RuntimeError: If the data stream ends before ``total_steps``.
         """
         with torch.inference_mode():
             self._enable_eval_mode()
@@ -226,11 +231,19 @@ class Inference:
                 ) as bar,
                 self._state.garbage_collector as gc,
                 self._state.profiler.open() as profiler,
+                contextlib.closing(iter(self._state.microbatch_pack_stream)) as packs,
             ):
                 self._state.event_bus.trigger(EVENT_INFERENCE_READY, EventInferenceReadyContext())
 
-                for device_pack in self._state.microbatch_pack_stream:
+                while self._state.schedule.current_step < self._state.schedule.total_steps:
                     self._state.event_bus.trigger(EVENT_INFERENCE_STEP_PRE, step_ctx)
+
+                    device_pack = next(packs, None)
+                    if device_pack is None:
+                        raise RuntimeError(
+                            f"The data stream ended at step {self._state.schedule.current_step}, "
+                            f"before total_steps={self._state.schedule.total_steps}"
+                        )
 
                     with self._state.event_bus.bounded(
                         EVENT_INFERENCE_FORWARD_PRE, EVENT_INFERENCE_FORWARD_POST, step_ctx

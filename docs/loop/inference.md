@@ -94,7 +94,7 @@ Before the loop starts:
 
 #### 2. The Step Loop
 
-For every step:
+The loop runs until `JobSchedule.total_steps` is reached, as in [training](train.md#2-the-step-loop). For every step:
 
 1. Triggers `EVENT_INFERENCE_STEP_PRE` event.
 2. **Microbatch Execution**:

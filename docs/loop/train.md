@@ -118,7 +118,7 @@ Before the loop starts:
 
 #### 2. The Step Loop
 
-For every global step (`step`), the trainer performs the following actions in strict order:
+The loop runs until `JobSchedule.total_steps` is reached (see [Data Loading](interfaces/data.md)). For every global step (`step`), the trainer performs the following actions in strict order:
 
 1. Triggers `EVENT_TRAIN_STEP_PRE` event.
 2. **Microbatch Execution**
