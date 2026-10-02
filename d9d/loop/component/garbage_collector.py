@@ -4,6 +4,8 @@ from contextlib import AbstractContextManager
 from types import TracebackType
 from typing import Self
 
+from torch.profiler import record_function
+
 from d9d.core.dist_context import DistributedContext
 from d9d.loop.config import GarbageCollectionConfig
 
@@ -70,7 +72,8 @@ class ManualGarbageCollector(AbstractContextManager):
         self._collect(generation=2)
 
     def _collect(self, generation: int):
-        begin = time.monotonic()
-        gc.collect(generation)
-        end = time.monotonic()
-        self._dist_ctx.logger.info(f"[GC] Garbage collection for generation {generation} took {end - begin}s")
+        with record_function("Garbage Collection"):
+            begin = time.monotonic()
+            gc.collect(generation)
+            end = time.monotonic()
+            self._dist_ctx.logger.info(f"[GC] Garbage collection for generation {generation} took {end - begin}s")

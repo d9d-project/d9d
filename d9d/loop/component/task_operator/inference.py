@@ -1,5 +1,7 @@
 import typing
 
+from torch.profiler import record_function
+
 from d9d.core.dist_context import DistributedContext
 from d9d.core.types import MicrobatchPack, PyTree
 from d9d.loop.control import InferenceTask, ProcessOutputsContext
@@ -43,7 +45,7 @@ class InferenceProcessor(typing.Generic[TPipelineOutput, TState]):
             pipeline_outputs: The ``PipelineOutput`` produced by the last stage.
             microbatch_idx: Index of the current microbatch within the step's pack.
         """
-        with self._state.scope(microbatch_idx) as state:
+        with record_function("Process Outputs"), self._state.scope(microbatch_idx) as state:
             self._task.process_outputs(ProcessOutputsContext(pipeline_results=pipeline_outputs, state=state))
 
 
@@ -76,14 +78,15 @@ class InferenceTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput,
         Args:
             pack: The step's pack of raw microbatches.
         """
-        try:
-            inputs_microbatches, shared_microbatches = build_pipeline_microbatch_inputs(
-                self._task, self._pipeline_state, pack
-            )
-            self._pipeline.schedule.step(
-                inputs_microbatches=inputs_microbatches,
-                shared_microbatches=shared_microbatches,
-                callback=InferenceProcessor(task=self._task, state=self._pipeline_state),
-            )
-        finally:
-            self._pipeline_state.reset()
+        with record_function("Forward"):
+            try:
+                inputs_microbatches, shared_microbatches = build_pipeline_microbatch_inputs(
+                    self._task, self._pipeline_state, pack
+                )
+                self._pipeline.schedule.step(
+                    inputs_microbatches=inputs_microbatches,
+                    shared_microbatches=shared_microbatches,
+                    callback=InferenceProcessor(task=self._task, state=self._pipeline_state),
+                )
+            finally:
+                self._pipeline_state.reset()

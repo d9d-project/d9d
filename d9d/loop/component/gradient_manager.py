@@ -2,6 +2,7 @@ from contextlib import contextmanager
 
 import torch
 from torch.distributed.tensor import DTensor
+from torch.profiler import record_function
 
 from d9d.core.dist_context import DistributedContext
 from d9d.core.offload import Offloadable, OffloadContext, OnloadContext
@@ -136,11 +137,12 @@ class GradientManager(Offloadable):
         3. Scales the gradients by the inverse of the total accumulated weight to
            normalize them.
         """
-        self._grad_sync.wait()
+        with record_function("Wait & Scale Gradients"):
+            self._grad_sync.wait()
 
-        if self._dist_context.mesh_params.is_distributed:
-            self._loss.sync(self._dist_context)
-        self._scale_grads()
+            if self._dist_context.mesh_params.is_distributed:
+                self._loss.sync(self._dist_context)
+            self._scale_grads()
 
     def compute_global_loss(self) -> torch.Tensor:
         """Calculates the final weighted mean loss.
