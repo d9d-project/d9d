@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.20.0 (2026-10-02)
+
+### Features
+
+- **loop**: Prefetch data packs to the device on a side CUDA stream
+  ([`f92a173`](https://github.com/d9d-project/d9d/commit/f92a17362ba1a875f38f6384c516f2fda36134ec))
+
+
 ## v0.19.4 (2026-10-01)
 
 ### Bug Fixes
