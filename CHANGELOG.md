@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.20.1 (2026-10-02)
+
+### Bug Fixes
+
+- **loop**: Run the train and inference loops for JobSchedule.total_steps
+  ([`102c1ed`](https://github.com/d9d-project/d9d/commit/102c1edfdf68e34148b44b4fbd4d1ec3a954d4fb))
+
+
 ## v0.20.0 (2026-10-02)
 
 ### Features
