@@ -183,6 +183,15 @@ def test_pin_memory_stream_pins_tensors_nested_in_dataclasses():
 
 
 @pytest.mark.local
+def test_pin_memory_stream_restores_the_intra_op_thread_count():
+    num_threads = torch.get_num_threads()
+
+    list(PinMemoryMicrobatchPackStream(_PackStream()))
+
+    assert torch.get_num_threads() == num_threads
+
+
+@pytest.mark.local
 def test_pin_memory_stream_delegates_total_steps_and_state():
     inner = _PackStream()
     stream = PinMemoryMicrobatchPackStream(inner)

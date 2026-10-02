@@ -1,4 +1,6 @@
 import dataclasses
+import threading
+import time
 
 import pytest
 import torch
@@ -157,3 +159,81 @@ def test_builder_picks_the_stream_by_prefetch_factor():
         build_device_pack_stream(_make_stream(), "cuda", -1)
     with pytest.raises(ValueError, match="positive"):
         PrefetchingDevicePackStream(_make_stream(), "cuda", 0)
+
+
+class _RecordingStream:
+    """Yields single-tensor packs and records which thread pulls them."""
+
+    def __init__(self, num_packs, fail_at=None):
+        self.total_steps = num_packs
+        self.pulled = 0
+        self.pulling_threads = set()
+        self._fail_at = fail_at
+
+    def __iter__(self):
+        for step in range(self.total_steps):
+            if step == self._fail_at:
+                raise RuntimeError("broken stream")
+            self.pulled += 1
+            self.pulling_threads.add(threading.current_thread())
+            yield [torch.full((4,), step)]
+
+    def state_dict(self):
+        return {}
+
+    def load_state_dict(self, state_dict):
+        pass
+
+
+def _prefetch_threads():
+    return [thread for thread in threading.enumerate() if thread.name == "d9d-pack-prefetch"]
+
+
+def _wait_until(condition, timeout=5.0):
+    deadline = time.monotonic() + timeout
+    while not condition() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    return condition()
+
+
+@pytest.mark.local
+@pytest.mark.parametrize("prefetch_factor", [1, 3])
+def test_stream_is_pulled_off_the_main_thread_at_most_prefetch_factor_ahead(prefetch_factor):
+    stream = _RecordingStream(num_packs=10)
+    iterator = iter(build_device_pack_stream(stream, "cuda", prefetch_factor))
+
+    next(iterator)
+
+    # the handed out pack plus up to prefetch_factor packs ahead, but no more
+    assert _wait_until(lambda: stream.pulled == 1 + prefetch_factor)
+    time.sleep(0.1)
+    assert stream.pulled == 1 + prefetch_factor
+    assert threading.main_thread() not in stream.pulling_threads
+
+
+@pytest.mark.local
+def test_stream_error_reaches_the_loop():
+    iterator = iter(build_device_pack_stream(_RecordingStream(num_packs=5, fail_at=2), "cuda", 1))
+
+    assert next(iterator)[0].tolist() == [0, 0, 0, 0]
+    assert next(iterator)[0].tolist() == [1, 1, 1, 1]
+    with pytest.raises(RuntimeError, match="broken stream"):
+        next(iterator)
+
+
+@pytest.mark.local
+def test_leaving_the_iteration_stops_the_background_thread():
+    stream = _RecordingStream(num_packs=10)
+    iterator = iter(build_device_pack_stream(stream, "cuda", 2))
+    next(iterator)
+    # the producer is now blocked waiting for a free slot
+    assert _wait_until(lambda: stream.pulled == 3)
+    assert len(_prefetch_threads()) == 1
+
+    # close from a helper thread, so a producer that never stops fails the test instead of hanging it
+    closer = threading.Thread(target=iterator.close, daemon=True)
+    closer.start()
+    closer.join(timeout=5)
+
+    assert not closer.is_alive(), "the background thread did not stop"
+    assert _prefetch_threads() == []
