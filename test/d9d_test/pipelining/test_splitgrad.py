@@ -101,3 +101,67 @@ def test_split_backward_correctness():
         # Check cleanup happens inside `stage_backward_weight` (it sets grads/intermediates to None)
         assert group.grads is None
         assert group.intermediates is None
+
+
+class _AuxThenProduct(torch.autograd.Function):
+    """Returns ``(aux, x @ w)``: the differentiable output is not the first one."""
+
+    @staticmethod
+    def forward(ctx, x, w):
+        ctx.save_for_backward(x, w)
+        y = x @ w
+        aux = y.detach().clone()
+        ctx.mark_non_differentiable(aux)
+        ctx.set_materialize_grads(False)
+        return aux, y
+
+    @staticmethod
+    def backward(ctx, _, grad_y):
+        x, w = ctx.saved_tensors
+        return grad_y @ w.T, x.T @ grad_y
+
+
+class _ProductAndDouble(torch.autograd.Function):
+    """Returns ``(x @ w, 2 * x @ w)``: two differentiable outputs of the same shape."""
+
+    @staticmethod
+    def forward(ctx, x, w):
+        ctx.save_for_backward(x, w)
+        y = x @ w
+        return y, 2 * y
+
+    @staticmethod
+    def backward(ctx, grad_y, grad_double):
+        x, w = ctx.saved_tensors
+        grad = grad_y + 2 * grad_double
+        return grad @ w.T, x.T @ grad
+
+
+def _aux_then_product_loss(x, w):
+    _, y = _AuxThenProduct.apply(x, w)
+    return (y * y).sum()
+
+
+def _product_and_double_loss(x, w):
+    y, double = _ProductAndDouble.apply(x, w)
+    # different upstream gradients for the two outputs, so mixing them up changes the result
+    return (y * y).sum() + double.sum()
+
+
+@pytest.mark.local
+@pytest.mark.parametrize("loss_fn", [_aux_then_product_loss, _product_and_double_loss])
+def test_split_backward_multi_output_node(loss_fn):
+    torch.manual_seed(0)
+    w = torch.nn.Parameter(torch.randn(8, 4))
+    x = torch.randn(16, 8, requires_grad=True)
+
+    loss_fn(x, w).backward()
+    expected_x_grad, expected_w_grad = x.grad, w.grad
+    x.grad, w.grad = None, None
+
+    loss = loss_fn(x, w)
+    results = stage_backward_input(outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x], weights=iter([w]))
+    stage_backward_weight(weights=iter([w]), param_groups=results.param_groups)
+
+    assert torch.allclose(results.input_grads[0], expected_x_grad)
+    assert torch.allclose(w.grad, expected_w_grad)
