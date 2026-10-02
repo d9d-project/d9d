@@ -1047,7 +1047,7 @@ wheels = [
 
 [[package]]
 name = "d9d"
-version = "0.21.1"
+version = "0.21.2"
 source = { editable = "." }
 default-groups = "all"
 dependencies = [

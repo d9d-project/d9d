@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.21.2 (2026-10-02)
+
+### Bug Fixes
+
+- **pipelining**: Replay weight grads in a single pass pinned to the captured grads
+  ([`fe422af`](https://github.com/d9d-project/d9d/commit/fe422af5fea5ee8b3fae99f4e0b61bd0ac32eefe))
+
+
 ## v0.21.1 (2026-10-02)
 
 ### Bug Fixes
