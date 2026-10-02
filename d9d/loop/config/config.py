@@ -28,7 +28,7 @@ class DataPrefetchConfig(BaseModel):
             ``0`` disables prefetching: every pack is copied on the current stream when its step starts.
     """
 
-    prefetch_factor: int = Field(default=1, ge=0)
+    prefetch_factor: int = Field(ge=0)
 
 
 class DeterminismConfig(BaseModel):
@@ -182,7 +182,7 @@ class TrainerConfig(BaseModel):
 
     run: RunConfig
     schedule: JobScheduleConfig
-    data_prefetch: DataPrefetchConfig = Field(default_factory=DataPrefetchConfig)
+    data_prefetch: DataPrefetchConfig
     logging: JobLoggerConfig
     pipelining: PipeliningConfig
     model_stage_factory: ModelStageFactoryConfig
@@ -210,7 +210,7 @@ class InferenceConfig(BaseModel):
     """
 
     schedule: JobScheduleConfig
-    data_prefetch: DataPrefetchConfig = Field(default_factory=DataPrefetchConfig)
+    data_prefetch: DataPrefetchConfig
     model_stage_factory: ModelStageFactoryConfig
     determinism: DeterminismConfig
     gc: GarbageCollectionConfig
