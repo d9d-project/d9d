@@ -18,7 +18,14 @@ class Profiler:
     """
 
     def __init__(
-        self, save_dir: Path, period_steps: int, warmup_steps: int, active_steps: int, dist_context: DistributedContext
+        self,
+        save_dir: Path,
+        period_steps: int,
+        warmup_steps: int,
+        active_steps: int,
+        record_shapes: bool,
+        with_stack: bool,
+        dist_context: DistributedContext,
     ):
         """Constructs a Profiler object.
 
@@ -27,12 +34,16 @@ class Profiler:
             period_steps: Total length of a profiling cycle (wait + warmup + active).
             warmup_steps: Number of steps to ignore before recording to allow for warming-up.
             active_steps: Number of steps to actively record traces.
+            record_shapes: Whether to record the input shapes of operators.
+            with_stack: Whether to record the Python call stacks of operators.
             dist_context: The distributed context object.
         """
         self._save_dir = save_dir
         self._period = period_steps
         self._warmup = warmup_steps
         self._active = active_steps
+        self._record_shapes = record_shapes
+        self._with_stack = with_stack
         self._dist_context = dist_context
 
     def _get_save_file_name(self) -> str:
@@ -68,8 +79,8 @@ class Profiler:
         """Opens a context manager for profiling execution.
 
         This sets up the `torch.profiler.profile` with a schedule derived from
-        the initialization parameters. It captures both CPU and CUDA activities,
-        records shapes, and tracks stack traces.
+        the initialization parameters. It captures both CPU and CUDA activities
+        on all threads, and records operator shapes and stack traces if enabled.
 
         When the schedule triggers `on_trace_ready`, the trace is automatically
         exported to the `save_dir`, compressed into a `.tar.gz` file, and the
@@ -90,8 +101,11 @@ class Profiler:
             activities=[tprof.ProfilerActivity.CPU, tprof.ProfilerActivity.CUDA],
             schedule=tprof.schedule(wait=wait, warmup=warmup, active=active),
             on_trace_ready=self._dump_trace,
-            record_shapes=True,
-            with_stack=True,
+            record_shapes=self._record_shapes,
+            with_stack=self._with_stack,
+            # by default only the thread that enters the profiler is recorded, which misses background
+            # threads such as data prefetching; torch exposes this option only via the private name
+            experimental_config=tprof._ExperimentalConfig(profile_all_threads=True),  # noqa: SLF001
         ) as profiler:
             profiler.step_num = start_step
             yield profiler

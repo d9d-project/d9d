@@ -5,6 +5,7 @@ from pathlib import Path
 import torch
 import torch.distributed.checkpoint as dcp
 from torch.distributed.checkpoint.stateful import Stateful
+from torch.profiler import record_function
 
 from d9d.core.dist_context import DistributedContext
 from d9d.loop.config import CheckpointingConfig
@@ -92,23 +93,24 @@ class StateCheckpointer:
             shutil.rmtree(delete_dir)
 
     def _checkpoint(self, state: Stateful):
-        next_checkpoint_id = self._next_checkpoint_id()
+        with record_function("Checkpoint Save"):
+            next_checkpoint_id = self._next_checkpoint_id()
 
-        self._dist_context.logger.info("Freeing up memory before checkpointing")
-        self._free_memory()
-        self._dist_context.logger.info("Waiting for world before saving checkpoint")
-        self._dist_context.wait_world()
-        self._dist_context.logger.info(f"Saving checkpoint {next_checkpoint_id}")
+            self._dist_context.logger.info("Freeing up memory before checkpointing")
+            self._free_memory()
+            self._dist_context.logger.info("Waiting for world before saving checkpoint")
+            self._dist_context.wait_world()
+            self._dist_context.logger.info(f"Saving checkpoint {next_checkpoint_id}")
 
-        save_from = {"state": state}
-        dcp.save(state_dict=save_from, checkpoint_id=next_checkpoint_id)
+            save_from = {"state": state}
+            dcp.save(state_dict=save_from, checkpoint_id=next_checkpoint_id)
 
-        self._purge_old_checkpoints()
-        self._free_memory()
+            self._purge_old_checkpoints()
+            self._free_memory()
 
-        self._dist_context.logger.info("Waiting for world after saving checkpoint")
-        self._dist_context.wait_world()
-        self._dist_context.logger.info("Checkpoint successfully saved across the world")
+            self._dist_context.logger.info("Waiting for world after saving checkpoint")
+            self._dist_context.wait_world()
+            self._dist_context.logger.info("Checkpoint successfully saved across the world")
 
     def checkpoint_if_needed(self, state: Stateful):
         """Checks if a checkpoint is due based on the configuration and saves if necessary.

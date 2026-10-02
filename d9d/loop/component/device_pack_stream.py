@@ -7,6 +7,7 @@ from typing import Any, Generic, TypeVar
 
 import torch
 from torch.distributed.checkpoint.stateful import Stateful
+from torch.profiler import record_function
 
 from d9d.core import pytree
 from d9d.core.protocol import MicrobatchPackStream
@@ -46,8 +47,14 @@ class DirectDevicePackStream(DevicePackStream):
         self._device = device
 
     def __iter__(self) -> Generator[MicrobatchPack, None, None]:
-        for pack in self._stream:
-            yield _copy_pack_to_device(pack, self._device)
+        packs = iter(self._stream)
+        while True:
+            with record_function("Get Microbatch Pack"):
+                pack = next(packs, None)
+                if pack is None:
+                    return
+                device_pack = _copy_pack_to_device(pack, self._device)
+            yield device_pack
 
     def state_dict(self) -> dict[str, Any]:
         return self._stream.state_dict()
@@ -147,12 +154,17 @@ class PrefetchingDevicePackStream(DevicePackStream):
     def _prefetch(self, device_index: int) -> Iterator[_PrefetchedPack]:
         # runs on the background thread, which needs its own current device
         torch.cuda.set_device(device_index)
-        for pack in self._stream:
-            stream_state = self._stream.state_dict()
-            with torch.cuda.stream(self._copy_stream):
-                device_pack = _copy_pack_to_device(pack, self._device)
-                copied = torch.cuda.Event()
-                copied.record()
+        packs = iter(self._stream)
+        while True:
+            with record_function("Prefetch Microbatch Pack"):
+                pack = next(packs, None)
+                if pack is None:
+                    return
+                stream_state = self._stream.state_dict()
+                with torch.cuda.stream(self._copy_stream):
+                    device_pack = _copy_pack_to_device(pack, self._device)
+                    copied = torch.cuda.Event()
+                    copied.record()
             yield _PrefetchedPack(pack=device_pack, copied=copied, stream_state=stream_state)
 
     def _hand_over(self, prefetched: _PrefetchedPack) -> MicrobatchPack:
@@ -172,8 +184,14 @@ class PrefetchingDevicePackStream(DevicePackStream):
 
         prefetched_packs = _BackgroundIterator(self._prefetch(torch.cuda.current_device()), self._prefetch_factor)
         try:
-            for prefetched in prefetched_packs:
-                yield self._hand_over(prefetched)
+            items = iter(prefetched_packs)
+            while True:
+                with record_function("Get Microbatch Pack"):
+                    prefetched = next(items, None)
+                    if prefetched is None:
+                        return
+                    pack = self._hand_over(prefetched)
+                yield pack
         finally:
             prefetched_packs.close()
 

@@ -2,6 +2,7 @@ from typing import Any, cast
 
 import torch
 from torch.distributed import DeviceMesh
+from torch.profiler import record_function
 
 from d9d.core.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 from d9d.core.protocol import OptimizerProtocol
@@ -32,8 +33,9 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
             optimizer.load_state_dict(state_dict[f"pp_{pp_rank}_stage_{i}"])
 
     def step(self) -> None:
-        for optimizer in self._optimizers:
-            optimizer.step()
+        with record_function("Optimizer Step"):
+            for optimizer in self._optimizers:
+                optimizer.step()
 
     def zero_grad(self) -> None:
         for optimizer in self._optimizers:

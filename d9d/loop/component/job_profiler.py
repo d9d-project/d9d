@@ -34,6 +34,8 @@ class JobProfiler:
                 active_steps=config.active_steps,
                 warmup_steps=config.warmup_steps,
                 period_steps=config.period_steps,
+                record_shapes=config.record_shapes,
+                with_stack=config.with_stack,
                 dist_context=dist_context,
             )
         self._schedule = schedule
