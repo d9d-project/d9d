@@ -350,9 +350,6 @@ class Trainer:
 
                 gc.collect_periodic()
 
-                if profiler:
-                    profiler.step()
-
                 self._state.timeout_manager.set_periodic()
 
                 self._state.event_bus.trigger(EVENT_TRAIN_STEP_POST, step_ctx)
@@ -360,6 +357,10 @@ class Trainer:
 
                 # checkpoint at the end of the step
                 self._state.checkpointer.checkpoint_if_needed(self._state)
+
+                # end the profiled step only now, so that it covers the step post events and the checkpoint
+                if profiler:
+                    profiler.step()
 
                 bar.update()
 
