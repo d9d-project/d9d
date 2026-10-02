@@ -8,6 +8,17 @@ from d9d.core.protocol import MicrobatchPackStream
 from d9d.core.types import MicrobatchPack
 
 
+def _pin_pack(pack: MicrobatchPack) -> MicrobatchPack:
+    # a parallel host copy can spend most of its time synchronizing the intra-op thread pool, so pin with a single
+    # thread, as the DataLoader's pin thread does; the setting is per thread and restored afterwards
+    num_threads = torch.get_num_threads()
+    torch.set_num_threads(1)
+    try:
+        return [pytree.tree_map_only(torch.Tensor, lambda x: x.pin_memory(), microbatch) for microbatch in pack]
+    finally:
+        torch.set_num_threads(num_threads)
+
+
 class PinMemoryMicrobatchPackStream(MicrobatchPackStream):
     """Wraps a microbatch pack stream to copy every tensor of each pack into page-locked (pinned) host memory.
 
@@ -33,7 +44,7 @@ class PinMemoryMicrobatchPackStream(MicrobatchPackStream):
             The next pack with all of its tensors in pinned host memory.
         """
         for pack in self._inner:
-            yield [pytree.tree_map_only(torch.Tensor, lambda x: x.pin_memory(), microbatch) for microbatch in pack]
+            yield _pin_pack(pack)
 
     @property
     def total_steps(self) -> int | None:
