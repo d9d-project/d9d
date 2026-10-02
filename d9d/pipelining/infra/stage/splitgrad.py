@@ -303,7 +303,7 @@ def stage_backward_weight(  # noqa: C901
 
     This function consumes the gradients captured in the `ParamGroup`s during
     `stage_backward_input` to compute the final gradients for the model weights.
-    It triggers backward passes starting from the intermediate nodes identified previously.
+    It triggers a single backward pass starting from all the intermediate nodes identified previously.
 
     Args:
         weights: An iterator over the model parameters to extract gradients for.
@@ -325,11 +325,12 @@ def stage_backward_weight(  # noqa: C901
         if grad_acc is not None:
             grad_acc_to_weight[grad_acc] = weight
 
-    for group in param_groups:
-        valid_edges = []
-        valid_grad_outputs: list[torch.Tensor] = []
-        captured: list[tuple[Node, tuple[torch.Tensor | None, ...]]] = []
+    valid_edges = []
+    valid_grad_outputs: list[torch.Tensor] = []
+    captured: list[tuple[Node, tuple[torch.Tensor | None, ...]]] = []
+    inputs_for_backward = []
 
+    for group in param_groups:
         # Ensure we have data
         if group.grads and group.intermediates:
             for grads_tuple, intermediate in zip(group.grads, group.intermediates, strict=True):
@@ -341,37 +342,33 @@ def stage_backward_weight(  # noqa: C901
                     if grad is not None:
                         valid_edges.append(GradientEdge(intermediate, output_nr))
                         valid_grad_outputs.append(grad)
+            inputs_for_backward.extend(grad_acc_to_weight[node] for node in group.params if node in grad_acc_to_weight)
 
-        # Break Cycle: Intermediates
+        # Break Cycle: Intermediates and Grads
         group.intermediates = None
-
-        if valid_edges:
-            inputs_for_backward = []
-            for node in group.params:
-                if node in grad_acc_to_weight:
-                    inputs_for_backward.append(grad_acc_to_weight[node])
-
-            if inputs_for_backward:
-                # an intermediate may lie downstream of another one (a weight reused on its own output), and then
-                # its gradient flows into the upstream intermediate on top of the captured gradient already replayed
-                # there; pin every intermediate to its captured gradient so nothing is counted twice
-                clamp_handles = []
-                if len(captured) > 1:
-                    for intermediate, grads_tuple in captured:
-                        clamp_handles.append(intermediate.register_prehook(_make_clamp_hook(grads_tuple)))
-                try:
-                    with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.weight):
-                        torch.autograd.backward(
-                            tensors=valid_edges,
-                            grad_tensors=valid_grad_outputs,
-                            retain_graph=retain_graph,
-                            inputs=inputs_for_backward,
-                        )
-                finally:
-                    for handle in clamp_handles:
-                        handle.remove()
-
-        # Break Cycle: Grads
         group.grads = None
+
+    if not valid_edges or not inputs_for_backward:
+        return tuple(w.grad for w in all_weights)
+
+    # All groups go in a single backward pass: a path from one intermediate down to a weight may cross nodes that
+    # belong to another group, so separate passes would free the graph under each other. Such a path also feeds the
+    # intermediates it crosses on top of the captured gradient already replayed there, so every intermediate is
+    # pinned to its captured gradient to keep anything from being counted twice.
+    clamp_handles = []
+    if len(captured) > 1:
+        for intermediate, grads_tuple in captured:
+            clamp_handles.append(intermediate.register_prehook(_make_clamp_hook(grads_tuple)))
+    try:
+        with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.weight):
+            torch.autograd.backward(
+                tensors=valid_edges,
+                grad_tensors=valid_grad_outputs,
+                retain_graph=retain_graph,
+                inputs=inputs_for_backward,
+            )
+    finally:
+        for handle in clamp_handles:
+            handle.remove()
 
     return tuple(w.grad for w in all_weights)
