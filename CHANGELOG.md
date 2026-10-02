@@ -2,6 +2,14 @@
 
 <!-- version list -->
 
+## v0.21.1 (2026-10-02)
+
+### Bug Fixes
+
+- **pipelining**: Replay captured weight grads on the outputs they belong to
+  ([`a7810c8`](https://github.com/d9d-project/d9d/commit/a7810c81e902ed57e6755ec92dc0344fbff9a98b))
+
+
 ## v0.21.0 (2026-10-02)
 
 ### Features
