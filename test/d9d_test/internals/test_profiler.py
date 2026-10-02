@@ -1,4 +1,6 @@
+import json
 import tarfile
+import threading
 
 import pytest
 import torch
@@ -31,6 +33,8 @@ def test_e2e(
         period_steps=period_steps,
         warmup_steps=warmup_steps,
         active_steps=active_steps,
+        record_shapes=True,
+        with_stack=True,
         dist_context=dist_ctx,
     )
 
@@ -88,6 +92,8 @@ def test_local_e2e(
         period_steps=period_steps,
         warmup_steps=warmup_steps,
         active_steps=active_steps,
+        record_shapes=True,
+        with_stack=True,
         dist_context=dist_ctx,
     )
 
@@ -120,3 +126,64 @@ def test_local_e2e(
                 assert member.size > 0
             except KeyError:
                 pytest.fail(f"Tarball did not contain expected file: {expected_member_name}")
+
+
+@pytest.mark.local
+def test_records_background_threads(dist_ctx_factory, tmp_path):
+    profiler_wrapper = Profiler(
+        save_dir=tmp_path,
+        period_steps=2,
+        warmup_steps=1,
+        active_steps=1,
+        record_shapes=True,
+        with_stack=True,
+        dist_context=dist_ctx_factory(DeviceMeshParameters()),
+    )
+
+    def background_work():
+        with torch.profiler.record_function("background work"):
+            torch.randn(10, 10).sum()
+
+    with profiler_wrapper.open(start_step=0) as prof:
+        for _ in range(2):
+            worker = threading.Thread(target=background_work)
+            worker.start()
+            worker.join()
+            prof.step()
+
+    with tarfile.open(tmp_path / "step_2" / "trace.tar.gz", "r:gz") as tar:
+        trace = json.load(tar.extractfile("trace.json"))
+    events = [event for event in trace["traceEvents"] if event.get("ph") == "X"]
+    step_threads = {event["tid"] for event in events if event["name"].startswith("ProfilerStep#")}
+    background = [event for event in events if event["name"] == "background work"]
+
+    assert background
+    assert {event["tid"] for event in background}.isdisjoint(step_threads)
+
+
+@pytest.mark.local
+@pytest.mark.parametrize("enabled", [True, False])
+def test_records_shapes_and_stacks_only_when_enabled(dist_ctx_factory, tmp_path, enabled):
+    profiler_wrapper = Profiler(
+        save_dir=tmp_path,
+        period_steps=2,
+        warmup_steps=1,
+        active_steps=1,
+        record_shapes=enabled,
+        with_stack=enabled,
+        dist_context=dist_ctx_factory(DeviceMeshParameters()),
+    )
+
+    with profiler_wrapper.open(start_step=0) as prof:
+        for _ in range(2):
+            torch.matmul(torch.randn(10, 10), torch.randn(10, 10))
+            prof.step()
+
+    with tarfile.open(tmp_path / "step_2" / "trace.tar.gz", "r:gz") as tar:
+        trace = json.load(tar.extractfile("trace.json"))
+    events = [event for event in trace["traceEvents"] if event.get("ph") == "X"]
+    matmuls = [event for event in events if event["name"] == "aten::matmul"]
+
+    assert matmuls
+    assert any(event.get("cat") == "python_function" for event in events) == enabled
+    assert all(("Input Dims" in event.get("args", {})) == enabled for event in matmuls)
