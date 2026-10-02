@@ -67,6 +67,9 @@
     "schedule": {
       "total_steps": null
     },
+    "data_prefetch": {
+      "prefetch_factor": 1
+    },
     "logging": {
       "period_steps": 5,
       "tracker": {

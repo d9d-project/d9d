@@ -1,5 +1,6 @@
 from .config import (
     CheckpointingConfig,
+    DataPrefetchConfig,
     DeterminismConfig,
     GarbageCollectionConfig,
     GradientClippingConfig,
@@ -17,6 +18,7 @@ from .types import StepActionPeriod, StepActionSpecial
 
 __all__ = [
     "CheckpointingConfig",
+    "DataPrefetchConfig",
     "DeterminismConfig",
     "GarbageCollectionConfig",
     "GradientClippingConfig",

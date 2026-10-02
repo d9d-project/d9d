@@ -52,6 +52,12 @@ The `d9d.loop.config` package defines the structure for configuring the training
     options:
       heading_level: 3
 
+### Data Prefetching
+
+::: d9d.loop.config.DataPrefetchConfig
+    options:
+      heading_level: 3
+
 ### Checkpointing
 
 ::: d9d.loop.config.CheckpointingConfig

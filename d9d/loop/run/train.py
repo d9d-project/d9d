@@ -22,6 +22,7 @@ from d9d.loop.component import (
     TimeoutManager,
     TrainSleeper,
     TrainTaskOperator,
+    build_device_pack_stream,
 )
 from d9d.loop.config import TrainerConfig
 from d9d.loop.control import (
@@ -65,8 +66,6 @@ from d9d.loop.event.catalogue.train import (
 )
 from d9d.loop.state import TrainJobState
 from d9d.metric.impl.container import ComposeMetric
-
-from ._device import move_pack_to_device
 
 
 class TrainingConfigurator:
@@ -128,6 +127,12 @@ class TrainingConfigurator:
         checkpointable_stream = DataParallelMicrobatchPackStream(
             dist_context=dist_context,
             inner=microbatch_pack_stream,
+        )
+
+        device_pack_stream = build_device_pack_stream(
+            stream=checkpointable_stream,
+            device=dist_context.current_device,
+            prefetch_factor=self._parameters.data_prefetch.prefetch_factor,
         )
 
         schedule = JobSchedule(
@@ -205,7 +210,7 @@ class TrainingConfigurator:
 
         return TrainJobState(
             dist_context=dist_context,
-            microbatch_pack_stream=checkpointable_stream,
+            microbatch_pack_stream=device_pack_stream,
             schedule=schedule,
             tracked_modules=modules,
             garbage_collector=gc,
@@ -293,11 +298,9 @@ class Trainer:
             run.set_context({"stage": "train"})
             self._state.event_bus.trigger(EVENT_TRAIN_READY, EventTrainReadyContext(run=run))
 
-            for pack in self._state.microbatch_pack_stream:
+            for device_pack in self._state.microbatch_pack_stream:
                 run.set_step(self._state.schedule.current_step)
                 self._state.event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
-
-                device_pack = move_pack_to_device(pack, "cuda")
 
                 with self._state.event_bus.bounded(
                     EVENT_TRAIN_FORWARD_BACKWARD_PRE, EVENT_TRAIN_FORWARD_BACKWARD_POST, step_ctx

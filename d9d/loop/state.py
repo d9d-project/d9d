@@ -4,8 +4,9 @@ from typing import Any
 from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.core.dist_context import DistributedContext
-from d9d.core.protocol import LRSchedulerProtocol, MicrobatchPackStream, OptimizerProtocol
+from d9d.core.protocol import LRSchedulerProtocol, OptimizerProtocol
 from d9d.loop.component import (
+    DevicePackStream,
     GradientClipper,
     GradientManager,
     InferenceTaskOperator,
@@ -52,7 +53,7 @@ class JobState(Stateful):
 
     tracked_modules: TrackedModules
 
-    microbatch_pack_stream: MicrobatchPackStream
+    microbatch_pack_stream: DevicePackStream
 
     timeout_manager: TimeoutManager
 

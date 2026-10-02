@@ -1,8 +1,12 @@
+import dataclasses
+
 import pytest
 import torch
 from d9d.core.dist_context import DeviceMeshParameters
+from d9d.dataset import BufferSortedDataset, ShardedDataset, ShardIndexingMode
 from d9d.dataset.batch_iterator import (
     FixedCountMicrobatchPacker,
+    PinMemoryMicrobatchPackStream,
     num_microbatches_for_global_batch,
 )
 from torch.utils.data import Dataset
@@ -140,3 +144,115 @@ def test_fixed_count_packer_state_delegates_to_loader():
 
     resumed_pack = next(iter(new_packer))
     assert resumed_pack[0].tolist() == [4.0, 5.0]
+
+
+@dataclasses.dataclass
+class _Microbatch:
+    ids: torch.Tensor
+    meta: dict[str, torch.Tensor]
+    size: int
+
+
+class _PackStream:
+    total_steps = 2
+
+    def __iter__(self):
+        for step in range(self.total_steps):
+            ids = torch.arange(step * 4, step * 4 + 4)
+            yield [_Microbatch(ids=ids, meta={"double": ids * 2}, size=4)]
+
+    def state_dict(self):
+        return {"marker": 7}
+
+    def load_state_dict(self, state_dict):
+        self.loaded = state_dict
+
+
+@pytest.mark.local
+def test_pin_memory_stream_pins_tensors_nested_in_dataclasses():
+    packs = list(PinMemoryMicrobatchPackStream(_PackStream()))
+
+    assert len(packs) == 2
+    for step, pack in enumerate(packs):
+        (microbatch,) = pack
+        assert isinstance(microbatch, _Microbatch)
+        assert microbatch.ids.is_pinned()
+        assert microbatch.meta["double"].is_pinned()
+        assert microbatch.ids.tolist() == list(range(step * 4, step * 4 + 4))
+        assert microbatch.size == 4
+
+
+@pytest.mark.local
+def test_pin_memory_stream_restores_the_intra_op_thread_count():
+    num_threads = torch.get_num_threads()
+
+    list(PinMemoryMicrobatchPackStream(_PackStream()))
+
+    assert torch.get_num_threads() == num_threads
+
+
+@pytest.mark.local
+def test_pin_memory_stream_delegates_total_steps_and_state():
+    inner = _PackStream()
+    stream = PinMemoryMicrobatchPackStream(inner)
+
+    assert stream.total_steps == 2
+    assert stream.state_dict() == {"marker": 7}
+
+    stream.load_state_dict({"marker": 8})
+    assert inner.loaded == {"marker": 8}
+
+
+class _SortableDataset(SimpleDataset):
+    def sort_key(self, idx):
+        return int(idx) % 7
+
+
+def _freeze(state):
+    if isinstance(state, torch.Tensor):
+        return ("tensor", tuple(state.flatten().tolist()))
+    if isinstance(state, dict):
+        return ("dict", tuple(sorted((repr(key), _freeze(value)) for key, value in state.items())))
+    if isinstance(state, (list, tuple)):
+        return ("seq", tuple(_freeze(value) for value in state))
+    return ("value", repr(state))
+
+
+@pytest.mark.local
+@pytest.mark.parametrize("num_workers", [0, 2])
+@pytest.mark.parametrize(
+    "make_dataset",
+    [
+        pytest.param(lambda: SimpleDataset(64), id="plain"),
+        pytest.param(
+            lambda: BufferSortedDataset(_SortableDataset(64), buffer_size=16, pack_size=4, init_seed=0),
+            id="buffer_sorted",
+        ),
+        pytest.param(
+            lambda: ShardedDataset(
+                SimpleDataset(64),
+                total_shards=2,
+                current_shard=1,
+                indexing_mode=ShardIndexingMode.sequential,
+                pad_to_equal_size_across_shards=True,
+            ),
+            id="sharded",
+        ),
+    ],
+)
+def test_builtin_stream_state_snapshot_is_not_mutated_by_further_iteration(num_workers, make_dataset):
+    # The MicrobatchPackStream contract prefetching relies on: a state snapshot stays valid while the stream
+    # keeps being iterated.
+    loader = StatefulDataLoader(
+        make_dataset(), batch_size=2, collate_fn=simple_collate, num_workers=num_workers, shuffle=True
+    )
+    stream = FixedCountMicrobatchPacker(loader, microbatches_per_step=2)
+    iterator = iter(stream)
+    next(iterator)
+
+    snapshot = stream.state_dict()
+    frozen = _freeze(snapshot)
+    for _ in range(3):
+        next(iterator)
+
+    assert _freeze(snapshot) == frozen

@@ -13,6 +13,7 @@ from d9d.loop.component import (
     PipelineStateHandler,
     StateCheckpointer,
     TimeoutManager,
+    build_device_pack_stream,
 )
 from d9d.loop.config import InferenceConfig, PipeliningConfig
 from d9d.loop.control import (
@@ -49,8 +50,6 @@ from d9d.loop.event.catalogue.inference import (
 )
 from d9d.loop.state import InferenceJobState
 from d9d.pipelining.factory import PipelineScheduleInferenceConfig
-
-from ._device import move_pack_to_device
 
 
 class InferenceConfigurator:
@@ -110,6 +109,12 @@ class InferenceConfigurator:
             inner=microbatch_pack_stream,
         )
 
+        device_pack_stream = build_device_pack_stream(
+            stream=checkpointable_stream,
+            device=dist_context.current_device,
+            prefetch_factor=self._parameters.data_prefetch.prefetch_factor,
+        )
+
         schedule = JobSchedule(
             config=self._parameters.schedule,
             stream=checkpointable_stream,
@@ -139,7 +144,7 @@ class InferenceConfigurator:
 
         return InferenceJobState(
             dist_context=dist_context,
-            microbatch_pack_stream=checkpointable_stream,
+            microbatch_pack_stream=device_pack_stream,
             schedule=schedule,
             tracked_modules=modules,
             garbage_collector=gc,
@@ -224,10 +229,8 @@ class Inference:
             ):
                 self._state.event_bus.trigger(EVENT_INFERENCE_READY, EventInferenceReadyContext())
 
-                for pack in self._state.microbatch_pack_stream:
+                for device_pack in self._state.microbatch_pack_stream:
                     self._state.event_bus.trigger(EVENT_INFERENCE_STEP_PRE, step_ctx)
-
-                    device_pack = move_pack_to_device(pack, "cuda")
 
                     with self._state.event_bus.bounded(
                         EVENT_INFERENCE_FORWARD_PRE, EVENT_INFERENCE_FORWARD_POST, step_ctx

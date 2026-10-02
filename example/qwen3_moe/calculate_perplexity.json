@@ -60,6 +60,9 @@
     "schedule": {
       "total_steps": null
     },
+    "data_prefetch": {
+      "prefetch_factor": 1
+    },
     "model_stage_factory": {
       "source_checkpoint": null,
       "checkpoint_only_trainable_parameters": false

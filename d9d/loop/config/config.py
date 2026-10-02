@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from d9d.pipelining.factory import AnyPipelineScheduleConfig
 from d9d.tracker import AnyTrackerConfig, RunConfig
@@ -17,6 +17,18 @@ class JobScheduleConfig(BaseModel):
     """
 
     total_steps: int | None
+
+
+class DataPrefetchConfig(BaseModel):
+    """Configuration for copying microbatch packs to the device ahead of the steps that consume them.
+
+    Attributes:
+        prefetch_factor: The number of packs copied to the device ahead of the current step. The copies run on
+            a dedicated CUDA stream and overlap with compute; each prefetched pack occupies device memory.
+            ``0`` disables prefetching: every pack is copied on the current stream when its step starts.
+    """
+
+    prefetch_factor: int = Field(ge=0)
 
 
 class DeterminismConfig(BaseModel):
@@ -154,6 +166,7 @@ class TrainerConfig(BaseModel):
     Attributes:
         run: Meta-information about the run (name, ID, tags).
         schedule: Job duration settings.
+        data_prefetch: Settings for copying data to the device ahead of time.
         logging: Experiment tracking settings.
         pipelining: Pipeline Parallelism schedule and settings. If None,
             pipeline parallelism is disabled.
@@ -169,6 +182,7 @@ class TrainerConfig(BaseModel):
 
     run: RunConfig
     schedule: JobScheduleConfig
+    data_prefetch: DataPrefetchConfig
     logging: JobLoggerConfig
     pipelining: PipeliningConfig
     model_stage_factory: ModelStageFactoryConfig
@@ -186,6 +200,7 @@ class InferenceConfig(BaseModel):
 
     Attributes:
         schedule: Job duration settings.
+        data_prefetch: Settings for copying data to the device ahead of time.
         model_stage_factory: Model initialization logic.
         determinism: Random seed settings.
         gc: Garbage collection settings.
@@ -195,6 +210,7 @@ class InferenceConfig(BaseModel):
     """
 
     schedule: JobScheduleConfig
+    data_prefetch: DataPrefetchConfig
     model_stage_factory: ModelStageFactoryConfig
     determinism: DeterminismConfig
     gc: GarbageCollectionConfig

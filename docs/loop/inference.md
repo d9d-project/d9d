@@ -99,7 +99,7 @@ For every step:
 1. Triggers `EVENT_INFERENCE_STEP_PRE` event.
 2. **Microbatch Execution**:
     *   Triggers `EVENT_INFERENCE_FORWARD_PRE` event.
-    *   The `MicrobatchPackStream` yields a **pack** containing $N$ microbatches (one step's worth); the loop moves it to the device.
+    *   The `DevicePackStream` hands out a **pack** containing $N$ microbatches (one step's worth), already on the device, as in [training](train.md#data-prefetching).
     *   The `InferenceTaskOperator` manages the execution: we delegate to the `InferenceTask` to map each microbatch before feeding it through the model, and to process the outputs.
     *   Unlike training, **no backward pass** is performed.
     *   Triggers `EVENT_INFERENCE_FORWARD_POST` event.
