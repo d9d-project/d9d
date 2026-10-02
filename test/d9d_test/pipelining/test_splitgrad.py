@@ -165,3 +165,60 @@ def test_split_backward_multi_output_node(loss_fn):
 
     assert torch.allclose(results.input_grads[0], expected_x_grad)
     assert torch.allclose(w.grad, expected_w_grad)
+
+
+def _reused_twice_loss(x, w):
+    return ((x @ w) @ w).square().sum()
+
+
+def _reused_thrice_loss(x, w):
+    return (((x @ w).tanh() @ w).tanh() @ w).sum()
+
+
+@pytest.mark.local
+@pytest.mark.parametrize(("loss_fn", "num_uses"), [(_reused_twice_loss, 2), (_reused_thrice_loss, 3)])
+def test_split_backward_weight_reused_downstream(loss_fn, num_uses):
+    # each use of ``w`` is an intermediate of the same group, and every later one lies downstream of the earlier ones
+    torch.manual_seed(0)
+    w = torch.nn.Parameter(torch.randn(8, 8))
+    x = torch.randn(16, 8, requires_grad=True)
+
+    loss_fn(x, w).backward()
+    expected_x_grad, expected_w_grad = x.grad, w.grad
+    x.grad, w.grad = None, None
+
+    loss = loss_fn(x, w)
+    results = stage_backward_input(outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x], weights=iter([w]))
+    assert [len(group.intermediates) for group in results.param_groups] == [num_uses]
+    stage_backward_weight(weights=iter([w]), param_groups=results.param_groups)
+
+    assert torch.allclose(results.input_grads[0], expected_x_grad)
+    assert torch.allclose(w.grad, expected_w_grad)
+
+
+@pytest.mark.local
+def test_split_backward_weight_reused_around_another_weight():
+    # ``wa`` and ``wb`` form separate groups, but the path from the second use of ``wa`` down to the first one
+    # crosses the intermediate of ``wb``
+    torch.manual_seed(0)
+    wa = torch.nn.Parameter(torch.randn(8, 8))
+    wb = torch.nn.Parameter(torch.randn(8, 8))
+    x = torch.randn(16, 8, requires_grad=True)
+
+    def loss_fn():
+        return (((x @ wa).tanh() @ wb).tanh() @ wa).sum()
+
+    loss_fn().backward()
+    expected_x_grad, expected_wa_grad, expected_wb_grad = x.grad, wa.grad, wb.grad
+    x.grad, wa.grad, wb.grad = None, None, None
+
+    loss = loss_fn()
+    results = stage_backward_input(
+        outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x], weights=iter([wa, wb])
+    )
+    assert sorted(len(group.intermediates) for group in results.param_groups) == [1, 2]
+    stage_backward_weight(weights=iter([wa, wb]), param_groups=results.param_groups)
+
+    assert torch.allclose(results.input_grads[0], expected_x_grad)
+    assert torch.allclose(wa.grad, expected_wa_grad)
+    assert torch.allclose(wb.grad, expected_wb_grad)
