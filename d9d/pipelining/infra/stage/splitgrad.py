@@ -50,12 +50,12 @@ class ParamGroup:
         intermediates: List of autograd Nodes serving as entry points for gradients
             flowing to these parameters.
         grads: Storage for captured gradients at the intermediate nodes during
-            the input backward phase.
+            the input backward phase, one per output of each intermediate node.
     """
 
     params: set[Node]
     intermediates: list[Node] | None
-    grads: list[torch.Tensor | None] | None = None
+    grads: list[tuple[torch.Tensor | None, ...] | None] | None = None
 
 
 def _get_grad_fn_or_grad_acc(t: torch.Tensor) -> Node | None:
@@ -188,8 +188,8 @@ def _get_param_groups(
     return unique_groups
 
 
-def _make_capture_hook(group: ParamGroup, idx: int) -> Callable[[torch.Tensor], None]:
-    def _hook(grad_in: torch.Tensor):
+def _make_capture_hook(group: ParamGroup, idx: int) -> Callable[[tuple[torch.Tensor | None, ...]], None]:
+    def _hook(grad_in: tuple[torch.Tensor | None, ...]):
         # Lazy init gradients list
         if group.grads is None and group.intermediates is not None:
             group.grads = [None] * len(group.intermediates)
@@ -325,10 +325,11 @@ def stage_backward_weight(  # noqa: C901
             for grads_tuple, intermediate in zip(group.grads, group.intermediates, strict=True):
                 if grads_tuple is None:
                     raise ValueError("Trying to do backward_weight with to intermediate grads")
-                non_none = [g for g in grads_tuple if g is not None]
-                if len(non_none) > 0:
-                    valid_edges.append(GradientEdge(intermediate, 0))
-                    valid_grad_outputs.append(cast(torch.Tensor, sum(non_none)))
+                # one edge per output: a multi-output node must get each gradient back on the output it belongs to
+                for output_nr, grad in enumerate(grads_tuple):
+                    if grad is not None:
+                        valid_edges.append(GradientEdge(intermediate, output_nr))
+                        valid_grad_outputs.append(grad)
 
         # Break Cycle: Intermediates
         group.intermediates = None
