@@ -68,8 +68,8 @@ class Profiler:
         """Opens a context manager for profiling execution.
 
         This sets up the `torch.profiler.profile` with a schedule derived from
-        the initialization parameters. It captures both CPU and CUDA activities,
-        records shapes, and tracks stack traces.
+        the initialization parameters. It captures both CPU and CUDA activities
+        on all threads, records shapes, and tracks stack traces.
 
         When the schedule triggers `on_trace_ready`, the trace is automatically
         exported to the `save_dir`, compressed into a `.tar.gz` file, and the
@@ -92,6 +92,9 @@ class Profiler:
             on_trace_ready=self._dump_trace,
             record_shapes=True,
             with_stack=True,
+            # by default only the thread that enters the profiler is recorded, which misses background
+            # threads such as data prefetching; torch exposes this option only via the private name
+            experimental_config=tprof._ExperimentalConfig(profile_all_threads=True),  # noqa: SLF001
         ) as profiler:
             profiler.step_num = start_step
             yield profiler
