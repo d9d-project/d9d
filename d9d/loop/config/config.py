@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import Self
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from d9d.pipelining.factory import AnyPipelineScheduleConfig
 from d9d.tracker import AnyTrackerConfig, RunConfig
@@ -121,12 +122,21 @@ class ProfilingConfig(BaseModel):
 
     traces_dir: Path
 
-    period_steps: int
-    warmup_steps: int
-    active_steps: int
+    period_steps: int = Field(gt=0)
+    warmup_steps: int = Field(ge=0)
+    active_steps: int = Field(gt=0)
 
     record_shapes: bool = True
     with_stack: bool = True
+
+    @model_validator(mode="after")
+    def _check_cycle_fits_period(self) -> Self:
+        if self.warmup_steps + self.active_steps > self.period_steps:
+            raise ValueError(
+                f"Profiling period_steps ({self.period_steps}) must cover warmup_steps ({self.warmup_steps}) "
+                f"plus active_steps ({self.active_steps})."
+            )
+        return self
 
 
 class JobLoggerConfig(BaseModel):
