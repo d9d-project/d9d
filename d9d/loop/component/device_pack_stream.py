@@ -1,8 +1,9 @@
 import abc
-import collections
 import dataclasses
+import queue
+import threading
 from collections.abc import Iterator
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 import torch
 from torch.distributed.checkpoint.stateful import Stateful
@@ -10,6 +11,8 @@ from torch.distributed.checkpoint.stateful import Stateful
 from d9d.core import pytree
 from d9d.core.protocol import MicrobatchPackStream
 from d9d.core.types import MicrobatchPack
+
+TItem = TypeVar("TItem")
 
 
 def _copy_pack_to_device(pack: MicrobatchPack, device: torch.types.Device) -> MicrobatchPack:
@@ -51,6 +54,57 @@ class DirectDevicePackStream(DevicePackStream):
 
 
 @dataclasses.dataclass(frozen=True)
+class _Failed:
+    error: BaseException
+
+
+@dataclasses.dataclass(frozen=True)
+class _Exhausted:
+    pass
+
+
+class _BackgroundIterator(Generic[TItem]):
+    """Runs an iterator on a background thread, keeping at most ``capacity`` of its items ahead of the consumer."""
+
+    def __init__(self, iterator: Iterator[TItem], capacity: int):
+        self._free_slots = threading.Semaphore(capacity)
+        self._items: queue.Queue[TItem | _Failed | _Exhausted] = queue.Queue()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, args=(iterator,), name="d9d-pack-prefetch", daemon=True)
+        self._thread.start()
+
+    def _run(self, iterator: Iterator[TItem]):
+        try:
+            while True:
+                self._free_slots.acquire()
+                if self._stop.is_set():
+                    return
+                item = next(iterator, _Exhausted())
+                self._items.put(item)
+                if isinstance(item, _Exhausted):
+                    return
+        except BaseException as error:  # noqa: BLE001 - re-raised in the consuming thread
+            self._items.put(_Failed(error))
+
+    def __iter__(self) -> Iterator[TItem]:
+        while True:
+            match self._items.get():
+                case _Failed(error=error):
+                    raise error
+                case _Exhausted():
+                    return
+                case item:
+                    self._free_slots.release()
+                    yield item
+
+    def close(self):
+        self._stop.set()
+        # wake the thread if it waits for a free slot, so it sees the stop request
+        self._free_slots.release()
+        self._thread.join()
+
+
+@dataclasses.dataclass(frozen=True)
 class _PrefetchedPack:
     pack: MicrobatchPack
     copied: torch.cuda.Event
@@ -60,8 +114,10 @@ class _PrefetchedPack:
 class PrefetchingDevicePackStream(DevicePackStream):
     """Copies packs to the device on a side CUDA stream ahead of the steps that consume them.
 
-    Prefetching runs the stream's state ahead of the job, so ``state_dict`` returns the stream state as of the
-    last handed out pack. This is the state of the last step, since checkpoints are only taken between steps.
+    A background thread pulls the packs from the stream, so their loading, pinning and copy launches stay off the
+    loop's critical path. Prefetching runs the stream's state ahead of the job, so ``state_dict`` returns the stream
+    state as of the last handed out pack. This is the state of the last step, since checkpoints are only taken
+    between steps.
     """
 
     def __init__(self, stream: MicrobatchPackStream, device: torch.types.Device, prefetch_factor: int):
@@ -83,20 +139,18 @@ class PrefetchingDevicePackStream(DevicePackStream):
         self._prefetch_factor = prefetch_factor
         self._copy_stream = torch.cuda.Stream()
 
-        self._prefetched: collections.deque[_PrefetchedPack] = collections.deque()
         self._handed_out_state: dict[str, Any] | None = None
 
-    def _pull(self, packs: Iterator[MicrobatchPack]) -> _PrefetchedPack | None:
-        pack = next(packs, None)
-        if pack is None:
-            return None
-
-        stream_state = self._stream.state_dict()
-        with torch.cuda.stream(self._copy_stream):
-            device_pack = _copy_pack_to_device(pack, self._device)
-            copied = torch.cuda.Event()
-            copied.record()
-        return _PrefetchedPack(pack=device_pack, copied=copied, stream_state=stream_state)
+    def _prefetch(self, device_index: int) -> Iterator[_PrefetchedPack]:
+        # runs on the background thread, which needs its own current device
+        torch.cuda.set_device(device_index)
+        for pack in self._stream:
+            stream_state = self._stream.state_dict()
+            with torch.cuda.stream(self._copy_stream):
+                device_pack = _copy_pack_to_device(pack, self._device)
+                copied = torch.cuda.Event()
+                copied.record()
+            yield _PrefetchedPack(pack=device_pack, copied=copied, stream_state=stream_state)
 
     def _hand_over(self, prefetched: _PrefetchedPack) -> MicrobatchPack:
         current_stream = torch.cuda.current_stream()
@@ -110,25 +164,15 @@ class PrefetchingDevicePackStream(DevicePackStream):
         return prefetched.pack
 
     def __iter__(self) -> Iterator[MicrobatchPack]:
-        # exact until the first pack is pulled
+        # nothing is pulled yet, so the stream's own state is exact
         self._handed_out_state = self._stream.state_dict()
+
+        prefetched_packs = _BackgroundIterator(self._prefetch(torch.cuda.current_device()), self._prefetch_factor)
         try:
-            packs = iter(self._stream)
-            is_exhausted = False
-            while True:
-                while not is_exhausted and len(self._prefetched) <= self._prefetch_factor:
-                    prefetched = self._pull(packs)
-                    if prefetched is None:
-                        is_exhausted = True
-                    else:
-                        self._prefetched.append(prefetched)
-
-                if not self._prefetched:
-                    return
-
-                yield self._hand_over(self._prefetched.popleft())
+            for prefetched in prefetched_packs:
+                yield self._hand_over(prefetched)
         finally:
-            self._prefetched.clear()
+            prefetched_packs.close()
 
     def state_dict(self) -> dict[str, Any]:
         if self._handed_out_state is None:

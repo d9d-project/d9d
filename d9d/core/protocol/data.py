@@ -56,7 +56,7 @@ class MicrobatchPackStream(Protocol):
     worth of microbatches - and that it supports state checkpointing via the ``Stateful`` interface
     (``state_dict``/``load_state_dict``), acting as the single checkpoint boundary for the data
     stream. It yields CPU (optionally memory-pinned) tensors; moving each pack to the device is the
-    loop's responsibility.
+    loop's responsibility. When prefetching, the loop iterates it on a background thread.
     """
 
     def __iter__(self) -> Iterator[MicrobatchPack]:
