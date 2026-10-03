@@ -6,13 +6,13 @@ The `d9d.loop` package provides the execution engine for distributed training. T
 
 ## Configuration and Construction
 
-You do not create a `Trainer` from loose objects. You build it with the `TrainingConfigurator`, using **dependency injection**.
+You do not create a `Trainer` from loose objects. You build it with the `TrainingConfigurator`, using dependency injection.
 
 The `TrainingConfigurator` combines:
 
-*   the **[infrastructure configuration](../core/dist_context.md)**,
-*   the **[job configuration](./config.md)**,
-*   the **[user logic](./interfaces/index.md)** (providers).
+*   the [infrastructure configuration](../core/dist_context.md),
+*   the [job configuration](./config.md),
+*   the [user logic](./interfaces/index.md) (providers).
 
 It returns a `Trainer` that holds a prepared `TrainJobState`.
 
@@ -82,11 +82,11 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
 
 1.  Triggers the `EVENT_TRAIN_STEP_PRE` event.
 2.  **Microbatch Execution**
-    *   The `DevicePackStream` hands out a **pack** of $N$ microbatches, already on the device (see [Data Prefetching](#data-prefetching)).
+    *   The `DevicePackStream` hands out a pack of $N$ microbatches, already on the device (see [Data Prefetching](#data-prefetching)).
     *   Triggers the `EVENT_TRAIN_FORWARD_BACKWARD_PRE` event.
     *   The `TrainTask` maps each microbatch to model inputs.
     *   The [pipeline program](../internals/pipelining.md) runs the forward and backward passes over all microbatches of the pack. Without pipeline parallelism, the program has a single stage.
-    *   Gradients **accumulate locally**. Between the forward and backward passes, the `TrainTask` computes the loss.
+    *   Gradients accumulate locally. Between the forward and backward passes, the `TrainTask` computes the loss.
     *   The last accumulation of each gradient bucket starts its all-reduce, which overlaps with the remaining backward work.
     *   The `TrainTask` updates the local metrics (e.g. token counts, accuracy) for each microbatch.
     *   Triggers the `EVENT_TRAIN_FORWARD_BACKWARD_POST` event.
@@ -150,7 +150,7 @@ trainer.wake()                  # Restore the training state, resume stepping
 
 ### What Gets Offloaded
 
-`sleep()` selects subsystems with a [`SleepTag`](../core/offload.md#sleep-tags). The default, `SleepTag.TENSOR_STATES`, offloads **all GPU tensor state as a single unit**:
+`sleep()` selects subsystems with a [`SleepTag`](../core/offload.md#sleep-tags). The default, `SleepTag.TENSOR_STATES`, offloads all GPU tensor state as a single unit:
 
 *   **Model** parameters and buffers (`TrackedModules`),
 *   **Optimizer** state (`PipelinedOptimizer`),
@@ -158,7 +158,7 @@ trainer.wake()                  # Restore the training state, resume stepping
 
 Data packs are not offloaded. The pack of the finished step and up to `prefetch_factor` [prefetched](#data-prefetching) packs stay on the device.
 
-`SleepTag.COMMS` (NCCL process groups) is reserved but **not implemented yet**. Requesting it raises `NotImplementedError`.
+`SleepTag.COMMS` (NCCL process groups) is reserved but not implemented yet. Requesting it raises `NotImplementedError`.
 
 The round trip keeps object identity, optimizer state dict keys and `DTensor` metadata. So external references, e.g. a frozen reference model held by a task, stay valid after waking. See the [round-trip invariant](../core/offload.md) for details.
 

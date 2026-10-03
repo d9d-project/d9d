@@ -63,10 +63,10 @@ The loop runs until it reaches `JobSchedule.total_steps`, as in [training](./tra
 
 1.  Triggers the `EVENT_INFERENCE_STEP_PRE` event.
 2.  **Microbatch Execution**:
-    *   The `DevicePackStream` hands out a **pack** of $N$ microbatches, already on the device, as in [training](./train.md#data-prefetching).
+    *   The `DevicePackStream` hands out a pack of $N$ microbatches, already on the device, as in [training](./train.md#data-prefetching).
     *   Triggers the `EVENT_INFERENCE_FORWARD_PRE` event.
     *   The `InferenceTask` maps each microbatch to model inputs. After the forward pass, it processes the outputs of each microbatch.
-    *   Unlike training, **no backward pass** runs.
+    *   Unlike training, no backward pass runs.
     *   Triggers the `EVENT_INFERENCE_FORWARD_POST` event.
 
 3.  **Maintenance**:

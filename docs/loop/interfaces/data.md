@@ -2,13 +2,13 @@
 
 ## About
 
-A `DataProvider` is the factory that you supply to the train or inference loop, like `ModelProvider` or `OptimizerProvider`. Given the run context, it builds a **`MicrobatchPackStream`**. This is a `Stateful` iterable that yields **microbatch packs** and reports its length through the `total_steps` property.
+A `DataProvider` is the factory that you supply to the train or inference loop, like `ModelProvider` or `OptimizerProvider`. Given the run context, it builds a `MicrobatchPackStream`. This is a `Stateful` iterable that yields microbatch packs and reports its length through the `total_steps` property.
 
 ## Concepts
 
 *   A **pack** holds the data of one step: a sequence of microbatches. `len(pack)` is the number of microbatches in that step (the gradient accumulation factor). It can vary from step to step. The loop copies packs to the device ahead of their steps (see [Data Prefetching](../train.md#data-prefetching)).
 *   **`total_steps`** is the number of steps the stream yields. It is `None` when the length is not known ahead of time, e.g. for streaming or data-dependent batching. `JobSchedule` takes the job duration from `JobScheduleConfig.total_steps` if it is set. It must not exceed the stream length. Otherwise, `JobSchedule` uses the `total_steps` of the stream. The loop runs exactly that many steps. It cuts a longer stream short and raises an error if the stream ends earlier.
-*   The stream is the only **checkpoint boundary** for the data. It saves and restores its own position per data-parallel rank, so the job resumes exactly. Prefetching iterates the stream on a background thread and can call `state_dict()` after every pack. So keep `state_dict()` cheap, and do not return objects that later iteration changes.
+*   The stream is the only checkpoint boundary for the data. It saves and restores its own position per data-parallel rank, so the job resumes exactly. Prefetching iterates the stream on a background thread and can call `state_dict()` after every pack. So keep `state_dict()` cheap, and do not return objects that later iteration changes.
 
 You can use the shipped `AutoDataProvider` for the common case, or write your own provider for full control.
 
@@ -16,7 +16,7 @@ You can use the shipped `AutoDataProvider` for the common case, or write your ow
 
 `AutoDataProvider` builds the default data stack for you. You supply the two parts that cannot be serialized: a `dataset_factory` and a `collator`. An `AutoDataConfig` holds the serializable settings: `global_batch_size`, `microbatch_size`, `shard_indexing_mode`, `drop_last` and loader settings. The loader settings include `shuffle`, `num_workers`, `pin_memory` and `prefetch_factor`. A `PinMemoryMicrobatchPackStream` does the pinning. Unlike the `DataLoader` option, it also pins tensors nested in dataclasses.
 
-`AutoDataProvider` **shards the dataset across data-parallel ranks for you**. It also builds the loader, derives the gradient accumulation factor and returns the stream. So your factory returns the *unsharded* dataset.
+`AutoDataProvider` shards the dataset across data-parallel ranks for you. It also builds the loader, derives the gradient accumulation factor and returns the stream. So your factory returns the *unsharded* dataset.
 
 *   The `dataset_factory` receives the `DistributedContext`, so it can guard data preparation. For example, `dist_context.main_process_first()` lets rank 0 fill the cache before the other ranks read it.
 *   The `collator` collates a list of samples into one microbatch.
@@ -72,7 +72,7 @@ A custom provider builds the same default stack by hand. It has two layers:
 
 Wrap the packer in a `PinMemoryMicrobatchPackStream` to pin the packs, so the loop copies them to the device asynchronously. The packer and the pinning stream live in `d9d.dataset.batch_iterator`.
 
-Unlike with `AutoDataProvider`, **you own the data-parallel sharding**. Shard the dataset yourself before you build the loader, e.g. with `shard_dataset_data_parallel`. See the [Dataset Utilities](../../dataset/index.md) documentation.
+Unlike with `AutoDataProvider`, you own the data-parallel sharding. Shard the dataset yourself before you build the loader, e.g. with `shard_dataset_data_parallel`. See the [Dataset Utilities](../../dataset/index.md) documentation.
 
 ```python
 from collections.abc import Sequence

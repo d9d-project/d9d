@@ -14,7 +14,7 @@ Choose a model from the d9d [catalogue](../../models/model_catalogue/index.md), 
 
 This method builds the `nn.Module` for one [pipeline parallel](../../models/pipeline_parallelism.md) stage, in the target `torch.dtype`.
 
-The loop calls it on the **meta device**, so you **must not** load model weights here. Instead, return a [state mapper](../../model_states/mapper.md) that maps the weights **on disk** to the weights **in memory**.
+The loop calls it on the meta device, so you must not load model weights here. Instead, return a [state mapper](../../model_states/mapper.md) that maps the weights on disk to the weights in memory.
 
 You can also apply [PEFT](../../peft/overview.md) methods and other architecture patches here. The returned state mapper must reflect the changes they make.
 

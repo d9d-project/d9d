@@ -20,13 +20,13 @@ d9d rejects this pattern for three reasons:
 2.  **Leaky abstractions**: Forward methods fill up with checks like `if self.layer is not None`.
 3.  **Invalid states**: The model object is half-built until it is sliced.
 
-In d9d, models are **pipeline-aware**. Each pipeline rank builds **only** the stages it owns. The returned module is complete and valid right away.
+In d9d, models are **pipeline-aware**. Each pipeline rank builds only the stages it owns. The returned module is complete and valid right away.
 
 ## Making Models Compatible
 
 ### The Four I/O Roles
 
-A pipelined model moves data across stage boundaries as four **explicitly named, generic PyTree types**. Dataclasses are the recommended form.
+A pipelined model moves data across stage boundaries as four explicitly named, generic PyTree types. Dataclasses are the recommended form.
 
 | Role             | Meaning                                                     | Crosses P2P? |
 |------------------|-------------------------------------------------------------|--------------|
@@ -42,9 +42,9 @@ Only `StageTransfer` crosses the network, so it is the only role that needs a `T
 To use pipeline parallelism, your model implements `d9d.pipelining.api.ModuleSupportsPipelining[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]`:
 
 *   **`forward(inputs, shared)`**: `inputs` is the `PipelineInput` on the first stage and the incoming `StageTransfer` on the other stages. It returns the outgoing `StageTransfer` on non-last stages and the `PipelineOutput` on the last stage. The stage knows its position from the `PipelineStageInfo` it gets at construction. It branches on `is_current_stage_first` and `is_current_stage_last` explicitly.
-*   **`stage_transfer_spec(pipeline_input, boundary)`**: Returns a PyTree with the **same structure as `StageTransfer`**, with every tensor leaf replaced by a `TensorSpec`. The `boundary` (`StageBoundary.incoming` or `outgoing`) selects which stage edge to describe.
+*   **`stage_transfer_spec(pipeline_input, boundary)`**: Returns a PyTree with the same structure as `StageTransfer`, with every tensor leaf replaced by a `TensorSpec`. The `boundary` (`StageBoundary.incoming` or `outgoing`) selects which stage edge to describe.
 
-The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* have the **same dataclass type**. So `pytree.tree_flatten` gives the same leaf order on both ends. Sender and receiver agree on the order **by construction**, and they need no handshake.
+The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* have the same dataclass type. So `pytree.tree_flatten` gives the same leaf order on both ends. Sender and receiver agree on the order by construction, and they need no handshake.
 
 ### Example
 
@@ -159,7 +159,7 @@ Some schedules limit the number of microbatches per step:
 
 ## Microbatches and Packs
 
-Pipelining consumes a **pack**: a sequence of ready microbatches for one step. The pack length, and so the batch size, can change from step to step. Each stage infers buffer shapes **per microbatch**, so the microbatches in one pack can also differ in shape.
+Pipelining consumes a **pack**: a sequence of ready microbatches for one step. The pack length, and so the batch size, can change from step to step. Each stage infers buffer shapes per microbatch, so the microbatches in one pack can also differ in shape.
 
 The schedule composes its program once per microbatch count and reuses it. It reallocates buffers when a microbatch shape differs from the previous step.
 
@@ -183,7 +183,7 @@ The `Trainer` builds the schedule and distributes the layers.
 
 To use pipelining outside the `Trainer`, for example in a custom loop, call the `build_schedule` factory.
 
-`build_schedule` takes a **model provider** instead of a built model. The model provider is a function that accepts a `PipelineStageInfo` and returns the `nn.Module` for that stage. This keeps construction consistent.
+`build_schedule` takes a model provider instead of a built model. The model provider is a function that accepts a `PipelineStageInfo` and returns the `nn.Module` for that stage. This keeps construction consistent.
 
 ```python
 from torch import Tensor

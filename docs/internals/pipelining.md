@@ -22,7 +22,7 @@ With this split, a research schedule such as Zero Bubble or DualPipeV is a list 
 
 #### PipelineStage (`infra/stage/stage.py`)
 
-Wraps a user `nn.Module`. It does **not** decide *when* to run. It gives the actions and the executor the atomic operations of a pipeline stage, such as the forward and backward passes.
+Wraps a user `nn.Module`. It does not decide *when* to run. It gives the actions and the executor the atomic operations of a pipeline stage, such as the forward and backward passes.
 
 It consists of:
 
@@ -64,7 +64,7 @@ Each step, it receives a **pack** (a sequence of ready per-microbatch inputs) an
 
 The d9d pipelining implementation borrows concepts from the `torch.distributed.pipelining` API, such as the Zero Bubble implementation. It restructures the code for clarity, type safety and modularity.
 
-The main differences are a **strict separation of concerns** and **composition over inheritance**:
+The main differences are a strict separation of concerns and composition over inheritance:
 
 1.  **Decomposed stage logic**:
     *   **PyTorch**: A single `_PipelineStageBase` class manages P2P buffer allocation, gradient accumulation state, and forward/backward execution.

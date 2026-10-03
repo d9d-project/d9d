@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.core.offload` package moves GPU-resident training state to host (CPU) memory and back. It is the base of the **sleep / wake** API of the `Trainer`. Sleep frees the GPUs for a colocated workload, for example a rollout engine that shares the GPUs in colocated reinforcement learning. The user entry points `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` are documented on the [Training Loop](../loop/train.md) page. This page covers the primitives they are built on.
+The `d9d.core.offload` package moves GPU-resident training state to host (CPU) memory and back. It is the base of the sleep / wake API of the `Trainer`. Sleep frees the GPUs for a colocated workload, for example a rollout engine that shares the GPUs in colocated reinforcement learning. The user entry points `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` are documented on the [Training Loop](../loop/train.md) page. This page covers the primitives they are built on.
 
 ## Building Blocks
 
@@ -13,11 +13,11 @@ The package defines two things:
 
 ## The Round-Trip Guarantee
 
-**An `offload` followed by an `onload` changes nothing observable.** Across the round trip:
+An `offload` followed by an `onload` changes nothing observable. Across the round trip:
 
-*   Parameters and buffers keep their **object identity**.
-*   The optimizer keeps its **state dict keys** and the tensor objects they map to.
-*   `DTensor` **wrapper instances** keep their `device_mesh`, `placements`, global `shape`, `stride` and `dtype`.
+*   Parameters and buffers keep their object identity.
+*   The optimizer keeps its state dict keys and the tensor objects they map to.
+*   `DTensor` wrapper instances keep their `device_mesh`, `placements`, global `shape`, `stride` and `dtype`.
 
 Only the device storage is allocated again. So external references stay valid after wake-up. Gradient hooks, optimizer state keyed by parameter and a frozen reference model held by a task all point at the same objects.
 
@@ -28,7 +28,7 @@ The primitives swap the storage in place instead of creating new tensors. For a 
 `SleepTag` selects the subsystems that `Trainer.sleep` and `Trainer.wake` act on:
 
 *   **`SleepTag.TENSOR_STATES`**: All GPU tensor state (model parameters and buffers, optimizer state, gradient buckets and the residual loss accumulator). They are offloaded together. `DEFAULT_SLEEP_TAGS` holds only this tag.
-*   **`SleepTag.COMMS`**: NCCL process groups. Opt-in and **not implemented yet**. Requesting it raises `NotImplementedError`.
+*   **`SleepTag.COMMS`**: NCCL process groups. Opt-in and not implemented yet. Requesting it raises `NotImplementedError`.
 
 ## Usage
 

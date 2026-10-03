@@ -23,7 +23,7 @@ For more details, see [PyTorch Issue #174017](https://github.com/pytorch/pytorch
 d9d adds the `GlobalGradContext` to work around this limitation. It is shared state through which the training loop tells custom operations which gradients it needs.
 
 1.  **Training loop**: Sets the enabled gradient directions, e.g. "input gradients only".
-2.  **Operation**: The custom `backward` checks the context. It computes a gradient only if `needs_input_grad` is `True` **and** the context enables its direction.
+2.  **Operation**: The custom `backward` checks the context. It computes a gradient only if `needs_input_grad` is `True` and the context enables its direction.
 
 By default, `GLOBAL_GRAD_CONTEXT` enables both input and weight gradients.
 

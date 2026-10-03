@@ -213,6 +213,7 @@ We follow the [Google Python style](https://google.github.io/styleguide/pyguide.
 *   **Write one paragraph per line.** Do not wrap lines by hand. Use soft wrapping in your editor.
 *   **Indent list items by four characters.** Write `*   ` for bullets and `1.  ` for numbered items, so nested
     blocks line up at four spaces.
+*   **Use bold only for labels and for a term where you define it.** Do not use bold for emphasis.
 *   **Write a labeled list item as `**Label**: Sentence.`** Put the colon outside the bold text. Start the text after
     it with a capital letter and end it with a period.
 *   **Write short, real examples.** Use real names from the API. Show configs and environment variables in the form

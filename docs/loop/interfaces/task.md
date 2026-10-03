@@ -24,7 +24,7 @@ A `TrainTask` builds the model inputs from each microbatch, computes the loss an
 
 ## InferenceTask
 
-An `InferenceTask` defines the logic of a single inference step. It handles the **forward-only** flow and processes the outputs of the model (e.g. logits, hidden states).
+An `InferenceTask` defines the logic of a single inference step. It handles the forward-only flow and processes the outputs of the model (e.g. logits, hidden states).
 
 **Lifecycle**, for each microbatch of a step:
 
@@ -39,13 +39,13 @@ An `InferenceTask` defines the logic of a single inference step. It handles the 
 
 ## Task State
 
-The raw `batch` is available only in `build_forward_inputs(...)`. The **state** carries side-data from `build_forward_inputs` to the later calls for the **same microbatch**. Use it for labels, masks, token counts or anything else the loss or the metrics need but the model does not return.
+The raw `batch` is available only in `build_forward_inputs(...)`. The **state** carries side-data from `build_forward_inputs` to the later calls for the same microbatch. Use it for labels, masks, token counts or anything else the loss or the metrics need but the model does not return.
 
 `TState`, the last type parameter of `TrainTask` / `InferenceTask`, declares the state. `TState` can be any PyTree:
 
-*   a **dataclass**, for attribute access and strict typing;
-*   a **`TypedDict`**, for dict access with checked keys;
-*   a **plain `dict`**, for quick, untyped side-data;
+*   a dataclass, for attribute access and strict typing;
+*   a `TypedDict`, for dict access with checked keys;
+*   a plain `dict`, for quick, untyped side-data;
 *   **`None`**, for tasks that carry nothing.
 
 `build_forward_inputs` returns the state. `compute_loss`, `process_outputs` and `update_metrics` read it back, fully typed.
@@ -68,9 +68,9 @@ Tensors stored in the state are detached from the autograd graph, so the cached 
 The task I/O uses the same PyTree roles as the model pipeline (see [Pipeline Parallelism](../../models/pipeline_parallelism.md)). `TrainTask` is generic over `[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]`:
 
 *   `TBatch`: the raw microbatch produced by the data stream.
-*   `TPipelineInput`: the `PipelineInput` fed to the **first** stage.
-*   `TSharedInput`: the `SharedInput` passed to **every** stage.
-*   `TPipelineOutput`: the `PipelineOutput` produced by the **last** stage and read in `compute_loss`. For a single-head model, it is the output of that head. For a model with several named heads, it holds the output of each head, keyed by head name.
+*   `TPipelineInput`: the `PipelineInput` fed to the first stage.
+*   `TSharedInput`: the `SharedInput` passed to every stage.
+*   `TPipelineOutput`: the `PipelineOutput` produced by the last stage and read in `compute_loss`. For a single-head model, it is the output of that head. For a model with several named heads, it holds the output of each head, keyed by head name.
 
 `build_forward_inputs` returns a `BuildForwardInputsResult` with the `input`, `shared` and `state` fields.
 

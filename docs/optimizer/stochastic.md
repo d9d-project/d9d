@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.optim.stochastic` module provides optimizers for training with bf16 parameters and no fp32 master copy. They round the updated parameters to bf16 with stochastic rounding. The update and the rounding run in one fused **Triton** kernel. The kernels live in `d9d.kernel.stochastic` and can also be called directly.
+The `d9d.optim.stochastic` module provides optimizers for training with bf16 parameters and no fp32 master copy. They round the updated parameters to bf16 with stochastic rounding. The update and the rounding run in one fused Triton kernel. The kernels live in `d9d.kernel.stochastic` and can also be called directly.
 
 ## Stochastic Rounding
 

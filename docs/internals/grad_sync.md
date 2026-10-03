@@ -28,7 +28,7 @@ Training often accumulates gradients over several microbatches before an optimiz
 
 1.  **Local accumulation**: During the backward pass of the first $N-1$ microbatches, local gradients accumulate in the bucket buffer. The parameter `DTensor` is `Replicate`, so the gradient also has a `Replicate` placement across the data parallel mesh. Its data still differs between ranks at this point.
 
-2.  **Automatic trigger**: Each bucket counts the gradient accumulations of its parameters. The `all_reduce` starts *only* when all parameters of the bucket reach the `require_accumulations` count. The trigger runs inside the backward hook of the *last* microbatch. So the communication overlaps with the backward pass of the remaining layers. The communication runs on a **separate CUDA stream**. You **must** wait for it before you use the gradients on your default stream.
+2.  **Automatic trigger**: Each bucket counts the gradient accumulations of its parameters. The `all_reduce` starts *only* when all parameters of the bucket reach the `require_accumulations` count. The trigger runs inside the backward hook of the *last* microbatch. So the communication overlaps with the backward pass of the remaining layers. The communication runs on a separate CUDA stream. You must wait for it before you use the gradients on your default stream.
 
 3.  **Synchronization**: When the asynchronous reduction completes, the flat buffer holds the globally summed gradient. The gradients have the same `Replicate` placement as their parameters. So the optimizer can use them without any further synchronization.
 

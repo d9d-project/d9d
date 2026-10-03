@@ -6,7 +6,7 @@ The `d9d.core.pytree` package traverses nested tensor structures (pytrees) recur
 
 ## Supported Containers
 
-The package traverses the containers that [`PyTree`](./types.md) describes (`dict`, `list`, `tuple`), nested to any depth. It also traverses **any dataclass**: the fields of a dataclass are its children in the tree.
+The package traverses the containers that [`PyTree`](./types.md) describes (`dict`, `list`, `tuple`), nested to any depth. It also traverses any dataclass: the fields of a dataclass are its children in the tree.
 
 Nesting works in every direction. A dataclass inside a dict, a list of dataclasses and a dataclass with dicts of tensors as fields are all traversed.
 
@@ -14,8 +14,8 @@ Nesting works in every direction. A dataclass inside a dict, a list of dataclass
 
 Traversal order is deterministic:
 
-*   **`dict` keys** are traversed in **sorted** order, whatever the insertion order.
-*   **Dataclass fields** are traversed in **declaration** order.
+*   **`dict` keys** are traversed in sorted order, whatever the insertion order.
+*   **Dataclass fields** are traversed in declaration order.
 
 ## Usage
 

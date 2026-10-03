@@ -17,9 +17,9 @@ d9d requires every trainable parameter in a distributed run to be a `torch.distr
 
 d9d does not use monolithic wrappers like `torch.nn.parallel.DistributedDataParallel` (DDP). DDP takes ownership of the whole model execution. Instead, d9d builds on PyTorch's `parallelize_module` API, which lets you choose a strategy for each submodule:
 
-*   Layer A can use **tensor parallelism** (row-wise or column-wise).
-*   Layer B, such as a router, can use **replicate parallelism**.
-*   Layer C, such as an MoE layer, can use **expert parallelism**.
+*   Layer A can use tensor parallelism (row-wise or column-wise).
+*   Layer B, such as a router, can use replicate parallelism.
+*   Layer C, such as an MoE layer, can use expert parallelism.
 
 Data parallelism is one more placement ("Replicate") in this system, so all strategies share one interface.
 

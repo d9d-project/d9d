@@ -30,7 +30,7 @@ Groups of sharded tensors come first. Their `all_reduce` runs asynchronously whi
 
 ## Mathematical Correctness
 
-Distributed gradient clipping must compute the **global norm** ($\|\mathbf{g}\|$) of a **single model instance**, however the model is split across GPUs.
+Distributed gradient clipping must compute the **global norm** ($\|\mathbf{g}\|$) of a single model instance, however the model is split across GPUs.
 
 Split the set of model parameters $\mathcal{P}$ into disjoint subsets by parallelism strategy:
 
@@ -52,7 +52,7 @@ $$
 \|G\|^2 = \sum_{rank=1}^{k} \|G_{rank}\|^2
 $$
 
-**Strategy:** compute the local norms and apply `all_reduce(op=SUM)`.
+**Strategy**: compute the local norms and apply `all_reduce(op=SUM)`.
 
 ### Proof for Replicated Parameters (DP)
 
@@ -68,7 +68,7 @@ $$
 \sum_{rank=1}^{k} \|G_{rank}\|^2 = k \cdot \|G\|^2 \quad (\text{Incorrect: Double Counting})
 $$
 
-**Strategy:** group these parameters separately and do not communicate.
+**Strategy**: group these parameters separately and do not communicate.
 
 ### Proof for Pipeline Parallelism (PP)
 
@@ -78,7 +78,7 @@ $$
 \|\mathbf{g}\|^2 = \|\mathbf{g}_{stage_1}\|^2 + \|\mathbf{g}_{stage_2}\|^2 + \dots
 $$
 
-**Strategy:** apply `all_reduce(op=SUM)` across the PP mesh.
+**Strategy**: apply `all_reduce(op=SUM)` across the PP mesh.
 
 ### Result
 
