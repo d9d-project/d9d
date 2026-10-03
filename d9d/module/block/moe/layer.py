@@ -14,13 +14,13 @@ from .shared_expert import SharedExpertParameters, SharedSwiGLU
 
 
 class MoELayer(nn.Module, ModuleLateInit):
-    """A complete Mixture-of-Experts (MoE) block comprising routing, communication, and computation.
+    """Mixture-of-Experts (MoE) block with routing, communication and expert computation.
 
-    This layer integrates:
+    The layer combines:
 
     1.  **Router**: Selects experts for each token.
-    2.  **Communicator**: Handles token dispatch to local or remote experts (EP).
-    3.  **Experts**: Performs parallelized computation (Grouped SwiGLU).
+    2.  **Communicator**: Dispatches tokens to local or remote experts (expert parallelism).
+    3.  **Experts**: Compute the outputs with grouped SwiGLU.
     """
 
     def __init__(
@@ -32,14 +32,15 @@ class MoELayer(nn.Module, ModuleLateInit):
         router_renormalize_probabilities: bool,
         shared_expert: SharedExpertParameters | None = None,
     ):
-        """Constructs the MoELayer.
+        """Constructs the ``MoELayer`` object.
 
         Args:
             hidden_dim: Hidden size.
-            intermediate_dim_grouped: Intermediate dimension for the Expert FFNs.
+            intermediate_dim_grouped: Intermediate size of each expert FFN.
             num_grouped_experts: Total number of experts.
             top_k: Number of experts to route each token to.
-            router_renormalize_probabilities: Configures router probability normalization behavior.
+            router_renormalize_probabilities: If ``True``, the router renormalizes the probabilities of the
+                selected experts to sum to 1.
             shared_expert: Optional configuration for a shared expert.
         """
         super().__init__()
@@ -65,15 +66,14 @@ class MoELayer(nn.Module, ModuleLateInit):
         self.tokens_per_expert = nn.Buffer(torch.empty((num_grouped_experts,), dtype=torch.int64), persistent=False)
 
     def enable_distributed_communicator(self, group: ProcessGroup):
-        """Switches from local no-op communication to distributed DeepEP communication.
+        """Switches from local communication to distributed DeepEP communication.
 
-        This should be called during model initialization if the model is running in a
-        distributed Expert Parallel environment.
+        Call it during model initialization if the model runs with expert parallelism.
 
         Args:
-            group: The PyTorch process group spanning the expert parallel ranks.
+            group: Process group that spans the expert-parallel ranks.
         """
-        # Lazy load the handler to prevent early DeepEP bindings/evaluation
+        # Import lazily, so DeepEP is loaded only when expert parallelism is used.
         from .communications.deepep import DeepEpCommunicationHandler  # noqa: PLC0415
 
         communicator = DeepEpCommunicationHandler(num_experts=self._num_grouped_experts)
@@ -92,13 +92,13 @@ class MoELayer(nn.Module, ModuleLateInit):
         self.tokens_per_expert.zero_()
 
     def forward(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        """Routes tokens to experts, computes, and combines results.
+        """Routes tokens to experts, computes the expert outputs and combines them.
 
         Args:
-            hidden_states: Input tensor. Shape: `(batch_size, seq_len, hidden_dim)`.
+            hidden_states: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.
 
         Returns:
-            Output tensor combined from experts. Shape: `(batch_size, seq_len, hidden_dim)`.
+            Output tensor. Shape: ``(batch, seq_len, hidden_size)``.
         """
         old_shape = hidden_states.shape
         hidden_states = hidden_states.reshape(-1, hidden_states.shape[-1])

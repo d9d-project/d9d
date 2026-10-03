@@ -2,19 +2,17 @@
 
 ## About
 
-The `d9d.module.block.normalization` module implements memory-efficient normalization layers.
+The `d9d.module.block.normalization` package implements normalization layers.
 
-## Features
-
-### RMSNorm
+## RMSNorm
 
 `RMSNorm` implements [Root Mean Square Layer Normalization](https://arxiv.org/abs/1910.07467).
 
-Uses an efficient custom Triton kernel for forward and backward passes.
+It uses a custom Triton kernel for the forward and backward passes, so it requires a GPU supported by Triton.
 
-It includes native support for zero-centered scaling weights.
+It supports zero-centered scaling weights (`zero_centered=True`). They are initialized to 0, and the kernel scales by `weight + 1`.
 
-#### Kernel Benchmarks (BF16, H100)
+### Kernel Benchmarks (bf16, H100)
 
 **Forward, Hidden Size = 128**
 
@@ -55,5 +53,21 @@ It includes native support for zero-centered scaling weights.
 **Backward, Hidden Size = 7168**
 
 ![](./benchmark/rms_norm/rms_norm_backward_N7168.png)
+
+## Usage
+
+```python
+import torch
+
+from d9d.module.block.normalization import RMSNorm
+
+norm = RMSNorm(hidden_size=2048, eps=1e-6).cuda()
+norm.reset_parameters()
+
+hidden_states = torch.randn(2, 16, 2048, device="cuda")
+output = norm(hidden_states)  # (2, 16, 2048)
+```
+
+## API Reference
 
 ::: d9d.module.block.normalization

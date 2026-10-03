@@ -6,25 +6,25 @@ from torch import nn
 from ..config import FlashAttention4SdpaBackendConfig, SdpaParameters
 from ..protocol import SdpaBackend
 
-# FA4's backward preprocess kernel requires head_dim to be a multiple of this
-# value; non-aligned dims trigger a CUTE predicate-shape bug.
+# FA4's backward preprocess kernel requires head_dim to be a multiple of this value.
+# Other head dims hit a CuTe predicate-shape bug.
 _FA4_HDIM_ALIGN = 32
 
 
 class FlashAttention4Sdpa(nn.Module, SdpaBackend):
-    """Scaled Dot Product Attention using Flash Attention 4.
+    """Scaled dot-product attention that uses FlashAttention 4.
 
-    When ``num_sinks`` is provided, a learnable per-head sink logit is added
-    to the softmax denominator (attention-sink mechanism).  This lets a
-    fraction of attention mass be absorbed by the sink, effectively
-    soft-gating the output without materializing an extra KV column.
-
-    Args:
-        config: Backend configuration.
-        params: Structural parameters.
+    If ``num_sinks`` is set, a learnable per-head sink logit is added to the softmax denominator.
+    The sink absorbs part of the attention mass.
     """
 
     def __init__(self, config: FlashAttention4SdpaBackendConfig, params: SdpaParameters) -> None:
+        """Constructs the ``FlashAttention4Sdpa`` object.
+
+        Args:
+            config: Backend configuration.
+            params: Structural layer parameters.
+        """
         super().__init__()
 
         self.sinks = nn.Parameter(torch.zeros(params.num_sinks)) if params.num_sinks is not None else None
@@ -41,12 +41,13 @@ class FlashAttention4Sdpa(nn.Module, SdpaBackend):
         scale: float,
     ) -> torch.Tensor:
         if attention_mask is not None:
-            raise ValueError("Flash Attention 4 does not support setting attention mask explicitly")
+            raise ValueError(
+                "The FlashAttention 4 backend does not support an explicit attention mask. "
+                "Pass attention_mask=None or use the PyTorch SDPA or eager backend."
+            )
 
-        # Pad head_dim to the next multiple of _FA4_HDIM_ALIGN so that FA4's
-        # backward preprocess kernel avoids the broken predicate-masking path.
-        # Zero-padding is transparent: extra dims contribute 0 to QK^T and to
-        # the weighted sum over V.
+        # Pad head_dim to a multiple of _FA4_HDIM_ALIGN. Zero-padding does not change the result:
+        # extra dims add 0 to QK^T and to the weighted sum over V.
         head_dim = query_states.shape[-1]
         pad = (-head_dim) % _FA4_HDIM_ALIGN
         if pad:

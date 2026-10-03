@@ -12,14 +12,17 @@ from d9d.module.block.moe.communications import ExpertCommunicationHandler
 
 
 class NoCommunicationHandler(ExpertCommunicationHandler):
-    """Handles MoE routing within a single device or when no cross-device routing is needed.
+    """Handles MoE routing when all experts are on the local device.
 
-    This handler does not perform network operations. It only permutes elements
-    mostly for local logical grouping or debugging.
+    This handler does no communication. It only sorts the tokens by expert index.
     """
 
     def __init__(self, num_experts: int):
-        """Constructs the NoCommunicationHandler."""
+        """Constructs the ``NoCommunicationHandler`` object.
+
+        Args:
+            num_experts: Number of local experts.
+        """
         self._num_experts = num_experts
 
         self._hidden_shape_before_permute: Size | None = None
@@ -45,7 +48,7 @@ class NoCommunicationHandler(ExpertCommunicationHandler):
 
     def combine(self, hidden_states: torch.Tensor) -> torch.Tensor:
         if self._unpermute_mapping is None:
-            raise ValueError("Cannot run combine before running dispatch!")
+            raise ValueError("Cannot run combine() before dispatch(). Call dispatch() first.")
 
         hidden_states = moe_unpermute_mask(
             hidden_states,

@@ -8,11 +8,11 @@ from .noop import HiddenStatesAggregatorNoOp
 
 
 class HiddenStatesAggregationMode(StrEnum):
-    """Enumeration of available hidden state aggregation strategies.
+    """Available hidden states aggregation strategies.
 
     Attributes:
-        no: Performs no aggregation (No-Op).
-        mean: Computes the mean of hidden states, taking a mask into account.
+        no: Performs no aggregation.
+        mean: Computes the masked mean of hidden states over the sequence.
     """
 
     no = "no"
@@ -22,26 +22,25 @@ class HiddenStatesAggregationMode(StrEnum):
 def create_hidden_states_aggregator(
     mode: HiddenStatesAggregationMode, agg_mask: torch.Tensor | None
 ) -> BaseHiddenStatesAggregator:
-    """Factory function to create a hidden states aggregator.
+    """Creates a hidden states aggregator.
 
     Args:
-        mode: The specific aggregation mode to instantiate.
-        agg_mask: A tensor mask required for specific modes.
-            Can be None if the selected mode does not require masking.
+        mode: Aggregation mode.
+        agg_mask: Aggregation mask. Required for the ``mean`` mode, can be ``None`` otherwise.
+            Shape: ``(batch, seq_len)``.
 
     Returns:
-        An instance of a concrete BaseHiddenStatesAggregator subclass.
+        The hidden states aggregator.
 
     Raises:
-        ValueError: If 'mean' mode is selected but 'agg_mask' is None, or if
-            an unknown mode is provided.
+        ValueError: If ``mode`` is ``mean`` and ``agg_mask`` is ``None``, or if ``mode`` is unknown.
     """
     match mode:
         case HiddenStatesAggregationMode.no:
             return HiddenStatesAggregatorNoOp()
         case HiddenStatesAggregationMode.mean:
             if agg_mask is None:
-                raise ValueError("You have to specify aggregation mask")
+                raise ValueError("The mean aggregation mode requires an aggregation mask, but agg_mask is None.")
             return HiddenStatesAggregatorMean(agg_mask)
         case _:
-            raise ValueError("Unknown hidden states aggregation mode")
+            raise ValueError(f"Unknown hidden states aggregation mode ({mode}).")

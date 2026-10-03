@@ -1,4 +1,4 @@
-"""Provides modules for positional embeddings, such as Rotary Positional Embeddings."""
+"""Provides modules for position embeddings, such as rotary position embeddings."""
 
 from .rope import (
     RotaryEmbeddingApplicator,

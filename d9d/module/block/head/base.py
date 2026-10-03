@@ -27,7 +27,7 @@ class TaskHead(nn.Module, ModuleLateInit, abc.ABC, Generic[THeadShared, THeadOut
         """Computes the head output from hidden states and this head's shared input.
 
         Args:
-            hidden_states: Backbone hidden states of shape ``(B, S, H)``.
+            hidden_states: Backbone hidden states. Shape: ``(batch, seq_len, hidden_size)``.
             shared: The head's own shared input (e.g. labels, a pooling mask).
 
         Returns:

@@ -7,20 +7,18 @@ from d9d.module.block.head.io import SequenceEmbeddingOutput, SequencePoolingHea
 
 
 class EmbeddingHead(TaskHead[SequencePoolingHeadShared, SequenceEmbeddingOutput]):
-    """A head module for extracting dense representations from hidden states.
+    """Head that extracts dense embeddings from hidden states.
 
-    It optionally applies a linear projection and L2 normalization to produce
-    embeddings for contrastive learning or retrieval tasks. It supports boolean
-    masking to select specific tokens (e.g., the last token) before extraction.
+    Optionally applies a linear projection and L2 normalization, e.g. for contrastive learning or retrieval.
+    An optional pooling mask selects specific tokens (e.g. the last token) before the projection.
     """
 
     def __init__(self, hidden_size: int, embedding_dim: int | None, normalize: bool):
-        """Constructs the EmbeddingHead object.
+        """Constructs the ``EmbeddingHead`` object.
 
         Args:
-            hidden_size: The input dimensionality (hidden state size).
-            embedding_dim: The dimensionality of the output embedding. If None,
-                additional linear projection won't be applied.
+            hidden_size: Hidden size.
+            embedding_dim: Dimensionality of the output embedding. If ``None``, no linear projection is applied.
             normalize: Whether to apply L2 normalization to the final embeddings.
         """
         super().__init__()
@@ -36,13 +34,12 @@ class EmbeddingHead(TaskHead[SequencePoolingHeadShared, SequenceEmbeddingOutput]
         """Computes dense embeddings from hidden states.
 
         Args:
-            hidden_states: Input tensor of hidden states.
-            shared: The head shared input. Its optional `pooling_mask` selects specific hidden
-                states: the input is indexed as `hidden_states[pooling_mask == 1]`, flattening the
-                batch and sequence dimensions into a single dimension of selected tokens.
+            hidden_states: Hidden states. Shape: ``(batch, seq_len, hidden_size)``.
+            shared: The head shared input. Its optional ``pooling_mask`` selects hidden states as
+                ``hidden_states[pooling_mask == 1]``, which flattens the batch and sequence dimensions.
 
         Returns:
-            The embedding output holding the extracted embeddings.
+            The embedding output holding the fp32 embeddings.
         """
         if shared.pooling_mask is not None:
             hidden_states = hidden_states[shared.pooling_mask == 1]
@@ -50,7 +47,7 @@ class EmbeddingHead(TaskHead[SequencePoolingHeadShared, SequenceEmbeddingOutput]
         if self.projection is not None:
             hidden_states = self.projection(hidden_states)
 
-        # convert to fp32 before normalization for numerical stability
+        # Upcast to fp32 before normalization for numerical stability.
         hidden_states = hidden_states.float()
 
         if self._normalize:

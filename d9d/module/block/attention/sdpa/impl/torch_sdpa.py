@@ -22,21 +22,31 @@ def _backend_type_to_torch(backend: TorchSdpaBackendType) -> SDPBackend:
 
 
 class TorchSdpa(nn.Module, SdpaBackend):
-    """Scaled Dot Product Attention using PyTorch's eager `scaled_dot_product_attention`.
-
-    Args:
-        config: Backend configuration.
-        params: Structural parameters.
-    """
+    """Scaled dot-product attention that uses ``torch.nn.functional.scaled_dot_product_attention``."""
 
     def __init__(self, config: TorchSdpaBackendConfig, params: SdpaParameters) -> None:
+        """Constructs the ``TorchSdpa`` object.
+
+        Args:
+            config: Backend configuration.
+            params: Structural layer parameters.
+
+        Raises:
+            ValueError: If ``params`` enables learnable sinks or a sliding window.
+        """
         super().__init__()
 
         if params.num_sinks is not None:
-            raise ValueError("PyTorch SDPA backend does not support learnable sinks (`num_sinks`).")
+            raise ValueError(
+                f"The PyTorch SDPA backend does not support learnable sinks, but num_sinks ({params.num_sinks}) "
+                f"is set. Use the FlashAttention 4 or eager backend."
+            )
 
         if params.window_size != (None, None):
-            raise ValueError("PyTorch SDPA backend does not support sliding window attention.")
+            raise ValueError(
+                f"The PyTorch SDPA backend does not support sliding window attention, but window_size "
+                f"({params.window_size}) is set. Use the FlashAttention 4, FlashAttention 2 or eager backend."
+            )
 
         if config.backends is not None:
             self._backends = [_backend_type_to_torch(backend) for backend in config.backends]

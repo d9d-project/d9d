@@ -8,19 +8,19 @@ from .grouped_linear import GroupedLinear
 
 
 class GroupedSwiGLU(nn.Module, ModuleLateInit):
-    """Executes a collection of SwiGLU experts efficiently using Grouped GEMM.
+    """Runs a set of SwiGLU experts with grouped GEMM.
 
-    This module implements the architectural pattern: `down_proj(SiLU(gate_proj(x)) * up_proj(x))`.
-    It applies this operation across multiple discrete experts in parallel without padding or masking.
+    Each expert computes ``down_proj(SiLU(gate_proj(x)) * up_proj(x))``. All experts run in one grouped GEMM
+    per projection, without padding or masking.
     """
 
     def __init__(self, hidden_dim: int, intermediate_dim: int, num_experts: int):
-        """Constructs the GroupedSwiGLU module.
+        """Constructs the ``GroupedSwiGLU`` object.
 
         Args:
-            hidden_dim: Dimensionality of the input and output hidden states.
-            intermediate_dim: Dimensionality of the intermediate projection.
-            num_experts: Total number of experts managed by this local instance.
+            hidden_dim: Hidden size of the input and output.
+            intermediate_dim: Intermediate size of each expert.
+            num_experts: Number of experts held by this module.
         """
         super().__init__()
         self._num_experts = num_experts
@@ -38,18 +38,17 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
         """Computes expert outputs for sorted input tokens.
 
         Args:
-            permuted_x: Input tokens sorted by their assigned expert.
-                Shape: `(total_tokens, hidden_dim)`.
-            permuted_probs: Routing weights/probabilities corresponding to the sorted tokens.
-                Shape: `(total_tokens)`.
-            tokens_per_expert: Number of tokens assigned to each consecutive expert. It is a CPU tensor.
-                Shape: `(num_experts)`.
+            permuted_x: Input tokens sorted by their assigned expert. Shape: ``(num_tokens, hidden_size)``.
+            permuted_probs: Routing probabilities of the sorted tokens. Shape: ``(num_tokens,)``.
+            tokens_per_expert: CPU tensor with the number of tokens assigned to each expert, in order.
+                Shape: ``(num_experts,)``.
 
         Returns:
-            The computed and weighted output tokens (still permuted).
-            Shape: `(total_tokens, hidden_dim)`.
+            The expert outputs weighted by the routing probabilities, in the sorted order of ``permuted_x``.
+            Shape: ``(num_tokens, hidden_size)``.
         """
-        if permuted_x.numel() == 0:  # handle cases when there are no routed experts to this instance
+        # No tokens were routed to the experts of this rank.
+        if permuted_x.numel() == 0:
             return permuted_x
 
         probs = permuted_probs[:, None].to(permuted_x.dtype)
@@ -61,7 +60,7 @@ class GroupedSwiGLU(nn.Module, ModuleLateInit):
         return probs * values
 
     def reset_parameters(self):
-        """Resets parameters for all internal linear projections."""
+        """Resets module parameters."""
         self.gate_proj.reset_parameters()
         self.up_proj.reset_parameters()
         self.down_proj.reset_parameters()

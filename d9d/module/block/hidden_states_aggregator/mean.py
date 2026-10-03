@@ -13,38 +13,36 @@ def _aggregate_hidden_states(hidden_states: torch.Tensor, agg_mask: torch.Tensor
 
 
 class HiddenStatesAggregatorMean(BaseHiddenStatesAggregator):
-    """Aggregator that computes the mean of hidden states using a validity mask."""
+    """Aggregator that computes the masked mean of hidden states over the sequence."""
 
     def __init__(self, agg_mask: torch.Tensor) -> None:
-        """Constructs the mean aggregator with the given mask.
+        """Constructs the ``HiddenStatesAggregatorMean`` object.
 
         Args:
-            agg_mask: A tensor used to mask out padding or invalid tokens
-                during average calculation.
+            agg_mask: Mask of the tokens to include in the mean. Zeros mask out padding or invalid tokens.
+                Shape: ``(batch, seq_len)``.
         """
         self._agg_mask = agg_mask
         self._collected_states: list[torch.Tensor] = []
 
     def add_hidden_states(self, hidden_states: torch.Tensor) -> None:
-        """Calculates the masked mean immediately and stores the result.
+        """Computes the masked mean of the hidden states and stores it.
 
         Args:
-            hidden_states: The raw hidden states to be averaged and stored.
+            hidden_states: Hidden states to average. Shape: ``(batch, seq_len, hidden_size)``.
         """
         agg = _aggregate_hidden_states(hidden_states=hidden_states, agg_mask=self._agg_mask)
         self._collected_states.append(agg)
 
     def pack_with_snapshot(self, snapshot: torch.Tensor | None) -> torch.Tensor | None:
-        """Stacks collected projected averages and appends to the snapshot.
-
-        This operation clears the internal buffer of collected states.
+        """Stacks the collected means after the snapshot and clears the collected means.
 
         Args:
-            snapshot: Previous states to prepend.
+            snapshot: Previous means to prepend, or ``None``. Shape: ``(num_snapshot_means, batch, hidden_size)``.
 
         Returns:
-            A tensor containing the snapshot followed by the stacked collected states,
-            or None if nothing was collected.
+            The snapshot followed by the stacked collected means, or ``None`` if nothing was collected.
+            Shape: ``(num_means, batch, hidden_size)``.
         """
         if len(self._collected_states) == 0:
             return None

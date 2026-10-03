@@ -42,23 +42,22 @@ def build_sdpa_backend(
     params: SdpaParameters,
     backend_config: AnySdpaBackendConfig | None,
 ) -> SdpaBackend:
-    """Builds the selected SDPA backend module based on the provided configuration.
+    """Builds the SDPA backend module for the given configuration.
 
-    If no explicit configuration is provided, it falls back to auto-detection (either from
-    the `D9D_BACKEND_AUTO_SDPA` environment variable or programmatic defaults).
-
-    The factory resolves the appropriate module implementation, passing along the backend configuration and
-    structural layer parameters.
+    If ``backend_config`` is ``None``, the backend config is read from the ``D9D_BACKEND_AUTO_SDPA``
+    environment variable (a JSON backend config). If the variable is not set, the factory picks the first
+    installed backend that supports ``params``, in this order: FlashAttention 4, FlashAttention 2, PyTorch SDPA,
+    eager.
 
     Args:
-        params: Structural layer requirements needed by the backend.
+        params: Structural layer parameters the backend must support.
         backend_config: Explicit SDPA backend configuration, or ``None`` to auto-detect.
 
     Returns:
-        An instantiated SDPA module implementing the SdpaBackend protocol.
+        The SDPA backend module.
 
     Raises:
-        ValueError: If an unknown backend configuration type is encountered.
+        ValueError: If the backend configuration type is unknown.
     """
     resolved = backend_config if backend_config is not None else _auto_detect_sdpa_backend(params)
 
@@ -80,4 +79,4 @@ def build_sdpa_backend(
 
             return EagerSdpa(resolved, params)
         case _:
-            raise ValueError(f"Unknown SDPA backend: {resolved}")
+            raise ValueError(f"Unknown SDPA backend config ({resolved}).")

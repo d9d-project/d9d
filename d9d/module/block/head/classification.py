@@ -6,21 +6,19 @@ from d9d.module.block.head.io import SequenceClassificationOutput, SequencePooli
 
 
 class ClassificationHead(TaskHead[SequencePoolingHeadShared, SequenceClassificationOutput]):
-    """A classification head module that is typically used on top of model hidden states.
+    """Classification head on top of model hidden states.
 
-    It applies dropout followed by a linear projection to produce logits for a specified
-    number of classes. It supports optional pooling via a mask, allowing for selection
-    of specific tokens (e.g., [CLS] tokens or specific sequence positions) before
-    projection.
+    Applies dropout and a linear projection to produce logits for ``num_labels`` classes.
+    An optional pooling mask selects specific tokens (e.g. ``[CLS]`` tokens) before the projection.
     """
 
     def __init__(self, hidden_size: int, num_labels: int, dropout: float):
-        """Constructs the ClassificationHead object.
+        """Constructs the ``ClassificationHead`` object.
 
         Args:
-            hidden_size: The input dimensionality (hidden state size).
-            num_labels: The number of output classes.
-            dropout: The dropout probability.
+            hidden_size: Hidden size.
+            num_labels: Number of output classes.
+            dropout: Dropout probability.
         """
         super().__init__()
 
@@ -31,18 +29,18 @@ class ClassificationHead(TaskHead[SequencePoolingHeadShared, SequenceClassificat
         """Computes class logits from hidden states.
 
         Args:
-            hidden_states: Input tensor of hidden states.
-            shared: The head shared input. Its optional `pooling_mask` selects specific hidden
-                states: the input is indexed as `hidden_states[pooling_mask == 1]`, flattening the
-                batch and sequence dimensions into a single dimension of selected tokens.
+            hidden_states: Hidden states. Shape: ``(batch, seq_len, hidden_size)``.
+            shared: The head shared input. Its optional ``pooling_mask`` selects hidden states as
+                ``hidden_states[pooling_mask == 1]``, which flattens the batch and sequence dimensions.
 
         Returns:
-            The classification output holding the unnormalized logits.
+            The classification output holding the unnormalized fp32 logits.
         """
         if shared.pooling_mask is not None:
             hidden_states = hidden_states[shared.pooling_mask == 1]
         logits = self.score(self.dropout(hidden_states))
-        logits = logits.float()  # force convert to FP32 to make sure loss is calculated properly
+        # Upcast to fp32 so the loss is computed in full precision.
+        logits = logits.float()
         return SequenceClassificationOutput(scores=logits)
 
     def reset_parameters(self):

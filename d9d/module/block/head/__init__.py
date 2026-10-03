@@ -1,4 +1,4 @@
-"""Task heads that turn backbone hidden states into a typed output, plus their IO contracts."""
+"""Task heads that turn backbone hidden states into a typed output, plus their I/O contracts."""
 
 from .base import TaskHead
 from .classification import ClassificationHead

@@ -1,4 +1,4 @@
-"""Package providing various embedding layer implementations."""
+"""Provides embedding layer implementations."""
 
 from .shard_token_embedding import SplitTokenEmbeddings
 

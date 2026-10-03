@@ -4,9 +4,9 @@ from .base import BaseHiddenStatesAggregator
 
 
 class HiddenStatesAggregatorNoOp(BaseHiddenStatesAggregator):
-    """Aggregator implementation that performs no operations.
+    """Aggregator that does nothing.
 
-    This acts as a null object for cases where aggregation is disabled in the configuration.
+    Used when aggregation is disabled in the configuration.
     """
 
     def add_hidden_states(self, hidden_states: torch.Tensor) -> None:
@@ -23,5 +23,5 @@ class HiddenStatesAggregatorNoOp(BaseHiddenStatesAggregator):
             snapshot: Ignored.
 
         Returns:
-            None.
+            Always ``None``, even if a snapshot is given.
         """
