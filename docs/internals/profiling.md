@@ -6,9 +6,9 @@ The `d9d.internals.profiling` package wraps the PyTorch profiler for distributed
 
 Profiling a large distributed job has three problems:
 
-1.  **File naming**: thousands of ranks that write to the same file name cause race conditions.
-2.  **Storage space**: raw Chrome trace JSON files can grow to several GiB quickly.
-3.  **Synchronization**: all ranks must profile the same steps without manual work.
+1.  **File naming**: Thousands of ranks that write to the same file name cause race conditions.
+2.  **Storage space**: Raw Chrome trace JSON files can grow to several GiB quickly.
+3.  **Synchronization**: All ranks must profile the same steps without manual work.
 
 The `Profiler` class solves them. It names each trace file after the `DeviceMesh` coordinates of the rank. It compresses each trace into a `.tar.gz` archive right after export. It runs the same periodic schedule (wait, warmup, active) on all ranks.
 

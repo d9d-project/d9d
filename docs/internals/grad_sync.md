@@ -20,7 +20,7 @@ Parameters share a bucket only if they have the same:
 1.  **Optimizer parameter group**
 2.  **Device**
 3.  **Gradient dtype**
-4.  **Reduce mesh**: the mesh dimensions where the parameter has a `Replicate` placement
+4.  **Reduce mesh**: The mesh dimensions where the parameter has a `Replicate` placement.
 
 The `bucket_size_mb` argument limits the size of a bucket in MiB. Parameters are bucketed in reverse order, because the backward pass produces gradients roughly in that order. Parameters with no `Replicate` placement need no reduction. They go to local buckets that do not communicate.
 

@@ -17,9 +17,9 @@ Some parameters can be `Shard`ed across a TP or FSDP mesh, while others are `Rep
 
 So the computation has three steps:
 
-1.  **Local norm**: compute the norm of the tensor shards present in GPU memory (with `to_local()`).
-2.  **Horizontal reduction**: run `all_reduce` only on the meshes where parameters are sharded. Sharded parameters then contribute correctly to the global norm. Replicated parameters are not counted twice and need no communication.
-3.  **Pipeline reduction**: sum the norms across the pipeline parallel mesh, because different stages hold different parameters.
+1.  **Local norm**: Compute the norm of the tensor shards present in GPU memory (with `to_local()`).
+2.  **Horizontal reduction**: Run `all_reduce` only on the meshes where parameters are sharded. Sharded parameters then contribute correctly to the global norm. Replicated parameters are not counted twice and need no communication.
+3.  **Pipeline reduction**: Sum the norms across the pipeline parallel mesh, because different stages hold different parameters.
 
 For the max norm (`inf`), both reductions take the maximum instead of the sum.
 
@@ -27,8 +27,8 @@ For the max norm (`inf`), both reductions take the maximum instead of the sum.
 
 `group_parameters_for_norm` groups parameters into `GradNormGroup` buckets by:
 
-1.  **Sharding**: parameters sharded on the same mesh share one collective for their norm.
-2.  **Device and dtype**: parameters in a group must be compatible for local math.
+1.  **Sharding**: Parameters sharded on the same mesh share one collective for their norm.
+2.  **Device and dtype**: Parameters in a group must be compatible for local math.
 
 Groups of sharded tensors come first. Their `all_reduce` runs asynchronously while the local norms of the other groups are computed.
 

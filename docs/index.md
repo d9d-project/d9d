@@ -44,7 +44,7 @@ Start with the [Table of Contents](./toc.md). You can read it from top to bottom
 
 ## Examples
 
-*   **[Qwen3-MoE Pretraining](https://github.com/d9d-project/d9d/blob/main/example/qwen3_moe/pretrain.py):** causal LM pretraining of a Qwen3-MoE model.
+*   **[Qwen3-MoE Pretraining](https://github.com/d9d-project/d9d/blob/main/example/qwen3_moe/pretrain.py)**: Causal LM pretraining of a Qwen3-MoE model.
 
 ---
 
@@ -77,8 +77,8 @@ In terms of **codebase & engineering**:
 
 To balance hackability and performance, d9d follows these design principles:
 
-*   **Composition over Monoliths**: we avoid "God Classes" like `DistributedDataParallel` or `ParallelDims` that own the entire execution loop. Instead, we provide composable and extendable APIs, such as per-layer horizontal parallelism strategies (`parallelize_replicate`, `parallelize_expert_parallel`, ...).
-*   **White-Box Modelling**: we encourage standard PyTorch code. Models are not wrapped in metadata specifications. They are standard `nn.Module`s that implement small protocols.
-*   **Pragmatic Efficiency**: we prefer native PyTorch, but we integrate non-native solutions if they improve MFU. For example, our MoE uses **DeepEP** communications, reindexing kernels from **Megatron-LM**, and grouped GEMM kernels.
-*   **Graph-Based State Management**: our I/O system treats model checkpoints as directed acyclic graphs. You can transform architectures (e.g. merge `q`, `k`, `v` into `qkv`) on the fly while streaming from disk, without loading the whole checkpoint into memory.
-*   **DTensors**: distributed parameters must be `torch.distributed.tensor.DTensor`s. DTensors know their topology, which makes checkpointing simpler. We use modern PyTorch 2.0 APIs (`DeviceMesh`) wherever we can.
+*   **Composition over Monoliths**: We avoid "God Classes" like `DistributedDataParallel` or `ParallelDims` that own the entire execution loop. Instead, we provide composable and extendable APIs, such as per-layer horizontal parallelism strategies (`parallelize_replicate`, `parallelize_expert_parallel`, ...).
+*   **White-Box Modeling**: We encourage standard PyTorch code. Models are not wrapped in metadata specifications. They are standard `nn.Module`s that implement small protocols.
+*   **Pragmatic Efficiency**: We prefer native PyTorch, but we integrate non-native solutions if they improve MFU. For example, our MoE uses **DeepEP** communications, reindexing kernels from **Megatron-LM**, and grouped GEMM kernels.
+*   **Graph-Based State Management**: Our I/O system treats model checkpoints as directed acyclic graphs. You can transform architectures (e.g. merge `q`, `k`, `v` into `qkv`) on the fly while streaming from disk, without loading the whole checkpoint into memory.
+*   **DTensors**: Distributed parameters must be `torch.distributed.tensor.DTensor`s. DTensors know their topology, which makes checkpointing simpler. We use modern PyTorch 2.0 APIs (`DeviceMesh`) wherever we can.

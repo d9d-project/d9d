@@ -6,8 +6,8 @@ The `d9d.module.block.embedding` package provides the `SplitTokenEmbeddings` tok
 
 ## Use Cases
 
-*   **Regular token embedding:** use a single split with the full vocabulary size.
-*   **Prompt tuning:** add new tokens to your tokenizer and use two splits. The first split holds the original token embeddings, and the second one holds the new prompt tokens. Train only the `nn.Embedding` of the second split.
+*   **Regular token embedding**: Use a single split with the full vocabulary size.
+*   **Prompt tuning**: Add new tokens to your tokenizer and use two splits. The first split holds the original token embeddings, and the second one holds the new prompt tokens. Train only the `nn.Embedding` of the second split.
 
 The [`SplitLanguageModellingHead`](./head.md) uses the same splits for the output vocabulary.
 

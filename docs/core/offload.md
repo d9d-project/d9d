@@ -6,7 +6,7 @@ The `d9d.core.offload` package moves GPU-resident training state to host (CPU) m
 
 The package defines two things:
 
-1.  **The `Offloadable` protocol**: the contract for a subsystem that owns GPU memory and can release and restore it.
+1.  **The `Offloadable` protocol**: The contract for a subsystem that owns GPU memory and can release and restore it.
 2.  **The tensor primitives** `offload_tensor` and `onload_tensor`: they move the storage of one tensor to the host and back. The tensor object, and the `DTensor` wrapper, stay the same.
 
 The user entry points `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` are documented on the [Training Loop](../loop/train.md) page. This page covers the primitives they are built on.
@@ -27,7 +27,7 @@ The primitives swap the storage in place instead of creating new tensors. For a 
 
 `SleepTag` selects the subsystems that `Trainer.sleep` and `Trainer.wake` act on:
 
-*   **`SleepTag.TENSOR_STATES`**: all GPU tensor state (model parameters and buffers, optimizer state, gradient buckets and the residual loss accumulator). They are offloaded together. `DEFAULT_SLEEP_TAGS` holds only this tag.
+*   **`SleepTag.TENSOR_STATES`**: All GPU tensor state (model parameters and buffers, optimizer state, gradient buckets and the residual loss accumulator). They are offloaded together. `DEFAULT_SLEEP_TAGS` holds only this tag.
 *   **`SleepTag.COMMS`**: NCCL process groups. Opt-in and **not implemented yet**. Requesting it raises `NotImplementedError`.
 
 ## Usage

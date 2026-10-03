@@ -42,7 +42,7 @@ Only `StageTransfer` crosses the network, so it is the only role that needs a `T
 To use pipeline parallelism, your model implements `d9d.pipelining.api.ModuleSupportsPipelining[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]`:
 
 *   **`forward(inputs, shared)`**: `inputs` is the `PipelineInput` on the first stage and the incoming `StageTransfer` on the other stages. It returns the outgoing `StageTransfer` on non-last stages and the `PipelineOutput` on the last stage. The stage knows its position from the `PipelineStageInfo` it gets at construction. It branches on `is_current_stage_first` and `is_current_stage_last` explicitly.
-*   **`stage_transfer_spec(pipeline_input, boundary)`**: returns a PyTree with the **same structure as `StageTransfer`**, with every tensor leaf replaced by a `TensorSpec`. The `boundary` (`StageBoundary.incoming` or `outgoing`) selects which stage edge to describe.
+*   **`stage_transfer_spec(pipeline_input, boundary)`**: Returns a PyTree with the **same structure as `StageTransfer`**, with every tensor leaf replaced by a `TensorSpec`. The `boundary` (`StageBoundary.incoming` or `outgoing`) selects which stage edge to describe.
 
 The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* have the **same dataclass type**. So `pytree.tree_flatten` gives the same leaf order on both ends. Sender and receiver agree on the order **by construction**, and they need no handshake.
 
