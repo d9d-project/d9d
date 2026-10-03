@@ -661,8 +661,6 @@ class _moe_permute_mask_map(torch.autograd.Function):
 
         row_id_map = make_row_id_map(routing_map, num_tokens, num_experts)
 
-        # todo torchao fp8
-
         output, permuted_scale, permuted_probs = permute_with_mask_map(
             inp,
             row_id_map,

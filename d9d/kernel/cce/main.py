@@ -1,6 +1,7 @@
 # Copyright (C) 2024 Apple Inc. All Rights Reserved.
-# TODO: currently this implementation diverges only in out_grad contiguity fix
-# TODO: proposed in cce.py (grep FIX) - we should contribute this to main repo
+# Copy of cut-cross-entropy 25.9.3 (linear_cross_entropy.py and cce.py). It differs from upstream only in
+# backward: grad_out and grad_lse_out are made contiguous before .view(-1) (see "FIX" in cce.py).
+# Upstream does not accept pull requests.
 import platform
 import warnings
 from typing import TYPE_CHECKING, Literal, overload

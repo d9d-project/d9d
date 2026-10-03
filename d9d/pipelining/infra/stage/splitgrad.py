@@ -290,9 +290,7 @@ def stage_backward_input(
     return BackwardInputResult(
         input_grads=final_input_grads,
         param_groups=param_groups,
-        # TODO(max): we can keep only intermediate ownership tokens to both truncate the
-        # TODO(max): graph and do not deallocate C++ stuff
-        grad_ownership_tokens=outputs,  # Keep the tensors alive!
+        grad_ownership_tokens=outputs,
     )
 
 

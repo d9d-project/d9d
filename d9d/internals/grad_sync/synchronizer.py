@@ -130,8 +130,6 @@ def _fill_buckets(
     Returns:
         List of configured gradient buckets.
     """
-    # TODO: Better grouping - probably we could trace autograd graph and use some topological clustering here
-    # TODO: to maximize overlap even better - current implementation just iterates over parameters in reverse order
     buckets = []
 
     bucket_size = bucket_size_mb * 1024 * 1024

@@ -13,8 +13,6 @@ from d9d.loop.config import CheckpointingConfig
 from .garbage_collector import ManualGarbageCollector
 from .job_schedule import JobSchedule
 
-# TODO feat(max): async checkpointing may break everything up, but I guess we still have to support it
-
 _SAVE_RE = re.compile(r"^save-(\d+)$")
 
 

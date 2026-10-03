@@ -16,8 +16,7 @@ from .splitgrad import (
     stage_backward_weight,
 )
 
-# TODO/NOTICE: We WILL NOT disable FSDP's resharding for microbatches since it will modify
-# TODO/NOTICE: its behavior in an unexpected way. Perhaps we need better FSDP resharding policy handler?
+# FSDP resharding stays enabled between microbatches: disabling it changes FSDP behavior in unexpected ways.
 
 
 @dataclasses.dataclass(slots=True)
