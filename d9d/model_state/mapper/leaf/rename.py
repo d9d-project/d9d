@@ -4,9 +4,15 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperRename(ModelStateMapper):
-    """Renames a single state tensor from `name_from` to `name_to`."""
+    """Renames a single state tensor."""
 
     def __init__(self, name_from: str, name_to: str):
+        """Constructs the ``ModelStateMapperRename`` object.
+
+        Args:
+            name_from: The source key.
+            name_to: The target key.
+        """
         self._name_from = name_from
         self._name_to = name_to
 

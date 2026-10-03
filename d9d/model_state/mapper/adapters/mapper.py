@@ -4,17 +4,13 @@ from d9d.model_state.mapper.leaf import ModelStateMapperIdentity
 
 
 def identity_mapper_from_mapper_outputs(mapper: ModelStateMapper) -> ModelStateMapper:
-    """Creates an identity mapper covering all outputs produced by the provided mapper.
-
-    This function inspects the `state_dependency_groups()` of the input `mapper`,
-    extracts every key listed in the `outputs` set of each group, and creates a
-    corresponding `ModelStateMapperIdentity` for it.
+    """Creates an identity mapper for every output key of the given mapper.
 
     Args:
-        mapper: The mapper whose output signature will be inspected to generate the new identity mapper.
+        mapper: The mapper whose ``state_dependency_groups()`` outputs are passed through.
 
     Returns:
-        A composite mapper that acts as a pass-through for every key produced by the source `mapper`.
+        A composite mapper that passes through every key produced by ``mapper``.
     """
     mappers: list[ModelStateMapper] = []
 

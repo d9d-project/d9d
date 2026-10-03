@@ -9,12 +9,19 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperDistribute(ModelStateMapper):
-    """Converts a single local Tensor object into a DTensor object.
+    """Converts a single full local tensor into a ``DTensor``.
 
-    The resulting DTensor uses the specified `device_mesh` and `placements`.
+    Every rank must hold the same full tensor. No communication happens.
     """
 
     def __init__(self, name: str, device_mesh: DeviceMesh | None, placements: Sequence[Placement] | None):
+        """Constructs the ``ModelStateMapperDistribute`` object.
+
+        Args:
+            name: The name of the tensor to distribute.
+            device_mesh: The device mesh of the resulting ``DTensor``. Passed to ``distribute_tensor``.
+            placements: The placements of the resulting ``DTensor``. Passed to ``distribute_tensor``.
+        """
         self._name = name
 
         self._device_mesh = device_mesh
@@ -29,15 +36,21 @@ class ModelStateMapperDistribute(ModelStateMapper):
                 group[self._name],
                 device_mesh=self._device_mesh,
                 placements=self._placements,
-                src_data_rank=None,  # do not communicate here
+                # Every rank already holds the full tensor, so skip the broadcast from a source rank.
+                src_data_rank=None,
             )
         }
 
 
 class ModelStateMapperGatherFullTensor(ModelStateMapper):
-    """Gathers a single DTensor object into a full Tensor object."""
+    """Gathers a single ``DTensor`` into a full local tensor."""
 
     def __init__(self, name: str):
+        """Constructs the ``ModelStateMapperGatherFullTensor`` object.
+
+        Args:
+            name: The name of the tensor to gather.
+        """
         self._name = name
 
     def state_dependency_groups(self) -> frozenset[StateGroup]:
@@ -47,6 +60,6 @@ class ModelStateMapperGatherFullTensor(ModelStateMapper):
         tensor = group[self._name]
 
         if not isinstance(tensor, DTensor):
-            raise ValueError("Cannot gather anything but DTensor")
+            raise ValueError(f"Tensor ({self._name}) type ({type(tensor).__name__}) must be DTensor to be gathered.")
 
         return {self._name: tensor.full_tensor()}

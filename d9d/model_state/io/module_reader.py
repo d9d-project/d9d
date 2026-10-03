@@ -46,27 +46,22 @@ def load_model_state(
     show_progress: bool = True,
     position: int | None = None,
 ):
-    """High-level utility to stream a checkpoint directly into a PyTorch module.
+    """Streams a checkpoint from disk into a PyTorch module.
 
-    This function orchestrates the full loading lifecycle:
+    1.  **Mapping**: ``mapper`` renames, stacks or reshapes on-disk states into model states.
+    2.  **Distribution**: if a model state is a ``DTensor``, the loaded tensor is distributed to match its
+        device mesh and placements.
+    3.  **Injection**: each transformed state is loaded into ``model`` with ``load_state_dict`` as soon as it is
+        ready.
 
-    1.  Topology Mapping: Uses `mapper` to rename/stack/reshape on-disk states to model states.
-
-    2.  Automatic Distribution: If the `model` contains `DTensor`s, the loaded local tensors are automatically
-        sharded/replicated to match the model's placement schema.
-
-    3.  Streaming Read & Inject: After loading and transforming a model state, it will be injected into `model`
-        using `load_state_dict(...)`.
-
-    NOTICE: Only states specified in `mapper` will be loaded! You can use
-    `d9d.model_state.mapper.adapters.identity_mapper_from_module(module)` to create a mapper that will load every
-    model state without changing it.
+    Only states listed in the outputs of ``mapper`` are loaded. To load every model state unchanged, build the
+    mapper with ``d9d.model_state.mapper.adapters.identity_mapper_from_module``.
 
     Args:
-        src_dir: Directory containing the checkpoint: either sharded .safetensors files described by a
-            `model.safetensors.index.json` file, or a single unindexed `model.safetensors` file.
-        mapper: The topology defining how mapping from disk keys to model keys works.
-        device: The device to load tensors onto (usually "cpu" or "cuda").
+        src_dir: Directory containing the checkpoint: either sharded ``.safetensors`` files described by a
+            ``model.safetensors.index.json`` file, or a single unindexed ``model.safetensors`` file.
+        mapper: The mapper from on-disk keys to model keys.
+        device: The device to load tensors onto, e.g. ``"cpu"`` or ``"cuda"``.
         model: The model instance to load weights into.
         show_progress: Whether to display the loading progress bar.
         position: Row index for the tqdm bar. Pass the process local rank to stack one bar

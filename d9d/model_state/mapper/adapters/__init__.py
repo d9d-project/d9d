@@ -1,9 +1,4 @@
-"""Adapters for building ModelStateMapper instances.
-
-This package provides utility functions that are used to create simple
-ModelStateMapper instances from objects such as PyTorch modules or other
-StateMappers.
-"""
+"""Adapters that build simple ``ModelStateMapper`` instances from PyTorch modules or other mappers."""
 
 from .mapper import identity_mapper_from_mapper_outputs
 from .module import identity_mapper_from_module

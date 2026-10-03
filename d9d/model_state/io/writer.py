@@ -18,7 +18,7 @@ from d9d.model_state.mapper import ModelStateMapper
 
 
 class _StateWritingFlowLocal:
-    """Internal orchestration logic for buffering, transforming, and sharding model states during save."""
+    """Buffers, transforms and shards model states during save."""
 
     def __init__(
         self,
@@ -27,7 +27,7 @@ class _StateWritingFlowLocal:
         shard_size_gb: float,
         show_progress: bool,
         sharding_rank: int,
-        # so we have to call writing flow from all processes, but
+        # Every rank must run the mapper because it can gather DTensors collectively, but only the master rank writes.
         is_current_process_rank_master: bool,
         position: int | None = None,
     ):
@@ -90,13 +90,16 @@ class _StateWritingFlowLocal:
             for input_name in group.inputs:
                 del self._available_source_states[input_name]
 
-            # proceed with stateful saving only on master rank
+            # Proceed with stateful saving only on master rank.
             if self._is_current_process_rank_master:
                 for name, tensor in states_to_save.items():
                     update_size = tensor.numel() * tensor.element_size()
 
                     if update_size > self._shard_size_bytes:
-                        raise ValueError(f"Cannot save state {name} that is larger than shard size")
+                        raise ValueError(
+                            f"State ({name}) size ({update_size} bytes) exceeds the shard size "
+                            f"({self._shard_size_bytes} bytes). Increase shard_size_gb."
+                        )
 
                     if self._current_shard_size + update_size > self._shard_size_bytes:
                         self._flush_shard()
@@ -110,14 +113,14 @@ class _StateWritingFlowLocal:
         if self._groups_to_process:
             missing_groups = {g.inputs for g in self._groups_to_process}
             raise ValueError(
-                f"Writing failed: not all source tensors were provided to satisfy mapper dependencies. "
-                f"Missing inputs for groups: {missing_groups}"
+                f"Cannot write model state: the state generator did not provide all tensors required by the mapper. "
+                f"The incomplete groups have inputs ({missing_groups})."
             )
 
         if self._available_source_states:
             warnings.warn(
-                f"State Writing: The following source tensors were provided but not consumed by any "
-                f"mapper group and will be ignored: {sorted(self._available_source_states.keys())}",
+                f"State writing: source tensors ({sorted(self._available_source_states.keys())}) "
+                "are not consumed by any mapper group and are ignored.",
                 stacklevel=2,
             )
 
@@ -181,15 +184,13 @@ def write_model_state_local(
 ):
     """Saves model states to disk in a single local process.
 
-    This function uses a streaming approach. It analyzes the mapper to determine which files
-    need to be saved. Tensors are loaded into memory only when needed and evicted immediately
-    after the mapper processes them.
+    A source tensor stays in memory only until all inputs of its mapper group arrive and the group is processed.
 
     Args:
         dest_dir: Destination directory.
         mapper: Mapping to apply to states before saving.
-        state_generator: Stream of (name, tensor) pairs to save.
-        shard_size_gb: Maximum size of a single .safetensors file in GB.
+        state_generator: Stream of ``(name, tensor)`` pairs to save.
+        shard_size_gb: Maximum size of a single ``.safetensors`` file in GiB.
         show_progress: Whether to show the progress bar.
     """
     idx = _StateWritingFlowLocal(
@@ -202,7 +203,8 @@ def write_model_state_local(
         position=None,
     ).write(state_generator=state_generator)
 
-    idx = cast(ModelStateIndex, idx)  # we are sure is_current_process_rank_master=True
+    # Write() returns an index because is_current_process_rank_master=True.
+    idx = cast(ModelStateIndex, idx)
 
     _finalize_master(dest_dir, [idx])
 
@@ -216,20 +218,19 @@ def write_model_state_distributed(
     show_progress: bool = True,
     position: int | None = None,
 ):
-    """Saves model states in a distributed setup (multiple processes).
+    """Saves model states from multiple processes.
 
-    This function uses a streaming approach. It analyzes the mapper to determine which files
-    need to be saved. Tensors are loaded into memory only when needed and evicted immediately
-    after the mapper processes them.
+    A source tensor stays in memory only until all inputs of its mapper group arrive and the group is processed.
 
-    Each rank writes its own shard. Rank 0 gathers indices and finalizes the checkpoint.
+    Every rank in ``process_group`` must call this function and writes its own shards. Rank 0 gathers the
+    indices and finalizes the checkpoint.
 
     Args:
         dest_dir: Destination directory.
         mapper: Mapping to apply to states before saving.
-        state_generator: Stream of (name, tensor) pairs from the model.
-        process_group: The distributed process group.
-        shard_size_gb: Maximum shard size in GB.
+        state_generator: Stream of ``(name, tensor)`` pairs from the model.
+        process_group: The process group of all writing ranks.
+        shard_size_gb: Maximum shard size in GiB.
         show_progress: Whether to show the progress bar.
         position: Row index for the tqdm bar. Pass the process local rank to stack one bar
             per rank without interleaving. ``None`` lets tqdm use its default (single bar).
@@ -259,35 +260,33 @@ def write_model_state_pipeline_parallel(
     show_progress: bool = True,
     position: int | None = None,
 ):
-    """Saves model states in a complex ND distributed training setting.
+    """Saves model states from a pipeline-parallel setup with any other mesh dimensions.
 
-    This function uses a streaming approach. It analyzes the mapper to determine which files
-    need to be saved. Tensors are loaded into memory only when needed and evicted immediately
-    after the mapper processes them.
+    A source tensor stays in memory only until all inputs of its mapper group arrive and the group is processed.
 
-    This handles Pipeline Parallelism by ensuring that only one rank per pipeline stage
-    actually writes data to disk to avoid duplication.
+    Every rank in ``device_mesh`` must call this function. Only one rank per pipeline stage writes to disk,
+    so no data is written twice.
 
     Args:
         dest_dir: Destination directory.
         mapper: Mapping to apply to states before saving.
-        state_generator: Stream of (name, tensor) pairs from the model.
-        device_mesh: The PyTorch DeviceMesh representing the cluster layout.
-        pipeline_dim_name: The name of the mesh dimension responsible for pipeline parallelism.
-        shard_size_gb: Maximum shard size in GB.
+        state_generator: Stream of ``(name, tensor)`` pairs from the model.
+        device_mesh: The device mesh of the whole job.
+        pipeline_dim_name: The name of the pipeline-parallel dimension in ``device_mesh``.
+        shard_size_gb: Maximum shard size in GiB.
         show_progress: Whether to show the progress bar.
         position: Row index for the tqdm bar. Pass the process local rank to stack one bar
             per rank without interleaving. ``None`` lets tqdm use its default (single bar).
 
     Raises:
-        ValueError: If the DeviceMesh has no dimension names or coordinates.
+        ValueError: If ``device_mesh`` has no dimension names or does not contain the current rank.
     """
     pipeline_rank = device_mesh[pipeline_dim_name].get_rank()
 
     mesh_dim_names = device_mesh.mesh_dim_names
     coords = device_mesh.get_coordinate()
     if mesh_dim_names is None or coords is None:
-        raise ValueError("Cannot save state using a DeviceMesh with no dim names or coords")
+        raise ValueError("Cannot save model state: device_mesh must have dimension names and contain the current rank.")
 
     non_pipeline_coord_sum = sum(
         coord for name, coord in zip(mesh_dim_names, coords, strict=True) if name != pipeline_dim_name

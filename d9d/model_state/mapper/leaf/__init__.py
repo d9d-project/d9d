@@ -1,4 +1,4 @@
-"""This package provides leaf mapper implementations."""
+"""Leaf mappers that transform individual tensors."""
 
 from .dtensor import ModelStateMapperDistribute, ModelStateMapperGatherFullTensor
 from .rename import ModelStateMapperRename

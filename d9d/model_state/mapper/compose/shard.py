@@ -4,15 +4,20 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperShard(ModelStateMapper):
-    """Wraps another state mapper and restricts its execution to a specific subset (shard) of dependency groups.
+    """Restricts another mapper to one shard of its dependency groups.
 
-    This is primarily used for parallelizing model loading across multiple processes
-    or nodes. By assigning a different `current_shard` index to each process,
-    the total set of tensors required by the `sub_mapper` is split evenly,
-    preventing every process from loading the entire checkpoint.
+    Use it to split model loading across processes. Give each process a different ``current_shard`` so that
+    each one loads only its part of the checkpoint.
     """
 
     def __init__(self, sub_mapper: ModelStateMapper, total_shards: int, current_shard: int):
+        """Constructs the ``ModelStateMapperShard`` object.
+
+        Args:
+            sub_mapper: The mapper whose dependency groups are split.
+            total_shards: The total number of shards.
+            current_shard: The index of the shard this mapper handles, in ``[0, total_shards)``.
+        """
         self._groups = self._shard_groups(
             sub_mapper.state_dependency_groups(), n_shards=total_shards, shard=current_shard
         )
