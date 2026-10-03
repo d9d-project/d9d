@@ -69,4 +69,4 @@ class ManualGarbageCollector(AbstractContextManager):
             begin = time.monotonic()
             gc.collect(generation)
             end = time.monotonic()
-            self._dist_ctx.logger.info(f"[GC] Garbage collection for generation {generation} took {end - begin}s")
+            self._dist_ctx.logger.info(f"Garbage collection for generation {generation} took {end - begin:.2f} seconds")
