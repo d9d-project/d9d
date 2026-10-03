@@ -5,7 +5,7 @@ from ..runtime import ActionBase
 
 
 class PipelineProgramBuilder(abc.ABC):
-    """Abstract interface for building pipeline execution schedules."""
+    """Abstract base class for builders of pipeline execution schedules."""
 
     @abc.abstractmethod
     def compose(self, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:

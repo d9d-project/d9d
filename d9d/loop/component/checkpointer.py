@@ -24,7 +24,7 @@ def _save_iter_predicate(x: Path) -> int:
 
 
 class StateCheckpointer:
-    """Manages the lifecycle of distributed training checkpoints.
+    """Lifecycle manager for distributed training checkpoints.
 
     It saves and loads the job state with PyTorch Distributed Checkpoint (DCP). It names checkpoints
     by step, keeps only the latest ones and synchronizes the ranks around each save and load.

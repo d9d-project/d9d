@@ -9,7 +9,7 @@ from .types import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
 
 @dataclasses.dataclass
 class PipelineStageInfo:
-    """Holds information about the current position within the distributed pipeline.
+    """Position of the current stage in the distributed pipeline.
 
     Attributes:
         current_stage: The 0-based index of the current pipeline stage.
@@ -90,7 +90,7 @@ def distribute_layers_for_pipeline_stage(
 
 
 class StageBoundary(enum.Enum):
-    """Identifies which inter-stage edge of a stage a transfer spec describes.
+    """Edge of a stage that a transfer spec describes.
 
     Attributes:
         incoming: The ``StageTransfer`` this stage receives from the previous stage.

@@ -9,7 +9,7 @@ from d9d.core.protocol import OptimizerProtocol
 
 
 class PipelinedOptimizer(OptimizerProtocol, Offloadable):
-    """Manages the optimizers of all stages hosted on a pipeline-parallel rank.
+    """Optimizer that combines the optimizers of all stages hosted on a pipeline-parallel rank.
 
     With pipeline parallelism, one rank can host several stages, each with its own parameters and
     optimizer. This class exposes them as one optimizer.

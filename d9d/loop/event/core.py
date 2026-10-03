@@ -25,7 +25,7 @@ class Event(Generic[TContext]):
 
 
 class EventBus:
-    """Registers handlers for typed events and calls them when an event is triggered."""
+    """Registry of handlers for typed events that calls them when an event is triggered."""
 
     def __init__(self) -> None:
         """Constructs the ``EventBus`` object."""

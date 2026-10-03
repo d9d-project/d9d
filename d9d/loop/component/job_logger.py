@@ -30,7 +30,7 @@ def _flatten_pytree_for_metrics(tree: PyTree[float]) -> dict[str, float]:
 
 
 class JobLogger(Stateful):
-    """Logs the loss and the metrics of a job to the experiment tracker.
+    """Logger that sends the loss and the metrics of a job to the experiment tracker.
 
     The loss is logged every step. Metrics are aggregated across ranks and logged periodically.
     """

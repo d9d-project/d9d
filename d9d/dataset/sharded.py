@@ -10,7 +10,7 @@ from d9d.core.dist_context import BATCH_DOMAIN, DistributedContext
 
 
 class ShardIndexingMode(StrEnum):
-    """Defines how a dataset is split across shards.
+    """Ways to split a dataset across shards.
 
     The examples show 14 items split across 4 shards.
 
@@ -38,7 +38,7 @@ _T_co = TypeVar("_T_co", covariant=True)
 
 
 class ShardedDataset(Dataset[_T_co], Stateful):
-    """Wraps a dataset to expose only one of its shards.
+    """Dataset wrapper that exposes only one shard of a dataset.
 
     Use it for data-parallel training, where each process sees only a subset of the data. Optional padding gives
     all shards the same length, so no rank waits forever in a collective.

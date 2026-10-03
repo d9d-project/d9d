@@ -21,7 +21,7 @@ from .model_stage_factory import TrackedModules
 
 
 class TrainSleeper:
-    """Offloads and restores the GPU-resident training state for a colocated RL hand-off.
+    """Component that offloads and restores the GPU-resident training state for a colocated RL hand-off.
 
     It runs the sleep/wake lifecycle for the ``Trainer``. It calls offload/onload on the ``Offloadable``
     subsystems in the correct order, surrounds the calls with lifecycle events and reports which

@@ -6,7 +6,7 @@ from d9d.core.protocol import LRSchedulerProtocol
 
 
 class PipelinedLRScheduler(LRSchedulerProtocol):
-    """Manages the LR schedulers of all stages hosted on a pipeline-parallel rank.
+    """Learning rate scheduler that combines the schedulers of all stages hosted on a pipeline-parallel rank.
 
     Like ``PipelinedOptimizer``, it exposes the schedulers of several model stages as one scheduler.
     """

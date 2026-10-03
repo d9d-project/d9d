@@ -39,7 +39,7 @@ def _build_receive_plan(spec_per_microbatch: tuple[PyTree[TensorSpec], ...]) -> 
 
 
 class StageReceiver(Generic[TStageTransfer]):
-    """Receives one stage's incoming ``StageTransfer`` from a single peer stage."""
+    """Receiver of one stage's incoming ``StageTransfer`` from a single peer stage."""
 
     def __init__(
         self,
@@ -136,7 +136,7 @@ class StageReceiver(Generic[TStageTransfer]):
 
 
 class StageSender(Generic[TStageTransfer]):
-    """Sends one stage's outgoing ``StageTransfer`` to a single peer stage."""
+    """Sender of one stage's outgoing ``StageTransfer`` to a single peer stage."""
 
     def __init__(self, peer_global_rank: int, group: dist.ProcessGroup):
         """Constructs the ``StageSender`` object.

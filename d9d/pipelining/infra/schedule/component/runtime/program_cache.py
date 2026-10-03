@@ -23,7 +23,7 @@ class CachedPipelineProgram:
 
 
 class PipelineProgramCache:
-    """Composes and caches per-rank pipeline programs, keyed on the microbatch count.
+    """Cache of composed per-rank pipeline programs, keyed on the microbatch count.
 
     A program depends only on the microbatch count and the (fixed) pipeline topology, so each count is
     composed once and reused across steps.

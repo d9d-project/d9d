@@ -23,7 +23,7 @@ def _copy_pack_to_device(pack: MicrobatchPack, device: torch.types.Device) -> Mi
 
 
 class DevicePackStream(abc.ABC, Stateful):
-    """Hands the packs of a microbatch pack stream to the loop on the device.
+    """Abstract base class for streams that hand microbatch packs to the loop on the device.
 
     Its state is the data state stored in checkpoints.
     """
@@ -37,7 +37,7 @@ class DevicePackStream(abc.ABC, Stateful):
 
 
 class DirectDevicePackStream(DevicePackStream):
-    """Copies each pack to the device on the current CUDA stream when it is handed out."""
+    """Device pack stream that copies each pack to the device on the current CUDA stream when it is handed out."""
 
     def __init__(self, stream: MicrobatchPackStream, device: torch.types.Device):
         """Constructs the ``DirectDevicePackStream`` object.
@@ -125,7 +125,7 @@ class _PrefetchedPack:
 
 
 class PrefetchingDevicePackStream(DevicePackStream):
-    """Copies packs to the device on a side CUDA stream ahead of the steps that consume them.
+    """Device pack stream that copies packs to the device on a side CUDA stream ahead of the steps that use them.
 
     A background thread pulls the packs from the stream, so their loading, pinning and copy launches stay off the
     loop's critical path. Prefetching runs the stream's state ahead of the job, so ``state_dict`` returns the stream

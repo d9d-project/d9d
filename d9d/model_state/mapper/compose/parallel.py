@@ -7,7 +7,7 @@ from d9d.model_state.mapper.compose.helper import filter_empty_mappers
 
 
 class ModelStateMapperParallel(ModelStateMapper):
-    """Executes a list of state mappers independently of each other.
+    """Mapper that executes a list of state mappers independently of each other.
 
     No two mappers can consume the same input key or produce the same output key. ``apply()`` routes each
     group to the mapper that declared it.

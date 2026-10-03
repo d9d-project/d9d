@@ -9,7 +9,7 @@ from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig
 
 
 class NullTrackerConfig(BaseModel):
-    """Configuration of the null tracker, which logs nothing.
+    """Configuration for the null tracker, which logs nothing.
 
     Attributes:
         provider: Discriminator field. Always ``"null"``.

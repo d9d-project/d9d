@@ -10,7 +10,7 @@ from d9d.module.base import ModuleLateInit
 
 
 class GroupedLinear(nn.Module, ModuleLateInit):
-    """Applies a separate linear transformation to each group of tokens with grouped GEMM.
+    """Linear layer with a separate transformation for each group of tokens, computed with grouped GEMM.
 
     Each group (expert) has its own weight and processes a variable number of tokens. This is the compute core
     of the Mixture-of-Experts layer. Requires the ``d9d[moe]`` extra.

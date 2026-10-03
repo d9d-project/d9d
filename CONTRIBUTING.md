@@ -194,6 +194,9 @@ We follow the [Google Python style](https://google.github.io/styleguide/pyguide.
     arguments in the `__init__` docstring.
 *   **Let overrides inherit the contract.** An override may omit its docstring. Document it only if its behavior
     differs from the base contract.
+*   **Write a class summary as a noun phrase** that says what an instance is, e.g. "The engine that runs a distributed
+    training job.". Do not write "Class that ...". A config starts with "Configuration for", a protocol with
+    "Protocol for" and an abstract class with "Abstract base class for".
 *   **Write a property docstring as a noun phrase,** e.g. "The current step.", without a `Returns:` section.
 
 ### Error Messages

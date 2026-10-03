@@ -35,7 +35,7 @@ class DatasetImplementingSortKeyProtocol(Protocol[_T_co]):
 
 
 class BufferSortedDataset(Dataset[_T_co], Stateful):
-    """Wraps a dataset to serve items sorted within buffers, with local shuffling.
+    """Dataset wrapper that serves items sorted within buffers, with local shuffling.
 
     Items of similar length end up in the same pack, which reduces padding in variable-length training.
     The shuffling keeps enough randomness in the order of updates.

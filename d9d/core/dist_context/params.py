@@ -7,7 +7,7 @@ from .configured import DistributedContext
 
 
 class DeviceMeshParameters(BaseModel):
-    """Parallelism degrees to build the device meshes from.
+    """Configuration for the parallelism degrees of the device meshes.
 
     Attributes:
         pipeline_parallel: Degree of pipeline parallelism (PP).

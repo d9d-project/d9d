@@ -9,7 +9,7 @@ from .model_stage_factory import TrackedModules
 
 
 class ModelStageExporter:
-    """Exports the model stages held by this process as a ``.safetensors`` checkpoint."""
+    """Exporter of the model stages held by this process to a ``.safetensors`` checkpoint."""
 
     def __init__(self, model_provider: ModelProvider, modules: TrackedModules, dist_context: DistributedContext):
         """Constructs the ``ModelStageExporter`` object.

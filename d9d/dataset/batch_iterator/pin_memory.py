@@ -20,7 +20,7 @@ def _pin_pack(pack: MicrobatchPack) -> MicrobatchPack:
 
 
 class PinMemoryMicrobatchPackStream(MicrobatchPackStream):
-    """Wraps a microbatch pack stream to copy every tensor of each pack into page-locked (pinned) host memory.
+    """Microbatch pack stream wrapper that copies every tensor of each pack into pinned host memory.
 
     Pinned memory lets the loop copy packs to the device asynchronously. Unlike the ``pin_memory`` option of
     ``torch.utils.data.DataLoader``, the traversal uses ``d9d.core.pytree``, so tensors nested in dataclasses are

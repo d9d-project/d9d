@@ -52,7 +52,7 @@ def _accumulate_inplace_(op: MetricReduceOp, accumulator: torch.Tensor, value: t
 
 
 class MetricAccumulator(Stateful):
-    """Tracks a distributed metric state.
+    """Accumulator of a distributed metric state.
 
     It keeps two copies of the state: a local copy, updated on every step, and a synchronized copy, filled by an
     all-reduce in ``sync()``.

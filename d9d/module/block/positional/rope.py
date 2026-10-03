@@ -183,7 +183,7 @@ def _apply_rotary_pos_emb(
 
 
 class RotaryEmbeddingApplicator(nn.Module):
-    """Applies rotary position embeddings (RoPE) to Q and K projections."""
+    """Layer that applies rotary position embeddings (RoPE) to Q and K projections."""
 
     def __init__(self, style: RotaryEmbeddingStyle) -> None:
         """Constructs the ``RotaryEmbeddingApplicator`` object.

@@ -11,7 +11,7 @@ TComputeResult = TypeVar("TComputeResult", bound=TensorTree)
 
 
 class Metric(abc.ABC, Stateful, Generic[TComputeResult]):
-    """Base class for all metrics.
+    """Abstract base class for all metrics.
 
     A metric tracks statistics over time, e.g. during training, and can be synchronized across distributed
     processes. It supports checkpointing through the ``Stateful`` interface.

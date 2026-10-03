@@ -27,7 +27,7 @@ AutoLRSchedulerConfig = Annotated[PiecewiseConfig, Field(discriminator="name")]
 
 
 class AutoLRSchedulerProvider(LRSchedulerProvider):
-    """Builds a learning rate scheduler from a configuration object."""
+    """Provider that builds a learning rate scheduler from a configuration object."""
 
     def __init__(self, config: AutoLRSchedulerConfig):
         """Constructs the ``AutoLRSchedulerProvider`` object."""

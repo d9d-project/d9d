@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class Qwen3MoELayerParameters(BaseModel):
-    """Configuration parameters for a single Qwen3 MoE layer.
+    """Configuration for a single Qwen3 MoE layer.
 
     Attributes:
         hidden_size: Size of the hidden states.
@@ -26,7 +26,7 @@ class Qwen3MoELayerParameters(BaseModel):
 
 
 class Qwen3MoEParameters(BaseModel):
-    """Configuration parameters for the Qwen3 Mixture-of-Experts model backbone.
+    """Configuration for the Qwen3 Mixture of Experts (MoE) model backbone.
 
     Attributes:
         layer: Configuration shared across all transformer layers.

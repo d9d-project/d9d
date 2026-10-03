@@ -7,7 +7,7 @@ from d9d.core.types import MicrobatchPack
 
 
 class DataParallelMicrobatchPackStream(MicrobatchPackStream):
-    """Wraps a microbatch pack stream to namespace its checkpoint state per data-parallel rank."""
+    """Microbatch pack stream wrapper that namespaces the checkpoint state per data-parallel rank."""
 
     def __init__(self, dist_context: DistributedContext, inner: MicrobatchPackStream):
         """Constructs the ``DataParallelMicrobatchPackStream`` object.

@@ -7,7 +7,7 @@ from .statistic import ConfusionMatrixStatistic
 
 
 class ClassificationAggregationMethod(StrEnum):
-    """Defines methods for aggregating metrics across multiple classes.
+    """Methods for aggregating metrics across classes.
 
     Attributes:
         MICRO: Computes the metric globally by summing the confusion matrices first.
@@ -24,7 +24,7 @@ class ClassificationAggregationMethod(StrEnum):
 
 
 class ConfusionMatrixAggregator:
-    """Computes a statistic from a confusion matrix and aggregates it across classes."""
+    """Aggregator that computes a statistic from a confusion matrix and aggregates it across classes."""
 
     def __init__(self, method: ClassificationAggregationMethod, statistic: ConfusionMatrixStatistic) -> None:
         """Constructs the ``ConfusionMatrixAggregator`` object.

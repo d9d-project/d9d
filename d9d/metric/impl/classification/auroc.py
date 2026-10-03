@@ -41,7 +41,7 @@ def _compute_histogram_auroc(pos_hist: torch.Tensor, neg_hist: torch.Tensor) -> 
 
 
 class BinaryAUROCMetric(Metric[torch.Tensor]):
-    """Computes an approximate AUROC for binary classification from histograms.
+    """Approximate AUROC metric for binary classification, computed from histograms.
 
     Exact AUROC needs all predictions to sort and rank them. This metric keeps two histograms of predicted
     probabilities instead, one for positive and one for negative samples. It estimates the area with the

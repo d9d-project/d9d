@@ -6,7 +6,7 @@ from d9d.module.base import ModuleLateInit
 
 
 class SwiGLU(nn.Module, ModuleLateInit):
-    """Implements the SwiGLU feed-forward network (FFN).
+    """SwiGLU feed-forward network (FFN).
 
     Computes ``down(SiLU(gate(x)) * up(x))``. This is the standard MLP block of architectures like LLaMA.
     """

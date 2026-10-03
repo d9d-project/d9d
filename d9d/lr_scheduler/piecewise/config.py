@@ -129,7 +129,7 @@ PhaseConfig = Annotated[StepPhaseConfig | PercentagePhaseConfig | RestPhaseConfi
 
 
 class PiecewiseSchedulerConfig(BaseModel):
-    """Declarative configuration for a piecewise learning rate scheduler.
+    """Configuration for a piecewise learning rate scheduler.
 
     Attributes:
         initial_multiplier: Learning rate multiplier at step 0.

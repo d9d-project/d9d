@@ -53,7 +53,7 @@ class DecoderWithHeads(
     ],
     Generic[TBackbone, THeadShared, THeadOutput],
 ):
-    """Composes one decoder backbone with a mapping of prebuilt named task heads.
+    """Model that composes one decoder backbone with a mapping of prebuilt named task heads.
 
     For a model with a single head, use ``DecoderWithHead`` instead. With one head there is nothing
     to key, and this class would make every caller name the only head.
@@ -158,7 +158,7 @@ class DecoderWithHead(
     ],
     Generic[TBackbone, THead, THeadShared, THeadOutput],
 ):
-    """Composes one decoder backbone with exactly one prebuilt task head.
+    """Model that composes one decoder backbone with exactly one prebuilt task head.
 
     This is the single-head counterpart of ``DecoderWithHeads``, not a special case of it. With one
     head there is nothing to key. The head is ``self.head`` (FQN ``head.*``), its shared input is a

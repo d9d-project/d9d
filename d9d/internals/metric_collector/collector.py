@@ -8,7 +8,7 @@ from d9d.metric import Metric
 
 
 class AsyncMetricCollector:
-    """Synchronizes and computes a metric asynchronously on a side CUDA stream.
+    """Asynchronous metric collector that synchronizes and computes a metric on a side CUDA stream.
 
     The distributed reduction and the computation run on the side stream, off the main training stream.
     """

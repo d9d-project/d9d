@@ -5,7 +5,7 @@ import torch
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class ConfusionMatrix:
-    """Represents a confusion matrix for classification evaluation.
+    """Confusion matrix for classification evaluation.
 
     Attributes:
         tp: The count of true positives.

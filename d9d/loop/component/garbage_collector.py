@@ -13,9 +13,9 @@ from .job_schedule import JobSchedule
 
 
 class ManualGarbageCollector(AbstractContextManager):
-    """Manages Python garbage collection during the training loop.
+    """Context manager for Python garbage collection during the training loop.
 
-    This context manager disables automatic garbage collection on entry to avoid unpredictable
+    It disables automatic garbage collection on entry to avoid unpredictable
     latency spikes during steps. Collections then run only at configured intervals or when forced.
     """
 

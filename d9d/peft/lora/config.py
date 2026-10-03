@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 
 class LoRAParameters(BaseModel):
-    """Hyperparameters for LoRA layers.
+    """Configuration for LoRA layers.
 
     Attributes:
         r: Rank of the low-rank adaptation matrices.

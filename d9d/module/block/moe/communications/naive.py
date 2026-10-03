@@ -12,7 +12,7 @@ from d9d.module.block.moe.communications import ExpertCommunicationHandler
 
 
 class NoCommunicationHandler(ExpertCommunicationHandler):
-    """Handles MoE routing when all experts are on the local device.
+    """MoE communication handler for the case when all experts are on the local device.
 
     This handler does no communication. It only sorts the tokens by expert index.
     """

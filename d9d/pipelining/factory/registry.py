@@ -26,6 +26,8 @@ TBoundRegistryFn = Callable[[TConfig], PipelineProgramBuilder]
 
 
 class PipelineProgramRegistry:
+    """Registry that maps each pipeline schedule config type to a function that builds its program."""
+
     def __init__(self) -> None:
         self._registry: TRegistryDict = {}
 

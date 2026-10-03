@@ -16,7 +16,7 @@ def _wait_batched_p2p(work: list[dist.Work]):
 
 
 class PipelineCommunicationHandler:
-    """Manages point-to-point communications between pipeline stages."""
+    """Handler of point-to-point communications between pipeline stages."""
 
     def __init__(self, stages: dict[int, PipelineStage]):
         """Constructs the ``PipelineCommunicationHandler`` object.

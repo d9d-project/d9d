@@ -9,7 +9,7 @@ from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
 
 
 class Profiler:
-    """Profiles the job periodically with ``torch.profiler``.
+    """Periodic job profiler based on ``torch.profiler``.
 
     The profiling cycle repeats every ``period_steps`` steps. Each trace is exported, compressed and named after
     the coordinates of the rank in the device mesh.

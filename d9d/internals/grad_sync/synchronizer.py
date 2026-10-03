@@ -168,7 +168,7 @@ def _fill_buckets(
 
 
 class GradientSynchronizer:
-    """Synchronizes the gradients of replicated parameters during the backward pass.
+    """Gradient synchronizer for replicated parameters. It reduces the gradients during the backward pass.
 
     It splits the parameters into buckets, allocates flat gradient buffers and runs asynchronous all-reduce
     operations.

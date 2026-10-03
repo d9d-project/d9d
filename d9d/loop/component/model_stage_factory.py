@@ -38,7 +38,7 @@ def _stateful_predicate_always(key: str, value: torch.Tensor) -> bool:
 
 
 class TrackedModules(Stateful, Offloadable):
-    """Wraps a list of model stages and manages their state for distributed checkpointing.
+    """Wrapper of a list of model stages that manages their state for distributed checkpointing.
 
     It implements the PyTorch Distributed ``Stateful`` protocol over all pipeline stages of the current
     rank. State keys are namespaced by pipeline rank and stage, so they are unique across ranks.
@@ -184,7 +184,7 @@ class TrackedModules(Stateful, Offloadable):
 
 
 class ModelStageFactory:
-    """Creates, initializes and parallelizes model stages.
+    """Factory that creates, initializes and parallelizes model stages.
 
     It drives the ``ModelProvider`` to:
 

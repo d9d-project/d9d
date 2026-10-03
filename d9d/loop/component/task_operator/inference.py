@@ -18,7 +18,7 @@ TState = typing.TypeVar("TState", bound=PyTree)
 
 
 class InferenceProcessor(typing.Generic[TPipelineOutput, TState]):
-    """Handles the processing of model outputs during inference or evaluation.
+    """Processor of model outputs during inference or evaluation.
 
     This component retrieves the per-microbatch state and delegates the output processing logic to the
     user-defined inference task.
@@ -50,7 +50,7 @@ class InferenceProcessor(typing.Generic[TPipelineOutput, TState]):
 
 
 class InferenceTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]):
-    """Orchestrates the forward pass for an inference task over one pack."""
+    """Operator that orchestrates the forward pass for an inference task over one pack."""
 
     def __init__(
         self,

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 
 
 class AimConfig(BaseModel):
-    """Configuration of the Aim tracker backend.
+    """Configuration for the Aim tracker backend.
 
     Attributes:
         provider: Discriminator field. Always ``"aim"``.

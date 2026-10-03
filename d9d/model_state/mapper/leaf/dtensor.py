@@ -9,7 +9,7 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperDistribute(ModelStateMapper):
-    """Converts a single full local tensor into a ``DTensor``.
+    """Mapper that converts a single full local tensor into a ``DTensor``.
 
     Every rank must hold the same full tensor. No communication happens.
     """
@@ -43,7 +43,7 @@ class ModelStateMapperDistribute(ModelStateMapper):
 
 
 class ModelStateMapperGatherFullTensor(ModelStateMapper):
-    """Gathers a single ``DTensor`` into a full local tensor."""
+    """Mapper that gathers a single ``DTensor`` into a full local tensor."""
 
     def __init__(self, name: str):
         """Constructs the ``ModelStateMapperGatherFullTensor`` object.

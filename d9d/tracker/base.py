@@ -58,7 +58,7 @@ class BaseTrackerRun(abc.ABC):
 
 
 class RunConfig(BaseModel):
-    """Configuration of a tracked run.
+    """Configuration for a tracked run.
 
     Attributes:
         name: The display name of the experiment.

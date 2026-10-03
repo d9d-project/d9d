@@ -14,7 +14,7 @@ def _build_groups(mapper: ModelStateMapper, source_prefix: str, target_prefix: s
 
 
 class ModelStateMapperPrefixScope(ModelStateMapper):
-    """Runs a child mapper under key prefixes.
+    """Mapper that runs a child mapper under key prefixes.
 
     Use it to apply a mapper written for a submodule (e.g. one operating on ``"in_proj"``) to the state dict of
     a parent module. Input (source) and output (target) prefixes are independent.

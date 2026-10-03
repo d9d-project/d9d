@@ -27,7 +27,7 @@ class CurveLinear(CurveBase):
 
 
 class CurveCosine(CurveBase):
-    """Interpolates using a cosine annealing schedule (half-period cosine)."""
+    """Cosine annealing curve (half-period cosine)."""
 
     def compute(self, start: float, end: float, step_p: float) -> float:
         cos_out = (1 + math.cos(math.pi * step_p)) / 2
@@ -35,7 +35,7 @@ class CurveCosine(CurveBase):
 
 
 class CurvePoly(CurveBase):
-    """Interpolates along ``step_p ** power``."""
+    """Polynomial curve along ``step_p ** power``."""
 
     def __init__(self, power: float):
         """Constructs the ``CurvePoly`` object.
@@ -51,7 +51,7 @@ class CurvePoly(CurveBase):
 
 
 class CurveExponential(CurveBase):
-    """Interpolates exponentially between start and end values (linearly in log space).
+    """Exponential curve between the start and end values (linear in log space).
 
     Start and end values below ``1e-8`` are treated as ``1e-8``.
     """

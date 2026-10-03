@@ -10,7 +10,7 @@ from d9d.model_state.mapper import ModelStateMapper
 
 @dataclasses.dataclass(slots=True)
 class PeftInjectionResult:
-    """Encapsulates the result of injecting a PEFT method into a model.
+    """The result of injecting a PEFT method into a model.
 
     Attributes:
         parameters_to_train: The parameters that must stay trainable.
@@ -25,7 +25,7 @@ TConfig = TypeVar("TConfig", bound=BaseModel)
 
 
 class PeftMethod(abc.ABC, Generic[TConfig]):
-    """Base class for all Parameter-Efficient Fine-Tuning methods."""
+    """Abstract base class for all parameter-efficient fine-tuning (PEFT) methods."""
 
     @abc.abstractmethod
     def inject(self, module: nn.Module) -> PeftInjectionResult:

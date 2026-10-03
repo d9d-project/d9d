@@ -22,7 +22,7 @@ from .registry import PIPELINE_PROGRAM_REGISTRY
 
 @dataclasses.dataclass(kw_only=True)
 class PipelineScheduleInfo(typing.Generic[TPipelineInput, TSharedInput, TPipelineOutput]):
-    """Contains the built pipeline schedule and rank-specific metadata.
+    """The built pipeline schedule and its rank-specific metadata.
 
     Attributes:
         schedule: The schedule that runs the pipeline steps.

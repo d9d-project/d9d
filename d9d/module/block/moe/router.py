@@ -21,7 +21,7 @@ class RoutingResult:
 
 
 class TopKRouter(nn.Module, ModuleLateInit):
-    """Selects the top-k experts for each token with a learned gate.
+    """Router that selects the top-k experts for each token with a learned gate.
 
     The router:
 

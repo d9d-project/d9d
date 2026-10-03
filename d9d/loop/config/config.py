@@ -174,7 +174,7 @@ class TimeoutConfig(BaseModel):
 
 
 class TrainerConfig(BaseModel):
-    """Top-level configuration object defining a complete training job.
+    """Configuration for a complete training job.
 
     Attributes:
         run: Meta-information about the run (name, ID, tags).
@@ -208,7 +208,7 @@ class TrainerConfig(BaseModel):
 
 
 class InferenceConfig(BaseModel):
-    """Top-level configuration object defining an inference or evaluation job.
+    """Configuration for a complete inference or evaluation job.
 
     Attributes:
         schedule: Job duration settings.

@@ -10,7 +10,7 @@ from d9d.model_state.mapper.leaf.single_tensor import ModelStateMapperIdentity
 
 
 class ModelStateMapperSequential(ModelStateMapper):
-    """Executes a list of mappers one after another.
+    """Mapper that executes a list of mappers one after another.
 
     Intermediate states stay hidden: the mapper exposes only the inputs of the first stage and the outputs of the
     last stage.

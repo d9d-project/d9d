@@ -8,7 +8,7 @@ from .grouped_linear import GroupedLinear
 
 
 class GroupedSwiGLU(nn.Module, ModuleLateInit):
-    """Runs a set of SwiGLU experts with grouped GEMM.
+    """Set of SwiGLU experts that run with grouped GEMM.
 
     Each expert computes ``down_proj(SiLU(gate_proj(x)) * up_proj(x))``. All experts run in one grouped GEMM
     per projection, without padding or masking.

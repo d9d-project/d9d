@@ -32,7 +32,7 @@ def _build_mesh_domains(params: "DeviceMeshParameters") -> dict[str, DeviceMesh]
 
 
 class DistributedContext:
-    """Holds the distributed execution environment and acts as its single source of truth.
+    """The single source of truth for the distributed execution environment.
 
     It builds a PyTorch ``DeviceMesh`` for each domain (regular, expert, dense, ...). Rank placement, group
     membership and parallel topology must all come from this context, so that they stay consistent.

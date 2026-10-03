@@ -8,7 +8,7 @@ from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddi
 
 
 class GroupedQueryAttention(nn.Module, ModuleLateInit):
-    """Implements Grouped Query Attention (GQA) with RoPE and optional QK normalization.
+    """Grouped Query Attention (GQA) layer with RoPE and optional QK normalization.
 
     The layer runs these steps:
 

@@ -8,7 +8,7 @@ from d9d.metric import Metric
 
 
 class ComposeMetric(Metric[dict[str, Any]]):
-    """Groups named child metrics into one metric.
+    """Container metric that groups named child metrics into one metric.
 
     Synchronization, computation, reset, device moves and checkpointing apply to all children. ``compute()``
     returns a dictionary with the result of each child. Update the children directly.

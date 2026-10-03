@@ -8,7 +8,7 @@ from d9d.metric.component import MetricAccumulator
 
 
 class WeightedMeanMetric(Metric[torch.Tensor]):
-    """Computes the weighted mean of values."""
+    """Metric for the weighted mean of values."""
 
     def __init__(self):
         """Constructs the ``WeightedMeanMetric`` object."""

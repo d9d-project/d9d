@@ -19,7 +19,7 @@ class TimeoutState(StrEnum):
 
 
 class TimeoutManager:
-    """Manages the dynamic adjustment of distributed timeouts during the job loop.
+    """Manager that adjusts the distributed timeouts dynamically during the job loop.
 
     The manager switches from the initialization timeout to the step timeout. The initialization
     timeout can be longer to cover compilation, caching and other startup work.

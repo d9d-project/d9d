@@ -4,7 +4,7 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperSelectChildModules(ModelStateMapper):
-    """Selects keys of a child module and strips the module prefix.
+    """Mapper that selects the keys of a child module and strips the module prefix.
 
     It is a batch rename that moves parameters from a submodule scope to the current scope.
     """

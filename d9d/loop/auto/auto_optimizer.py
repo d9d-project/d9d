@@ -197,7 +197,7 @@ AutoOptimizerConfig = Annotated[
 
 
 class AutoOptimizerProvider(OptimizerProvider):
-    """Builds a PyTorch optimizer from a configuration object."""
+    """Provider that builds a PyTorch optimizer from a configuration object."""
 
     def __init__(self, config: AutoOptimizerConfig):
         """Constructs the ``AutoOptimizerProvider`` object."""

@@ -11,7 +11,7 @@ IsLeaf = Callable[[Any], bool]
 
 
 class PyTreeFlattener:
-    """Flattens PyTrees into their leaves, descending into dataclasses as internal nodes."""
+    """PyTree flattener that descends into dataclasses as internal nodes."""
 
     def __init__(self):
         """Constructs the ``PyTreeFlattener`` object."""

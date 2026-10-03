@@ -70,7 +70,7 @@ from d9d.metric.impl.container import ComposeMetric
 
 
 class TrainingConfigurator:
-    """Orchestrates the assembly of the distributed training environment.
+    """Configurator that assembles the distributed training environment.
 
     It combines the device mesh parameters, the ``TrainerConfig`` and the user-defined providers
     into a ``Trainer`` that is ready to run the training loop.

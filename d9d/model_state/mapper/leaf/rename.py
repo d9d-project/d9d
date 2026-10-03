@@ -4,7 +4,7 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperRename(ModelStateMapper):
-    """Renames a single state tensor."""
+    """Mapper that renames a single state tensor."""
 
     def __init__(self, name_from: str, name_to: str):
         """Constructs the ``ModelStateMapperRename`` object.

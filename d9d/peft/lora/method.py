@@ -53,7 +53,7 @@ def named_modules_without_lora(
 
 
 class LoRA(PeftMethod[LoRAConfig]):
-    """Implements Low-Rank Adaptation (LoRA).
+    """PEFT method for Low-Rank Adaptation (LoRA).
 
     ``inject`` replaces every ``nn.Linear`` or ``GroupedLinear`` layer whose name matches the configured pattern
     with a LoRA wrapper. The original ``layer.weight`` moves to ``layer.base.weight``. For each wrapped layer,

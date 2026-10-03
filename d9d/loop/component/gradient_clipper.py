@@ -10,7 +10,7 @@ from .model_stage_factory import TrackedModules
 
 
 class GradientClipper:
-    """Manages gradient clipping and logging of gradient norms in a distributed execution environment."""
+    """Gradient clipper that also logs gradient norms in a distributed execution environment."""
 
     def __init__(
         self,

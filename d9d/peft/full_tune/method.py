@@ -7,7 +7,7 @@ from .config import FullTuneConfig
 
 
 class FullTune(PeftMethod[FullTuneConfig]):
-    """Implements full fine-tuning as a PEFT method.
+    """PEFT method for full fine-tuning.
 
     It injects no adapters. It marks all parameters of the matching modules as trainable.
     """

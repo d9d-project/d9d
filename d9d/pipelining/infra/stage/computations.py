@@ -21,7 +21,7 @@ from .splitgrad import (
 
 @dataclasses.dataclass(slots=True)
 class ForwardCache(Generic[TPipelineInput, TStageTransfer, TPipelineOutput]):
-    """Stores the inputs and outputs of a forward pass to be used later in the backward pass.
+    """Inputs and outputs of a forward pass, kept for the backward pass.
 
     Attributes:
         inputs: The stage's incoming ``StageTransfer`` (or ``PipelineInput`` on the first stage) as a
@@ -35,7 +35,7 @@ class ForwardCache(Generic[TPipelineInput, TStageTransfer, TPipelineOutput]):
 
 
 class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
-    """Handles the execution of the forward pass for a pipeline stage module.
+    """Forward pass handler for a pipeline stage module.
 
     It caches the inputs and outputs of each microbatch for the backward pass.
     """
@@ -194,7 +194,7 @@ BackwardSeed = BackwardSeedLoss | BackwardSeedTransfer[TStageTransfer]
 
 
 class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
-    """Handles the execution of backward passes for a pipeline stage.
+    """Backward pass handler for a pipeline stage.
 
     It can split the backward pass into an input-gradient and a weight-gradient phase, as Zero Bubble
     schedules require.

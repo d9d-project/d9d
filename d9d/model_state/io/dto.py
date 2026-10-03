@@ -12,7 +12,7 @@ class ModelStateIndexMeta(BaseModel):
 
 
 class ModelStateIndex(BaseModel):
-    """Represents the content of the ``model.safetensors.index.json`` file.
+    """Content of the ``model.safetensors.index.json`` file.
 
     The index maps every weight name to the ``.safetensors`` file that contains it.
 

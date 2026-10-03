@@ -2,7 +2,7 @@ from pydantic import BaseModel
 
 
 class Qwen3DenseLayerParameters(BaseModel):
-    """Configuration parameters for a single Qwen3 Dense layer.
+    """Configuration for a single Qwen3 Dense layer.
 
     Attributes:
         hidden_size: Size of the hidden states.
@@ -22,7 +22,7 @@ class Qwen3DenseLayerParameters(BaseModel):
 
 
 class Qwen3DenseParameters(BaseModel):
-    """Configuration parameters for the Qwen3 Dense model backbone.
+    """Configuration for the Qwen3 Dense model backbone.
 
     Attributes:
         layer: Configuration shared across all transformer layers.

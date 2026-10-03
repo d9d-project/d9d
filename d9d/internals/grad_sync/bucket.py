@@ -13,7 +13,7 @@ from .placement_helper import dist_grad_from_local
 
 
 class AbstractGradientBucket(abc.ABC):
-    """Interface for a bucket that holds a subset of the model parameters.
+    """Abstract base class for a bucket that holds a subset of the model parameters.
 
     A bucket owns the memory layout of the parameter gradients and the lifecycle of their synchronization.
     """
@@ -80,7 +80,7 @@ class LocalGradientBucket(AbstractGradientBucket):
 
 
 class AccumulationCounter:
-    """Tracks the number of gradient accumulation steps for a set of parameters."""
+    """Counter of gradient accumulation steps for a set of parameters."""
 
     def __init__(self, parameters: list[nn.Parameter]):
         """Constructs the ``AccumulationCounter`` object.

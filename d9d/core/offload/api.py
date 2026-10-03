@@ -6,7 +6,7 @@ from d9d.core.dist_context import DistributedContext
 
 
 class SleepTag(StrEnum):
-    """Selects the subsystems that ``Trainer.sleep`` and ``Trainer.wake`` act on.
+    """Subsystems that ``Trainer.sleep`` and ``Trainer.wake`` act on.
 
     Attributes:
         TENSOR_STATES: All GPU tensor state: model parameters and buffers, optimizer state, gradient buckets and

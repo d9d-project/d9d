@@ -54,7 +54,7 @@ class AutoDataConfig(BaseModel):
 
 
 class AutoDataProvider(DataProvider):
-    """Builds the default data stack: shards the dataset, loads microbatches and packs them per step.
+    """Data provider for the default data stack, which shards the dataset, loads microbatches and packs them per step.
 
     The dataset is sharded across data-parallel ranks and loaded by a stateful loader at the microbatch size.
     The number of microbatches per step follows from the global batch size. A ``FixedCountMicrobatchPacker``

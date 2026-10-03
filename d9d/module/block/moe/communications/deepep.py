@@ -149,7 +149,7 @@ class DeepEpCombine(torch.autograd.Function):
 
 
 class DeepEpCommunicationHandler(ExpertCommunicationHandler):
-    """Handles MoE communication across expert-parallel ranks with the DeepEP library.
+    """MoE communication handler for expert-parallel ranks, based on the DeepEP library.
 
     Requires the ``d9d[moe]`` extra.
     """

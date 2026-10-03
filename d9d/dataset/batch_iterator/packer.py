@@ -7,7 +7,7 @@ from d9d.core.types import MicrobatchPack, PyTree
 
 
 class FixedCountMicrobatchPacker(MicrobatchPackStream):
-    """Groups the microbatches of a loader into packs of ``microbatches_per_step``.
+    """Microbatch pack stream that groups the microbatches of a loader into packs of ``microbatches_per_step``.
 
     It is the default ``MicrobatchPackStream``. A short trailing pack (``drop_last=False``) is consistent across
     ranks only when every rank sees the same number of microbatches, e.g. when the dataset was sharded with

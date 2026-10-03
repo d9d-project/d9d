@@ -22,7 +22,7 @@ TState = typing.TypeVar("TState", bound=PyTree)
 
 
 class LossComputer(typing.Generic[TPipelineOutput, TState]):
-    """Computes and accumulates the training loss for each microbatch of a step.
+    """Component that computes and accumulates the training loss for each microbatch of a step.
 
     This component bridges the raw outputs of the model pipeline and the user-defined training task.
     """
@@ -79,7 +79,7 @@ class LossComputer(typing.Generic[TPipelineOutput, TState]):
 
 
 class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]):
-    """Orchestrates the forward and backward passes for a training task over one pack.
+    """Operator that orchestrates the forward and backward passes for a training task over one pack.
 
     It builds the per-microbatch inputs, reconfigures the pipeline schedule for the pack length, and
     drives execution. Loss/weight and metrics accumulate per microbatch through the loss callback.

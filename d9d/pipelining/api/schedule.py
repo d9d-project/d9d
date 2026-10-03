@@ -11,7 +11,7 @@ from .types import (
 
 
 class PipelineSchedule(abc.ABC, typing.Generic[TPipelineInput, TSharedInput, TPipelineOutput]):
-    """Abstract base class defining the interface for pipeline execution schedules.
+    """Abstract base class for pipeline execution schedules.
 
     Type parameters:
         TPipelineInput: The ``PipelineInput`` fed to the first stage.

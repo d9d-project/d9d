@@ -23,7 +23,7 @@ class SchedulePhase:
 
 
 class PiecewiseScheduleEngine:
-    """Computes learning rate multipliers from a list of phases."""
+    """Engine that computes learning rate multipliers from a list of phases."""
 
     def __init__(self, phases: list[SchedulePhase]):
         """Constructs the ``PiecewiseScheduleEngine`` object.

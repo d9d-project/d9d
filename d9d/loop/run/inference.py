@@ -55,7 +55,7 @@ from d9d.pipelining.factory import PipelineScheduleInferenceConfig
 
 
 class InferenceConfigurator:
-    """Orchestrates the assembly of the distributed inference environment.
+    """Configurator that assembles the distributed inference environment.
 
     It combines the device mesh parameters, the ``InferenceConfig`` and the user-defined providers
     into an ``Inference`` object that is ready to run the inference loop.

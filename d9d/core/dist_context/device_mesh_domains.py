@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 
 
 class DeviceMeshDomain(abc.ABC):
-    """Builds the device mesh of one domain.
+    """Abstract base class for a domain that builds one device mesh.
 
     A domain arranges the GPUs into a multidimensional mesh that serves specific parallelism techniques.
     """
@@ -36,6 +36,11 @@ REGULAR_DOMAIN = "regular"
 
 
 class RegularDomain(DeviceMeshDomain):
+    """Domain that builds the most granular mesh, with every parallelism in its own dimension.
+
+    Dimensions: ``("pp", "dp_replicate", "dp_shard", "cp_shard", "cp_replicate", "tp")``.
+    """
+
     @property
     def name(self) -> str:
         return "regular"
@@ -66,6 +71,11 @@ EXPERT_DOMAIN = "expert"
 
 
 class ExpertDomain(DeviceMeshDomain):
+    """Domain that builds the mesh for Mixture-of-Experts (MoE) layers.
+
+    Dimensions: ``("pp", "ep_replicate", "ep_shard")``.
+    """
+
     @property
     def name(self) -> str:
         return EXPERT_DOMAIN
@@ -96,6 +106,11 @@ DENSE_DOMAIN = "dense"
 
 
 class DenseDomain(DeviceMeshDomain):
+    """Domain that builds the mesh for dense layers.
+
+    Dimensions: ``("pp", "dp_replicate", "dp_cp_shard", "cp_replicate", "tp")``.
+    """
+
     @property
     def name(self) -> str:
         return DENSE_DOMAIN
@@ -124,6 +139,11 @@ BATCH_DOMAIN = "batch"
 
 
 class BatchDomain(DeviceMeshDomain):
+    """Domain that builds the mesh for distributing input data.
+
+    Dimensions: ``("pp", "dp", "cp", "tp")``.
+    """
+
     @property
     def name(self) -> str:
         return BATCH_DOMAIN
@@ -150,6 +170,11 @@ FLAT_DOMAIN = "flat"
 
 
 class FlatDomain(DeviceMeshDomain):
+    """Domain that builds a single-dimension mesh with all the processes.
+
+    Dimensions: ``("world",)``.
+    """
+
     @property
     def name(self) -> str:
         return FLAT_DOMAIN

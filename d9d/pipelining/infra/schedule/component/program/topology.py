@@ -3,7 +3,7 @@ from enum import StrEnum
 
 
 class ScheduleStyle(StrEnum):
-    """Defines the strategy for mapping logical stages to physical ranks.
+    """Strategies for mapping logical stages to physical ranks.
 
     Attributes:
         loop: Assigns stages round-robin: stage ``i`` goes to rank ``i % pp_size``.

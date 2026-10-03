@@ -97,7 +97,7 @@ class RegisterModelEventsContext:
 
 
 class ModelProvider(abc.ABC, Generic[TModel]):
-    """Abstract interface for defining the lifecycle of a distributed model.
+    """Abstract base class for the lifecycle of a distributed model.
 
     The provider initializes, parallelizes (shards, replicates, etc.) and prepares the model for export.
     """

@@ -9,7 +9,7 @@ from .confusion_matrix import ConfusionMatrix
 
 
 class ConfusionMatrixAccumulator(Stateful):
-    """Accumulates confusion matrix statistics across batches and distributed workers."""
+    """Accumulator of confusion matrix statistics across batches and distributed workers."""
 
     def __init__(self, num_outputs: int):
         """Constructs the ``ConfusionMatrixAccumulator`` object.

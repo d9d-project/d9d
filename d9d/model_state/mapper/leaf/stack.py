@@ -4,7 +4,7 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperStackTensors(ModelStateMapper):
-    """Stacks multiple input tensors into a single output tensor along a new dimension."""
+    """Mapper that stacks multiple input tensors into a single output tensor along a new dimension."""
 
     def __init__(
         self,
@@ -34,7 +34,7 @@ class ModelStateMapperStackTensors(ModelStateMapper):
 
 
 class ModelStateMapperUnstackTensors(ModelStateMapper):
-    """Unstacks a single input tensor into multiple output tensors along a specified dimension."""
+    """Mapper that unstacks a single input tensor into multiple output tensors along a specified dimension."""
 
     def __init__(
         self,
@@ -67,7 +67,7 @@ class ModelStateMapperUnstackTensors(ModelStateMapper):
 
 
 class ModelStateMapperChunkTensors(ModelStateMapper):
-    """Chunks a single input tensor into multiple output tensors along a specified dimension."""
+    """Mapper that chunks a single input tensor into multiple output tensors along a specified dimension."""
 
     def __init__(
         self,
@@ -100,7 +100,7 @@ class ModelStateMapperChunkTensors(ModelStateMapper):
 
 
 class ModelStateMapperConcatenateTensors(ModelStateMapper):
-    """Concatenates multiple input tensors into a single output tensor along a specified dimension.
+    """Mapper that concatenates multiple input tensors into a single output tensor along a specified dimension.
 
     It is the inverse of ``ModelStateMapperChunkTensors``.
     """

@@ -7,7 +7,7 @@ from .config import LoRAParameters
 
 
 class LoRALinear(nn.Module):
-    """Wraps an ``nn.Linear`` layer with low-rank adaptation matrices A and B.
+    """Wrapper that adds low-rank adaptation matrices A and B to an ``nn.Linear`` layer.
 
     Attributes:
         lora_A: The A matrix (``in_features -> r``).
@@ -84,7 +84,7 @@ class LoRALinear(nn.Module):
 
 
 class LoRAGroupedLinear(nn.Module):
-    """Wraps a ``GroupedLinear`` layer, as used by MoE experts, with low-rank adaptation matrices A and B.
+    """Wrapper that adds low-rank adaptation matrices A and B to a ``GroupedLinear`` layer, as used by MoE experts.
 
     Attributes:
         lora_A: The A matrix (``in_features -> r`` for each group).

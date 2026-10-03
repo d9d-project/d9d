@@ -4,7 +4,7 @@ import torch
 
 
 class TokenPoolingType(StrEnum):
-    """Enumeration of supported token pooling strategies.
+    """Supported token pooling strategies.
 
     Attributes:
         first: Selects the first token of the sequence, e.g. the ``[CLS]`` token.

@@ -14,7 +14,7 @@ from .model_stage_factory import TrackedModules
 
 
 class GradientManager(Offloadable):
-    """Manages the lifecycle of gradients during the training loop.
+    """Lifecycle manager for gradients during the training loop.
 
     It synchronizes gradients across ranks through a ``GradientSynchronizer``, sets the gradient dtype
     and divides gradients by the accumulated loss weight before the optimizer step.

@@ -12,7 +12,7 @@ from .communications import PipelineCommunicationHandler
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class ActionContext(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
-    """Holds the runtime context required to execute a pipeline action.
+    """Runtime context required to execute a pipeline action.
 
     Attributes:
         pipeline_inputs_microbatches: Per-microbatch ``PipelineInput``, indexed by microbatch.
@@ -31,7 +31,7 @@ class ActionContext(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
 
 
 class ActionWorkType(StrEnum):
-    """Classifies the type of work performed by an action.
+    """Types of work that an action performs.
 
     Attributes:
         compute: The action computes (a forward or backward pass).

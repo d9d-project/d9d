@@ -21,7 +21,7 @@ from d9d.metric.component.classification import (
 
 
 class ConfusionMatrixMetric(Metric[torch.Tensor]):
-    """Computes a statistic, such as accuracy, precision, recall or F1 score, from a confusion matrix.
+    """Metric for a statistic, such as accuracy, precision, recall or F1 score, computed from a confusion matrix.
 
     Use ``confusion_matrix_metric()`` to build it.
     """
@@ -73,7 +73,7 @@ class ConfusionMatrixMetric(Metric[torch.Tensor]):
 
 
 class ConfusionMatrixMetricBuilder:
-    """Builds a ``ConfusionMatrixMetric`` step by step.
+    """Step-by-step builder of a ``ConfusionMatrixMetric``.
 
     Choose one problem type, one statistic and, unless the problem type sets it, one aggregation method. Then call
     ``build()``.

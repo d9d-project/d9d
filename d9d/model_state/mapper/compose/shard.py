@@ -4,7 +4,7 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperShard(ModelStateMapper):
-    """Restricts another mapper to one shard of its dependency groups.
+    """Mapper that restricts another mapper to one shard of its dependency groups.
 
     Use it to split model loading across processes. Give each process a different ``current_shard`` so that
     each one loads only its part of the checkpoint.

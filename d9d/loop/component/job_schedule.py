@@ -29,7 +29,7 @@ def _resolve_total_steps(config: JobScheduleConfig, stream: MicrobatchPackStream
 
 
 class JobSchedule(Stateful):
-    """Tracks the progress and resolves the duration of a job loop."""
+    """Progress tracker of a job loop. It also resolves the duration of the loop."""
 
     def __init__(self, config: JobScheduleConfig, stream: MicrobatchPackStream):
         """Constructs the ``JobSchedule`` object.

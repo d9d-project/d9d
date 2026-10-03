@@ -6,7 +6,7 @@ import torch
 
 @dataclasses.dataclass(frozen=True)
 class StateGroup:
-    """Represents an atomic unit of dependency in the model state transformation graph.
+    """Atomic unit of dependency in the model state transformation graph.
 
     A ``StateGroup`` binds a set of input keys (source) to a set of output keys (destination).
 
@@ -20,7 +20,7 @@ class StateGroup:
 
 
 class ModelStateMapper(abc.ABC):
-    """Base class for all model state transformations.
+    """Abstract base class for all model state transformations.
 
     A mapper separates the declaration of a transformation from its execution:
 

@@ -242,7 +242,7 @@ def _build_decay_gate(
 
 
 class GatedDeltaNet(nn.Module, ModuleLateInit):
-    """Implements the Gated DeltaNet (GDN) attention layer.
+    """Gated DeltaNet (GDN) attention layer.
 
     The layer combines linear attention based on the delta rule with Mamba-style data-dependent gating and
     short causal convolutions. It runs these steps:

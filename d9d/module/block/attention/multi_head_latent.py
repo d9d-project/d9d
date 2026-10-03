@@ -9,7 +9,7 @@ from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddi
 
 
 class LowRankProjection(nn.Module):
-    """Implements a low-rank linear projection with an intermediate normalization layer."""
+    """Low-rank linear projection with an intermediate normalization layer."""
 
     def __init__(self, in_features: int, bottleneck: int, out_features: int, norm_eps: float):
         """Constructs the ``LowRankProjection`` object.
@@ -44,7 +44,7 @@ class LowRankProjection(nn.Module):
 
 
 class MultiHeadLatentAttention(nn.Module, ModuleLateInit):
-    """Implements Multi-Head Latent Attention (MLA) from DeepSeek-V2.
+    """Multi-Head Latent Attention (MLA) layer from DeepSeek-V2.
 
     The layer runs these steps:
 

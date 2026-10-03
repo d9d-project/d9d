@@ -72,7 +72,7 @@ class FinalizeContext:
 
 
 class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch, TPipelineInput, TSharedInput, TState]):
-    """Abstract base class representing a unit of work (Task) in the training/inference loop.
+    """Abstract base class for a unit of work (task) in the training or inference loop.
 
     Type parameters:
         TBatch: The raw microbatch type produced by the data stream.
@@ -165,7 +165,7 @@ class CreateMetricsContext:
 
 @dataclasses.dataclass(kw_only=True)
 class CreateMetricsResult:
-    """Result of metric initialization.
+    """The result of metric initialization.
 
     Attributes:
         metrics: A dictionary mapping metric names to ``Metric`` instances.
@@ -192,7 +192,7 @@ class TrainTask(
     abc.ABC,
     typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState],
 ):
-    """Abstract base class for defining training-specific logic."""
+    """Abstract base class for training-specific logic."""
 
     @abc.abstractmethod
     def compute_loss(self, ctx: ComputeLossContext[TPipelineOutput, TState]) -> ComputeLossResult:
@@ -278,7 +278,7 @@ class InferenceTask(
     abc.ABC,
     typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState],
 ):
-    """Abstract base class for defining inference-specific logic."""
+    """Abstract base class for inference-specific logic."""
 
     @abc.abstractmethod
     def process_outputs(self, ctx: ProcessOutputsContext[TPipelineOutput, TState]):

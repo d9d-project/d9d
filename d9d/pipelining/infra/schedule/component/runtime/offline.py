@@ -7,7 +7,7 @@ from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedul
 
 
 class OfflinePipelineExecutor(PipelineSchedule[Any, Any, Any]):
-    """Executes the model immediately without pipeline parallelism.
+    """Executor that runs the model immediately without pipeline parallelism.
 
     This schedule treats the model as a single stage. It runs the forward pass, and optionally the
     backward pass, for every microbatch in the pack. It serves single-device runs through the pipeline

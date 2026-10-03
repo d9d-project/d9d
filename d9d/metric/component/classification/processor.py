@@ -21,7 +21,7 @@ class ClassificationPredictionsProcessor(Protocol):
 
 
 class TopKProcessor(ClassificationPredictionsProcessor):
-    """Processes classification predictions to evaluate top-k accuracy."""
+    """Classification predictions processor for top-k accuracy."""
 
     def __init__(self, k: int) -> None:
         """Constructs the ``TopKProcessor`` object.
@@ -53,7 +53,7 @@ class TopKProcessor(ClassificationPredictionsProcessor):
 
 
 class OneHotProcessor(ClassificationPredictionsProcessor):
-    """Converts the argmax of predictions and the targets into one-hot tensors."""
+    """Predictions processor that converts the argmax of predictions and the targets into one-hot tensors."""
 
     def __init__(self, num_classes: int) -> None:
         """Constructs the ``OneHotProcessor`` object.
@@ -105,7 +105,7 @@ class OneHotProcessor(ClassificationPredictionsProcessor):
 
 
 class ThresholdProcessor(ClassificationPredictionsProcessor):
-    """Binarizes probability predictions with a threshold."""
+    """Predictions processor that binarizes probability predictions with a threshold."""
 
     def __init__(self, threshold: float) -> None:
         """Constructs the ``ThresholdProcessor`` object.

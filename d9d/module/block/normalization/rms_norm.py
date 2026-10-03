@@ -6,7 +6,7 @@ from d9d.module.base import ModuleLateInit
 
 
 class RMSNorm(nn.Module, ModuleLateInit):
-    """Implements Root Mean Square Layer Normalization (RMSNorm).
+    """Root Mean Square Layer Normalization (RMSNorm) layer.
 
     Normalizes the input over its last dimension by its root mean square and applies learnable scaling
     weights. The weights can optionally be zero-centered.

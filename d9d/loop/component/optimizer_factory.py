@@ -13,7 +13,7 @@ from .model_stage_factory import TrackedModules
 
 
 class OptimizerFactory:
-    """Creates the optimizer and the learning rate scheduler for the model stages of this rank."""
+    """Factory of the optimizer and the learning rate scheduler for the model stages of this rank."""
 
     def __init__(
         self,

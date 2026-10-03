@@ -39,7 +39,7 @@ def stage_backward_full(
 
 @dataclass
 class ParamGroup:
-    """Represents a group of parameters and their dependency intermediates in the autograd graph.
+    """Group of parameters and their dependency intermediates in the autograd graph.
 
     The split backward pass uses it to find the intermediate nodes through which gradients flow to
     a set of parameters.
@@ -210,7 +210,7 @@ def _make_clamp_hook(
 
 @dataclass
 class BackwardInputResult:
-    """Container for the results of the input backward phase.
+    """The results of the input backward phase.
 
     Attributes:
         input_grads: The gradients computed for the input tensors.

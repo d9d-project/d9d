@@ -6,7 +6,7 @@ import torch.nn.functional as F
 
 
 class PaddingSide1D(StrEnum):
-    """Enum specifying the side for padding 1D sequences.
+    """Side on which 1D sequences are padded.
 
     Attributes:
         left: Pad on the left side.

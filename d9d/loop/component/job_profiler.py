@@ -11,7 +11,7 @@ from .job_schedule import JobSchedule
 
 
 class JobProfiler:
-    """Manages profiling sessions during a job loop.
+    """Manager of profiling sessions during a job loop.
 
     The profiling window follows the current step of the job schedule.
     """

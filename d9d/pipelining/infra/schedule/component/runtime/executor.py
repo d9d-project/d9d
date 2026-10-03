@@ -66,7 +66,7 @@ class _BufferConfig:
 
 
 class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
-    """Executes a pipeline schedule by running its sequence of actions."""
+    """Executor that runs a pipeline schedule as its sequence of actions."""
 
     def __init__(
         self,
