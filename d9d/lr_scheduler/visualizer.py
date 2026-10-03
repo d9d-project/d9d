@@ -23,23 +23,23 @@ def _get_history(factory: SchedulerFactory, num_steps: int, init_lr: float) -> l
 
 
 def visualize_lr_scheduler(factory: SchedulerFactory, num_steps: int, init_lr: float = 1.0):
-    """Visualizes the learning rate schedule using Plotly.
+    """Plots a learning rate schedule as an interactive Plotly chart.
 
-    This function simulates the training process for `num_steps` to record the LR changes
-    and generates an interactive plot.
+    The function builds the scheduler for a dummy optimizer, steps it ``num_steps`` times and plots the
+    learning rate at each step.
 
     Args:
-        factory: A callable that accepts an Optimizer and returns an LRScheduler.
-        num_steps: The number of steps to simulate.
-        init_lr: The initial learning rate to set on the dummy optimizer.
+        factory: Callable that builds the scheduler for a given optimizer.
+        num_steps: Number of steps to simulate.
+        init_lr: Initial learning rate of the dummy optimizer.
 
     Raises:
-        ImportError: If the `plotly` library is not installed.
+        ImportError: If ``plotly`` is not installed.
     """
     try:
         import plotly.graph_objects as go  # noqa: PLC0415
     except ImportError as e:
-        raise ImportError("You have to install `plotly` dependency to use scheduler visualization") from e
+        raise ImportError("Scheduler visualization requires plotly. Install the d9d[visualization] extra.") from e
     lrs = _get_history(factory, num_steps, init_lr)
     steps = list(range(num_steps))
 

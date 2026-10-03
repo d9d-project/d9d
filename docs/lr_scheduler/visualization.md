@@ -2,13 +2,11 @@
 
 ## About
 
-It is often difficult to mentally visualize complex multiphase learning rate schedules.
+`visualize_lr_scheduler` plots a learning rate schedule as an interactive [Plotly](https://plotly.com/python/) chart. It helps you check a multiphase schedule before you train with it. It needs the `d9d[visualization]` extra.
 
-To address this, d9d allows you to visualize the resulting learning rate curve interactively using `plotly`.
+## Usage
 
-## Usage Example
-
-The `visualize_lr_scheduler` function takes a factory function that constructs your scheduler, simulates a training run, and plots the learning rate history.
+Pass a function that builds your scheduler for a given optimizer. `visualize_lr_scheduler` builds the scheduler for a dummy optimizer, steps it `num_steps` times and plots the learning rate at each step.
 
 ```python
 import torch
@@ -26,11 +24,11 @@ def create_scheduler(optimizer: torch.optim.Optimizer):
     )
 
 
-# Opens an interactive plot in browser/notebook
+# Opens an interactive plot in the browser or notebook.
 visualize_lr_scheduler(
     factory=create_scheduler,
-    num_steps=100,  # Duration to simulate
-    init_lr=1e-3  # Base LR to visualize
+    num_steps=100,  # Number of steps to simulate
+    init_lr=1e-3  # Base learning rate of the dummy optimizer
 )
 ```
 

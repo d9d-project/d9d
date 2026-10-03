@@ -23,7 +23,6 @@ def _copy_fp32_to_bf16_kernel(
     offsets = pid * BLOCK_SIZE + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
 
-    # load source value (fp32)
     val_fp32 = tl.load(source_ptr + offsets, mask=mask)
 
     val_bf16 = fp32_to_bf16_kernel(val_fp32=val_fp32, offsets=offsets, seed=seed)
@@ -34,46 +33,42 @@ def _copy_fp32_to_bf16_kernel(
 def copy_fp32_to_bf16_stochastic_(
     target: torch.Tensor, source: torch.Tensor, generator: torch.Generator | None = None
 ) -> torch.Tensor:
-    """Copies elements from a Float32 tensor to a BFloat16 tensor using stochastic rounding.
+    """Copies an fp32 tensor into a bf16 tensor in place with stochastic rounding.
 
-    Unlike standard round-to-nearest casting, stochastic rounding probabilistically rounds
-    numbers up or down based on the value of the bits being truncated. This preserves the
-    expected value of the tensor (E[round(x)] = x), which is crucial for accumulating
-    gradients or parameters in low precision without stagnation.
-
-    This operation is performed in-place on the target tensor.
+    Stochastic rounding rounds each value up or down at random. The probability of rounding up equals the
+    fraction that the cast drops, so the expected value is preserved: ``E[round(x)] = x``. Small updates
+    then accumulate in bf16 instead of being lost.
 
     Args:
-        target: The output tensor where results are written. Must be of type BFloat16
-            and contiguous.
-        source: The input tensor containing values to copy. Must be of type Float32.
-        generator: An optional PyTorch RNG generator to strictly control the random
-            noise used for rounding.
+        target: Output tensor. Must be bf16 and contiguous.
+        source: Input tensor. Must be fp32 and have the same shape as ``target``.
+        generator: Random number generator that seeds the rounding noise. If ``None``, the default PyTorch
+            generator is used.
 
     Returns:
-        The target tensor, modified in-place.
+        The ``target`` tensor.
 
     Raises:
-        ValueError: If target is not contiguous, if source/target shapes do not match,
-            or if dtypes are not FP32 and BF16 respectively.
+        ValueError: If ``target`` is not contiguous, if the shapes differ, or if ``source`` is not fp32 or
+            ``target`` is not bf16.
     """
     if not source.is_contiguous():
         source = source.contiguous()
 
     if not target.is_contiguous():
-        raise ValueError("Since this is an in-place operation, target should be a contiguous tensor!")
+        raise ValueError("target must be contiguous because the copy writes it in place.")
 
     if source.shape != target.shape:
-        raise ValueError(f"source shape {tuple(source.shape)} must match target shape {tuple(target.shape)}.")
+        raise ValueError(f"source shape ({tuple(source.shape)}) must match target shape ({tuple(target.shape)}).")
 
     if source.dtype != torch.float32:
-        raise ValueError("Source must be Float32")
+        raise ValueError(f"source dtype ({source.dtype}) must be torch.float32.")
     if target.dtype != torch.bfloat16:
-        raise ValueError("Target must be BFloat16")
+        raise ValueError(f"target dtype ({target.dtype}) must be torch.bfloat16.")
 
     n_elements = source.numel()
 
-    # Generate a random seed for this specific kernel launch
+    # A new seed for each launch, so repeated copies get different noise.
     seed = torch.randint(0, 2**31 - 1, (1,), device="cpu", generator=generator).item()
 
     def _grid(meta: dict[str, int]) -> tuple[int, ...]:

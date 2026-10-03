@@ -5,18 +5,18 @@ import triton.language as tl
 
 @triton.autotune(
     configs=[
-        # for large hidden states
+        # For large hidden states.
         triton.Config({"ROWS_PER_BLOCK": 1}, num_warps=16),
         triton.Config({"ROWS_PER_BLOCK": 1}, num_warps=32),
         triton.Config({"ROWS_PER_BLOCK": 2}, num_warps=8),
         triton.Config({"ROWS_PER_BLOCK": 2}, num_warps=16),
         triton.Config({"ROWS_PER_BLOCK": 2}, num_warps=32),
-        # for mid hidden states
+        # For mid hidden states.
         triton.Config({"ROWS_PER_BLOCK": 4}, num_warps=8),
         triton.Config({"ROWS_PER_BLOCK": 4}, num_warps=16),
         triton.Config({"ROWS_PER_BLOCK": 8}, num_warps=8),
         triton.Config({"ROWS_PER_BLOCK": 8}, num_warps=16),
-        # for small hidden states
+        # For small hidden states.
         triton.Config({"ROWS_PER_BLOCK": 16}, num_warps=16),
         triton.Config({"ROWS_PER_BLOCK": 32}, num_warps=16),
     ],
@@ -29,7 +29,7 @@ def _rms_norm_forward_kernel(
     out_ptr: tl.tensor,
     inv_rms_ptr: tl.tensor,
     M: int,
-    M_BUCKET: int,  # for auto-tuning
+    M_BUCKET: int,  # For autotuning
     N: int,
     eps: float,
     ZERO_CENTERED: tl.constexpr,
@@ -43,7 +43,7 @@ def _rms_norm_forward_kernel(
     r = row_start + rows
     r_mask = r < M
 
-    # we are sure that BLOCK_SIZE_N >= N
+    # The caller sets BLOCK_SIZE_N >= N, so one block covers a whole row.
     cols = tl.arange(0, BLOCK_SIZE_N)
     col_mask = cols < N
 
@@ -54,7 +54,7 @@ def _rms_norm_forward_kernel(
     mask_2d = r_mask[:, None] & col_mask[None, :]
     offsets = r[:, None] * N + cols[None, :]
 
-    # we always compute in fp32
+    # Compute in fp32 whatever the input dtype.
     x = tl.load(x_ptr + offsets, mask=mask_2d, other=0.0).to(tl.float32)
 
     var = tl.sum(x * x, axis=1) / N
@@ -79,19 +79,18 @@ def _bucketize_m(m: int) -> int:
 def rms_norm_forward(
     x: torch.Tensor, weight: torch.Tensor, eps: float, zero_centered: bool
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Computes the forward pass of Root Mean Square (RMS) normalization.
+    """Computes the forward pass of RMS (root mean square) normalization over the last dimension.
 
     Args:
-        x: Input tensor to be normalized.
-        weight: Learnable 1D scaling parameters.
-        eps: Small scalar added to the variance for numerical stability.
-        zero_centered: If True, centers the learned weight parameter around zero
-            by artificially offsetting weights by 1.0 during computation.
+        x: Input tensor. Shape: ``(..., hidden_size)``.
+        weight: Scale for each element of the last dimension. Shape: ``(hidden_size,)``.
+        eps: Value added to the mean square for numerical stability.
+        zero_centered: If ``True``, the kernel scales by ``weight + 1.0``.
 
     Returns:
-        A tuple containing:
-            - The final normalized output tensor.
-            - The computed inverse RMS tensor (saved for the backward pass).
+        A tuple of the normalized tensor, with the shape of ``x``, and the fp32 inverse RMS of each row,
+        which the backward pass needs. The inverse RMS has shape ``(num_rows,)``, where ``num_rows`` is the
+        product of all dimensions of ``x`` except the last.
     """
     if not x.is_contiguous():
         x = x.contiguous()
@@ -131,18 +130,18 @@ def rms_norm_forward(
 
 @triton.autotune(
     configs=[
-        # for large hidden states
+        # For large hidden states.
         triton.Config({"ROWS_PER_BLOCK": 1}, num_warps=16),
         triton.Config({"ROWS_PER_BLOCK": 1}, num_warps=32),
         triton.Config({"ROWS_PER_BLOCK": 2}, num_warps=8),
         triton.Config({"ROWS_PER_BLOCK": 2}, num_warps=16),
         triton.Config({"ROWS_PER_BLOCK": 2}, num_warps=32),
-        # for mid hidden states
+        # For mid hidden states.
         triton.Config({"ROWS_PER_BLOCK": 4}, num_warps=8),
         triton.Config({"ROWS_PER_BLOCK": 4}, num_warps=16),
         triton.Config({"ROWS_PER_BLOCK": 8}, num_warps=8),
         triton.Config({"ROWS_PER_BLOCK": 8}, num_warps=16),
-        # for small hidden states
+        # For small hidden states.
         triton.Config({"ROWS_PER_BLOCK": 16}, num_warps=16),
         triton.Config({"ROWS_PER_BLOCK": 32}, num_warps=16),
     ],
@@ -164,8 +163,8 @@ def _rms_norm_backward_kernel(
     BLOCK_SIZE_N: tl.constexpr,
     ROWS_PER_BLOCK: tl.constexpr,
 ):
-    # we use persistent implementation since now we can maintain acc_dweight that is local
-    # and avoid constantly writing to dweight in HBM
+    # Persistent kernel: each program accumulates its weight gradient locally
+    # and writes it to HBM once at the end.
     pid = tl.program_id(axis=0)
     num_jobs = tl.num_programs(axis=0)
 
@@ -209,19 +208,17 @@ def _rms_norm_backward_kernel(
 def rms_norm_backward(
     grad_output: torch.Tensor, x: torch.Tensor, weight: torch.Tensor, inv_rms: torch.Tensor, zero_centered: bool
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Computes the backward pass of Root Mean Square (RMS) normalization.
+    """Computes the backward pass of RMS (root mean square) normalization.
 
     Args:
-        grad_output: Gradient of the objective with respect to the output tensor.
-        x: The original input tensor.
-        weight: The learned scaling parameters for normalization.
-        inv_rms: The inverse RMS values produced during the forward pass.
-        zero_centered: Whether the weights were configured as zero-centered during the forward pass.
+        grad_output: Gradient of the loss with respect to the output. Shape: ``(..., hidden_size)``.
+        x: Input of the forward pass. Shape: ``(..., hidden_size)``.
+        weight: Scale used in the forward pass. Shape: ``(hidden_size,)``.
+        inv_rms: Inverse RMS returned by ``rms_norm_forward``. Shape: ``(num_rows,)``.
+        zero_centered: The ``zero_centered`` value used in the forward pass.
 
     Returns:
-        A tuple containing:
-            - The gradient with respect to the input tensor.
-            - The gradient with respect to the weight tensor.
+        A tuple of the gradients with respect to ``x`` and ``weight``.
     """
     if not grad_output.is_contiguous():
         grad_output = grad_output.contiguous()
@@ -235,11 +232,11 @@ def rms_norm_backward(
 
     grad_x = torch.empty_like(x)
 
-    # must allocate fp32 and set to exactly zero for correctness on atomic adds
+    # fp32 and zero-initialized because the kernel accumulates into it with atomic adds.
     grad_weight_fp32 = torch.zeros_like(weight, dtype=torch.float32)
 
     sm_count = torch.cuda.get_device_properties(x.device).multi_processor_count
-    max_workers = sm_count * 2  # oversubscribe to SMs
+    max_workers = sm_count * 2  # Oversubscribe to SMs
 
     block_size_n = max(triton.next_power_of_2(n_size), 16)
     m_bucket = _bucketize_m(m_size)

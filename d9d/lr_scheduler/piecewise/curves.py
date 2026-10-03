@@ -7,12 +7,12 @@ class CurveBase(abc.ABC):
 
     @abc.abstractmethod
     def compute(self, start: float, end: float, step_p: float) -> float:
-        """Calculates the interpolated value.
+        """Computes the interpolated value.
 
         Args:
-            start: The value at the beginning of the phase.
-            end: The value at the end of the phase.
-            step_p: Progress fraction through the phase (0.0 to 1.0).
+            start: Value at the start of the phase.
+            end: Value at the end of the phase.
+            step_p: Progress through the phase, from 0.0 to 1.0.
 
         Returns:
             The interpolated value.
@@ -35,13 +35,13 @@ class CurveCosine(CurveBase):
 
 
 class CurvePoly(CurveBase):
-    """Interpolates using a polynomial function."""
+    """Interpolates along ``step_p ** power``."""
 
     def __init__(self, power: float):
-        """Constructs a polynomial curve.
+        """Constructs the ``CurvePoly`` object.
 
         Args:
-            power: The exponent of the polynomial. 1.0 is linear, 2.0 is quadratic, etc.
+            power: Exponent of the polynomial. 1.0 is linear, 2.0 is quadratic.
         """
         self._power = power
 
@@ -51,7 +51,10 @@ class CurvePoly(CurveBase):
 
 
 class CurveExponential(CurveBase):
-    """Interpolates exponentially between start and end values (log-space linear)."""
+    """Interpolates exponentially between start and end values (linearly in log space).
+
+    Start and end values below ``1e-8`` are treated as ``1e-8``.
+    """
 
     def compute(self, start: float, end: float, step_p: float) -> float:
         eps = 1e-8

@@ -38,16 +38,12 @@ def _tensor_to_local(tensor: torch.Tensor) -> torch.Tensor:
 
 
 class StochasticAdamW(Optimizer):
-    """Implements the AdamW algorithm with Stochastic Rounding.
+    """AdamW optimizer for bf16 parameters with stochastic rounding.
 
-    This optimizer is designed to handle stochastic rounding primarily for BF16 training,
-    leveraging a custom kernel.
+    Parameters must be bf16. Gradients can be bf16 or fp32. Parameters can be ``DTensor``s.
 
-    Parameters must be in BF16. Gradients could be both in BF16 and FP32.
-
-    It natively supports PyTorch distributed ``DTensor`` parameters.
-
-    It maintains its own random number generator state to ensure reproducibility.
+    The optimizer owns its random number generator and saves the generator state in ``state_dict``. A
+    resumed run therefore gets the same rounding noise.
     """
 
     def __init__(
@@ -60,20 +56,20 @@ class StochasticAdamW(Optimizer):
         generator: torch.Generator | None = None,
         state_dtype: torch.dtype = torch.float32,
     ):
-        """Constructs a new StochasticAdamW optimizer.
+        """Constructs the ``StochasticAdamW`` object.
 
         Args:
-            params: Iterable of parameters to optimize or dicts defining parameter groups.
+            params: Parameters to optimize, or dicts that define parameter groups.
             lr: Learning rate.
-            betas: Coefficients used for computing running averages of gradient and its square.
-            eps: Term added to the denominator to improve numerical stability.
-            weight_decay: Weight decay coefficient.
-            generator: Pseudorandom number generator for stochastic rounding. If None,
-                a new generator is created and seeded from the main PyTorch generator.
-            state_dtype: Data Type to use for the optimizer states.
+            betas: Decay rates of the first and second moments.
+            eps: Term added to the denominator for numerical stability.
+            weight_decay: Decoupled weight decay coefficient.
+            generator: Random number generator for stochastic rounding. If ``None``, a new CPU generator is
+                seeded from the default PyTorch generator.
+            state_dtype: Dtype of the optimizer states. Can be ``torch.float32`` or ``torch.bfloat16``.
 
         Raises:
-            ValueError: If any of the provided hyperparameters are invalid.
+            ValueError: If ``lr``, ``eps``, ``betas`` or ``weight_decay`` is out of range.
         """
         if lr <= 0:
             raise ValueError(f"lr ({lr}) must be positive.")
@@ -88,7 +84,7 @@ class StochasticAdamW(Optimizer):
 
         if generator is None:
             generator = torch.Generator(device="cpu")
-            # make the generator fork from pytorch's main generator
+            # Seed from the default generator, so torch.manual_seed also fixes the rounding noise.
             seed = cast(int, torch.randint(0, 2**32, (1,)).item())
             generator.manual_seed(seed)
 
@@ -104,11 +100,13 @@ class StochasticAdamW(Optimizer):
         super().__init__(params, defaults)
 
     def state_dict(self) -> StateDict:
+        """Returns the optimizer state, including the generator state."""
         state_dict = super().state_dict()
         state_dict[_GENERATOR_STATE_KEY] = self._generator.get_state()
         return state_dict
 
     def load_state_dict(self, state_dict: StateDict) -> None:
+        """Loads the optimizer state, including the generator state if it is present."""
         if _GENERATOR_STATE_KEY in state_dict:
             self._generator.set_state(state_dict.pop(_GENERATOR_STATE_KEY))
         super().load_state_dict(state_dict)
@@ -135,7 +133,7 @@ class StochasticAdamW(Optimizer):
 
                 state = self.state[p]
 
-                # State Initialization
+                # Initialize the state lazily on the first step of each parameter.
                 if len(state) == 0:
                     state["step"] = 0
                     state["exp_avg"] = _new_buffer(p, dtype_override=state_dtype)

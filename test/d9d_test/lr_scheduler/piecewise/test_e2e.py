@@ -55,7 +55,7 @@ def test_builder_percentage_backward_step():
     builder = piecewise_schedule(0.0, total_steps=100)
     builder.for_steps(50, 1.0, CurveLinear())  # now at step 50
 
-    with pytest.raises(ValueError, match="before the end of the previous phase"):
+    with pytest.raises(ValueError, match="before the previous phase end"):
         builder.until_percentage(0.4, 0.5, CurveLinear())  # 0.4 * 100 = 40 < 50
 
 
@@ -64,5 +64,5 @@ def test_builder_exceed_total_steps(optimizer):
     builder = piecewise_schedule(0.0, total_steps=10)
     builder.for_steps(15, 1.0, CurveLinear())
 
-    with pytest.raises(ValueError, match=r"end at step 15, after total_steps \(10\)"):
+    with pytest.raises(ValueError, match=r"end step \(15\) exceeds total_steps \(10\)"):
         builder.build(optimizer)

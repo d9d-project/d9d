@@ -13,11 +13,11 @@ class PiecewiseScheduleBuilder:
     """Builder for constructing multiphase learning rate schedules."""
 
     def __init__(self, initial_multiplier: float, total_steps: int | None):
-        """Constructs a new PiecewiseScheduleBuilder.
+        """Constructs the ``PiecewiseScheduleBuilder`` object.
 
         Args:
-            initial_multiplier: The starting learning rate multiplier (usually 0.0 or 1.0).
-            total_steps: The total number of training steps. Required if using percentage-based methods.
+            initial_multiplier: Learning rate multiplier at step 0, usually 0.0 or 1.0.
+            total_steps: Total number of training steps. Required by ``until_percentage`` and ``fill_rest``.
         """
         self._phases: list[SchedulePhase] = []
         self._total_steps = total_steps
@@ -25,12 +25,12 @@ class PiecewiseScheduleBuilder:
         self._last_multiplier = initial_multiplier
 
     def for_steps(self, steps: int, target_multiplier: float, curve: CurveBase) -> Self:
-        """Adds a schedule phase lasting for a specific number of steps.
+        """Adds a phase that lasts a given number of steps.
 
         Args:
             steps: Duration of this phase in steps.
-            target_multiplier: The value of the multiplier at the end of this phase.
-            curve: The interpolation curve to use for bridging the start and end values.
+            target_multiplier: Multiplier at the end of this phase.
+            curve: Curve that interpolates from the start value to ``target_multiplier``.
 
         Returns:
             The builder instance for chaining.
@@ -51,64 +51,67 @@ class PiecewiseScheduleBuilder:
         return self
 
     def until_percentage(self, p: float, target_multiplier: float, curve: CurveBase) -> Self:
-        """Adds a schedule phase lasting until a specific percentage of total training steps is reached.
+        """Adds a phase that lasts until a given fraction of ``total_steps``.
 
         Args:
-            p: The target percentage (0.0 to 1.0) of total_steps where this phase ends.
-            target_multiplier: The value of the multiplier at the end of this phase.
-            curve: The interpolation curve to use.
+            p: Fraction of ``total_steps``, from 0.0 to 1.0, at which this phase ends.
+            target_multiplier: Multiplier at the end of this phase.
+            curve: Curve that interpolates from the start value to ``target_multiplier``.
 
         Returns:
             The builder instance for chaining.
 
         Raises:
-            ValueError: If total_steps was not provided in constructor or if the target
-                percentage implies a step count earlier than the current cursor.
+            ValueError: If ``total_steps`` was not set, if ``p`` is outside ``[0.0, 1.0]``, or if ``p`` maps to
+                a step before the end of the previous phase.
         """
         if self._total_steps is None:
             raise ValueError("Percentage-based phases require total_steps. Pass total_steps to piecewise_schedule().")
 
         if not 0.0 <= p <= 1.0:
-            raise ValueError("Percentage should be in range of [0.0, 1.0]")
+            raise ValueError(f"p ({p}) must be in the range [0.0, 1.0].")
 
         target_step_abs = int(self._total_steps * p)
         duration = target_step_abs - self._last_end_step
 
         if duration < 0:
             raise ValueError(
-                f"p ({p}) maps to step {target_step_abs}, which is before the end of the previous phase "
-                f"(step {self._last_end_step})."
+                f"p ({p}) maps to step ({target_step_abs}), which is before the previous phase end "
+                f"({self._last_end_step})."
             )
 
         return self.for_steps(duration, target_multiplier, curve)
 
     def fill_rest(self, target_multiplier: float, curve: CurveBase) -> Self:
-        """Adds a schedule phase that lasts from the current cursor until the end of training.
+        """Adds a phase that lasts until the end of training.
 
         Args:
-            target_multiplier: The value of the multiplier at the very end of training.
-            curve: The interpolation curve to use.
+            target_multiplier: Multiplier at the end of training.
+            curve: Curve that interpolates from the start value to ``target_multiplier``.
 
         Returns:
             The builder instance for chaining.
+
+        Raises:
+            ValueError: If ``total_steps`` was not set, or if the previous phases end after ``total_steps``.
         """
         return self.until_percentage(1.0, target_multiplier, curve)
 
     def build(self, optimizer: Optimizer) -> LRSchedulerProtocol:
-        """Finalizes the schedule and returns a PyTorch LR Scheduler.
+        """Builds a PyTorch learning rate scheduler from the added phases.
 
         Args:
-            optimizer: The optimizer to wrap.
+            optimizer: Optimizer whose learning rate the scheduler controls.
 
         Returns:
-            A scheduler configured with the defined phases.
+            A scheduler that multiplies the base learning rate by the scheduled multiplier.
 
         Raises:
-            ValueError: If the defined phases exceed the total_steps provided.
+            ValueError: If no phases were added, or if the phases end after ``total_steps``.
         """
         if self._total_steps is not None and self._last_end_step > self._total_steps:
             raise ValueError(
-                f"The phases end at step {self._last_end_step}, after total_steps ({self._total_steps}). "
+                f"The phase end step ({self._last_end_step}) exceeds total_steps ({self._total_steps}). "
                 "Shorten the phases or increase total_steps."
             )
 
@@ -117,13 +120,13 @@ class PiecewiseScheduleBuilder:
 
 
 def piecewise_schedule(initial_multiplier: float, total_steps: int | None = None) -> PiecewiseScheduleBuilder:
-    """Entry point for creating a piecewise learning rate schedule.
+    """Starts building a piecewise learning rate schedule.
 
     Args:
-        initial_multiplier: The initial learning rate multiplier.
-        total_steps: Total training steps. Required for percentage-based scheduling.
+        initial_multiplier: Learning rate multiplier at step 0.
+        total_steps: Total number of training steps. Required for percentage-based phases.
 
     Returns:
-        A builder instance to configure phases.
+        A builder to add phases to.
     """
     return PiecewiseScheduleBuilder(initial_multiplier=initial_multiplier, total_steps=total_steps)

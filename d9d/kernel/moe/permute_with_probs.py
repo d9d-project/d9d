@@ -1027,10 +1027,5 @@ def moe_unpermute_mask(
         By default, set to an empty tensor, which means that the tokens are directly merged by accumulation.
     restore_shape: torch.Size, default = None
         The output shape after the unpermute operation.
-    map_type: str, default = 'mask'
-        Type of the routing map tensor. Should be the same as the value passed to moe_permute.
-        Options are: 'mask', 'index'.
-    probs: torch.Tensor, default = None
-        Renamed to merging_probs. Keep for backward compatibility.
     """
     return _moe_unpermute_mask_map.apply(inp, row_id_map, merging_probs, restore_shape)

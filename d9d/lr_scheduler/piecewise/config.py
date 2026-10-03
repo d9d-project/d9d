@@ -10,19 +10,31 @@ from .curves import CurveBase, CurveCosine, CurveExponential, CurveLinear, Curve
 
 
 class CurveLinearConfig(BaseModel):
-    """Configuration for linear interpolation."""
+    """Configuration for linear interpolation.
+
+    Attributes:
+        type: Discriminator, always ``"linear"``.
+    """
 
     type: Literal["linear"] = "linear"
 
 
 class CurveCosineConfig(BaseModel):
-    """Configuration for cosine interpolation."""
+    """Configuration for cosine interpolation.
+
+    Attributes:
+        type: Discriminator, always ``"cosine"``.
+    """
 
     type: Literal["cosine"] = "cosine"
 
 
 class CurveExponentialConfig(BaseModel):
-    """Configuration for exponential interpolation."""
+    """Configuration for exponential interpolation.
+
+    Attributes:
+        type: Discriminator, always ``"exponential"``.
+    """
 
     type: Literal["exponential"] = "exponential"
 
@@ -31,7 +43,8 @@ class CurvePolyConfig(BaseModel):
     """Configuration for polynomial interpolation.
 
     Attributes:
-        power: The exponent of the polynomial function.
+        type: Discriminator, always ``"poly"``.
+        power: Exponent of the polynomial.
     """
 
     type: Literal["poly"] = "poly"
@@ -44,13 +57,13 @@ AnyCurveConfig = Annotated[
 
 
 def curve_from_config(config: AnyCurveConfig) -> CurveBase:
-    """Instantiates a concrete curve object from its configuration.
+    """Builds a curve from its configuration.
 
     Args:
-        config: The configuration object.
+        config: Curve configuration.
 
     Returns:
-        The instantiated curve.
+        The curve.
     """
     match config:
         case CurveLinearConfig():
@@ -67,10 +80,10 @@ class StepPhaseConfig(BaseModel):
     """Configuration for a phase defined by a fixed number of steps.
 
     Attributes:
-        mode: Discriminator field, must be "steps".
-        steps: The absolute duration of this phase in steps.
-        target_multiplier: The multiplier value at the end of this phase.
-        curve: The interpolation curve configuration.
+        mode: Discriminator, always ``"steps"``.
+        steps: Duration of this phase in steps.
+        target_multiplier: Multiplier at the end of this phase.
+        curve: Interpolation curve configuration.
     """
 
     mode: Literal["steps"] = "steps"
@@ -81,13 +94,13 @@ class StepPhaseConfig(BaseModel):
 
 
 class PercentagePhaseConfig(BaseModel):
-    """Configuration for a phase that lasts until a specific percentage of training is complete.
+    """Configuration for a phase that lasts until a given fraction of the total steps.
 
     Attributes:
-        mode: Discriminator field, must be "percentage".
-        percentage: The target progress (0.0 to 1.0) where this phase ends.
-        target_multiplier: The multiplier value at the end of this phase.
-        curve: The interpolation curve configuration.
+        mode: Discriminator, always ``"percentage"``.
+        percentage: Fraction of the total steps, from 0.0 to 1.0, at which this phase ends.
+        target_multiplier: Multiplier at the end of this phase.
+        curve: Interpolation curve configuration.
     """
 
     mode: Literal["percentage"] = "percentage"
@@ -98,12 +111,12 @@ class PercentagePhaseConfig(BaseModel):
 
 
 class RestPhaseConfig(BaseModel):
-    """Configuration for a phase that fills the remainder of the training duration.
+    """Configuration for a phase that lasts until the end of training.
 
     Attributes:
-        mode: Discriminator field, must be "rest".
-        target_multiplier: The multiplier value at the very end of training.
-        curve: The interpolation curve configuration.
+        mode: Discriminator, always ``"rest"``.
+        target_multiplier: Multiplier at the end of training.
+        curve: Interpolation curve configuration.
     """
 
     mode: Literal["rest"] = "rest"
@@ -119,8 +132,8 @@ class PiecewiseSchedulerConfig(BaseModel):
     """Declarative configuration for a piecewise learning rate scheduler.
 
     Attributes:
-        initial_multiplier: The starting learning rate multiplier.
-        phases: A sequential list of phase configurations.
+        initial_multiplier: Learning rate multiplier at step 0.
+        phases: Phase configurations, in order.
     """
 
     initial_multiplier: float
@@ -130,15 +143,19 @@ class PiecewiseSchedulerConfig(BaseModel):
 def piecewise_scheduler_from_config(
     config: PiecewiseSchedulerConfig, optimizer: Optimizer, total_steps: int | None
 ) -> LRSchedulerProtocol:
-    """Constructs a PyTorch scheduler from the provided configuration.
+    """Builds a PyTorch learning rate scheduler from a configuration.
 
     Args:
-        config: The scheduler configuration.
-        optimizer: The optimizer to wrap.
-        total_steps: The total number of training steps. Required if using percentage-based phases.
+        config: Scheduler configuration.
+        optimizer: Optimizer whose learning rate the scheduler controls.
+        total_steps: Total number of training steps. Required if ``config`` has ``"percentage"`` or
+            ``"rest"`` phases.
 
     Returns:
-        A configured learning rate scheduler.
+        The learning rate scheduler.
+
+    Raises:
+        ValueError: If the phases do not fit ``total_steps``, as described in ``PiecewiseScheduleBuilder``.
     """
     builder = piecewise_schedule(config.initial_multiplier, total_steps)
 

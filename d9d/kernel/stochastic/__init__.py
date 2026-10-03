@@ -1,4 +1,4 @@
-"""Utilities for stochastic type casting (e.g., FP32 to BF16)."""
+"""Triton kernels that round fp32 values to bf16 stochastically."""
 
 from .adamw_step import adamw_stochastic_bf16_
 from .copy import copy_fp32_to_bf16_stochastic_

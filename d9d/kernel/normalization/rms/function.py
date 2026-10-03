@@ -7,7 +7,7 @@ from .op import rms_norm_backward, rms_norm_forward
 
 
 class RMSNormFunction(Function):
-    """Custom PyTorch autograd function for Root Mean Square (RMS) normalization."""
+    """Autograd function for RMS (root mean square) normalization."""
 
     @staticmethod
     def forward(ctx: Any, x: torch.Tensor, weight: torch.Tensor, eps: float, zero_centered: bool) -> torch.Tensor:
@@ -29,16 +29,16 @@ class RMSNormFunction(Function):
 
 
 def rms_norm(x: torch.Tensor, weight: torch.Tensor, eps: float = 1e-6, zero_centered: bool = False) -> torch.Tensor:
-    """Applies Root Mean Square (RMS) normalization to the input tensor.
+    """Applies RMS (root mean square) normalization over the last dimension.
 
     Args:
-        x: Input tensor to normalize.
-        weight: Learnable scaling parameters.
-        eps: A small value added to the variance for numerical stability.
-        zero_centered: If True, the learned weights are computationally centered around zero
-            by artificially offsetting them by 1.0.
+        x: Input tensor. Shape: ``(..., hidden_size)``.
+        weight: Scale for each element of the last dimension. Shape: ``(hidden_size,)``.
+        eps: Value added to the mean square for numerical stability.
+        zero_centered: If ``True``, the kernel scales by ``weight + 1.0``, so a zero ``weight`` keeps the
+            normalized input unchanged.
 
     Returns:
-        The normalized output tensor.
+        The normalized tensor. Shape: ``(..., hidden_size)``.
     """
     return RMSNormFunction.apply(x, weight, eps, zero_centered)

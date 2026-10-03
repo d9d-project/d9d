@@ -4,8 +4,7 @@ import triton.language as tl
 
 
 def _size_bucket(n_elements: int) -> int:
-    # different auto-tuning for small and asymptotically large kernels
-    # perhaps we could extend this in future?
+    # Autotune small and large inputs separately.
     if n_elements < 8192:
         return 0
     else:
@@ -28,44 +27,43 @@ def _silu_mul_kernel(
     y_ptr: torch.Tensor,
     out_ptr: torch.Tensor,
     n_elements: int,
-    size_bucket: int,  # used for autotuning
+    size_bucket: int,  # Used for autotuning
     BLOCK_SIZE: tl.constexpr,
 ):
-    # prepare
     pid = tl.program_id(axis=0)
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
 
-    # read
     x = tl.load(x_ptr + offsets, mask=mask)
-    x_fp32 = x.to(tl.float32)  # sigmoid wants fp32
+    x_fp32 = x.to(tl.float32)  # tl.sigmoid needs fp32 input
     y = tl.load(y_ptr + offsets, mask=mask)
 
-    # compute
-    # cast back to match with torch
+    # Cast silu(x) to the input dtype before the multiply to match PyTorch eager results.
     silu_x = (x_fp32 * tl.sigmoid(x_fp32)).cast(y.dtype)
     out = silu_x * y
 
-    # write
     tl.store(out_ptr + offsets, out, mask=mask)
 
 
 def silu_mul_forward(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
-    """Computes the forward pass of silu(x)*y using Triton.
+    """Computes the forward pass of ``silu(x) * y``.
 
     Args:
-        x: Input tensor x.
-        y: Input tensor y.
+        x: Input passed through SiLU.
+        y: Input multiplied by ``silu(x)``.
 
     Returns:
-        The output tensor.
+        The result, with the same shape as the inputs.
 
     Raises:
-        ValueError: If inputs x and y do not match in shape or device.
+        ValueError: If ``x`` and ``y`` differ in shape or device.
     """
     if x.shape != y.shape or x.device != y.device:
-        raise ValueError("Inputs x and y must have the same shape, be on same device.")
+        raise ValueError(
+            f"x shape ({tuple(x.shape)}) and device ({x.device}) must match "
+            f"y shape ({tuple(y.shape)}) and device ({y.device})."
+        )
 
     if not x.is_contiguous():
         x = x.contiguous()
@@ -101,49 +99,45 @@ def _silu_mul_backward_kernel(
     grad_x_ptr: torch.Tensor,
     grad_y_ptr: torch.Tensor,
     n_elements: int,
-    size_bucket: int,  # used for autotuning
+    size_bucket: int,  # Used for autotuning
     BLOCK_SIZE: tl.constexpr,
 ):
-    # prepare
     pid = tl.program_id(0)
     block_start = pid * BLOCK_SIZE
     offsets = block_start + tl.arange(0, BLOCK_SIZE)
     mask = offsets < n_elements
 
-    # read
     dout = tl.load(grad_out_ptr + offsets, mask=mask)
-    x = tl.load(x_ptr + offsets, mask=mask).to(tl.float32)  # sigmoid wants fp32
+    x = tl.load(x_ptr + offsets, mask=mask).to(tl.float32)  # tl.sigmoid needs fp32 input
     y = tl.load(y_ptr + offsets, mask=mask)
 
-    # Recompute Silu components
+    # Recompute silu(x) instead of saving it in the forward pass.
     sig_x = tl.sigmoid(x)
     silu_x = x * sig_x
 
-    # Compute grad_y
-    # dy = dout * silu(x)
-    dx_silu_x = dout * silu_x  # Reuse this variable name logic
+    # grad_y = dout * silu(x)
+    dx_silu_x = dout * silu_x
     tl.store(grad_y_ptr + offsets, dx_silu_x, mask=mask)
 
-    # Compute grad_x
     # silu'(x) = sigmoid(x) + x * sigmoid(x) * (1 - sigmoid(x))
     #          = sigmoid(x) + silu(x) * (1 - sigmoid(x))
     d_silu = sig_x + silu_x * (1.0 - sig_x)
 
-    # dx = dout * y * silu'(x)
+    # grad_x = dout * y * silu'(x)
     dx = dout * y * d_silu
     tl.store(grad_x_ptr + offsets, dx, mask=mask)
 
 
 def silu_mul_backward(grad_output: torch.Tensor, x: torch.Tensor, y: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-    """Computes the backward pass of silu(x)*y using Triton.
+    """Computes the backward pass of ``silu(x) * y``.
 
     Args:
         grad_output: Gradient of the loss with respect to the output.
-        x: Original input tensor x.
-        y: Original input tensor y.
+        x: Input ``x`` of the forward pass.
+        y: Input ``y`` of the forward pass.
 
     Returns:
-        A tuple of (grad_x, grad_y).
+        A tuple of the gradients with respect to ``x`` and ``y``.
     """
     if not grad_output.is_contiguous():
         grad_output = grad_output.contiguous()
