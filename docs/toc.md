@@ -51,6 +51,7 @@ Parameter-Efficient Fine-Tuning framework.
 *   **Methods**: [LoRA](./peft/lora.md), [Full Fine-Tuning](./peft/full_tune.md), and [Method Stacking](./peft/stack.md).
 
 ## 📈 Optimization and Metrics
+Metrics, experiment tracking, learning rate schedules and optimizers.
 
 *   **[Metrics Overview](./metric/overview.md)**: Distributed-aware statistic accumulation.
 *   **[Metric Catalogue](./metric/metric_catalogue/index.md)**: Ready-to-use metric implementations.
