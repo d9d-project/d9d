@@ -26,8 +26,8 @@ class GlobalGradContext:
 
     This class works around the limitation:
 
-    1. Training code sets which gradient edges (inputs or weights) to compute now.
-    2. Module code checks whether it must compute a gradient edge, and skips the work otherwise.
+    1.  Training code sets which gradient edges (inputs or weights) to compute now.
+    2.  Module code checks whether it must compute a gradient edge, and skips the work otherwise.
     """
 
     def __init__(self):

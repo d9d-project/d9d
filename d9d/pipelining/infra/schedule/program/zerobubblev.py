@@ -19,7 +19,7 @@ class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
     input-gradient and weight-gradient parts to fill pipeline bubbles.
 
     References:
-        https://arxiv.org/abs/2401.10241, Section 6
+        [Zero Bubble Pipeline Parallelism](https://arxiv.org/abs/2401.10241), Section 6
     """
 
     def __init__(self):

@@ -23,8 +23,8 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
     bubbles.
 
     References:
-        https://github.com/deepseek-ai/DualPipe
-        https://hackmd.io/@ufotalent/r1lVXsa9Jg
+        *   [DualPipe](https://github.com/deepseek-ai/DualPipe)
+        *   [DualPipeV write-up](https://hackmd.io/@ufotalent/r1lVXsa9Jg)
     """
 
     def __init__(self):

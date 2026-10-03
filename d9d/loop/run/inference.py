@@ -196,12 +196,12 @@ class Inference:
 
         This method:
 
-        1. Waits for all ranks.
-        2. Loads the latest checkpoint if available.
-        3. Iterates through the data stream.
-        4. Runs the pipeline forward pass for every pack.
-        5. Runs periodic garbage collection and profiling.
-        6. Finalizes the task on completion.
+        1.  Waits for all ranks.
+        2.  Loads the latest checkpoint if available.
+        3.  Iterates through the data stream.
+        4.  Runs the pipeline forward pass for every pack.
+        5.  Runs periodic garbage collection and profiling.
+        6.  Finalizes the task on completion.
 
         Raises:
             RuntimeError: If the data stream ends before ``total_steps``.

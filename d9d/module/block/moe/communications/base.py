@@ -23,9 +23,9 @@ class ExpertCommunicationHandler(abc.ABC):
         Returns:
             A tuple of:
 
-            - Sorted hidden states received by this rank. Shape: ``(num_received_tokens, hidden_size)``.
-            - Routing weights in the same order. Shape: ``(num_received_tokens,)``.
-            - CPU tensor with the number of tokens each local expert received. Shape: ``(num_local_experts,)``.
+            *   Sorted hidden states received by this rank. Shape: ``(num_received_tokens, hidden_size)``.
+            *   Routing weights in the same order. Shape: ``(num_received_tokens,)``.
+            *   CPU tensor with the number of tokens each local expert received. Shape: ``(num_local_experts,)``.
         """
         ...
 

@@ -49,8 +49,8 @@ class BinaryAUROCMetric(Metric[torch.Tensor]):
     is 0.5.
 
     References:
-        Albakour et al., "Fast and memory efficient AUC-ROC approximation for Stream Learning", 2021.
-            https://www.researchgate.net/publication/353020448_Fast_and_memory_efficient_AUC-ROC_approximation_for_Stream_Learning
+        Albakour et al., [Fast and memory efficient AUC-ROC approximation for Stream Learning](https://www.researchgate.net/publication/353020448_Fast_and_memory_efficient_AUC-ROC_approximation_for_Stream_Learning),
+        2021.
     """
 
     def __init__(self, num_bins: int = 10000):

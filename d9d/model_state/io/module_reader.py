@@ -49,9 +49,9 @@ def load_model_state(
     """Streams a checkpoint from disk into a PyTorch module.
 
     1.  **Mapping**: ``mapper`` renames, stacks or reshapes on-disk states into model states.
-    2.  **Distribution**: if a model state is a ``DTensor``, the loaded tensor is distributed to match its
+    2.  **Distribution**: If a model state is a ``DTensor``, the loaded tensor is distributed to match its
         device mesh and placements.
-    3.  **Injection**: each transformed state is loaded into ``model`` with ``load_state_dict`` as soon as it is
+    3.  **Injection**: Each transformed state is loaded into ``model`` with ``load_state_dict`` as soon as it is
         ready.
 
     Only states listed in the outputs of ``mapper`` are loaded. To load every model state unchanged, build the

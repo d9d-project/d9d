@@ -188,10 +188,10 @@ class ModelStageFactory:
 
     It drives the ``ModelProvider`` to:
 
-    1. Initialize models on the meta device.
-    2. Apply horizontal parallelism (TP, DP, FSDP, etc.).
-    3. Materialize weights on the target device.
-    4. Load the initial model state from a checkpoint.
+    1.  Initialize models on the meta device.
+    2.  Apply horizontal parallelism (TP, DP, FSDP, etc.).
+    3.  Materialize weights on the target device.
+    4.  Load the initial model state from a checkpoint.
     """
 
     def __init__(

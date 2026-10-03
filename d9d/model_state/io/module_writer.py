@@ -92,9 +92,9 @@ def save_model_state_pipeline_parallel(
     Every rank must call this function.
 
     1.  **Gathering**: ``DTensor`` states are gathered into full tensors before saving.
-    2.  **Single writer**: for each pipeline stage, only one rank writes files, so ranks do not overwrite each
+    2.  **Single writer**: For each pipeline stage, only one rank writes files, so ranks do not overwrite each
         other.
-    3.  **Index merging**: the indices of all pipeline stages are merged into one global index file.
+    3.  **Index merging**: The indices of all pipeline stages are merged into one global index file.
 
     Only states listed in the inputs of ``mapper`` are saved. To save every model state unchanged, build the
     mapper with ``d9d.model_state.mapper.adapters.identity_mapper_from_module``.

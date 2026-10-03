@@ -129,10 +129,10 @@ class GradientManager(Offloadable):
 
         This method performs the following operations:
 
-        1. Waits for all gradient synchronization hooks to complete.
-        2. Synchronizes the accumulated loss/weights across the distributed context.
-        3. Scales the gradients by the inverse of the total accumulated weight to
-           normalize them.
+        1.  Waits for all gradient synchronization hooks to complete.
+        2.  Synchronizes the accumulated loss/weights across the distributed context.
+        3.  Scales the gradients by the inverse of the total accumulated weight to
+            normalize them.
         """
         with record_function("Wait & Scale Gradients"):
             self._grad_sync.wait()

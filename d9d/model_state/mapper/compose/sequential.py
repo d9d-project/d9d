@@ -15,9 +15,9 @@ class ModelStateMapperSequential(ModelStateMapper):
     Intermediate states stay hidden: the mapper exposes only the inputs of the first stage and the outputs of the
     last stage.
 
-    1.  **Gap filling**: if a tensor must pass a stage unchanged to reach a later stage or the final output, an
+    1.  **Gap filling**: If a tensor must pass a stage unchanged to reach a later stage or the final output, an
         identity mapper is added for it.
-    2.  **Group merging**: the mapper reports the net dependency graph. If stage A maps ``x`` to ``y`` and stage B
+    2.  **Group merging**: The mapper reports the net dependency graph. If stage A maps ``x`` to ``y`` and stage B
         maps ``y`` to ``z``, the mapper reports a single group ``{x} -> {z}``.
     """
 

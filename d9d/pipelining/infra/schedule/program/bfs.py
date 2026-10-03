@@ -18,7 +18,7 @@ class LoopedBFSPipelineProgramBuilder(PipelineProgramBuilder):
     it then runs the backward passes in reverse order.
 
     References:
-        https://arxiv.org/abs/2211.05953
+        [Breadth-First Pipeline Parallelism](https://arxiv.org/abs/2211.05953)
     """
 
     def __init__(self, num_stages_per_rank: int, inference_mode: bool = False):

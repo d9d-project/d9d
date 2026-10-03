@@ -55,7 +55,7 @@ class YarnRopeScaling(RopeScaling):
     """YaRN (Yet another RoPE extensioN) scaling strategy for position embeddings.
 
     References:
-        https://arxiv.org/abs/2309.00071
+        [YaRN: Efficient Context Window Extension of Large Language Models](https://arxiv.org/abs/2309.00071)
     """
 
     def __init__(
@@ -117,7 +117,7 @@ class NtkRopeScaling(RopeScaling):
     """NTK-Aware (Neural Tangent Kernel) scaling strategy for position embeddings.
 
     References:
-        https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/
+        [NTK-Aware Scaled RoPE](https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/)
     """
 
     def __init__(self, factor: float) -> None:
