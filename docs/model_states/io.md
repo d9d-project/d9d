@@ -48,6 +48,8 @@ from pathlib import Path
 from d9d.model_state.io import read_model_state
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
 
+model = ...
+
 # Load every state of the model unchanged.
 mapper = identity_mapper_from_module(model)
 
@@ -73,6 +75,8 @@ This example saves a model locally in shards of at most 1 GiB.
 from pathlib import Path
 from d9d.model_state.io import write_model_state_local
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
+
+model = ...
 
 # The writer creates the shard files and the index file.
 write_model_state_local(

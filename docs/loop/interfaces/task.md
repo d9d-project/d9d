@@ -53,12 +53,18 @@ The raw `batch` is available only in `build_forward_inputs(...)`. The **state** 
 ```python
 class MyState(TypedDict):
     target: torch.Tensor
+    num_targets: torch.Tensor
 
 # In build_forward_inputs:
-return BuildForwardInputsResult(input=..., shared=..., state=MyState(target=ctx.batch["target"]))
+target = ctx.batch["target"]
+state = MyState(target=target, num_targets=(target != LM_IGNORE_INDEX).sum())
+return BuildForwardInputsResult(input=..., shared=..., state=state)
 
-# Later, in update_metrics / compute_loss:
-ctx.metrics["accuracy"].update(ctx.state["target"])  # ctx.state is typed as MyState
+# Later, in compute_loss (ctx.state is typed as MyState):
+loss = loss_fn(ctx.pipeline_results, ctx.state["target"])
+
+# And in update_metrics:
+ctx.metrics["num_targets"].update(ctx.state["num_targets"])
 ```
 
 Tensors stored in the state are detached from the autograd graph, so the cached state never keeps the graph alive.

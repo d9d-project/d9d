@@ -14,7 +14,8 @@ class PeftInjectionResult:
 
     Attributes:
         parameters_to_train: The parameters that must stay trainable.
-        load_state_mappers: The mappers that load pre-trained weights into the modified structure.
+        load_state_mappers: The mappers that rename the original keys of the changed layers to the modified
+            structure. They do not cover keys that the method leaves unchanged.
     """
 
     parameters_to_train: list[nn.Parameter]

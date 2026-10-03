@@ -34,9 +34,9 @@ class CustomTrainTask(TrainTask):
     def __init__(self):
         self._modules = []
 
-    def register_events(self, ctx: RegisterTaskEventsContext) -> None:
+    def register_events(self, context: RegisterTaskEventsContext) -> None:
         # Registers every method of this instance marked with @subscribe.
-        subscribe_annotated(ctx.event_bus, self)
+        subscribe_annotated(context.event_bus, self)
 
     @subscribe(EVENT_TRAIN_MODEL_STAGES_READY)
     def _on_model_ready(self, ctx: EventModelStagesReadyContext) -> None:
@@ -45,6 +45,9 @@ class CustomTrainTask(TrainTask):
     @subscribe(EVENT_TRAIN_STEP_POST)
     def _on_step_post(self, ctx: EventStepContext) -> None:
         print(f"Step {ctx.schedule.current_step} of {ctx.schedule.total_steps} completed.")
+
+    def build_forward_inputs(self, ctx):
+        ...  # Task logic
 
     def compute_loss(self, ctx):
         ...  # Task logic
@@ -60,11 +63,17 @@ from d9d.loop.event.catalogue.train import EVENT_TRAIN_OPTIMIZER_READY
 
 
 class CustomTrainTask(TrainTask):
-    def register_events(self, ctx: RegisterTaskEventsContext) -> None:
-        ctx.event_bus.subscribe(
+    def register_events(self, context: RegisterTaskEventsContext) -> None:
+        context.event_bus.subscribe(
             EVENT_TRAIN_OPTIMIZER_READY,
             lambda event_ctx: print(f"Optimizer loaded: {event_ctx.optimizer}"),
         )
+
+    def build_forward_inputs(self, ctx):
+        ...  # Task logic
+
+    def compute_loss(self, ctx):
+        ...  # Task logic
 ```
 
 ## Custom Events

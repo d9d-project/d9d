@@ -56,7 +56,7 @@ stack_mapper = ModelStateMapperStackTensors(
 
 # Show what this mapper needs and produces.
 print(stack_mapper.state_dependency_groups())
-# Output (abridged): {StateGroup(inputs={'attn.q.weight', ...}, outputs={'attn.qkv.weight'})}
+# Output (abridged): frozenset({StateGroup(inputs=frozenset({'attn.q.weight', ...}), outputs=frozenset({'attn.qkv.weight'}))})
 
 # Run the transformation.
 dummy_data = {

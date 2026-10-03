@@ -49,7 +49,7 @@ Usually, you create and update metrics in your `TrainTask`. See the examples in 
 
 ### Manual Usage
 
-You can also use d9d metrics without the `Trainer`. Called directly, `sync()` blocks until all ranks finish the reduction. To overlap it with other work, call it within `torch.cuda.stream(...)`.
+You can also use d9d metrics without the `Trainer`. Called directly, `sync()` runs the reduction on the current CUDA stream. To overlap it with other work, call it within `torch.cuda.stream(...)`.
 
 ```python
 from d9d.metric.impl.aggregation import WeightedMeanMetric
@@ -59,10 +59,10 @@ metric = WeightedMeanMetric()
 metric.to("cuda")
 
 dataloader = ...
-dist_ctx = ...
+dist_context = ...  # The DistributedContext of the job.
 
 # 2. Training loop.
-for step, batch in enumerate(dataloader):
+for batch in dataloader:
     # ... forward, backward ...
     loss = ...
     num_tokens = ...
@@ -71,8 +71,8 @@ for step, batch in enumerate(dataloader):
     metric.update(values=loss, weights=num_tokens)
 
 # 3. Synchronize and compute.
-# Blocks until all ranks finish the all_reduce.
-metric.sync(dist_ctx)
+# Reduces the state across all ranks on the current stream.
+metric.sync(dist_context)
 print(f"Global average loss: {metric.compute()}")
 
 # 4. Reset for the next epoch.

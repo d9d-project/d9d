@@ -11,10 +11,13 @@ import re
 from d9d.peft import inject_peft_and_freeze
 from d9d.peft.full_tune import FullTune, FullTuneConfig
 
+model = ...  # Your model.
+
 method = FullTune(FullTuneConfig(module_name_pattern=re.compile(r".*norm.*")))
 
 # Freezes every parameter except those of modules named like "...norm...".
-mapper = inject_peft_and_freeze(method, model)
+# Full fine-tuning keeps the state keys, so the returned mapper is empty.
+inject_peft_and_freeze(method, model)
 ```
 
 ## API Reference
