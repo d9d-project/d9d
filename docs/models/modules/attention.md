@@ -62,6 +62,18 @@ export D9D_BACKEND_AUTO_SDPA='{"kind": "torch", "backends": ["FLASH_ATTENTION"]}
 This override only affects auto-detection; passing an explicit `sdpa_backend`
 configuration to a layer takes precedence over the environment variable.
 
+#### Variable-Length Backends
+
+For packed variable-length sequences (multiple segments concatenated along the token dimension,
+e.g. vision patches — see [Vision Blocks](./vision.md)), a parallel set of backends implements
+the `VarlenSdpaBackend` protocol. They consume `(total_tokens, heads, head_dim)` tensors plus
+cumulative segment lengths (`cu_seqlens`), and attention never crosses segment boundaries.
+
+The backend is chosen via `build_varlen_sdpa_backend()`, reusing the same configuration classes.
+Available implementations: `"flash_attention_4"`, `"flash_attention_2"` (native varlen kernels)
+and `"torch"` (a block-diagonal-mask fallback, correct but quadratic in the total packed length).
+Auto-detection can be overridden through the `D9D_BACKEND_AUTO_SDPA_VARLEN` environment variable.
+
 ::: d9d.module.block.attention
     options:
       heading_level: 3

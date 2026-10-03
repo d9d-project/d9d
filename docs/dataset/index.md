@@ -165,4 +165,10 @@ batch_aligned = pad_stack_1d(
 )
 ```
 
+### Multimodal Utilities
+
+For multimodal models (see [Multimodality](../models/multimodality.md)), the collator computes
+3D MRoPE position ids on CPU via `compute_multimodal_position_ids` and guarantees that every
+microbatch carries media via `pad_empty_media` (the empty-media convention).
+
 ::: d9d.dataset

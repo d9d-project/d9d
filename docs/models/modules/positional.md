@@ -20,4 +20,14 @@ Second one is typically bound to attention module implementation and is used for
 
 The package supports multiple internal memory layouts for RoPE operations via the `RotaryEmbeddingStyle` enumeration. It is critical that both the provider and applicator share the identical style configuration:
 
+### Multimodal Rotary Positional Encoding (MRoPE)
+
+`MultimodalRotaryEmbeddingProvider` consumes 3D position ids of shape `(3, batch, seq)` — separate
+position planes for the temporal, height and width axes — and combines per-plane rotary
+embeddings according to `mrope_section`. For text tokens, whose positions are identical across
+the three planes, the output is numerically identical to the standard `RotaryEmbeddingProvider`.
+The output plugs into the same `RotaryEmbeddingApplicator`.
+
+See [Multimodality](../multimodality.md) for how the 3D position ids are computed.
+
 ::: d9d.module.block.positional
