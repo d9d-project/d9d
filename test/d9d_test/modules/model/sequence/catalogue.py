@@ -1,10 +1,13 @@
 from collections.abc import Callable
 from enum import StrEnum, auto
+from typing import TypeVar
 
 from d9d.core.dist_context import DistributedContext
 from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
 from d9d.module.model import DecoderBackbone, DecoderWithHead, DecoderWithHeads
+from d9d.module.model.qwen3_5 import Qwen3p5LayerParameters, Qwen3p5Model, Qwen3p5Parameters
+from d9d.module.model.qwen3_5_moe import Qwen3p5MoELayerParameters, Qwen3p5MoEModel, Qwen3p5MoEParameters
 from d9d.module.model.qwen3_dense import (
     Qwen3DenseLayerParameters,
     Qwen3DenseModel,
@@ -23,8 +26,12 @@ from d9d.module.parallelism.model import (
     parallelize_qwen3_dense_model,
     parallelize_qwen3_moe_model,
 )
+from d9d.module.parallelism.model.qwen3_5 import parallelize_qwen3p5_model
+from d9d.module.parallelism.model.qwen3_5_moe import parallelize_qwen3p5_moe_model
 from d9d.pipelining.api import PipelineStageInfo
 from transformers import PretrainedConfig, PreTrainedModel, Qwen3Config, Qwen3MoeConfig
+from transformers.models.qwen3_5.configuration_qwen3_5 import Qwen3_5TextConfig
+from transformers.models.qwen3_5_moe.configuration_qwen3_5_moe import Qwen3_5MoeTextConfig
 
 from d9d_test.modules.helper import torch_seed
 
@@ -32,6 +39,12 @@ from d9d_test.modules.helper import torch_seed
 class ModelCatalogue(StrEnum):
     QWEN3_MOE = auto()
     QWEN3_DENSE = auto()
+    QWEN3_5 = auto()
+    QWEN3_5_MOE = auto()
+
+
+class MultimodalModelCatalogue(StrEnum):
+    QWEN3_5_MOE = auto()
 
 
 _HIDDEN_SIZE = 512
@@ -52,6 +65,18 @@ _VOCAB_SPLIT_ORDER = ["a"]
 _VOCAB_MERGED = 100
 
 _PAD_TOKEN_ID = 99
+
+# Qwen3.5-specific structure
+_Q35_HEAD_DIM = 64
+_Q35_ROPE_DIM = 16  # partial_rotary_factor 0.25
+_Q35_MROPE_SECTION = (4, 2, 2)
+_Q35_FULL_ATTENTION_INTERVAL = 4
+_Q35_GDN_NUM_K_HEADS = 4
+_Q35_GDN_NUM_V_HEADS = 8
+_Q35_GDN_HEAD_DIM = 64
+_Q35_GDN_CONV = 4
+_Q35_SHARED_EXPERT_INTERMEDIATE = 256
+_Q35_ROPE_BASE = 5_000_000
 
 
 # HuggingFace experts layout the d9d MoE mappers translate from/to in these tests.
@@ -92,9 +117,64 @@ QWEN3_DENSE_PARAMETERS = Qwen3DenseParameters(
     split_vocab_order=_VOCAB_SPLIT_ORDER,
 )
 
-D9D_MODEL_PARAMETERS: dict[ModelCatalogue, Qwen3MoEParameters | Qwen3DenseParameters] = {
+QWEN3_5_PARAMETERS = Qwen3p5Parameters(
+    layer=Qwen3p5LayerParameters(
+        hidden_size=_HIDDEN_SIZE,
+        intermediate_size=_INTERMEDIATE_SIZE_DENSE,
+        num_attention_heads=_NUM_ATTENTION_HEADS,
+        num_key_value_heads=_NUM_KV_HEADS,
+        head_dim=_Q35_HEAD_DIM,
+        rope_dim=_Q35_ROPE_DIM,
+        linear_num_key_heads=_Q35_GDN_NUM_K_HEADS,
+        linear_num_value_heads=_Q35_GDN_NUM_V_HEADS,
+        linear_key_head_dim=_Q35_GDN_HEAD_DIM,
+        linear_value_head_dim=_Q35_GDN_HEAD_DIM,
+        linear_conv_kernel_dim=_Q35_GDN_CONV,
+        rms_norm_eps=_RMS_NORM_EPS,
+    ),
+    num_hidden_layers=_NUM_LAYERS,
+    full_attention_interval=_Q35_FULL_ATTENTION_INTERVAL,
+    rope_base=_Q35_ROPE_BASE,
+    mrope_section=_Q35_MROPE_SECTION,
+    max_position_ids=_MAX_POS_ID,
+    split_vocab_size=_VOCAB_SPLIT_SIZE,
+    split_vocab_order=_VOCAB_SPLIT_ORDER,
+)
+
+QWEN3_5_MOE_PARAMETERS = Qwen3p5MoEParameters(
+    layer=Qwen3p5MoELayerParameters(
+        hidden_size=_HIDDEN_SIZE,
+        moe_intermediate_size=_INTERMEDIATE_SIZE_MOE,
+        shared_expert_intermediate_size=_Q35_SHARED_EXPERT_INTERMEDIATE,
+        num_experts=_NUM_EXPERTS_MOE,
+        experts_top_k=_EXPERTS_TOP_K_MOE,
+        num_attention_heads=_NUM_ATTENTION_HEADS,
+        num_key_value_heads=_NUM_KV_HEADS,
+        head_dim=_Q35_HEAD_DIM,
+        rope_dim=_Q35_ROPE_DIM,
+        linear_num_key_heads=_Q35_GDN_NUM_K_HEADS,
+        linear_num_value_heads=_Q35_GDN_NUM_V_HEADS,
+        linear_key_head_dim=_Q35_GDN_HEAD_DIM,
+        linear_value_head_dim=_Q35_GDN_HEAD_DIM,
+        linear_conv_kernel_dim=_Q35_GDN_CONV,
+        rms_norm_eps=_RMS_NORM_EPS,
+    ),
+    num_hidden_layers=_NUM_LAYERS,
+    full_attention_interval=_Q35_FULL_ATTENTION_INTERVAL,
+    rope_base=_Q35_ROPE_BASE,
+    mrope_section=_Q35_MROPE_SECTION,
+    max_position_ids=_MAX_POS_ID,
+    split_vocab_size=_VOCAB_SPLIT_SIZE,
+    split_vocab_order=_VOCAB_SPLIT_ORDER,
+)
+
+D9D_MODEL_PARAMETERS: dict[
+    ModelCatalogue, Qwen3MoEParameters | Qwen3DenseParameters | Qwen3p5Parameters | Qwen3p5MoEParameters
+] = {
     ModelCatalogue.QWEN3_MOE: QWEN3_MOE_PARAMETERS,
     ModelCatalogue.QWEN3_DENSE: QWEN3_DENSE_PARAMETERS,
+    ModelCatalogue.QWEN3_5: QWEN3_5_PARAMETERS,
+    ModelCatalogue.QWEN3_5_MOE: QWEN3_5_MOE_PARAMETERS,
 }
 
 
@@ -144,17 +224,89 @@ HF_MODEL_PARAMETERS: dict[ModelCatalogue, PretrainedConfig] = {
         _attn_implementation="flash_attention_4",
         pad_token_id=_PAD_TOKEN_ID,
     ),
+    ModelCatalogue.QWEN3_5: Qwen3_5TextConfig(
+        vocab_size=_VOCAB_MERGED,
+        num_hidden_layers=_NUM_LAYERS,
+        hidden_size=_HIDDEN_SIZE,
+        intermediate_size=_INTERMEDIATE_SIZE_DENSE,
+        num_attention_heads=_NUM_ATTENTION_HEADS,
+        num_key_value_heads=_NUM_KV_HEADS,
+        head_dim=_Q35_HEAD_DIM,
+        linear_conv_kernel_dim=_Q35_GDN_CONV,
+        linear_key_head_dim=_Q35_GDN_HEAD_DIM,
+        linear_value_head_dim=_Q35_GDN_HEAD_DIM,
+        linear_num_key_heads=_Q35_GDN_NUM_K_HEADS,
+        linear_num_value_heads=_Q35_GDN_NUM_V_HEADS,
+        hidden_act="silu",
+        max_position_embeddings=_MAX_POS_ID,
+        rms_norm_eps=_RMS_NORM_EPS,
+        use_cache=False,
+        tie_word_embeddings=False,
+        rope_parameters={
+            "rope_type": "default",
+            "rope_theta": float(_Q35_ROPE_BASE),
+            "partial_rotary_factor": 0.25,
+            "mrope_section": list(_Q35_MROPE_SECTION),
+            "mrope_interleaved": True,
+        },
+        attention_bias=False,
+        attention_dropout=0.0,
+        full_attention_interval=_Q35_FULL_ATTENTION_INTERVAL,
+        _attn_implementation="sdpa",
+        pad_token_id=_PAD_TOKEN_ID,
+    ),
+    ModelCatalogue.QWEN3_5_MOE: Qwen3_5MoeTextConfig(
+        vocab_size=_VOCAB_MERGED,
+        num_hidden_layers=_NUM_LAYERS,
+        hidden_size=_HIDDEN_SIZE,
+        num_attention_heads=_NUM_ATTENTION_HEADS,
+        num_key_value_heads=_NUM_KV_HEADS,
+        head_dim=_Q35_HEAD_DIM,
+        linear_conv_kernel_dim=_Q35_GDN_CONV,
+        linear_key_head_dim=_Q35_GDN_HEAD_DIM,
+        linear_value_head_dim=_Q35_GDN_HEAD_DIM,
+        linear_num_key_heads=_Q35_GDN_NUM_K_HEADS,
+        linear_num_value_heads=_Q35_GDN_NUM_V_HEADS,
+        moe_intermediate_size=_INTERMEDIATE_SIZE_MOE,
+        shared_expert_intermediate_size=_Q35_SHARED_EXPERT_INTERMEDIATE,
+        num_experts_per_tok=_EXPERTS_TOP_K_MOE,
+        num_experts=_NUM_EXPERTS_MOE,
+        hidden_act="silu",
+        max_position_embeddings=_MAX_POS_ID,
+        rms_norm_eps=_RMS_NORM_EPS,
+        use_cache=False,
+        tie_word_embeddings=False,
+        rope_parameters={
+            "rope_type": "default",
+            "rope_theta": float(_Q35_ROPE_BASE),
+            "partial_rotary_factor": 0.25,
+            "mrope_section": list(_Q35_MROPE_SECTION),
+            "mrope_interleaved": True,
+        },
+        attention_bias=False,
+        attention_dropout=0.0,
+        router_aux_loss_coef=0.0,
+        full_attention_interval=_Q35_FULL_ATTENTION_INTERVAL,
+        _attn_implementation="sdpa",
+        pad_token_id=_PAD_TOKEN_ID,
+    ),
 }
 
 
-BACKBONE_CLASSES: dict[ModelCatalogue, type[Qwen3MoEModel] | type[Qwen3DenseModel]] = {
+BACKBONE_CLASSES: dict[
+    ModelCatalogue, type[Qwen3MoEModel] | type[Qwen3DenseModel] | type[Qwen3p5Model] | type[Qwen3p5MoEModel]
+] = {
     ModelCatalogue.QWEN3_MOE: Qwen3MoEModel,
     ModelCatalogue.QWEN3_DENSE: Qwen3DenseModel,
+    ModelCatalogue.QWEN3_5: Qwen3p5Model,
+    ModelCatalogue.QWEN3_5_MOE: Qwen3p5MoEModel,
 }
 
 BACKBONE_PARALLELIZE_FN: dict[ModelCatalogue, Callable[..., None]] = {
     ModelCatalogue.QWEN3_MOE: parallelize_qwen3_moe_model,
     ModelCatalogue.QWEN3_DENSE: parallelize_qwen3_dense_model,
+    ModelCatalogue.QWEN3_5: parallelize_qwen3p5_model,
+    ModelCatalogue.QWEN3_5_MOE: parallelize_qwen3p5_moe_model,
 }
 
 
@@ -174,6 +326,24 @@ def hf_model_factory(
             for layer_name in bf16_layers:
                 model.get_submodule(layer_name).bfloat16()
 
+            return model
+
+    return _build_fn
+
+
+TModel = TypeVar("TModel")
+
+
+def d9d_model_factory(
+    model_class: type[TModel],
+    **model_kwargs,
+) -> Callable[[PipelineStageInfo], TModel]:
+    """Builds a factory instantiating a self-contained d9d model on the target device."""
+
+    def _build_fn(stage: PipelineStageInfo):
+        with torch_seed(_D9D_INIT_SEED):
+            model = model_class(**model_kwargs, stage=stage).cuda().bfloat16()
+            model.reset_parameters()
             return model
 
     return _build_fn

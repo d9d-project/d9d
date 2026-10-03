@@ -14,3 +14,4 @@ The `d9d.module.block` package provides highly optimized, composable building bl
 *   **[Mixture of Experts (MoE)](./moe.md)**
 *   **[Positional Embeddings](./positional.md)**:
 *   **[Normalization Layers](./normalization.md)**:
+*   **[Vision Blocks](./vision.md)**

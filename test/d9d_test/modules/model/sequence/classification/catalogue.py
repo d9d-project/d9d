@@ -57,7 +57,9 @@ D9D_MODEL_FACTORIES_CLS = {
         )
         for enable_checkpointing in (True, False)
     ]
-    for model_type in ModelCatalogue
+    # Only the families with a HuggingFace counterpart for this task: the parity suite
+    # needs a reference model, and HF_MODEL_FACTORY_CLS is what defines that set.
+    for model_type in HF_MODEL_FACTORY_CLS
 }
 
 

@@ -1,4 +1,4 @@
-from .backbone import DecoderBackbone
+from .backbone import DecoderBackbone, SequenceDecoderBackbone, TokenEmbeddings
 from .decoder import (
     SINGLE_HEAD_PREFIX,
     DecoderForCausalLM,
@@ -14,6 +14,7 @@ from .head import (
     EmbeddingHeadConfig,
     build_decoder_head,
 )
+from .multimodal import MultimodalBackbone
 
 __all__ = [
     "SINGLE_HEAD_PREFIX",
@@ -27,5 +28,8 @@ __all__ = [
     "DecoderWithHead",
     "DecoderWithHeads",
     "EmbeddingHeadConfig",
+    "MultimodalBackbone",
+    "SequenceDecoderBackbone",
+    "TokenEmbeddings",
     "build_decoder_head",
 ]

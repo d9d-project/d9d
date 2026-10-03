@@ -165,7 +165,9 @@ class MambaDecayGate(nn.Module, ModuleLateInit):
             torch.rand(self._num_heads, device=self.dt_bias.device) * (math.log(self._dt_max) - math.log(self._dt_min))
             + math.log(self._dt_min)
         ).clamp(min=self._dt_init_floor)
-        self.dt_bias.data = dt + torch.log(-torch.expm1(-dt))
+        # Preserve the parameter dtype: replacing `.data` with the fp32 result of `torch.rand`
+        # would silently undo a `.bfloat16()` model cast and break FSDP's uniform-dtype requirement.
+        self.dt_bias.data = (dt + torch.log(-torch.expm1(-dt))).to(self.dt_bias.dtype)
 
 
 class MambaDecayGateParameters(BaseModel):

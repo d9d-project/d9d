@@ -43,7 +43,9 @@ nav = [
         { "Model Catalogue" = [
             "models/model_catalogue/index.md",
             "models/model_catalogue/qwen3_moe.md",
-            "models/model_catalogue/qwen3_dense.md"
+            "models/model_catalogue/qwen3_dense.md",
+            "models/model_catalogue/qwen3_5_moe.md",
+            "models/model_catalogue/qwen3_5.md"
         ] },
         { "Modules" = [
             "models/modules/index.md",
@@ -55,8 +57,10 @@ nav = [
             "models/modules/positional.md",
             "models/modules/normalization.md",
             "models/modules/hidden_states_aggregator.md",
+            "models/modules/vision.md",
         ] },
         "models/model_design.md",
+        "models/multimodality.md",
         "models/horizontal_parallelism.md",
         "models/pipeline_parallelism.md",
     ] },

@@ -13,11 +13,19 @@ THeadOutput = TypeVar("THeadOutput")
 class SequenceInput:
     """The inputs for a sequence transformer: the token ids fed to the first stage.
 
+    ``inputs_embeds`` lets a caller supply the first stage's embeddings itself instead of having
+    the backbone look them up. This is what a modality encoder composition needs: it embeds the
+    tokens, merges media embeddings into the placeholder positions, and hands the result to the
+    backbone. ``input_ids`` is still carried, so the backbone reads shapes from it either way.
+
     Attributes:
         input_ids: Indices of input sequence tokens, shape ``[batch, seq]``.
+        inputs_embeds: Pre-computed token embeddings, shape ``[batch, seq, hidden]``. When given,
+            the backbone skips its own embedding lookup and consumes these instead.
     """
 
     input_ids: torch.Tensor
+    inputs_embeds: torch.Tensor | None = None
 
 
 @dataclasses.dataclass
