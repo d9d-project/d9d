@@ -1,6 +1,6 @@
 [project]
 site_name = "d9d"
-site_description = "d9d is a distributed training framework built on top of PyTorch 2.0. It aims to be hackable, modular, and efficient, designed to scale from single-GPU debugging to massive clusters running 6D-Parallelism."
+site_description = "d9d is a distributed training framework built on top of modern PyTorch. It aims to be hackable, modular, and efficient, designed to scale from single-GPU debugging to massive clusters running 6D-Parallelism."
 repo_url = "https://github.com/d9d-project/d9d"
 copyright = """
 Copyright &copy; 2026 The d9d Project
@@ -14,6 +14,7 @@ extra_javascript = [
 nav = [
     { "Home" = "index.md" },
     { "Table of Contents" = "toc.md" },
+    { "Troubleshooting" = "troubleshooting.md" },
     { "Core" = [
         "core/dist_context.md",
         "core/dist_ops.md",

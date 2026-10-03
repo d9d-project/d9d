@@ -63,7 +63,7 @@ It returns a `Trainer` that holds a prepared `TrainJobState`.
 Before the loop starts:
 
 1.  **Global Synchronization**: The trainer waits for all ranks (a barrier).
-2.  **State Loading**: The `StateCheckpointer` looks for a checkpoint in the save directory.
+2.  **State Loading**: The `StateCheckpointer` looks for the latest checkpoint in `checkpointing.save_dir`/`run.name`.
     *   If a checkpoint exists, it loads it into all `Stateful` objects of the job state.
     *   If no checkpoint exists, the job starts from the first step.
 3.  **Context Entry**: The trainer enters several context managers:

@@ -42,6 +42,10 @@ Install it with your package manager:
 
 Start with the [Table of Contents](./toc.md). You can read it from top to bottom.
 
+If a job hangs or fails, see [Troubleshooting](./troubleshooting.md).
+
+d9d is in alpha, so public APIs can change between minor releases. Read the [changelog](https://github.com/d9d-project/d9d/blob/main/CHANGELOG.md) before you upgrade.
+
 ## Examples
 
 *   **[Qwen3-MoE Pretraining](https://github.com/d9d-project/d9d/blob/main/example/qwen3_moe/pretrain.py)**: Causal LM pretraining of a Qwen3-MoE model.
