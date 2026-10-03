@@ -32,7 +32,7 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
         """Constructs the DualPipeV builder."""
 
     @staticmethod
-    def _build_for_rank(  # noqa: C901
+    def _build_for_rank(  # noqa: C901 - the schedule steps share counters and the weight queue
         rank: int, stage_to_rank: dict[int, int], num_microbatches: int, pp_size: int
     ) -> list[ActionBase]:
         compute_actions: list[ActionBase] = []

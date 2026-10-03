@@ -33,7 +33,7 @@ def init_deepep_buffer(group: torch.distributed.ProcessGroup, hidden_bytes: int)
         group: The process group intended for communication.
         hidden_bytes: Size of a single hidden state vector in bytes.
     """
-    global _buffer  # noqa: PLW0603
+    global _buffer  # noqa: PLW0603 - one DeepEP buffer is shared by all MoE layers of the process
     num_nvl_bytes, num_rdma_bytes = 0, 0
     for config in (
         Buffer.get_dispatch_config(group.size()),

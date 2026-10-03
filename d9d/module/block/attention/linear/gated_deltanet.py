@@ -56,7 +56,7 @@ class CausalShortDepthwiseConv1d(nn.Module, ModuleLateInit):
             output_final_state=False,
             activation="silu",
             backend="triton",
-        )  # ty:ignore[call-non-callable]  -- fla-core has bad typings unfortunately
+        )  # ty: ignore[call-non-callable] - fla-core has wrong type annotations for causal_conv1d
 
         return x
 

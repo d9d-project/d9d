@@ -94,7 +94,7 @@ def _adamw_stochastic_bf16_kernel(
         tl.store(v_ptr + offsets, v_next, mask=mask)
 
 
-def adamw_stochastic_bf16_(  # noqa: C901
+def adamw_stochastic_bf16_(  # noqa: C901 - a flat list of input checks before one kernel launch
     params: torch.Tensor,
     grads: torch.Tensor,
     exp_avg: torch.Tensor,

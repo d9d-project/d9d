@@ -110,7 +110,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
             num_stages=num_stages,
         )
 
-    def _generate_rank_schedule(  # noqa: C901
+    def _generate_rank_schedule(  # noqa: C901 - the phases share counters and the weight queue
         self,
         rank: int,
         pp_size: int,

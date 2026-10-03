@@ -20,7 +20,8 @@ class OffloadedTensor:
 
 def _local_storage_holder(tensor: torch.Tensor) -> torch.Tensor:
     """Returns the storage-bearing tensor: the DTensor's local shard, or the tensor itself."""
-    return tensor._local_tensor if isinstance(tensor, DTensor) else tensor  # noqa: SLF001
+    # to_local() returns a new tensor object, so rebinding its .data would not reach the DTensor
+    return tensor._local_tensor if isinstance(tensor, DTensor) else tensor  # noqa: SLF001 - need the stored shard
 
 
 def offload_tensor(tensor: torch.Tensor, *, pin_memory: bool) -> OffloadedTensor:

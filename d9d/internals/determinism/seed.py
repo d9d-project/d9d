@@ -56,4 +56,5 @@ def set_seeds(
         duplicate_seed_mesh = mesh_regular[duplicate_seed_mesh_dim] if len(duplicate_seed_mesh_dim) != 0 else None
 
         if duplicate_seed_mesh and duplicate_seed_mesh.get_coordinate() is not None:
-            torch.distributed.tensor._random.manual_seed(seed, duplicate_seed_mesh)  # noqa: SLF001
+            # torch can seed the DTensor random generator for a given mesh only through a private function
+            torch.distributed.tensor._random.manual_seed(seed, duplicate_seed_mesh)  # noqa: SLF001 - no public API

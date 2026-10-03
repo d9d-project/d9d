@@ -357,7 +357,7 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
 
         if self._info.is_current_stage_last and not self._info.is_current_stage_first:
             for t in pytree.tree_leaves(fwd_outputs):
-                if not t._is_view():  # noqa: SLF001
+                if not t._is_view():  # noqa: SLF001 - PyTorch has no public check for views
                     t.detach_()
 
     def backward_weight_one_chunk(self, microbatch_index: int):

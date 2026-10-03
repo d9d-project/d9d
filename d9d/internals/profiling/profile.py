@@ -104,8 +104,8 @@ class Profiler:
             record_shapes=self._record_shapes,
             with_stack=self._with_stack,
             # by default only the thread that enters the profiler is recorded, which misses background
-            # threads such as data prefetching; torch exposes this option only via the private name
-            experimental_config=tprof._ExperimentalConfig(profile_all_threads=True),  # noqa: SLF001
+            # threads such as data prefetching; torch exposes this option only under a private name
+            experimental_config=tprof._ExperimentalConfig(profile_all_threads=True),  # noqa: SLF001 - no public name
         ) as profiler:
             profiler.step_num = start_step
             yield profiler

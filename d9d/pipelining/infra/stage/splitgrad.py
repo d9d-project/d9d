@@ -296,7 +296,7 @@ def stage_backward_input(
     )
 
 
-def stage_backward_weight(  # noqa: C901
+def stage_backward_weight(  # noqa: C901 - edge collection and the single backward pass share the clamp hooks
     weights: Iterator[nn.Parameter], param_groups: list[ParamGroup], retain_graph: bool = False
 ) -> tuple[torch.Tensor | None, ...]:
     """Performs the second phase of a split backward pass: Weight Gradients.

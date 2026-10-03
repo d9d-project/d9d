@@ -1,4 +1,4 @@
-import pickle  # noqa: S403
+import pickle  # noqa: S403 - only for the RNG state that this class writes and reads itself
 import random
 from typing import Any, Protocol, TypeVar
 
@@ -124,7 +124,7 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
         return ret
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        self._rng.setstate(pickle.loads(state_dict["seed"]))  # noqa: S301
+        self._rng.setstate(pickle.loads(state_dict["seed"]))  # noqa: S301 - our own checkpoint, from state_dict()
         self._buffer_idx = state_dict["buffer_idx"]
         self._buffer_indices = state_dict["buffer_indices"]
         if isinstance(self._base_dataset, Stateful):

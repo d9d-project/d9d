@@ -15,7 +15,9 @@ class SiLUMulFunction(Function):
         return silu_mul_forward(x, y)
 
     @staticmethod
-    def backward(ctx: Any, grad_output: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:  # type: ignore[invalid-method-override]
+    def backward(  # ty: ignore[invalid-method-override] - torch declares backward with variadic grad_outputs
+        ctx: Any, grad_output: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
         x, y = ctx.saved_tensors
         return silu_mul_backward(grad_output, x, y)
 

@@ -19,7 +19,9 @@ class RMSNormFunction(Function):
         return out
 
     @staticmethod
-    def backward(ctx: Any, grad_output: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, None, None]:  # type: ignore[invalid-method-override]
+    def backward(  # ty: ignore[invalid-method-override] - torch declares backward with variadic grad_outputs
+        ctx: Any, grad_output: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, None, None]:
         x, weight = ctx.saved_tensors
         inv_rms = ctx.inv_rms
         grad_x, grad_weight = rms_norm_backward(grad_output, x, weight, inv_rms, zero_centered=ctx.zero_centered)
