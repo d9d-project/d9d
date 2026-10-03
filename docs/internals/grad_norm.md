@@ -1,4 +1,4 @@
-# Gradient Norm & Clipping
+# Gradient Norm and Clipping
 
 ## About
 

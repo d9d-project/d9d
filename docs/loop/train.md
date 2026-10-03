@@ -4,7 +4,7 @@
 
 The `d9d.loop` package provides the execution engine for distributed training. The `Trainer` separates the *definition* of a job (models, tasks, data) from its *execution* (synchronization, checkpointing, profiling). So the same code runs on a single GPU or on a large pipeline-parallel cluster without changes.
 
-## Configuration & Construction
+## Configuration and Construction
 
 You do not create a `Trainer` from loose objects. You build it with the `TrainingConfigurator`, using **dependency injection**.
 
@@ -58,7 +58,7 @@ It returns a `Trainer` that holds a prepared `TrainJobState`.
 
 `Trainer.train()` runs the lifecycle below. Knowing this order helps when you debug distributed issues or look for side effects.
 
-### 1. Initialization & Recovery
+### 1. Initialization and Recovery
 
 Before the loop starts:
 
@@ -133,7 +133,7 @@ While a step runs, a background thread prepares the next `data_prefetch.prefetch
 *   **Memory**: Every prefetched pack occupies device memory. `prefetch_factor: 0` disables prefetching.
 *   **Checkpoints** save the data position of the last completed step. Packs that were prefetched but not consumed are read again after a restart. A checkpoint can be loaded with any `prefetch_factor`.
 
-## Sleep & Wake (Colocated RL)
+## Sleep and Wake (Colocated RL)
 
 In **colocated RL**, a rollout or inference engine shares the same GPUs as the `Trainer`. The two cannot occupy the device at once, so the `Trainer` must hand the GPU back for a while. `Trainer.sleep()` releases the training state to host memory and frees the device cache. `Trainer.wake()` restores it. Both are built on the [State Offloading](../core/offload.md) subsystem.
 

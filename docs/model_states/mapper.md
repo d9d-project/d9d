@@ -22,7 +22,7 @@ Mappers come in three kinds:
 
 ## Usage
 
-### Pass-through Mapping for a PyTorch Module
+### Pass-Through Mapping for a PyTorch Module
 
 Use `identity_mapper_from_module` when checkpoint keys match the model's state dict keys, as in standard `load_state_dict`. You still get d9d's streaming and sharding.
 

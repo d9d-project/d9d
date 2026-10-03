@@ -35,7 +35,7 @@ uv add d9d
 
 ## About
 
-### Why another framework?
+### Why Another Framework?
 
 Distributed training frameworks such as **Megatron-LM** are monolithic: you run a script from the command line to train one of a set of *predefined* models, using *predefined* regimes. These systems are hard to hack and to integrate into new research workflows. They aim to be a complete end-to-end solution, which limits flexibility for experiment-driven research.
 
@@ -43,7 +43,7 @@ Writing your own distributed training solution from scratch is also hard. You mu
 
 **d9d** fills the gap between monolithic frameworks and homebrew setups. It gives you modular building blocks for distributed training.
 
-### What d9d is and isn't
+### What d9d Is and Isn't
 
 In terms of **core concept**:
 
@@ -68,7 +68,7 @@ To balance hackability and performance, d9d follows these design principles:
 *   **Graph-Based State Management**: Our I/O system treats model checkpoints as directed acyclic graphs. You can transform architectures (e.g. merge `q`, `k`, `v` into `qkv`) on the fly while streaming from disk, without loading the whole checkpoint into memory.
 *   **DTensors**: Distributed parameters must be `torch.distributed.tensor.DTensor`s. DTensors know their topology, which makes checkpointing simpler. We use modern PyTorch 2.0 APIs (`DeviceMesh`) wherever we can.
 
-## Community & Support
+## Community and Support
 
 Join our community if you need help, want to discuss large-scale training strategies, or want to contribute to **d9d**.
 

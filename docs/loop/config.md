@@ -30,7 +30,7 @@ Periodic actions, such as `checkpointing.period_steps`, take a `StepActionPeriod
     options:
       heading_level: 4
 
-### Diagnostics & Reproducibility
+### Diagnostics and Reproducibility
 
 ::: d9d.tracker.RunConfig
     options:

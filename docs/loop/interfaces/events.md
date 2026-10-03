@@ -1,4 +1,4 @@
-# Event Bus & Hooks
+# Event Bus and Hooks
 
 ## About
 

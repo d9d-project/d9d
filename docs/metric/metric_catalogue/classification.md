@@ -14,7 +14,7 @@ from d9d.metric.impl.classification import BinaryAUROCMetric
 auroc = BinaryAUROCMetric()
 ```
 
-## Confusion Matrix-based Metrics
+## Confusion Matrix-Based Metrics
 
 Accuracy, precision, recall and F-beta are all computed from a confusion matrix. `confusion_matrix_metric()` returns a builder that defines such a metric in three steps:
 

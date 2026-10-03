@@ -50,7 +50,7 @@ Start with the [Table of Contents](./toc.md). You can read it from top to bottom
 
 ## About
 
-### Why another framework?
+### Why Another Framework?
 
 Distributed training frameworks such as **Megatron-LM** are monolithic: you run a script from the command line to train one of a set of *predefined* models, using *predefined* regimes. These systems are hard to hack and to integrate into new research workflows. They aim to be a complete end-to-end solution, which limits flexibility for experiment-driven research.
 
@@ -58,7 +58,7 @@ Writing your own distributed training solution from scratch is also hard. You mu
 
 **d9d** fills the gap between monolithic frameworks and homebrew setups. It gives you modular building blocks for distributed training.
 
-### What d9d is and isn't
+### What d9d Is and Isn't
 
 In terms of **core concept**:
 

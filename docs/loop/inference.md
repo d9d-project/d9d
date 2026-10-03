@@ -4,7 +4,7 @@
 
 The `d9d.loop` package also provides the execution engine for distributed inference. Like the `Trainer`, the `Inference` engine separates the *definition* of a job from its *execution*. It runs forward passes only.
 
-## Configuration & Construction
+## Configuration and Construction
 
 You build the `Inference` engine with the `InferenceConfigurator`. It combines the infrastructure configuration, the [job configuration](./config.md) and the user logic into an `Inference` object that is ready to run.
 
@@ -43,7 +43,7 @@ You build the `Inference` engine with the `InferenceConfigurator`. It combines t
 
 `Inference.infer()` runs the lifecycle below.
 
-### 1. Initialization & Recovery
+### 1. Initialization and Recovery
 
 Before the loop starts:
 

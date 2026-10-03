@@ -11,6 +11,6 @@ For common cases, such as standard optimizers, `d9d` provides **Auto** implement
 *   **[User Tasks](./task.md)**: Implement `TrainTask` and `InferenceTask` to build model inputs, carry data to the loss and compute the loss.
 *   **[Model Definition](./model.md)**: Implement `ModelProvider` to initialize models, map their state and set up horizontal parallelism.
 *   **[Data Loading](./data.md)**: Use a `DataProvider` to build the `MicrobatchPackStream`, collate data and shard it across ranks.
-*   **[Events & Hooks](./events.md)**: Hook into specific moments of the train or inference lifecycle through the event bus.
-*   **[Optimizers](./optimizer.md)**: Configure standard optimizers with `AutoOptimizerProvider`, or write your own `OptimizerProvider`.
+*   **[Event Bus and Hooks](./events.md)**: Hook into specific moments of the train or inference lifecycle through the event bus.
+*   **[Optimizer](./optimizer.md)**: Configure standard optimizers with `AutoOptimizerProvider`, or write your own `OptimizerProvider`.
 *   **[Learning Rate Scheduler](./lr_scheduler.md)**: Use `AutoLRSchedulerProvider` for piecewise schedules (warmup, hold, decay), or write your own `LRSchedulerProvider`.

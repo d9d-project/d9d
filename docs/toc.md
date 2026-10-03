@@ -23,7 +23,7 @@ How to configure and run jobs.
 *   **[Interfaces](./loop/interfaces/index.md)**: How to inject your custom Model, Data, and Step logic (Train & Infer).
 
 
-## 💾 Data & State
+## 💾 Data and State
 Managing data loading and model checkpoints.
 
 *   **[Model State Mapper](./model_states/mapper.md)**: The graph-based transformation engine for checkpoints (transform architectures on-the-fly).
@@ -31,7 +31,7 @@ Managing data loading and model checkpoints.
 *   **[Datasets](./dataset/index.md)**: Distributed-aware dataset wrappers and length bucketing.
 
 
-## 🧠 Modeling & Architecture
+## 🧠 Modeling and Architecture
 Building blocks for LLMs.
 
 *   **[Model Catalogue](./models/model_catalogue/index.md)**: Models available directly in d9d.
@@ -50,7 +50,7 @@ Parameter-Efficient Fine-Tuning framework.
 *   **[PEFT Overview](./peft/overview.md)**: Injection lifecycle and state mapping.
 *   **Methods**: [LoRA](./peft/lora.md), [Full Fine-Tuning](./peft/full_tune.md), and [Method Stacking](./peft/stack.md).
 
-## 📈 Optimization & Metrics
+## 📈 Optimization and Metrics
 
 *   **[Metrics Overview](./metric/overview.md)**: Distributed-aware statistic accumulation.
 *   **[Metric Catalogue](./metric/metric_catalogue/index.md)**: Ready-to-use metric implementations.
@@ -65,7 +65,7 @@ Deep dive into the engine room.
 *   **[Autograd Extensions](./core/autograd_extensions.md)**: How we do split backward for pipeline parallelism.
 *   **[Pipelining Internals](./internals/pipelining.md)**: How the VM and Schedules work.
 *   **[Gradient Synchronization](./internals/grad_sync.md)**: Custom backward hooks for overlapping comms.
-*   **[Gradient Norm & Clipping](./internals/grad_norm.md)**: Correct global norm calculation across hybrid meshes.
+*   **[Gradient Norm and Clipping](./internals/grad_norm.md)**: Correct global norm calculation across hybrid meshes.
 *   **[Metric Collection](./internals/metric_collector.md)**: Custom overlapped metric synchronization & computation.
 *   **[Determinism](./internals/determinism.md)**: RNG seeding across distributed processes.
 *   **[Profiling](./internals/profiling.md)**: A distributed-aware wrapper around the PyTorch Profiler.
