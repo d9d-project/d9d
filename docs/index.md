@@ -56,7 +56,7 @@ Distributed training frameworks such as **Megatron-LM** are monolithic: you run 
 
 Writing your own distributed training solution from scratch is also hard. You must implement many low-level components that are the same across setups, such as distributed checkpoints and synchronization. You must also fix common performance bottlenecks yourself.
 
-**d9d** fills the gap between monolithic frameworks and homebrew setups. It gives you modular building blocks for distributed training.
+d9d fills the gap between monolithic frameworks and homebrew setups. It gives you modular building blocks for distributed training.
 
 ### What d9d Is and Isn't
 

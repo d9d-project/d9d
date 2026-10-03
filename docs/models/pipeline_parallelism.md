@@ -167,7 +167,7 @@ The schedule composes its program once per microbatch count and reuses it. It re
 
 ### Within the Trainer
 
-Pipelining is available in the [Trainer](../loop/train.md) framework. Set the schedule in the `pipelining` section of the Trainer config:
+Pipelining is available in the [`Trainer`](../loop/train.md) framework. Set the schedule in the `pipelining` section of the `Trainer` config:
 
 ```json
 {
@@ -177,11 +177,11 @@ Pipelining is available in the [Trainer](../loop/train.md) framework. Set the sc
 }
 ```
 
-The Trainer builds the schedule and distributes the layers.
+The `Trainer` builds the schedule and distributes the layers.
 
 ### Manual Usage
 
-To use pipelining outside the Trainer, for example in a custom loop, call the `build_schedule` factory.
+To use pipelining outside the `Trainer`, for example in a custom loop, call the `build_schedule` factory.
 
 `build_schedule` takes a **model provider** instead of a built model. The model provider is a function that accepts a `PipelineStageInfo` and returns the `nn.Module` for that stage. This keeps construction consistent.
 

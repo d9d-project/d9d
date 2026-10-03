@@ -2,7 +2,7 @@
 
 ## About
 
-`d9d` does not use a fixed set of lifecycle methods, such as `on_step_start` or `on_post_optimizer`. Instead, a typed **event bus** lets you extend both the training and the inference loops. Any user component (`TrainTask`, `ModelProvider`, etc.) can subscribe to specific points of the execution. You subscribe *only* to the events you need, so your code does not depend on the internal execution order.
+d9d does not use a fixed set of lifecycle methods, such as `on_step_start` or `on_post_optimizer`. Instead, a typed **event bus** lets you extend both the training and the inference loops. Any user component (`TrainTask`, `ModelProvider`, etc.) can subscribe to specific points of the execution. You subscribe *only* to the events you need, so your code does not depend on the internal execution order.
 
 ## How It Works
 

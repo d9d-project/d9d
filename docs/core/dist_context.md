@@ -42,7 +42,7 @@ In d9d, `DistributedContext` is the explicit controller of the whole distributed
 
 ## DeviceMesh Domains
 
-Different parts of a model need different parallelism strategies, for example dense layers and Mixture-of-Experts (MoE) layers. d9d describes each strategy as a **DeviceMesh domain**.
+Different parts of a model need different parallelism strategies, for example dense layers and Mixture-of-Experts (MoE) layers. d9d describes each strategy as a **`DeviceMesh` domain**.
 
 The physical GPUs stay the same, but each domain arranges them into a different mesh. There are domains for MoE layers, for dense layers and for the input batch. Get the `DeviceMesh` of a domain with `dist_ctx.mesh_for(domain_name)`.
 

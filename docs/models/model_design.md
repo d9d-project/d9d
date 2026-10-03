@@ -26,9 +26,9 @@ See [Pipeline Parallelism](./pipeline_parallelism.md).
 
 ### Late Initialization
 
-Building a large model on a single GPU, or even in CPU RAM, often runs out of memory. d9d avoids this with the `ModuleLateInit` protocol. Every model stage that you pass to the [Trainer](../loop/train.md) must implement it.
+Building a large model on a single GPU, or even in CPU RAM, often runs out of memory. d9d avoids this with the `ModuleLateInit` protocol. Every model stage that you pass to the [`Trainer`](../loop/train.md) must implement it.
 
-The Trainer initializes a model stage in this order:
+The `Trainer` initializes a model stage in this order:
 
 1.  Construct the model on the `meta` device, which allocates no memory.
 2.  Apply the horizontal parallelism strategy.

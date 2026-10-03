@@ -41,7 +41,7 @@ Distributed training frameworks such as **Megatron-LM** are monolithic: you run 
 
 Writing your own distributed training solution from scratch is also hard. You must implement many low-level components that are the same across setups, such as distributed checkpoints and synchronization. You must also fix common performance bottlenecks yourself.
 
-**d9d** fills the gap between monolithic frameworks and homebrew setups. It gives you modular building blocks for distributed training.
+d9d fills the gap between monolithic frameworks and homebrew setups. It gives you modular building blocks for distributed training.
 
 ### What d9d Is and Isn't
 
@@ -70,7 +70,7 @@ To balance hackability and performance, d9d follows these design principles:
 
 ## Community and Support
 
-Join our community if you need help, want to discuss large-scale training strategies, or want to contribute to **d9d**.
+Join our community if you need help, want to discuss large-scale training strategies, or want to contribute to d9d.
 
 *   💬 **Discord:** [Join the d9d server](https://discord.gg/sNRjDbxVrg) for real-time chat, support, and framework hacking.
 *   🐛 **Issues:** For bug reports and feature requests, please use the [GitHub Issue Tracker](https://github.com/d9d-project/d9d/issues).

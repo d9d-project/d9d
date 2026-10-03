@@ -61,7 +61,7 @@ class MyCustomOp(torch.autograd.Function):
 
 ### In Training Loops
 
-The d9d pipelining schedules set the context for split-backward passes. If you use them, directly or through the [Trainer](../loop/train.md), you do not need to do anything.
+The d9d pipelining schedules set the context for split-backward passes. If you use them, directly or through the [`Trainer`](../loop/train.md), you do not need to do anything.
 
 If you write your own split-backward logic, you must set the context yourself:
 
