@@ -13,7 +13,7 @@ class PiecewiseConfig(BaseModel):
     """Configuration for the piecewise learning rate scheduler.
 
     Attributes:
-        name: Discriminator tag, must be ``"piecewise"``.
+        name: Discriminator field. Always ``"piecewise"``.
         scheduler: Detailed configuration for the piecewise schedule.
     """
 

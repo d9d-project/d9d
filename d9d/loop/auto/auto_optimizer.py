@@ -34,7 +34,7 @@ class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
     """Configuration for the Stochastic AdamW optimizer.
 
     Attributes:
-        name: Discriminator tag.
+        name: Discriminator field. Always ``"stochastic_adamw"``.
         lr: Learning rate.
         betas: Coefficients used for computing running averages of gradient and its square.
         eps: Term added to the denominator to improve numerical stability.
@@ -70,7 +70,7 @@ class AdamWOptimizerConfig(BaseAutoOptimizerConfig):
     """Configuration for the PyTorch AdamW optimizer.
 
     Attributes:
-        name: Discriminator tag.
+        name: Discriminator field. Always ``"adamw"``.
         lr: The learning rate.
         betas: Coefficients for computing running averages of gradient and its square.
         eps: Term added to the denominator to improve numerical stability.
@@ -110,7 +110,7 @@ class AdamOptimizerConfig(BaseAutoOptimizerConfig):
     """Configuration for the PyTorch Adam optimizer.
 
     Attributes:
-        name: Discriminator tag.
+        name: Discriminator field. Always ``"adam"``.
         lr: The learning rate.
         betas: Coefficients for computing running averages of gradient and its square.
         eps: Term added to the denominator to improve numerical stability.
@@ -153,7 +153,7 @@ class SGDOptimizerConfig(BaseAutoOptimizerConfig):
     """Configuration for the PyTorch SGD optimizer.
 
     Attributes:
-        name: Discriminator tag.
+        name: Discriminator field. Always ``"sgd"``.
         lr: The learning rate.
         momentum: Momentum factor.
         dampening: Dampening for momentum.

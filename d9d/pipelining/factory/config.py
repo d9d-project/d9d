@@ -9,7 +9,7 @@ class PipelineScheduleInferenceConfig(BaseModel):
     This schedule runs all forward passes and no backward passes.
 
     Attributes:
-        schedule: The schedule name, ``"inference"``.
+        schedule: Discriminator field. Always ``"inference"``.
     """
 
     schedule: Literal["inference"] = "inference"
@@ -22,7 +22,7 @@ class PipelineScheduleGPipeConfig(BaseModel):
     starts the backward pass.
 
     Attributes:
-        schedule: The schedule name, ``"gpipe"``.
+        schedule: Discriminator field. Always ``"gpipe"``.
     """
 
     schedule: Literal["gpipe"] = "gpipe"
@@ -35,7 +35,7 @@ class PipelineScheduleLoopedBFSConfig(BaseModel):
     stage before it moves to the next.
 
     Attributes:
-        schedule: The schedule name, ``"looped_bfs"``.
+        schedule: Discriminator field. Always ``"looped_bfs"``.
         num_stages_per_rank: The number of stages hosted on each rank.
     """
 
@@ -51,7 +51,7 @@ class PipelineSchedule1F1BConfig(BaseModel):
     into input-gradient and weight-gradient parts to reduce pipeline bubbles.
 
     Attributes:
-        schedule: The schedule name, ``"1f1b"``.
+        schedule: Discriminator field. Always ``"1f1b"``.
         num_stages_per_rank: The number of stages hosted on each rank.
         zero_bubble: Whether to use the Interleaved Zero Bubble (ZB1P) variant.
     """
@@ -69,7 +69,7 @@ class PipelineScheduleZeroBubbleVConfig(BaseModel):
     weight-gradient parts. It always hosts 2 stages per rank.
 
     Attributes:
-        schedule: The schedule name, ``"zero_bubble_v"``.
+        schedule: Discriminator field. Always ``"zero_bubble_v"``.
     """
 
     schedule: Literal["zero_bubble_v"] = "zero_bubble_v"
@@ -83,7 +83,7 @@ class PipelineScheduleDualPipeVConfig(BaseModel):
     microbatches per step must be at least twice the pipeline-parallel size.
 
     Attributes:
-        schedule: The schedule name, ``"dual_pipe_v"``.
+        schedule: Discriminator field. Always ``"dual_pipe_v"``.
     """
 
     schedule: Literal["dual_pipe_v"] = "dual_pipe_v"

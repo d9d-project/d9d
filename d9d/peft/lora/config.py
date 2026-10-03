@@ -22,7 +22,7 @@ class LoRAConfig(BaseModel):
     """Configuration for LoRA application.
 
     Attributes:
-        kind: Discriminator field, always ``"lora"``.
+        kind: Discriminator field. Always ``"lora"``.
         module_name_pattern: Regular expression that must fully match the names of modules to wrap with LoRA.
         params: Hyperparameters for the LoRA layers.
     """

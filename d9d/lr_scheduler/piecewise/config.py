@@ -13,7 +13,7 @@ class CurveLinearConfig(BaseModel):
     """Configuration for linear interpolation.
 
     Attributes:
-        type: Discriminator, always ``"linear"``.
+        type: Discriminator field. Always ``"linear"``.
     """
 
     type: Literal["linear"] = "linear"
@@ -23,7 +23,7 @@ class CurveCosineConfig(BaseModel):
     """Configuration for cosine interpolation.
 
     Attributes:
-        type: Discriminator, always ``"cosine"``.
+        type: Discriminator field. Always ``"cosine"``.
     """
 
     type: Literal["cosine"] = "cosine"
@@ -33,7 +33,7 @@ class CurveExponentialConfig(BaseModel):
     """Configuration for exponential interpolation.
 
     Attributes:
-        type: Discriminator, always ``"exponential"``.
+        type: Discriminator field. Always ``"exponential"``.
     """
 
     type: Literal["exponential"] = "exponential"
@@ -43,7 +43,7 @@ class CurvePolyConfig(BaseModel):
     """Configuration for polynomial interpolation.
 
     Attributes:
-        type: Discriminator, always ``"poly"``.
+        type: Discriminator field. Always ``"poly"``.
         power: Exponent of the polynomial.
     """
 
@@ -80,7 +80,7 @@ class StepPhaseConfig(BaseModel):
     """Configuration for a phase defined by a fixed number of steps.
 
     Attributes:
-        mode: Discriminator, always ``"steps"``.
+        mode: Discriminator field. Always ``"steps"``.
         steps: Duration of this phase in steps.
         target_multiplier: Multiplier at the end of this phase.
         curve: Interpolation curve configuration.
@@ -97,7 +97,7 @@ class PercentagePhaseConfig(BaseModel):
     """Configuration for a phase that lasts until a given fraction of the total steps.
 
     Attributes:
-        mode: Discriminator, always ``"percentage"``.
+        mode: Discriminator field. Always ``"percentage"``.
         percentage: Fraction of the total steps, from 0.0 to 1.0, at which this phase ends.
         target_multiplier: Multiplier at the end of this phase.
         curve: Interpolation curve configuration.
@@ -114,7 +114,7 @@ class RestPhaseConfig(BaseModel):
     """Configuration for a phase that lasts until the end of training.
 
     Attributes:
-        mode: Discriminator, always ``"rest"``.
+        mode: Discriminator field. Always ``"rest"``.
         target_multiplier: Multiplier at the end of training.
         curve: Interpolation curve configuration.
     """

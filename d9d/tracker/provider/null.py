@@ -12,7 +12,7 @@ class NullTrackerConfig(BaseModel):
     """Configuration of the null tracker, which logs nothing.
 
     Attributes:
-        provider: The discriminator field. Must be ``"null"``.
+        provider: Discriminator field. Always ``"null"``.
     """
 
     provider: Literal["null"] = "null"

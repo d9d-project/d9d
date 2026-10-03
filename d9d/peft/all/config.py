@@ -10,7 +10,7 @@ class PeftStackConfig(BaseModel):
     """Configuration for applying a stack of multiple PEFT methods sequentially.
 
     Attributes:
-        kind: Discriminator field, always ``"stack"``.
+        kind: Discriminator field. Always ``"stack"``.
         methods: The PEFT configurations (e.g. LoRA, full tune) to apply in order.
     """
 

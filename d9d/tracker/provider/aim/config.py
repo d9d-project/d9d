@@ -7,7 +7,7 @@ class AimConfig(BaseModel):
     """Configuration of the Aim tracker backend.
 
     Attributes:
-        provider: The discriminator field. Must be ``"aim"``.
+        provider: Discriminator field. Always ``"aim"``.
         repo: The path or URL of the Aim repository.
         log_system_params: Whether to log system resource usage (CPU, GPU, memory).
         capture_terminal_logs: Whether to capture stdout and stderr.
