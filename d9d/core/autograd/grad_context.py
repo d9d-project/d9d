@@ -3,14 +3,13 @@ from enum import StrEnum
 
 
 class GradDirection(StrEnum):
-    """Enum representing the specific gradient edges to compute.
+    """Gradient edges that a custom autograd function can compute.
 
-    This is used to manually control gradient flow in custom autograd functions
-    during split backward passes.
+    Custom autograd functions use it to skip gradient work during split backward passes.
 
     Attributes:
-        inputs: Mark gradient edge as pointing to the module's inputs (activations).
-        weight: Mark gradient edge as pointing to the module's parameters (weights).
+        inputs: The gradient edges to the module inputs (activations).
+        weight: The gradient edges to the module parameters (weights).
     """
 
     inputs = "inputs"
@@ -18,36 +17,31 @@ class GradDirection(StrEnum):
 
 
 class GlobalGradContext:
-    """Global state manager for controlling gradient computation in custom autograd functions.
+    """Global state that controls gradient computation in custom autograd functions.
 
-    This context addresses a limitation in PyTorch where custom `torch.autograd.Function`
-    implementations set `ctx.needs_input_grad` to True for all edges requiring grad,
-    even during partial backward passes (e.g., `torch.autograd.backward(inputs=...)`).
+    PyTorch sets ``ctx.needs_input_grad`` to ``True`` for every edge that requires grad in a custom
+    ``torch.autograd.Function``. It does so even in a partial backward pass, such as
+    ``torch.autograd.backward(inputs=...)``. See the
+    [related issue](https://github.com/pytorch/pytorch/issues/174017).
 
-    For additional information on this limitation, please refer to a
-        [related issue](https://github.com/pytorch/pytorch/issues/174017).
+    This class works around the limitation:
 
-    This class allows:
-
-    1. For the training code - to explicitly signal which gradient edges (inputs vs weights)
-        should currently be computed, allowing custom ops to skip unnecessary computations.
-    2. For module code - to check whether it's required to compute a gradient edge.
+    1. Training code sets which gradient edges (inputs or weights) to compute now.
+    2. Module code checks whether it must compute a gradient edge, and skips the work otherwise.
     """
 
     def __init__(self):
-        """Constructs a GlobalGradContext object with all directions enabled by default."""
-        # both directions by default
+        """Constructs the ``GlobalGradContext`` object with both directions enabled."""
         self._enabled_directions: set[GradDirection] = {GradDirection.inputs, GradDirection.weight}
 
     def check_direction(self, direction: GradDirection | None) -> bool:
-        """Checks if the gradient calculation for the given direction is currently enabled.
+        """Checks whether gradient computation for the given direction is enabled.
 
         Args:
-            direction: The direction to check (inputs or weights). If None,
-                returns True.
+            direction: The direction to check.
 
         Returns:
-            True if the direction is enabled or None is passed, False otherwise.
+            ``True`` if the direction is enabled or ``direction`` is ``None``, ``False`` otherwise.
         """
         if direction is None:
             return True
@@ -56,10 +50,9 @@ class GlobalGradContext:
 
     @contextmanager
     def with_directions(self, *directions: GradDirection):
-        """Context manager that sets the enabled gradient directions.
+        """Enables only the given gradient directions inside the context.
 
-        This overrides the current state for the duration of the context
-        and restores the previous state afterwards.
+        The previous directions are restored when the context exits.
 
         Args:
             *directions: The gradient directions to enable.
@@ -71,9 +64,7 @@ class GlobalGradContext:
 
 
 GLOBAL_GRAD_CONTEXT = GlobalGradContext()
-"""
-The singleton instance of GlobalGradContext.
+"""The singleton ``GlobalGradContext``.
 
-This should be used by custom autograd functions to check `GLOBAL_GRAD_CONTEXT.check_direction()`
-during their backward pass.
+Custom autograd functions call ``GLOBAL_GRAD_CONTEXT.check_direction()`` in their backward pass.
 """

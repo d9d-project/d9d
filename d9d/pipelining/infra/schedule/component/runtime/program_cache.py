@@ -30,10 +30,10 @@ class PipelineProgramCache:
     """
 
     def __init__(self, dist_context: DistributedContext, builder: "PipelineProgramBuilder"):
-        """Constructs a PipelineProgramCache.
+        """Constructs the ``PipelineProgramCache`` object.
 
         Args:
-            dist_context: The distributed context, used to resolve this rank's position in the pp group.
+            dist_context: The distributed context, used to find the position of this rank in the ``pp`` group.
             builder: Builder that composes the all-rank action program for a microbatch count.
         """
         pp_group = dist_context.mesh_for(REGULAR_DOMAIN).get_group("pp")
@@ -49,7 +49,7 @@ class PipelineProgramCache:
             num_microbatches: The number of microbatches in the step.
 
         Returns:
-            The cached program for this rank plus whether it contains backward work.
+            The cached program for this rank and whether it contains backward work.
         """
         cache_value = self._cache.get(num_microbatches)
         if cache_value is None:

@@ -26,12 +26,11 @@ from .computations import (
 
 
 class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
-    """Represents a single structural stage in a Pipelined Model.
+    """A single stage of a pipelined model.
 
-    This class acts as an orchestrator that combines the P2P handlers (`StageReceiver`/`StageSender`
-    for I/O) and the `Forward`/`BackwardComputeHandler` (for execution). It abstracts away the
-    complexity of buffer management, distributed communication, and gradient calculation from the
-    scheduler.
+    It combines the P2P handlers (``StageReceiver`` and ``StageSender``) with the compute handlers
+    (``ForwardComputeHandler`` and ``BackwardComputeHandler``). It hides buffer management, P2P
+    communication and gradient computation from the schedule.
     """
 
     def __init__(
@@ -41,13 +40,13 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         group: dist.ProcessGroup,
         stage_to_host_topology: dict[int, int],
     ):
-        """Constructs a PipelineStage object.
+        """Constructs the ``PipelineStage`` object.
 
         Args:
-            info: Metadata about the stage (index, total stages).
-            module: The PyTorch module executed by this stage.
-            group: The distributed process group for pipeline communications.
-            stage_to_host_topology: Dict mapping stage ID to PP rank hosting it.
+            info: The position of the stage in the pipeline.
+            module: The module that runs this stage.
+            group: The pipeline-parallel process group.
+            stage_to_host_topology: Mapping from stage index to the pipeline-parallel rank that hosts it.
         """
         self._info = info
         self._module = module
@@ -68,6 +67,7 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
 
     @property
     def info(self) -> PipelineStageInfo:
+        """The position of this stage in the pipeline."""
         return self._info
 
     def _peer_global_rank(self, stage_idx: int) -> int:
@@ -100,12 +100,11 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
     def configure_buffers(self, has_backward: bool, pipeline_inputs_per_microbatch: tuple[TPipelineInput, ...]):
         """Initializes the communication handlers and buffers for the stage.
 
-        This must be called before execution to establish P2P buffer sizes and directions. Transfer
-        shapes are inferred per microbatch, so each microbatch's receive buffers are sized
-        independently and the microbatches in a pack may differ in shape.
+        It must run before the stage executes any microbatch. Transfer shapes are inferred per
+        microbatch, so the microbatches in a pack can differ in shape.
 
         Args:
-            has_backward: Does this pipeline stage should store info for a backward pass
+            has_backward: Whether the stage must prepare for a backward pass.
             pipeline_inputs_per_microbatch: A ``PipelineInput`` for each microbatch.
 
         Raises:
@@ -116,7 +115,9 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
 
         module = self._module
         if not isinstance(module, ModuleSupportsPipelining):
-            raise TypeError("Module does not implement ModuleSupportsPipelining protocol")
+            raise TypeError(
+                f"The stage module ({type(module).__name__}) must implement the ModuleSupportsPipelining protocol."
+            )
 
         self._forward_receiver = self._make_receiver(
             pipeline_inputs_per_microbatch,
@@ -146,24 +147,30 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
 
     def _require_configured(self):
         if not self._configured:
-            raise ValueError("You must configure stage buffers first")
+            raise ValueError("The stage buffers are not configured. Call configure_buffers() first.")
 
     def _require_backward(self) -> BackwardComputeHandler[TPipelineInput, TStageTransfer]:
         if self._backward_comp is None:
-            raise ValueError("Stage is not configured for a backward pass")
+            raise ValueError(
+                "The stage is not configured for a backward pass. Call configure_buffers() with has_backward=True."
+            )
         return self._backward_comp
 
     def set_local_fwd_input(self, inputs: TStageTransfer, microbatch_index: int):
-        """Sets local forward inputs manually.
+        """Sets the forward inputs from the previous stage on the same rank.
 
-        Used for the V-shape schedulers.
+        V-shape schedules use it, because the previous stage can live on the same rank.
+
+        Args:
+            inputs: The ``StageTransfer`` produced by the previous stage.
+            microbatch_index: The microbatch identifier.
 
         Raises:
             ValueError: If the stage is not configured, or has no forward receiver (first stage).
         """
         self._require_configured()
         if self._forward_receiver is None:
-            raise ValueError("Stage has no forward receiver")
+            raise ValueError("The first stage has no forward receiver.")
 
         self._forward_receiver.set_inputs_local(inputs, microbatch_index)
 
@@ -180,7 +187,7 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
             ValueError: If called on the last stage, which produces a ``PipelineOutput`` instead.
         """
         if self._info.is_current_stage_last:
-            raise ValueError("The last stage produces a PipelineOutput, not a StageTransfer")
+            raise ValueError("The last stage produces a PipelineOutput, not a StageTransfer.")
 
         return cast(TStageTransfer, self._forward_comp.get_outputs(microbatch_index))
 
@@ -197,15 +204,18 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
             ValueError: If called on a non-last stage, which produces a ``StageTransfer`` instead.
         """
         if not self._info.is_current_stage_last:
-            raise ValueError("Only the last stage produces a PipelineOutput")
+            raise ValueError("Only the last stage produces a PipelineOutput.")
 
         return cast(TPipelineOutput, self._forward_comp.get_outputs(microbatch_index))
 
     def pop_local_bwd_output(self, microbatch_index: int) -> TStageTransfer:
-        """Retrieves local backward outputs (gradients).
+        """Retrieves and releases the input gradients to hand to the previous stage on the same rank.
+
+        Args:
+            microbatch_index: The microbatch identifier.
 
         Returns:
-            The backward output gradients.
+            The input gradients, shaped like the incoming ``StageTransfer``.
 
         Raises:
             ValueError: If the stage is not configured for backward passes.
@@ -216,7 +226,11 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         return backward_comp.pop_for_sending(microbatch_index)
 
     def set_local_bwd_input(self, inputs: TStageTransfer, microbatch_index: int):
-        """Sets local backward inputs (output gradients) manually.
+        """Sets the output gradients from the next stage on the same rank.
+
+        Args:
+            inputs: The gradients of the ``StageTransfer`` this stage produced.
+            microbatch_index: The microbatch identifier.
 
         Raises:
             ValueError: If the stage is not configured for backward passes, or has no backward
@@ -225,12 +239,15 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         self._require_configured()
         self._require_backward()
         if self._backward_receiver is None:
-            raise ValueError("Stage has no backward receiver (last stage is seeded from the loss)")
+            raise ValueError("The last stage has no backward receiver: its backward pass starts from the loss.")
 
         self._backward_receiver.set_inputs_local(inputs, microbatch_index)
 
     def get_fwd_recv_ops(self, microbatch_index: int) -> list[dist.P2POp]:
         """Returns P2P ops to receive forward inputs for the given microbatch.
+
+        Args:
+            microbatch_index: The microbatch identifier.
 
         Returns:
             The list of P2P operations (empty if this stage has no forward receiver).
@@ -247,6 +264,9 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
     def get_fwd_send_ops(self, microbatch_index: int) -> list[dist.P2POp]:
         """Returns P2P ops to send forward outputs for the given microbatch.
 
+        Args:
+            microbatch_index: The microbatch identifier.
+
         Returns:
             The list of P2P operations (empty if this stage has no forward sender).
 
@@ -260,7 +280,10 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         return self._forward_sender.send(self.get_produced_transfer(microbatch_index))
 
     def get_bwd_recv_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """Returns P2P ops to receive backward gradients for the given microbatch.
+        """Returns P2P ops to receive output gradients for the given microbatch.
+
+        Args:
+            microbatch_index: The microbatch identifier.
 
         Returns:
             The list of P2P operations (empty if this stage has no backward receiver).
@@ -275,7 +298,10 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         return self._backward_receiver.receive(microbatch_index)
 
     def get_bwd_send_ops(self, microbatch_index: int) -> list[dist.P2POp]:
-        """Returns P2P ops to send backward gradients for the given microbatch.
+        """Returns P2P ops to send input gradients for the given microbatch.
+
+        Args:
+            microbatch_index: The microbatch identifier.
 
         Returns:
             The list of P2P operations (empty if this stage has no backward sender).
@@ -296,15 +322,14 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         pipeline_inputs: TPipelineInput,
         pipeline_shared: TSharedInput,
     ):
-        """Executes a forward pass for a single microbatch chunk.
+        """Runs the forward pass for one microbatch.
 
-        Fetches inputs from the communication buffer (or `pipeline_inputs` if first stage),
-        runs the computation, and caches the result.
+        The first stage reads ``pipeline_inputs``. Other stages read the received transfer. The
+        result is cached for the backward pass.
 
         Args:
             microbatch_index: The microbatch index.
-            pipeline_inputs: The ``PipelineInput`` provided locally (only used if this is the first
-                stage).
+            pipeline_inputs: The ``PipelineInput`` of the microbatch. Only the first stage uses it.
             pipeline_shared: The ``SharedInput`` passed to every stage.
 
         Raises:
@@ -320,18 +345,18 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         self._forward_comp.run(microbatch_index=microbatch_index, inputs=inputs, shared=pipeline_shared)
 
     def backward_one_chunk(self, microbatch_index: int, loss: torch.Tensor | None = None, full_backward: bool = True):
-        """Executes a backward pass for a single microbatch chunk.
-
-        Can perform either a full backward or just the input gradients (if `full_backward=False`).
-        It fetches required data from forward cache and communication buffers.
+        """Runs the backward pass for one microbatch.
 
         Args:
             microbatch_index: The microbatch index.
-            loss: The loss tensor (only used if this is the last stage).
-            full_backward: If True, computes grads for inputs and weights. If False, only for inputs.
+            loss: The loss tensor. Only the last stage uses it, and there it must be set.
+            full_backward: If ``True``, computes gradients for the inputs and the weights. If
+                ``False``, computes only the input gradients; ``backward_weight_one_chunk`` computes
+                the weight gradients later.
 
         Raises:
-            ValueError: If the stage is not configured for backward passes.
+            ValueError: If the stage is not configured for backward passes, or if ``loss`` is
+                ``None`` on the last stage.
         """
         self._require_configured()
         backward_comp = self._require_backward()
@@ -340,9 +365,9 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
 
         seed: BackwardSeed[TStageTransfer]
         if self._backward_receiver is None:
-            # last stage: the output stays in the pipeline, backward is seeded from the loss
+            # Last stage: the output does not leave the pipeline, so the backward pass starts from the loss.
             if loss is None:
-                raise ValueError("Cannot perform backward on last stage without loss specified")
+                raise ValueError("The last stage needs a loss for the backward pass, but loss is None.")
             seed = BackwardSeedLoss(loss=loss)
         else:
             seed = BackwardSeedTransfer(
@@ -355,16 +380,17 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         else:
             backward_comp.backward_input(microbatch_index=microbatch_index, inputs=inputs, seed=seed)
 
+        # The last stage no longer needs its outputs for the backward pass. Detaching them frees the
+        # autograd graph early. Views cannot be detached in place. Mirrors torch/distributed/pipelining/stage.py.
         if self._info.is_current_stage_last and not self._info.is_current_stage_first:
             for t in pytree.tree_leaves(fwd_outputs):
                 if not t._is_view():  # noqa: SLF001 - PyTorch has no public check for views
                     t.detach_()
 
     def backward_weight_one_chunk(self, microbatch_index: int):
-        """Executes the weight gradient accumulation part of the backward pass.
+        """Runs the deferred weight backward for one microbatch.
 
-        This assumes `backward_one_chunk(..., full_backward=False)` was already called
-        for this microbatch.
+        ``backward_one_chunk(..., full_backward=False)`` must run first for this microbatch.
 
         Args:
             microbatch_index: The microbatch index.
@@ -378,7 +404,7 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         backward_comp.backward_weight(microbatch_index=microbatch_index)
 
     def reset(self):
-        """Resets the internal state of communication handlers, clearing gradients on buffers."""
+        """Releases the live receive buffers of this stage."""
         if self._forward_receiver is not None:
             self._forward_receiver.reset()
         if self._backward_receiver is not None:

@@ -6,13 +6,18 @@ from d9d.core.protocol import LRSchedulerProtocol
 
 
 class PipelinedLRScheduler(LRSchedulerProtocol):
-    """Wrapper that manages multiple LR schedulers for a pipeline parallel rank.
+    """Manages the LR schedulers of all stages hosted on a pipeline-parallel rank.
 
-    Similar to `PipelinedOptimizer`, this aggregates schedulers corresponding to
-    multiple model stages hosted on the current rank.
+    Like ``PipelinedOptimizer``, it exposes the schedulers of several model stages as one scheduler.
     """
 
     def __init__(self, mesh_pp: DeviceMesh | None, schedulers: list[LRSchedulerProtocol]):
+        """Constructs the ``PipelinedLRScheduler`` object.
+
+        Args:
+            mesh_pp: The pipeline-parallel mesh, or ``None`` without pipeline parallelism.
+            schedulers: One LR scheduler per stage hosted on this rank.
+        """
         self._pp_rank = mesh_pp.get_local_rank() if mesh_pp is not None else 0
         self._schedulers = schedulers
 

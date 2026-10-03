@@ -13,7 +13,7 @@ class PipelineProgramBuilder(abc.ABC):
 
         Args:
             num_microbatches: Number of microbatches per step.
-            pp_size: Number of pipeline parallel ranks.
+            pp_size: Number of pipeline-parallel ranks.
 
         Returns:
             A dictionary mapping rank indices to their list of sequential actions.
@@ -23,11 +23,11 @@ class PipelineProgramBuilder(abc.ABC):
     @property
     @abc.abstractmethod
     def num_stages_per_rank(self) -> int:
-        """Returns the number of model stages designated for each rank."""
+        """The number of model stages hosted on each rank."""
         ...
 
     @property
     @abc.abstractmethod
     def topology_style(self) -> ScheduleStyle:
-        """Returns the topology style strategy used to assign stages to ranks."""
+        """The topology style used to assign stages to ranks."""
         ...

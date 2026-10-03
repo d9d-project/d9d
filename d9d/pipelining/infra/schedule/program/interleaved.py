@@ -15,24 +15,24 @@ from ..component.runtime import (
 
 
 class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
-    """Builder for Interleaved Pipeline Parallelism schedules.
+    """Builder for interleaved pipeline parallelism schedules.
 
     This builder supports:
 
-    1.  **Standard Interleaved 1F1B**: Assigns multiple stages per rank and prioritizes
-        depth-first execution. (See https://arxiv.org/pdf/2104.04473)
-    2.  **Interleaved Zero Bubble (ZB1P)**: Extends 1F1B by splitting backward passes
-        into Input Gradients and Weight Gradients. Weight gradients are delayed
-        to fill pipeline bubbles. (See https://arxiv.org/pdf/2401.10241)
+    1.  **Standard Interleaved 1F1B**: Hosts several stages per rank and prefers depth-first
+        execution. (See https://arxiv.org/abs/2104.04473)
+    2.  **Interleaved Zero Bubble (ZB1P)**: Extends 1F1B by splitting the backward pass into
+        input-gradient and weight-gradient parts. Weight gradients are deferred to fill pipeline
+        bubbles. (See https://arxiv.org/abs/2401.10241)
     """
 
     def __init__(self, num_stages_per_rank: int, enable_zero_bubble: bool = False):
-        """Constructs the Interleaved 1F1B builder.
+        """Constructs the ``Interleaved1F1BPipelineProgramBuilder`` object.
 
         Args:
             num_stages_per_rank: Number of stages per rank.
-            enable_zero_bubble: If True, uses the ZB1P schedule variant which
-                splits backward passes to reduce bubble size.
+            enable_zero_bubble: If ``True``, uses the ZB1P variant, which splits backward passes
+                to reduce bubbles.
         """
         self._num_stages_per_rank = num_stages_per_rank
         self._enable_zero_bubble = enable_zero_bubble
@@ -58,15 +58,15 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         """Generates the execution program for all ranks.
 
         Args:
-            num_microbatches: Total microbatches. Must be divisible by the derived
-                number of rounds.
+            num_microbatches: Number of microbatches per step. It must be divisible by the number of
+                rounds, ``max(1, num_microbatches // pp_size)``.
             pp_size: Number of pipeline ranks.
 
         Returns:
             A dictionary mapping rank indices to their list of sequential actions.
 
         Raises:
-            ValueError: If num_stages is not divisible by pp_size or microbatches by rounds.
+            ValueError: If ``num_microbatches`` is not divisible by the number of rounds.
         """
         num_stages = self.num_stages_per_rank * pp_size
 
@@ -76,7 +76,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
             )
 
         # 1. Topology Setup
-        # Use Loop/Round-Robin assignment: Rank 0 gets Stage 0, PP, 2*PP...
+        # Round-robin: rank 0 hosts stages 0, pp_size, 2 * pp_size, and so on.
         stage_to_rank = build_stage_to_host_rank_topology(
             pp_size=pp_size, num_stages=num_stages, style=ScheduleStyle.loop
         )
@@ -84,14 +84,16 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         num_rounds = max(1, num_microbatches // pp_size)
 
         if num_microbatches % num_rounds != 0:
-            raise ValueError(f"microbatches ({num_microbatches}) must be divisible by rounds ({num_rounds}).")
+            raise ValueError(
+                f"num_microbatches ({num_microbatches}) must be divisible by the number of rounds ({num_rounds})."
+            )
 
         microbatches_per_round = num_microbatches // num_rounds
 
         # 2. Schedule Generation
         actions: dict[int, list[ActionBase]] = {}
 
-        # Zero Bubble 1f1b uses a shorter warmup heuristic (factor 1) than Standard (factor 2)
+        # Zero Bubble 1F1B uses a shorter warmup (factor 1) than standard 1F1B (factor 2).
         warmup_multiplier = 1 if self._enable_zero_bubble else 2
 
         for rank in range(pp_size):
@@ -130,14 +132,14 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         fwd_counters: dict[int, int] = defaultdict(int)
         bwd_counters: dict[int, int] = defaultdict(int)
 
-        # FIFO Queue for deferred weight gradients in Zero Bubble
-        # Stores: (stage_idx, microbatch_idx)
+        # FIFO queue for deferred weight gradients in Zero Bubble.
+        # Stores: (stage_idx, microbatch_idx).
         pending_weights: deque[tuple[int, int]] = deque()
 
         # -- Helpers --
 
         def get_global_stage(local_idx: int) -> int:
-            """Converts a local virtual stage index (0..N) to global stage ID.
+            """Converts a local stage index on this rank to a global stage index.
 
             Returns:
                 The global stage index.
@@ -167,8 +169,8 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
             stage = get_global_stage(local_idx)
             mb = bwd_counters[stage]
 
-            # In Zero Bubble, we split: Backward Input (Now) + Backward Weight (Later)
-            # In Standard 1F1B, we do full backward now.
+            # Zero Bubble runs the input backward now and defers the weight backward.
+            # Standard 1F1B runs the full backward now.
             is_full = not self._enable_zero_bubble
 
             rank_actions.append(
@@ -185,7 +187,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
                 return
 
             steps_into_1f1b = op_idx - warmup_offset
-            # The earliest reasonable time to start weaving in weights is proportional to rank depth
+            # Deeper ranks wait longer before they start the deferred weight backwards.
             if steps_into_1f1b >= rank:
                 w_stage, w_mb = pending_weights.popleft()
                 rank_actions.append(BackwardWeightComputeAction(stage_idx=w_stage, microbatch_idx=w_mb))
@@ -197,7 +199,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
         fwd_bwd_ops = total_microbatch_ops - warmup_ops
         cooldown_ops = total_microbatch_ops - fwd_bwd_ops
 
-        # Combine into one sequence for iteration, but handle logic per phase
+        # Combine into one sequence for iteration, but handle logic per phase.
         total_ops = warmup_ops + fwd_bwd_ops + cooldown_ops
 
         # -- Main Schedule Loop --

@@ -1,4 +1,4 @@
-"""Pipelining API that is intended to be accessible by end user."""
+"""Public pipelining API for end users."""
 
 from .module import (
     ModuleSupportsPipelining,

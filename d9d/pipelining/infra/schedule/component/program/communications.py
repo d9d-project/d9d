@@ -50,12 +50,10 @@ def _check_action_communication_dependencies_fulfilled(
 def check_action_communication_dependencies_fulfilled(
     action: ActionBase, rank_events: set[ActionBase], num_stages: int
 ) -> bool:
-    """Checks if data dependencies (Receive or Local Compute) are met for an action.
+    """Checks whether the data dependencies of an action are met.
 
-    This function determines if a compute action is allowed to run based on
-    whether its inputs are available in `rank_events`. Inputs are available
-    if they were either computed locally by a previous stage or received
-    from a remote rank.
+    A compute action can run when its inputs are available in ``rank_events``. Inputs are available
+    if a previous stage computed them on this rank or if they were received from a remote rank.
 
     Args:
         action: The action to check.
@@ -63,7 +61,7 @@ def check_action_communication_dependencies_fulfilled(
         num_stages: Total number of stages in the pipeline.
 
     Returns:
-        True if all dependencies are satisfied, False otherwise.
+        ``True`` if all dependencies are met, ``False`` otherwise.
     """
     return all(
         _check_action_communication_dependencies_fulfilled(sub, rank_events, num_stages)
@@ -121,10 +119,9 @@ def add_communication_ops(
 ) -> dict[int, list[ActionBase]]:
     """Injects communication actions into a computation-only schedule.
 
-    This function iterates through the provided compute schedule and simulates execution.
-    When a compute action produces a result needed by a different rank, it injects
-    Send/Receive pairs. It also reorders actions to ensure that Receive
-    operations occur before the Computes that depend on them, preventing deadlocks.
+    This function simulates the compute schedule. When a compute action produces a result that
+    another rank needs, it adds a send and receive pair. Each receive comes before the computes
+    that depend on it, so the schedule does not deadlock.
 
     Args:
         compute_actions: Initial schedule containing only compute operations.
@@ -135,7 +132,7 @@ def add_communication_ops(
         A new schedule dictionary including both compute and communication actions.
 
     Raises:
-        RuntimeError: If the schedule simulation enters a deadlock state.
+        RuntimeError: If the schedule simulation deadlocks.
     """
     compute_actions = copy.deepcopy(compute_actions)
 
@@ -153,13 +150,11 @@ def add_communication_ops(
             current_action = compute_actions[rank][0]
             sub_actions = _get_sub_actions(current_action)
 
-            # Check readiness
             if not check_action_communication_dependencies_fulfilled(
                 current_action, completed_events[rank], num_stages
             ):
                 continue
 
-            # Execute
             full_actions[rank].append(current_action)
             compute_actions[rank].pop(0)
             progress = True
@@ -171,15 +166,17 @@ def add_communication_ops(
                     sub_action, num_stages=num_stages, stage_to_rank=stage_to_rank
                 )
                 if comm_pkg:
-                    # Add Send locally
                     full_actions[rank].append(comm_pkg.send)
                     completed_events[rank].add(comm_pkg.send)
 
-                    # Add Recv remotely and unblock target
+                    # Adding the receive to the peer rank unblocks its dependent compute.
                     full_actions[comm_pkg.sends_to_rank].append(comm_pkg.recv)
                     completed_events[comm_pkg.sends_to_rank].add(comm_pkg.recv)
 
         if not progress and compute_actions:
-            raise RuntimeError("Deadlock in schedule simulation")
+            raise RuntimeError(
+                "The schedule simulation deadlocked: no rank can run its next action. "
+                "Check the compute order produced by the program builder."
+            )
 
     return full_actions

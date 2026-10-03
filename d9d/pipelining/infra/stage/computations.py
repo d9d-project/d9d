@@ -37,15 +37,15 @@ class ForwardCache(Generic[TPipelineInput, TStageTransfer, TPipelineOutput]):
 class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
     """Handles the execution of the forward pass for a pipeline stage module.
 
-    Maintains a cache of inputs and outputs indexed by microbatch ID.
+    It caches the inputs and outputs of each microbatch for the backward pass.
     """
 
     def __init__(self, stage_index: int, module: nn.Module):
-        """Constructs a ForwardComputeHandler object.
+        """Constructs the ``ForwardComputeHandler`` object.
 
         Args:
             stage_index: Logical index of the stage.
-            module: The PyTorch module representing this stage computation.
+            module: The module that runs this stage.
         """
         self._stage_idx = stage_index
         self._module = module
@@ -61,12 +61,14 @@ class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput
             shared: The ``SharedInput`` passed to every stage.
 
         Raises:
-            RuntimeError: If the forward pass implementation fails.
+            RuntimeError: If the module forward pass raises. The original exception is chained.
         """
         try:
             output = self._module(inputs, shared)
         except Exception as e:
-            raise RuntimeError(f"S{self._stage_idx}B{microbatch_index} failed to run forward") from e
+            raise RuntimeError(
+                f"The forward pass failed on stage ({self._stage_idx}) for microbatch_index ({microbatch_index})."
+            ) from e
 
         self._cache[microbatch_index] = ForwardCache(inputs=inputs, outputs=output)
 
@@ -86,7 +88,7 @@ class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput
     ) -> tuple[TPipelineInput | TStageTransfer, TStageTransfer | TPipelineOutput]:
         """Retrieves and removes the cached inputs and outputs for a specific microbatch.
 
-        Typically called when initiating the backward pass.
+        The backward pass calls it.
 
         Args:
             microbatch_index: Identifier for the microbatch.
@@ -115,14 +117,13 @@ class _SendableInputGrads:
 class _DeferredFullBackward:
     """A full backward to replay at weight time.
 
-    Used by the first stage, which cannot split input- and weight-gradient passes (it has no input
-    peer to send input grads to), so it stashes the flattened tensors and runs a full backward when
-    the weight phase arrives.
+    The first stage uses it. It has no previous stage to send input gradients to, so it does not split
+    the backward pass. It keeps the flattened tensors and runs a full backward in the weight phase.
 
     Attributes:
         outputs: The output tensor leaves to backprop from.
-        output_grads: Their gradient leaves, or None to seed an implicit unit gradient.
-        inputs: The input tensor leaves the backward flows into.
+        output_grads: Their gradient leaves, or ``None`` to seed an implicit unit gradient.
+        inputs: The input tensor leaves the backward pass flows into.
     """
 
     outputs: list[torch.Tensor]
@@ -132,11 +133,11 @@ class _DeferredFullBackward:
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class _DeferredWeightBackward:
-    """A weight-gradient-only backward to replay from saved param groups (the ZB split optimization).
+    """A weight-gradient-only backward pass to replay from saved param groups (the Zero Bubble split).
 
     Attributes:
         param_groups: The parameter groups whose weight gradients still need accumulating.
-        ownership_tokens: Autograd nodes kept alive to own the pending gradient graph.
+        ownership_tokens: References that keep the pending gradient graph alive.
     """
 
     param_groups: list[ParamGroup]
@@ -147,11 +148,12 @@ class _DeferredWeightBackward:
 class _BackwardState:
     """Per-microbatch backward state carried between the backward phases.
 
-    A single entry holds two orthogonal, independently-optional facts:
+    Each field can be ``None`` independently of the other.
 
     Attributes:
-        sendable_grads: The input gradients ready to send upstream, or None on the first stage.
-        pending_weight: The weight-gradient work still to run, or None after a full backward.
+        sendable_grads: The input gradients ready to send upstream, or ``None`` on the first stage
+            and after they were sent.
+        pending_weight: The weight-gradient work still to run, or ``None`` after a full backward.
     """
 
     sendable_grads: _SendableInputGrads | None
@@ -162,7 +164,7 @@ class _BackwardState:
 class BackwardSeedLoss:
     """Backward seed for the last stage.
 
-    The produced output does not leave the pipeline, so backward is seeded directly from the scalar
+    The produced output does not leave the pipeline, so the backward pass is seeded directly from the scalar
     loss with an implicit unit gradient.
 
     Attributes:
@@ -176,7 +178,7 @@ class BackwardSeedLoss:
 class BackwardSeedTransfer(Generic[TStageTransfer]):
     """Backward seed for a non-last stage.
 
-    Backward propagates the gradients received from the next stage through the transfer this stage
+    The backward pass propagates the gradients received from the next stage through the transfer this stage
     produced in the forward pass.
 
     Attributes:
@@ -194,12 +196,12 @@ BackwardSeed = BackwardSeedLoss | BackwardSeedTransfer[TStageTransfer]
 class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
     """Handles the execution of backward passes for a pipeline stage.
 
-    Supports splitting the backward pass into input-gradients and weight-gradients phases, which is
-    necessary for schedules like ZB.
+    It can split the backward pass into an input-gradient and a weight-gradient phase, as Zero Bubble
+    schedules require.
     """
 
     def __init__(self, stage_index: int, module: nn.Module, has_input_peer: bool):
-        """Constructs a BackwardComputeHandler object.
+        """Constructs the ``BackwardComputeHandler`` object.
 
         Args:
             stage_index: Logical index of the stage (used only in diagnostics).
@@ -228,7 +230,7 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
             case BackwardSeedTransfer():
                 return pytree.tree_leaves(seed.outputs), pytree.tree_leaves(seed.output_grads)
             case _:
-                raise ValueError("Unknown backward seed type")
+                raise ValueError(f"Unknown backward seed type ({type(seed).__name__}).")
 
     def backward_full(
         self,
@@ -241,13 +243,16 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
         Args:
             microbatch_index: Identifier for the microbatch.
             inputs: The input transfer used in the forward pass.
-            seed: The downstream backward seed (loss on the last stage, transfer + grads otherwise).
+            seed: The downstream backward seed: the loss on the last stage, the transfer and its
+                gradients otherwise.
 
         Raises:
-            ValueError: If a double backward is attempted for the same microbatch.
+            ValueError: If a backward pass already ran for this microbatch.
         """
         if microbatch_index in self._cache:
-            raise ValueError(f"S{self._stage_idx}B{microbatch_index} double backward")
+            raise ValueError(
+                f"A backward pass already ran on stage ({self._stage_idx}) for microbatch_index ({microbatch_index})."
+            )
 
         input_leaves, input_spec = pytree.tree_flatten(inputs)
         output_leaves, output_grad_leaves = self._seed_leaves(seed)
@@ -270,18 +275,21 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
     ):
         """Performs a partial backward pass to compute gradients with respect to inputs only.
 
-        This prepares the computation state for a subsequent `backward_weight` call.
+        A later ``backward_weight`` call for the same microbatch computes the weight gradients.
 
         Args:
             microbatch_index: Identifier for the microbatch.
             inputs: The input transfer used in the forward pass.
-            seed: The downstream backward seed (loss on the last stage, transfer + grads otherwise).
+            seed: The downstream backward seed: the loss on the last stage, the transfer and its
+                gradients otherwise.
 
         Raises:
-            ValueError: If a double backward is attempted.
+            ValueError: If a backward pass already ran for this microbatch.
         """
         if microbatch_index in self._cache:
-            raise ValueError(f"S{self._stage_idx}B{microbatch_index} double backward")
+            raise ValueError(
+                f"A backward pass already ran on stage ({self._stage_idx}) for microbatch_index ({microbatch_index})."
+            )
 
         input_leaves, input_spec = pytree.tree_flatten(inputs)
         output_leaves, output_grad_leaves = self._seed_leaves(seed)
@@ -314,16 +322,20 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
     def backward_weight(self, microbatch_index: int):
         """Performs a partial backward pass to accumulate gradients into weights.
 
-        Must be preceded by `backward_input` for the same microbatch index.
+        ``backward_input`` must run first for the same microbatch.
 
         Args:
             microbatch_index: Identifier for the microbatch.
 
         Raises:
-            ValueError: If `backward_input` was not called before or if called twice.
+            ValueError: If ``backward_input`` did not run for this microbatch, or if the weight
+                backward already ran.
         """
         if microbatch_index not in self._cache:
-            raise ValueError(f"S{self._stage_idx}BW{microbatch_index} - weight backward with no input backward before")
+            raise ValueError(
+                f"Weight backward on stage ({self._stage_idx}) for microbatch_index ({microbatch_index}) "
+                "needs a preceding input backward."
+            )
 
         state = self._cache[microbatch_index]
         pending = state.pending_weight
@@ -338,7 +350,11 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
             case _DeferredWeightBackward():
                 stage_backward_weight(weights=self._parameters_with_grad(), param_groups=pending.param_groups)
             case None:
-                raise ValueError("Previous backward was a full backward, not an input backward")
+                raise ValueError(
+                    f"No weight backward is pending on stage ({self._stage_idx}) for microbatch_index "
+                    f"({microbatch_index}): the previous backward pass was a full backward, or the weight backward "
+                    "already ran."
+                )
 
         state.pending_weight = None
         self._release_if_complete(microbatch_index)
@@ -353,17 +369,25 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
             The input gradients, shaped like the stage's input transfer.
 
         Raises:
-            ValueError: If the required backward pass was not performed or if gradients are missing.
+            ValueError: If no input gradients are ready for sending, or if an input gradient is
+                ``None``.
         """
         state = self._cache[microbatch_index]
 
         sendable = state.sendable_grads
         if sendable is None:
-            raise ValueError("You should call either backward_full or backward_input before popping cached grad")
+            raise ValueError(
+                f"No input gradients to send on stage ({self._stage_idx}) for microbatch_index ({microbatch_index}). "
+                "Call backward_full() or backward_input() first."
+            )
 
         for grad_value in sendable.leaves:
             if grad_value is None:
-                raise ValueError("Cannot pop null gradient for sending! Perhaps malformed schedule?")
+                raise ValueError(
+                    f"An input gradient on stage ({self._stage_idx}) for microbatch_index ({microbatch_index}) "
+                    "is None and cannot be sent. Every tensor in the incoming StageTransfer must have a "
+                    "differentiable path to the stage outputs."
+                )
 
         full_tree = pytree.tree_unflatten(sendable.treespec, sendable.leaves)
 

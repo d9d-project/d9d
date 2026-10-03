@@ -46,8 +46,8 @@ class _MicrobatchInputSpec:
 class _BufferConfig:
     """Identifies a stage-buffer allocation: the input fingerprint of every microbatch in the pack.
 
-    Buffers are sized per microbatch, so the cache key covers all of them — a pack whose microbatch
-    shapes differ from the last step's (in count or in any individual shape) reconfigures.
+    Buffers are sized per microbatch, so the key covers all of them. Stage buffers are reconfigured
+    when the microbatch count or any microbatch shape differs from the last step.
     """
 
     microbatches: tuple[_MicrobatchInputSpec, ...]
@@ -66,7 +66,7 @@ class _BufferConfig:
 
 
 class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
-    """Executes a defined pipeline schedule by interpreting a sequence of actions."""
+    """Executes a pipeline schedule by running its sequence of actions."""
 
     def __init__(
         self,
@@ -74,7 +74,7 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
         stages: list[PipelineStage],
         program_builder: "PipelineProgramBuilder",
     ):
-        """Constructs the schedule executor.
+        """Constructs the ``PipelineScheduleExecutor`` object.
 
         Args:
             dist_context: The distributed context.
@@ -109,13 +109,16 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
     ):
         num_microbatches = len(inputs_microbatches)
         if num_microbatches == 0:
-            raise ValueError("Cannot run a pipeline step over an empty pack")
+            raise ValueError("Cannot run a pipeline step over an empty pack.")
         if len(shared_microbatches) != num_microbatches:
-            raise ValueError("inputs_microbatches and shared_microbatches must have the same length")
+            raise ValueError(
+                f"inputs_microbatches ({num_microbatches}) and shared_microbatches ({len(shared_microbatches)}) "
+                "must have the same length."
+            )
 
         expected_structure = pytree.tree_flatten(inputs_microbatches[0])[1]
         if any(pytree.tree_flatten(microbatch)[1] != expected_structure for microbatch in inputs_microbatches):
-            raise ValueError("All microbatches in a pack must share the same PipelineInput structure")
+            raise ValueError("All microbatches in a pack must share the same PipelineInput structure.")
 
         program = self._programs.program_for(num_microbatches)
         self._configure_buffers(inputs_microbatches, program.has_backward)

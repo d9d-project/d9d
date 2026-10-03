@@ -18,8 +18,8 @@ class _MicrobatchReceivePlan:
     """How to receive and rebuild one microbatch's incoming transfer.
 
     Attributes:
-        leaf_specs: The specs of the ordered tensor leaves to receive, in transfer flatten order;
-            each sizes one receive buffer.
+        leaf_specs: The specs of the tensor leaves to receive, in transfer flatten order. Each spec
+            sizes one receive buffer.
         treespec: The structure spec that rebuilds the ``StageTransfer`` from the received leaves.
     """
 
@@ -31,7 +31,7 @@ def _build_receive_plan(spec_per_microbatch: tuple[PyTree[TensorSpec], ...]) -> 
     plan_per_microbatch: list[_MicrobatchReceivePlan] = []
 
     for pytree_specs in spec_per_microbatch:
-        # tree_flatten is guaranteed to be deterministic in order
+        # Sender and receiver match leaves by flatten order, and tree_flatten keeps that order deterministic.
         leaf_specs, treespec = pytree.tree_flatten(pytree_specs, is_leaf=_is_spec)
         plan_per_microbatch.append(_MicrobatchReceivePlan(leaf_specs=leaf_specs, treespec=treespec))
 
@@ -48,16 +48,15 @@ class StageReceiver(Generic[TStageTransfer]):
         group: dist.ProcessGroup,
         requires_grad: bool,
     ):
-        """Constructs a StageReceiver object.
+        """Constructs the ``StageReceiver`` object.
 
         Args:
             peer_global_rank: The global (world) rank of the peer stage sending the transfer.
             spec_per_microbatch: The incoming transfer spec (a ``TensorSpec`` PyTree) for each
-                microbatch in the pack; the receive buffers for microbatch ``i`` are sized from
-                entry ``i``.
-            group: The process group strictly for pipeline communication.
-            requires_grad: Whether receive buffers should require gradients (enables gradient flow
-                from backward stages to forward stages).
+                microbatch in the pack. Entry ``i`` sizes the receive buffers of microbatch ``i``.
+            group: The pipeline-parallel process group.
+            requires_grad: Whether receive buffers require gradients, so that the backward pass
+                can compute gradients for them.
         """
         self._peer_global_rank = peer_global_rank
         self._group = group
@@ -70,15 +69,16 @@ class StageReceiver(Generic[TStageTransfer]):
             spec.shape,
             dtype=spec.dtype,
             layout=spec.layout,
-            device="cuda",  # force device
+            # TensorSpec has no device field: receive buffers always live on the current CUDA device.
+            device="cuda",
             requires_grad=self._requires_grad,
         )
 
     def set_inputs_local(self, inputs: TStageTransfer, microbatch_index: int):
-        """Manually fills the input buffer for a specific microbatch with a local transfer.
+        """Fills the input buffers of a microbatch with a transfer from a stage on the same rank.
 
-        Used for the V-shape schedulers, where the producing stage lives on the same rank and its
-        transfer is handed over directly rather than received via the network.
+        V-shape schedules use it when the producing stage lives on the same rank, so the transfer
+        does not go over the network.
 
         Args:
             inputs: The ``StageTransfer`` produced by the peer stage.
@@ -91,9 +91,8 @@ class StageReceiver(Generic[TStageTransfer]):
     def pop_inputs(self, microbatch_index: int) -> TStageTransfer:
         """Retrieves and releases the input transfer for a specific microbatch.
 
-        Consume-once: the buffers are removed from the handler, transferring ownership to the caller so
-        the memory can be freed once the caller (e.g. the forward/backward cache) releases it. Calling
-        this twice for the same microbatch raises ``KeyError``.
+        The buffers are removed from the receiver, so the caller owns them and can free them. A second
+        call for the same microbatch raises ``KeyError``.
 
         Args:
             microbatch_index: The microbatch identifier.
@@ -102,23 +101,23 @@ class StageReceiver(Generic[TStageTransfer]):
             The received ``StageTransfer``, reconstructed from the buffers.
 
         Raises:
-            KeyError: If no buffer has been allocated for the microbatch (never received or set).
+            KeyError: If the microbatch has no live buffers: they were never received or set, or were
+                already popped.
         """
         treespec = self._plan_per_microbatch[microbatch_index].treespec
         buffers = self._live_buffers.pop(microbatch_index)
         return cast(TStageTransfer, pytree.tree_unflatten(treespec, buffers))
 
     def receive(self, microbatch_index: int) -> list[dist.P2POp]:
-        """Allocates the receive buffers for a microbatch and generates the P2P receive operations.
+        """Allocates the receive buffers for a microbatch and builds the P2P receive operations.
 
-        Allocates one buffer per transfer leaf (in flatten order) and registers them as live until
-        consumed by :meth:`pop_inputs`, then builds the ``dist.irecv`` ops that fill them.
+        The buffers stay live until ``pop_inputs`` consumes them.
 
         Args:
             microbatch_index: The microbatch identifier.
 
         Returns:
-            A list of `dist.P2POp` objects configured for `dist.irecv`.
+            A list of ``dist.P2POp`` objects for ``dist.irecv``.
         """
         ops = []
         buffers = []
@@ -140,23 +139,23 @@ class StageSender(Generic[TStageTransfer]):
     """Sends one stage's outgoing ``StageTransfer`` to a single peer stage."""
 
     def __init__(self, peer_global_rank: int, group: dist.ProcessGroup):
-        """Constructs a StageSender object.
+        """Constructs the ``StageSender`` object.
 
         Args:
             peer_global_rank: The global (world) rank of the peer stage consuming the transfer.
-            group: The process group strictly for pipeline communication.
+            group: The pipeline-parallel process group.
         """
         self._peer_global_rank = peer_global_rank
         self._group = group
 
     def send(self, send_contents: TStageTransfer) -> list[dist.P2POp]:
-        """Generates the PyTorch P2P send operations for a transfer.
+        """Builds the P2P send operations for a transfer.
 
         Args:
             send_contents: The ``StageTransfer`` to send (only its tensor leaves are read).
 
         Returns:
-            A list of `dist.P2POp` objects configured for `dist.isend`.
+            A list of ``dist.P2POp`` objects for ``dist.isend``.
         """
         return [
             dist.P2POp(dist.isend, leaf, self._peer_global_rank, self._group)

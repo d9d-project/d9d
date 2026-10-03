@@ -13,20 +13,19 @@ from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 def stage_backward_full(
     outputs: list[torch.Tensor], output_grads: list[torch.Tensor] | None, inputs: list[torch.Tensor]
 ) -> list[torch.Tensor | None]:
-    """Performs a standard, full backward pass for a pipeline stage.
+    """Runs a full backward pass for a pipeline stage.
 
-    This function computes gradients for the inputs based on the gradients
-    received for the outputs.
+    It computes the gradients of the inputs and accumulates the weight gradients.
 
     Args:
         outputs: The output tensors of the forward pass.
-        output_grads: The gradients arriving from the next pipeline stage corresponding
-            to `outputs`. If None, assumes scalar output or implied ones.
-        inputs: The input tensors to the forward pass for which gradients are required.
+        output_grads: The gradients for ``outputs`` from the next pipeline stage. If ``None``,
+            ``outputs`` must be scalars, and autograd seeds them with an implicit unit gradient.
+        inputs: The input tensors of the forward pass to return gradients for.
 
     Returns:
-        A list of gradients corresponding to the `inputs`. If some input does not require gradient - its result will
-            be None.
+        The gradients of ``inputs``, in order. The entry is ``None`` for an input that got no
+        gradient.
     """
     with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs, GradDirection.weight):
         torch.autograd.backward(tensors=outputs, grad_tensors=output_grads)
@@ -42,15 +41,15 @@ def stage_backward_full(
 class ParamGroup:
     """Represents a group of parameters and their dependency intermediates in the autograd graph.
 
-    This structure is used to manage the split backward pass, identifying which
-    intermediate nodes in the graph allow gradients to flow to specific sets of parameters.
+    The split backward pass uses it to find the intermediate nodes through which gradients flow to
+    a set of parameters.
 
     Attributes:
-        params: Set of autograd Nodes representing the parameters.
-        intermediates: List of autograd Nodes serving as entry points for gradients
-            flowing to these parameters.
-        grads: Storage for captured gradients at the intermediate nodes during
-            the input backward phase, one per output of each intermediate node.
+        params: The gradient accumulator nodes of the parameters.
+        intermediates: The nodes through which gradients enter these parameters, or ``None`` after the
+            weight backward consumed them.
+        grads: The gradients captured at each intermediate node during the input backward. Each entry
+            holds one gradient per output of the node.
     """
 
     params: set[Node]
@@ -60,7 +59,8 @@ class ParamGroup:
 
 def _get_grad_fn_or_grad_acc(t: torch.Tensor) -> Node | None:
     if t.requires_grad and t.grad_fn is None:
-        # hack from pytorch codebase to create accumulation op
+        # A leaf's AccumulateGrad node is created lazily, and a dummy view creates it. Mirrors
+        # _get_grad_fn_or_grad_acc in torch/distributed/pipelining/_backward.py.
         viewed_t = t.view_as(t)
         grad_fn = viewed_t.grad_fn
         grad_fn = cast(Node, grad_fn)
@@ -70,10 +70,10 @@ def _get_grad_fn_or_grad_acc(t: torch.Tensor) -> Node | None:
 
 
 def _construct_reverse_graph(roots: list[Node]) -> dict[Node, list[Node]]:
-    """Builds a reverse adjacency list (Input -> Output) via BFS from the roots.
+    """Builds a reverse adjacency list (input -> output) by BFS from the roots.
 
-    Standard autograd graphs point from Output -> Input (next_functions).
-    This helper provides the reverse mapping to assist in dependency analysis.
+    Autograd graphs point from output to input (``next_functions``). The reverse mapping serves the
+    dependency analysis.
 
     Args:
         roots: The starting nodes for the graph traversal.
@@ -105,8 +105,8 @@ def _reverse_closure(
     """Computes a closure of nodes reachable from roots in the reverse graph.
 
     Args:
-        roots: Starting nodes.
-        target_nodes: Nodes that act as boundaries/targets for the search.
+        roots: The starting nodes.
+        target_nodes: The nodes where the search stops. They are recorded but not expanded.
         reverse_edges_dict: The reverse graph adjacency list.
 
     Returns:
@@ -141,8 +141,8 @@ def _get_param_groups(
 ) -> list[ParamGroup]:
     """Clusters parameters based on their dependencies on inputs.
 
-    This function identifies how gradients propagate from inputs through intermediates
-    to parameters, grouping them to facilitate split backward execution.
+    This function finds how gradients flow from the inputs through intermediates to the parameters.
+    Parameters that share intermediates go into one group.
 
     Args:
         inputs: Gradient functions of the input tensors.
@@ -175,7 +175,7 @@ def _get_param_groups(
         for intermediate_node in current_dict["intermediates"]:
             node_to_group_map[intermediate_node] = current_dict
 
-    # Deduplicate and Convert to Dataclass
+    # Several intermediates map to the same group dict, so deduplicate by identity.
     unique_groups = []
     seen_ids = set()
     for group_dict in node_to_group_map.values():
@@ -190,7 +190,6 @@ def _get_param_groups(
 
 def _make_capture_hook(group: ParamGroup, idx: int) -> Callable[[tuple[torch.Tensor | None, ...]], None]:
     def _hook(grad_in: tuple[torch.Tensor | None, ...]):
-        # Lazy init gradients list
         if group.grads is None and group.intermediates is not None:
             group.grads = [None] * len(group.intermediates)
 
@@ -215,10 +214,9 @@ class BackwardInputResult:
 
     Attributes:
         input_grads: The gradients computed for the input tensors.
-        param_groups: The parameter groups with hooks established to capture
-            weight gradients in the subsequent phase.
-        grad_ownership_tokens: References to tensors keeping the computation
-            graph alive for the weight backward phase.
+        param_groups: The parameter groups with the gradients captured for the weight backward.
+        grad_ownership_tokens: References that keep the autograd graph alive for the weight
+            backward.
     """
 
     input_grads: list[torch.Tensor | None]
@@ -232,13 +230,11 @@ def stage_backward_input(
     inputs: list[torch.Tensor],
     weights: Iterator[nn.Parameter],
 ) -> BackwardInputResult:
-    """Performs the first phase of a split backward pass: Input Gradients.
+    """Runs the first phase of a split backward pass: the input gradients.
 
-    This function computes the gradients with respect to `inputs` while postponing
-    the computation of gradients with respect to `weights`. It analyzes the
-    autograd graph to identify intermediate nodes where gradients destined for
-    weights split off from the main flow. Hooks are registered at these
-    intermediates to capture gradients for the second phase (`stage_backward_weight`).
+    This function computes the gradients of ``inputs`` and defers the gradients of ``weights``. It
+    captures the gradients at the intermediate nodes where the weight gradients branch off. The
+    second phase, ``stage_backward_weight``, replays them.
 
     Args:
         outputs: The output tensors of the forward pass.
@@ -247,8 +243,8 @@ def stage_backward_input(
         weights: An iterator over the model parameters (weights).
 
     Returns:
-        A result object containing input gradients, prepared parameter groups,
-        and ownership tokens to maintain graph validity.
+        The input gradients, the parameter groups with captured gradients, and the tokens that keep
+        the graph alive.
     """
     outputs_grad_fn = [grad_fn for x in outputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
     inputs_grad_fn = [grad_fn for x in inputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
@@ -278,8 +274,6 @@ def stage_backward_input(
         )
 
     final_input_grads = []
-
-    # 6. Cleanup
     for input_item in inputs:
         final_input_grads.append(input_item.grad)
         input_item.grad = None
@@ -297,11 +291,11 @@ def stage_backward_input(
 def stage_backward_weight(  # noqa: C901 - edge collection and the single backward pass share the clamp hooks
     weights: Iterator[nn.Parameter], param_groups: list[ParamGroup], retain_graph: bool = False
 ) -> tuple[torch.Tensor | None, ...]:
-    """Performs the second phase of a split backward pass: Weight Gradients.
+    """Runs the second phase of a split backward pass: the weight gradients.
 
-    This function consumes the gradients captured in the `ParamGroup`s during
-    `stage_backward_input` to compute the final gradients for the model weights.
-    It triggers a single backward pass starting from all the intermediate nodes identified previously.
+    This function replays the gradients that ``stage_backward_input`` captured in the param groups.
+    It runs one backward pass from all intermediate nodes and accumulates the weight gradients. The
+    param groups are consumed.
 
     Args:
         weights: An iterator over the model parameters to extract gradients for.
@@ -309,10 +303,10 @@ def stage_backward_weight(  # noqa: C901 - edge collection and the single backwa
         retain_graph: Whether to retain the graph after this backward pass.
 
     Returns:
-        A tuple of gradients corresponding to the provided `weights`.
+        The gradients of ``weights``, in order.
 
     Raises:
-        ValueError: If backward weight is attempted without intermediate gradients.
+        ValueError: If no gradient was captured for an intermediate node of a group.
     """
     grad_acc_to_weight = {}
     all_weights = []  # Keep order
@@ -329,30 +323,32 @@ def stage_backward_weight(  # noqa: C901 - edge collection and the single backwa
     inputs_for_backward = []
 
     for group in param_groups:
-        # Ensure we have data
         if group.grads and group.intermediates:
             for grads_tuple, intermediate in zip(group.grads, group.intermediates, strict=True):
                 if grads_tuple is None:
-                    raise ValueError("Trying to do backward_weight with to intermediate grads")
+                    raise ValueError(
+                        "No gradient was captured for an intermediate node during the input backward, "
+                        "so the weight backward cannot run."
+                    )
                 captured.append((intermediate, grads_tuple))
-                # one edge per output: a multi-output node must get each gradient back on the output it belongs to
+                # One edge per output: a multi-output node must get each gradient back on its own output.
                 for output_nr, grad in enumerate(grads_tuple):
                     if grad is not None:
                         valid_edges.append(GradientEdge(intermediate, output_nr))
                         valid_grad_outputs.append(grad)
             inputs_for_backward.extend(grad_acc_to_weight[node] for node in group.params if node in grad_acc_to_weight)
 
-        # Break Cycle: Intermediates and Grads
+        # The group is consumed: drop its nodes and captured gradients so they can be freed.
         group.intermediates = None
         group.grads = None
 
     if not valid_edges or not inputs_for_backward:
         return tuple(w.grad for w in all_weights)
 
-    # All groups go in a single backward pass: a path from one intermediate down to a weight may cross nodes that
-    # belong to another group, so separate passes would free the graph under each other. Such a path also feeds the
-    # intermediates it crosses on top of the captured gradient already replayed there, so every intermediate is
-    # pinned to its captured gradient to keep anything from being counted twice.
+    # Run all groups in one backward pass. A path from one intermediate to a weight can cross nodes of
+    # another group, so separate passes would free the graph under each other. Such a path also adds
+    # gradient to the intermediates it crosses, on top of their replayed captured gradient. A clamp hook
+    # pins each intermediate to its captured gradient, so nothing is counted twice.
     clamp_handles = []
     if len(captured) > 1:
         for intermediate, grads_tuple in captured:

@@ -14,10 +14,10 @@ PipelineResultFn = Callable[[TPipelineOutput, int], Any]
 
 Args:
     outputs: The ``PipelineOutput`` produced by the last stage.
-    microbatch_idx: The index of the current micro-batch being processed.
+    microbatch_idx: The index of the current microbatch.
 
 Returns:
-    Anything - not used.
+    Any value. The schedule ignores it.
 """
 
 PipelineLossFn = Callable[[TPipelineOutput, int], torch.Tensor]
@@ -25,7 +25,7 @@ PipelineLossFn = Callable[[TPipelineOutput, int], torch.Tensor]
 
 Args:
     outputs: The ``PipelineOutput`` PyTree produced by the last stage.
-    microbatch_idx: The index of the current micro-batch being processed.
+    microbatch_idx: The index of the current microbatch.
 
 Returns:
     The computed loss tensor (scalar).

@@ -6,8 +6,9 @@ class ScheduleStyle(StrEnum):
     """Defines the strategy for mapping logical stages to physical ranks.
 
     Attributes:
-        loop: Assigns stages in a round-robin circular fashion (mod pp_size).
-        v: Assigns stages in a zig-zag V-shape pattern. Useful for interleaved 1F1B schedules.
+        loop: Assigns stages round-robin: stage ``i`` goes to rank ``i % pp_size``.
+        v: Assigns stages in a zig-zag V shape: rank 0 hosts the first and the last stage. Used by
+            the Zero Bubble V and DualPipeV schedules.
     """
 
     loop = "loop"
@@ -18,16 +19,16 @@ def build_stage_to_host_rank_topology(pp_size: int, num_stages: int, style: Sche
     """Constructs the mapping from stage index to rank index.
 
     Args:
-        pp_size: Number of pipeline parallel ranks.
+        pp_size: Number of pipeline-parallel ranks.
         num_stages: Total number of model stages.
         style: The topology style to use for assignment.
 
     Returns:
-        A dictionary mapping stage IDs to Rank IDs.
+        A dictionary mapping stage indices to rank indices.
 
     Raises:
-        ValueError: If the style is unknown or if V-style parameters are invalid
-            (num_stages must be divisible by pp_size).
+        ValueError: If the style is unknown, or if the style is ``v`` and ``num_stages`` is not
+            divisible by ``pp_size``.
     """
     match style:
         case ScheduleStyle.loop:
@@ -58,8 +59,7 @@ def invert_stage_to_host_rank_topology(stage_to_host: dict[int, int]) -> dict[in
         stage_to_host: Mapping from stage index to rank index.
 
     Returns:
-        A dictionary where keys are Rank IDs and values are lists of Stage IDs
-        managed by that rank.
+        A dictionary mapping each rank index to the list of stage indices it hosts.
     """
     host_to_stage = defaultdict(list)
     for stage_idx, host in stage_to_host.items():

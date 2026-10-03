@@ -12,21 +12,21 @@ from ..component.runtime import (
 
 
 class LoopedBFSPipelineProgramBuilder(PipelineProgramBuilder):
-    """Builder for the Breadth-First Pipeline Parallelism schedule.
+    """Builder for the Looped Breadth-First pipeline parallelism schedule.
 
-    This schedule runs all available forward microbatches for local stages first.
-    If configured for training, it then runs backwards in reverse topological order.
+    This schedule first runs the forward pass of all microbatches for the local stages. For training,
+    it then runs the backward passes in reverse order.
 
     References:
-        https://arxiv.org/pdf/2211.05953
+        https://arxiv.org/abs/2211.05953
     """
 
     def __init__(self, num_stages_per_rank: int, inference_mode: bool = False):
-        """Constructs the LoopedBFS builder.
+        """Constructs the ``LoopedBFSPipelineProgramBuilder`` object.
 
         Args:
             num_stages_per_rank: Number of stages per rank.
-            inference_mode: If True, only forward passes are scheduled. If False,
+            inference_mode: If ``True``, only forward passes are scheduled. If ``False``,
                 both forward and backward passes are scheduled.
         """
         self._num_stages_per_rank = num_stages_per_rank
@@ -43,14 +43,11 @@ class LoopedBFSPipelineProgramBuilder(PipelineProgramBuilder):
         for rank in range(pp_size):
             my_stages = [s for s in range(num_stages) if stage_to_rank[s] == rank]
 
-            # Schedule all Forwards
-            # In Breadth-First loops, we finish all microbatches for the current stage
-            # before moving to the next stage assigned to this rank.
+            # Breadth-first: finish all microbatches of a stage before the next stage on this rank.
             for stage_idx in my_stages:
                 for mb_idx in range(num_microbatches):
                     compute_actions[rank].append(ForwardComputeAction(stage_idx=stage_idx, microbatch_idx=mb_idx))
 
-            # Schedule all Backwards (Reverse order) - Only if training
             if not self._inference_mode:
                 for stage_idx in reversed(my_stages):
                     for mb_idx in reversed(range(num_microbatches)):
