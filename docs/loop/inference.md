@@ -30,7 +30,7 @@ You build the `Inference` engine with the `InferenceConfigurator`. It combines t
     *   Triggers the `EVENT_INFERENCE_DATA_STREAM_READY` event.
 
 6.  **Model Materialization**:
-    *   The `ModelStageFactory` builds the model, as in [training](train.md#the-configuration-lifecycle).
+    *   The `ModelStageFactory` builds the model, as in [training](./train.md#the-configuration-lifecycle).
     *   You can reuse the `ModelProvider` from training.
     *   The pipeline schedule is always `PipelineScheduleInferenceConfig`. `InferenceConfig` has no pipelining settings.
     *   Triggers the `EVENT_INFERENCE_MODEL_STAGES_READY` event.
@@ -59,11 +59,11 @@ Before the loop starts:
 
 ### 2. The Step Loop
 
-The loop runs until it reaches `JobSchedule.total_steps`, as in [training](train.md#2-the-step-loop). For every step:
+The loop runs until it reaches `JobSchedule.total_steps`, as in [training](./train.md#2-the-step-loop). For every step:
 
 1.  Triggers the `EVENT_INFERENCE_STEP_PRE` event.
 2.  **Microbatch Execution**:
-    *   The `DevicePackStream` hands out a **pack** of $N$ microbatches, already on the device, as in [training](train.md#data-prefetching).
+    *   The `DevicePackStream` hands out a **pack** of $N$ microbatches, already on the device, as in [training](./train.md#data-prefetching).
     *   Triggers the `EVENT_INFERENCE_FORWARD_PRE` event.
     *   The `InferenceTask` maps each microbatch to model inputs. After the forward pass, it processes the outputs of each microbatch.
     *   Unlike training, **no backward pass** runs.

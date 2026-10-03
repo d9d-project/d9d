@@ -78,7 +78,7 @@ Before the loop starts:
 
 ### 2. The Step Loop
 
-The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](interfaces/data.md)). For every step, the trainer runs these actions in this order:
+The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./interfaces/data.md)). For every step, the trainer runs these actions in this order:
 
 1.  Triggers the `EVENT_TRAIN_STEP_PRE` event.
 2.  **Microbatch Execution**

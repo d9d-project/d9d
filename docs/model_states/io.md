@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.model_state.io` package reads and writes model checkpoints. It is built on the [`d9d.model_state.mapper`](mapper.md) framework, so it can transform model states on the fly while it streams them. It does not load the whole checkpoint into memory at once.
+The `d9d.model_state.io` package reads and writes model checkpoints. It is built on the [`d9d.model_state.mapper`](./mapper.md) framework, so it can transform model states on the fly while it streams them. It does not load the whole checkpoint into memory at once.
 
 ## Checkpoint Format
 
@@ -37,7 +37,7 @@ d9d saves differently:
 
 ## Usage
 
-These examples load and save model states without transforming them. For complex mappings, see the [Model State Mapper](mapper.md) page.
+These examples load and save model states without transforming them. For complex mappings, see the [Model State Mapper](./mapper.md) page.
 
 ### Raw I/O: Streamed Loading
 
