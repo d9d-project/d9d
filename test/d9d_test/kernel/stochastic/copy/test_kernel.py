@@ -8,7 +8,7 @@ def test_bad_shape():
     src = torch.empty(100, dtype=torch.float32, device="cuda")
     tgt = torch.empty(200, dtype=torch.bfloat16, device="cuda")
 
-    with pytest.raises(ValueError, match="different shape"):
+    with pytest.raises(ValueError, match="must match target shape"):
         copy_fp32_to_bf16_stochastic_(tgt, src)
 
 

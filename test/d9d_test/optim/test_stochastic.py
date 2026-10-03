@@ -9,11 +9,11 @@ from d9d.optim.stochastic import StochasticAdamW
 @pytest.mark.parametrize(
     ("kwargs", "match_msg"),
     [
-        ({"lr": -0.1}, "Invalid learning rate"),
-        ({"eps": -1e-6}, "Invalid epsilon value"),
-        ({"betas": (-0.1, 0.999)}, "Invalid beta parameter at index 0"),
-        ({"betas": (0.9, 1.0)}, "Invalid beta parameter at index 1"),
-        ({"weight_decay": -0.01}, "Invalid weight_decay value"),
+        ({"lr": -0.1}, r"^lr \("),
+        ({"eps": -1e-6}, r"^eps \("),
+        ({"betas": (-0.1, 0.999)}, r"^betas\[0\]"),
+        ({"betas": (0.9, 1.0)}, r"^betas\[1\]"),
+        ({"weight_decay": -0.01}, r"^weight_decay \("),
     ],
 )
 def test_init_validation(kwargs, match_msg):
@@ -30,7 +30,7 @@ def test_step_errors():
     param = torch.zeros(10, dtype=torch.bfloat16, requires_grad=True)
     optim = StochasticAdamW([param], lr=1e-3)
 
-    with pytest.raises(ValueError, match="Closure is not supported"):
+    with pytest.raises(ValueError, match="does not support closures"):
         optim.step(closure=lambda: 1.0)
 
     # Test sparse gradient error

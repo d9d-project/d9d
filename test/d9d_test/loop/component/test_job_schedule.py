@@ -162,5 +162,5 @@ def test_should_do_action_invalid_input():
     with pytest.raises(ValueError):
         schedule.should_do_action(-5)
 
-    with pytest.raises(ValueError, match="Invalid step configuration"):
+    with pytest.raises(ValueError, match="Invalid step action"):
         schedule.should_do_action("invalid_action")

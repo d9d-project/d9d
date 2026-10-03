@@ -13,15 +13,15 @@ def test_validation_logic():
     m = torch.zeros(valid_shape, dtype=torch.float32, device="cuda").contiguous()
     v = torch.zeros(valid_shape, dtype=torch.float32, device="cuda").contiguous()
 
-    with pytest.raises(ValueError, match="Shape mismatch"):
+    with pytest.raises(ValueError, match="must match params shape"):
         adamw_stochastic_bf16_(
             p, torch.zeros((64,), dtype=torch.bfloat16, device="cuda"), m, v, 1e-3, 0.9, 0.999, 1e-8, 0.0, 1
         )
 
-    with pytest.raises(ValueError, match="Params must be BFloat16"):
+    with pytest.raises(ValueError, match="params dtype"):
         adamw_stochastic_bf16_(p.float(), g.float(), m, v, 1e-3, 0.9, 0.999, 1e-8, 0.0, 1)
 
-    with pytest.raises(ValueError, match="States have different dtypes"):
+    with pytest.raises(ValueError, match="and exp_avg_sq dtype"):
         adamw_stochastic_bf16_(p, g, m.bfloat16(), v.float(), 1e-3, 0.9, 0.999, 1e-8, 0.0, 1)
 
 
