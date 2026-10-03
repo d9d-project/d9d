@@ -1,39 +1,39 @@
 # Gradient Synchronization
 
-!!! warning "Internal API Warning"
-    If you are utilizing the standard `d9d` training infrastructure, you **do not** need to call these functions manually. The framework automatically handles gradient synchronization. This package is primarily intended for users extending `d9d`.
-
 ## About
 
-The `d9d.internals.grad_sync` package provides low-level primitives for synchronizing gradients in distributed training setups utilizing `DTensor`.
+The `d9d.internals.grad_sync` package synchronizes gradients of `DTensor` parameters in distributed training.
 
-Unlike standard PyTorch `DistributedDataParallel` which assumes a uniform communication strategy for the entire model, this package is designed to work with heterogeneous distributions often found in ND-parallelism (e.g., mixtures of Data, Tensor, Sequence, and Pipeline parallelism). It inspects `DTensor` placements to automatically determine which dimensions require reduction (all-reduce) and groups parameters into efficient communication buckets.
+PyTorch `DistributedDataParallel` applies one communication strategy to the whole model. This package instead supports the mixed layouts of ND parallelism, which combines data, tensor, context and pipeline parallelism. It reads the `DTensor` placements of each parameter to find the mesh dimensions that need an all-reduce. Then it groups the parameters into communication buckets.
 
-## Core Concepts
+!!! warning "Internal API"
+    If you use the standard d9d training loop, you do not need to call this package. d9d synchronizes the gradients itself. This page is for users who extend d9d.
 
-### Bucketing & Flattening
+## Bucketing and Flattening
 
-Communication overhead is dominated by latency when reducing many small tensors. To mitigate this, `GradientSynchronizer` groups parameters into **Buckets**.
+When many small tensors are reduced, latency dominates the communication cost. So `GradientSynchronizer` groups parameters into **buckets**.
 
-Inside a `SyncGradientBucket`, gradients for multiple parameters are flattened into a single contiguous block of memory. When a reduction is triggered, the system performs a single `all_reduce` operation on this large buffer instead of hundreds of small operations.
+A `SyncGradientBucket` stores the gradients of all its parameters in one contiguous buffer. Its reduction is a single `all_reduce` per process group on this buffer, instead of hundreds of small operations.
 
-Parameters are grouped automatically based on:
+Parameters share a bucket only if they have the same:
 
-1.  **Device**
-2.  **DType**
-3.  **Associated DeviceMesh**
+1.  **Optimizer parameter group**
+2.  **Device**
+3.  **Gradient dtype**
+4.  **Reduce mesh**: the mesh dimensions where the parameter has a `Replicate` placement
 
-### Asynchronous Reduction
+The `bucket_size_mb` argument limits the size of a bucket in MiB. Parameters are bucketed in reverse order, because the backward pass produces gradients roughly in that order. Parameters with no `Replicate` placement need no reduction. They go to local buckets that do not communicate.
 
-In large-scale training, effective batch size is often increased by accumulating gradients over multiple micro-batches before performing an optimizer step. This package manages the lifecycle of distributed `DTensor` gradients during this accumulation phase without simple `no_sync` context managers.
+## Asynchronous Reduction
 
-1.  **Local Accumulation**: 
-    During the backward pass of the first $N-1$ micro-batches, local gradients are accumulated into the bucket's buffer. Conceptually, while the parameter `DTensor` is `Replicate`d, these intermediate local gradients also represent a `Replicate` (although contain different data) state across the Data Parallel mesh.
+Training often accumulates gradients over several microbatches before an optimizer step. This package manages the `DTensor` gradients during the accumulation. You do not need a `no_sync` context manager.
 
-2.  **Automatic Triggering**: 
-    Each bucket maintains an internal counter. The `all_reduce` communication is *only* triggered when the specific parameter group has reached the `require_accumulations` count. This trigger happens automatically inside the backward hook of the *last* micro-batch, allowing communication to immediately overlap with the computation of remaining layers higher up in the model. This communication is made in a **separate CUDA stream** that **should** be awaited before using the gradients in your default stream.
+1.  **Local accumulation**: During the backward pass of the first $N-1$ microbatches, local gradients accumulate in the bucket buffer. The parameter `DTensor` is `Replicate`, so the gradient also has a `Replicate` placement across the data parallel mesh. Its data still differs between ranks at this point.
 
-3.  **Synchronization**: 
-    Once the asynchronous reduction completes, the flat buffer contains the globally summed gradient. Metadata of the contained parameter gradients is marked as `Replicate`, making them safe for the Optimizer to consume without involving synchronization later.
+2.  **Automatic trigger**: Each bucket counts the gradient accumulations of its parameters. The `all_reduce` starts *only* when all parameters of the bucket reach the `require_accumulations` count. The trigger runs inside the backward hook of the *last* microbatch. So the communication overlaps with the backward pass of the remaining layers. The communication runs on a **separate CUDA stream**. You **must** wait for it before you use the gradients on your default stream.
+
+3.  **Synchronization**: When the asynchronous reduction completes, the flat buffer holds the globally summed gradient. The gradients have the same `Replicate` placement as their parameters. So the optimizer can use them without any further synchronization.
+
+## API Reference
 
 ::: d9d.internals.grad_sync

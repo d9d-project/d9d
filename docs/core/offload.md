@@ -2,33 +2,39 @@
 
 ## About
 
-The `d9d.core.offload` package provides the low-level machinery for releasing GPU-resident training state to host (CPU) memory and restoring it later. It is the foundation of the Trainer's **sleep / wake** API, which frees the accelerator for a colocated workload - most notably a rollout engine sharing the same GPUs in colocated reinforcement learning.
+The `d9d.core.offload` package moves GPU-resident training state to host (CPU) memory and back. It is the base of the **sleep / wake** API of the `Trainer`. Sleep frees the GPUs for a colocated workload, for example a rollout engine that shares the GPUs in colocated reinforcement learning.
 
 The package defines two things:
 
-1. **The `Offloadable` protocol** - the contract a subsystem implements to declare that it owns GPU memory and knows how to release and reacquire it.
-2. **The tensor-swap primitives** - `offload_tensor` and `onload_tensor`, which move a single tensor's storage to and from the host while preserving the tensor (and `DTensor` wrapper) object.
+1.  **The `Offloadable` protocol**: the contract for a subsystem that owns GPU memory and can release and restore it.
+2.  **The tensor primitives** `offload_tensor` and `onload_tensor`: they move the storage of one tensor to the host and back. The tensor object, and the `DTensor` wrapper, stay the same.
 
-The high-level user entry points - `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` - are documented in the [Training Loop](../loop/train.md) page. This page covers the primitives those methods are built on.
+The user entry points `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` are documented on the [Training Loop](../loop/train.md) page. This page covers the primitives they are built on.
 
-## The Round-Trip Invariant
+## The Round-Trip Guarantee
 
-The central guarantee of this subsystem is that **an `offload` followed by an `onload` is observationally a no-op**. Across the round trip:
+**An `offload` followed by an `onload` changes nothing observable.** Across the round trip:
 
-* Parameter and buffer **object identity** is preserved.
-* Optimizer **state-dict keys** and the tensor objects they map to are preserved.
-* `DTensor` **wrapper instances**, their `device_mesh`, `placements`, global `shape`, `stride` and `dtype` are preserved.
+*   Parameters and buffers keep their **object identity**.
+*   The optimizer keeps its **state dict keys** and the tensor objects they map to.
+*   `DTensor` **wrapper instances** keep their `device_mesh`, `placements`, global `shape`, `stride` and `dtype`.
 
-Only the *underlying device storage* is reallocated. This is what makes offloading safe in the presence of external references - gradient hooks, optimizer state keyed by parameter, or a frozen reference model held by a task all keep pointing at the same objects after waking up.
+Only the device storage is allocated again. So external references stay valid after wake-up. Gradient hooks, optimizer state keyed by parameter and a frozen reference model held by a task all point at the same objects.
 
-The trick is that the swap rebinds storage in place rather than creating new tensors:
+The primitives swap the storage in place instead of creating new tensors. For a `DTensor`, only the storage of the local shard moves. The distributed metadata stays on the wrapper.
 
-* For a plain tensor, `tensor.data` is rebound to a host (then back to a device) buffer.
-* For a `DTensor`, only the **local shard's** storage (`_local_tensor.data`) is rebound. All distributed metadata lives on the wrapper and never leaves it, so any code still holding the `DTensor` sees the same object with its placements intact.
+## Sleep Tags
+
+`SleepTag` selects the subsystems that `Trainer.sleep` and `Trainer.wake` act on:
+
+*   **`SleepTag.TENSOR_STATES`**: all GPU tensor state (model parameters and buffers, optimizer state, gradient buckets and the residual loss accumulator). They are offloaded together. `DEFAULT_SLEEP_TAGS` holds only this tag.
+*   **`SleepTag.COMMS`**: NCCL process groups. Opt-in and **not implemented yet**. Requesting it raises `NotImplementedError`.
 
 ## Usage
 
-`offload_tensor` / `onload_tensor` operate on a single tensor and return an `OffloadedTensor` handle that you hold between the two calls. The same tensor object is passed to both.
+### Offloading a Tensor
+
+`offload_tensor` returns an `OffloadedTensor` handle. Keep it until you call `onload_tensor`, and pass the same tensor object to both calls.
 
 ```python
 import torch
@@ -37,31 +43,35 @@ from d9d.core.offload import offload_tensor, onload_tensor
 device = torch.device("cuda")
 param = torch.randn(4096, 4096, device=device)
 
-# Release the GPU storage; `param` now points at a host mirror.
+# Release the GPU storage; `param` now lives in host memory.
 handle = offload_tensor(param, pin_memory=True)
 assert param.device.type == "cpu"
 
-# ... colocated workload runs on the freed GPU ...
+# ... a colocated workload runs on the freed GPU ...
 
 # Restore the GPU storage in place; `param` is the same object as before.
 onload_tensor(param, handle, device=device)
 assert param.device.type == "cuda"
 ```
 
-`DTensor` is handled transparently - pass the wrapper and only its local shard is swapped:
+For a `DTensor`, pass the wrapper. Only its local shard moves:
 
 ```python
 from torch.distributed.tensor import DTensor
 
-dt: DTensor = ...                          # a sharded parameter
+dt: DTensor = ...                          # A sharded parameter
 handle = offload_tensor(dt, pin_memory=True)
-# dt.device_mesh, dt.placements, dt.shape are unchanged here
+# dt.device_mesh, dt.placements and dt.shape are unchanged here.
 onload_tensor(dt, handle, device=device)
 ```
 
 ### Implementing `Offloadable`
 
-Subsystems that own GPU state implement the protocol so the Trainer can fan offload/onload out to them as a unit. The pattern is to record the handles in a mirror, drain the asynchronous copies with `torch.cuda.synchronize`, and guard against double offload/onload.
+A subsystem that owns GPU state implements the protocol, so that the `Trainer` can offload and onload it together with the others. A typical implementation does three things:
+
+1.  Keep the handles in a mirror.
+2.  Wait for the asynchronous copies with `torch.cuda.synchronize`.
+3.  Reject a second offload or onload in a row.
 
 ```python
 import torch
@@ -75,14 +85,14 @@ class MySubsystem(Offloadable):
 
     def offload(self, ctx: OffloadContext) -> None:
         if self._mirror is not None:
-            raise RuntimeError("already offloaded")
+            raise RuntimeError("MySubsystem is already offloaded.")
         self._mirror = {id(t): offload_tensor(t, pin_memory=ctx.pin_memory) for t in self._tensors}
-        # Drain the non-blocking device-to-host copies before storage is freed.
+        # Wait for the non-blocking device-to-host copies before the storage is freed.
         torch.cuda.synchronize(ctx.dist_context.current_device)
 
     def onload(self, ctx: OnloadContext) -> None:
         if self._mirror is None:
-            raise RuntimeError("not offloaded")
+            raise RuntimeError("MySubsystem is not offloaded.")
         device = ctx.dist_context.current_device
         for t in self._tensors:
             onload_tensor(t, self._mirror[id(t)], device=device)
@@ -93,17 +103,8 @@ class MySubsystem(Offloadable):
         return self._mirror is not None
 ```
 
-The built-in `Offloadable` implementations - `TrackedModules` (model parameters and buffers), `PipelinedOptimizer` (optimizer state) and `GradientManager` (gradient buckets and the residual loss accumulator) - all follow this shape.
-
-## Sleep Tags
-
-Offloading is selected by `SleepTag`, a subsystem selector shared by `Trainer.sleep` and `Trainer.wake`:
-
-* **`SleepTag.TENSOR_STATES`** - all GPU tensor state (model parameters and buffers, optimizer state, gradient buckets and the residual loss accumulator). Offloaded as a single unit. This is the only tag enabled by `DEFAULT_SLEEP_TAGS`.
-* **`SleepTag.COMMS`** - NCCL process groups. Opt-in and **not yet implemented**; requesting it raises `NotImplementedError`.
+The built-in implementations follow the same pattern: `TrackedModules` (model parameters and buffers), `PipelinedOptimizer` (optimizer state) and `GradientManager` (gradient buckets and the residual loss accumulator).
 
 ## API Reference
 
 ::: d9d.core.offload
-    options:
-        heading_level: 4

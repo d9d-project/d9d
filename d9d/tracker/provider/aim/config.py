@@ -4,14 +4,14 @@ from pydantic import BaseModel
 
 
 class AimConfig(BaseModel):
-    """Configuration for the Aim tracker backend.
+    """Configuration of the Aim tracker backend.
 
     Attributes:
-        provider: Discriminator field, must be 'aim'.
-        repo: Path to the Aim repository directory or URL.
-        log_system_params: Whether to log system resource usage (CPU/GPU/Memory).
-        capture_terminal_logs: Whether to capture stdout/stderr.
-        system_tracking_interval: Interval in seconds for system monitoring.
+        provider: The discriminator field. Must be ``"aim"``.
+        repo: The path or URL of the Aim repository.
+        log_system_params: Whether to log system resource usage (CPU, GPU, memory).
+        capture_terminal_logs: Whether to capture stdout and stderr.
+        system_tracking_interval: The interval of system monitoring in seconds.
     """
 
     provider: Literal["aim"] = "aim"

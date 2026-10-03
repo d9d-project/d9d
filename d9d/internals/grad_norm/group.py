@@ -11,15 +11,15 @@ from torch.distributed.tensor import DTensor, Shard
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
 class GradNormGroup:
-    """Defines a group of parameters that share the same distributed properties.
+    """Key of a group of parameters with the same distributed properties.
 
-    This grouping is used to batch gradient norm reductions efficiently. Parameters
-    sharing the same device mesh shards can be reduced in a single communication collective.
+    Parameters sharded over the same device meshes share one collective for their gradient norm.
 
     Attributes:
-        shard_meshes: A tuple of device meshes where the parameters are sharded, or None if replicated/local.
-        device: The device where parameters reside.
-        grad_dtype: The data type of the gradients.
+        shard_meshes: The device meshes the parameters are sharded over, or ``None`` if they are replicated or
+            local.
+        device: The device of the parameters.
+        grad_dtype: The dtype of the gradients.
     """
 
     shard_meshes: tuple[DeviceMesh, ...] | None
@@ -28,6 +28,7 @@ class GradNormGroup:
 
 
 ParametersForNorm = dict[GradNormGroup, list[nn.Parameter]]
+"""Parameters grouped by ``GradNormGroup``, as built by ``group_parameters_for_norm``."""
 
 
 def _extract_shard_meshes(param: nn.Parameter) -> tuple[DeviceMesh, ...] | None:
@@ -54,20 +55,20 @@ def _extract_shard_meshes(param: nn.Parameter) -> tuple[DeviceMesh, ...] | None:
 
 
 def _group_sort_key(item: tuple[GradNormGroup, list[nn.Parameter]]) -> Any:
-    # put items WITH shard_meshes on top so they are processed first so we benefit from comm-comp overlap
+    # Sharded groups come first, so their norm all-reduce overlaps with the norm computation of the other groups.
     return item[0].shard_meshes is None
 
 
 def group_parameters_for_norm(parameters: Iterable[nn.Parameter]) -> ParametersForNorm:
-    """Groups parameters based on their distributed tensor characteristics.
+    """Groups parameters by their shard meshes, device and gradient dtype.
 
-    Groups parameters by their sharding meshes, device, and gradient data type.
+    Parameters that do not require gradients are skipped. Groups of sharded parameters come first.
 
     Args:
-        parameters: The iterable of parameters to group.
+        parameters: The parameters to group.
 
     Returns:
-        A dictionary mapping synchronization groups to lists of parameters.
+        A dict that maps groups to their parameters.
     """
     grouped_params: ParametersForNorm = defaultdict(list)
     for param in parameters:
@@ -78,5 +79,4 @@ def group_parameters_for_norm(parameters: Iterable[nn.Parameter]) -> ParametersF
             shard_meshes=_extract_shard_meshes(param), grad_dtype=param.grad_dtype, device=param.device
         )
         grouped_params[group].append(param)
-    # we are sure dict is ordered in python 3.11 so we can sort it...
     return dict(sorted(grouped_params.items(), key=_group_sort_key))

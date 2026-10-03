@@ -22,7 +22,7 @@ def _parameter_to_local_grad(parameter: nn.Parameter) -> torch.Tensor:
     grad = parameter.grad
 
     if grad is None:
-        raise ValueError("None grad detected")
+        raise ValueError("Parameter gradient is None. Every parameter that requires grad must have a gradient.")
 
     if isinstance(grad, DTensor):
         return grad.to_local()
@@ -31,8 +31,6 @@ def _parameter_to_local_grad(parameter: nn.Parameter) -> torch.Tensor:
 
 
 def _get_local_norm_pow(parameters: list[nn.Parameter], norm_type: float) -> torch.Tensor:
-    # calculates for local
-
     if len(parameters) == 0:
         return torch.tensor(0.0, device="cuda")
 
@@ -47,7 +45,6 @@ def _get_local_norm_pow(parameters: list[nn.Parameter], norm_type: float) -> tor
 
 
 def _get_global_norm_pow_horizontal(parameter_groups: ParametersForNorm, norm_type: float) -> torch.Tensor:
-    # calculates for horizontal parallelism
     if len(parameter_groups) == 0:
         return torch.tensor(0.0, device="cuda")
 
@@ -58,8 +55,8 @@ def _get_global_norm_pow_horizontal(parameter_groups: ParametersForNorm, norm_ty
         if group.shard_meshes is not None:
             if len(group.shard_meshes) != 1:
                 raise ValueError(
-                    "Currently we do not support calculating norm for tensors that are sharded on multiple dims - feel "
-                    "free to file an issue if you need it."
+                    f"The number of shard meshes ({len(group.shard_meshes)}) must be 1. Gradient norm of tensors "
+                    "sharded on more than one mesh dimension is not supported. File an issue if you need it."
                 )
             process_group = group.shard_meshes[0].get_group()
             work = cast(
@@ -103,28 +100,23 @@ def _clip_grad_with_norm_(parameter_groups: ParametersForNorm, max_norm: float, 
 def clip_grad_norm_distributed_(
     parameter_groups: ParametersForNorm, max_norm: float | None, norm_type: float, pp_mesh: DeviceMesh | None
 ) -> torch.Tensor:
-    """Clips gradient norms in a fully distributed environment.
+    """Computes the global gradient norm and clips the gradients in place.
 
-    This function calculates the global gradient norm across all dimensions of parallelism
-    (Horizontal - DP/CP/TP/EP/..., and Pipeline) and scales the gradients in-place to ensure the norm
-    does not exceed max_norm.
-
-    It accurately handles DTensors by identifying their sharding placements and performing
-    reductions only on the necessary process groups.
-
-    Overlaps communication and computation if possible.
+    The norm covers all parallelism dimensions: horizontal (DP, CP, TP, EP, ...) and pipeline. The gradients are
+    scaled so that the norm does not exceed ``max_norm``. A ``DTensor`` gradient is reduced only over the process
+    groups it is sharded on. Communication overlaps with computation where possible.
 
     Args:
-        parameter_groups: Dictionary grouping parameters by synchronization requirements,
-            typically created by `group_parameters_for_norm`.
-        max_norm: The maximum allowed norm of the gradients. If None, the function
-            calculates and returns the global norm without modifying the gradients.
-        norm_type: The type of the norm to calculate (e.g., 2.0 for L2 norm, inf for max norm).
-        pp_mesh: The device mesh representing the pipeline parallel dimension, needed
-            to reduce norms across pipeline stages.
+        parameter_groups: Parameters grouped by synchronization requirements, usually built by
+            ``group_parameters_for_norm``.
+        max_norm: The maximum norm of the gradients. If ``None``, the function returns the global norm and does
+            not change the gradients.
+        norm_type: The type of the norm, e.g. ``2.0`` for the L2 norm or ``inf`` for the max norm.
+        pp_mesh: The pipeline parallel device mesh, to reduce the norm across pipeline stages. ``None`` skips
+            this reduction.
 
     Returns:
-        The calculated global gradient norm.
+        The global gradient norm.
     """
     with record_function("Gradient Clipping"):
         global_norm_pow = _get_global_norm_pow_pp(

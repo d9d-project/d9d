@@ -10,9 +10,8 @@ def gather(
 ) -> list[torch.Tensor] | tuple[list[torch.Tensor] | None, dist.Work] | None:
     """Gathers tensors from the process group to a specific destination rank.
 
-    This function assumes that tensors on all ranks have the same shape and dtype
-    as the tensor on the current rank. It automatically allocates the output
-    buffer list on the destination.
+    Tensors on all ranks must have the same shape and dtype as the local tensor. The output list is
+    allocated on the destination rank.
 
     Args:
         tensor: The local tensor to send.
@@ -21,8 +20,8 @@ def gather(
         async_op: Whether the operation should be asynchronous.
 
     Returns:
-        If async_op is False: A list of tensors on the destination rank, None elsewhere.
-            If async_op is True: A tuple containing (buffer_list, work_handle).
+        If ``async_op`` is ``False``, a list of tensors on the destination rank and ``None`` on other ranks.
+        If ``async_op`` is ``True``, a tuple of this value and the work handle.
     """
     if group.rank() == group_dst:
         save_list = [torch.empty_like(tensor) for _ in range(group.size())]
@@ -42,9 +41,8 @@ def all_gather(
 ) -> list[torch.Tensor] | tuple[list[torch.Tensor], dist.Work]:
     """Gathers tensors from the whole process group to all ranks.
 
-    This function assumes that tensors on all ranks have the same shape and dtype
-    as the tensor on the current rank. It automatically allocates the output
-    buffer list.
+    Tensors on all ranks must have the same shape and dtype as the local tensor. The output list is
+    allocated on all ranks.
 
     Args:
         tensor: The local tensor to send.
@@ -52,8 +50,8 @@ def all_gather(
         async_op: Whether the operation should be asynchronous.
 
     Returns:
-        If async_op is False: A list of gathered tensors.
-            If async_op is True: A tuple containing (buffer_list, work_handle).
+        If ``async_op`` is ``False``, a list of gathered tensors. If ``async_op`` is ``True``, a tuple of this
+        list and the work handle.
     """
     save_list = [torch.empty_like(tensor) for _ in range(group.size())]
     work = dist.all_gather(save_list, tensor, group=group, async_op=async_op)
@@ -87,18 +85,16 @@ def all_gather_variadic_shape(
 ) -> list[torch.Tensor] | tuple[list[torch.Tensor], dist.Work]:
     """Gathers tensors of different shapes from the whole process group to all ranks.
 
-    Unlike standard all_gather, this function first communicates the shape of the
-    tensor on every rank allowing for dynamic sizing.
+    Unlike ``all_gather``, this function first exchanges the tensor shapes of all ranks.
 
     Args:
         tensor: The local tensor to send.
         group: The process group to work on.
-        async_op: Whether the final data gathering should be asynchronous.
-                  Note that shape gathering is always synchronous.
+        async_op: Whether the data gathering should be asynchronous. The shape exchange is always synchronous.
 
     Returns:
-        If async_op is False: A list of gathered tensors of varying shapes.
-            If async_op is True: A tuple containing (buffer_list, work_handle).
+        If ``async_op`` is ``False``, a list of gathered tensors of varying shapes. If ``async_op`` is ``True``,
+        a tuple of this list and the work handle.
     """
     all_shape = _all_gather_shapes(tensor, group)
 
@@ -113,10 +109,8 @@ def all_gather_variadic_shape(
 def gather_variadic_shape(tensor: torch.Tensor, group: dist.ProcessGroup, group_dst: int) -> list[torch.Tensor] | None:
     """Gathers tensors of different shapes from the process group to a specific rank.
 
-    This function coordinates shape exchange and uses point-to-point communication
-    (isend/irecv) to gather tensors that may differ in shape across ranks.
-
-    Currently, does not support async_op.
+    This function first exchanges the tensor shapes of all ranks. Then it gathers the tensors with
+    point-to-point communication (``isend`` and ``irecv``). It does not support ``async_op``.
 
     Args:
         tensor: The local tensor to send.
@@ -124,7 +118,7 @@ def gather_variadic_shape(tensor: torch.Tensor, group: dist.ProcessGroup, group_
         group_dst: The rank within the group that will receive the tensors.
 
     Returns:
-        A list of tensors of varying shapes on the destination rank; None on other ranks.
+        A list of tensors of varying shapes on the destination rank, ``None`` on other ranks.
     """
     is_current_dst = group.rank() == group_dst
 
@@ -141,7 +135,7 @@ def gather_variadic_shape(tensor: torch.Tensor, group: dist.ProcessGroup, group_
                 tuple(all_shape[group_src_i]), dtype=tensor.dtype, device=tensor.device
             )
             all_recv_future = dist.irecv(all_result[group_src_i], group=group, group_src=group_src_i)
-            all_recv_future = cast(dist.Work, all_recv_future)  # we know we are on dst rank
+            all_recv_future = cast(dist.Work, all_recv_future)  # irecv returns None only on ranks outside the group
             all_recv_futures.append(all_recv_future)
         for recv_future in all_recv_futures:
             recv_future.wait()

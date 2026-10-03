@@ -1,89 +1,97 @@
 # Gradient Norm & Clipping
 
-!!! warning "Internal API Warning"
-    If you are utilizing the standard `d9d` training infrastructure, you **do not** need to call these functions manually. The framework automatically handles gradient clipping. This package is primarily intended for users extending the internals of `d9d`.
-
 ## About
 
-The `d9d.internals.grad_norm` package handles the calculation and clipping of gradient norms in complex distributed environments.
+The `d9d.internals.grad_norm` package computes and clips gradient norms in distributed jobs.
 
-Standard PyTorch `clip_grad_norm_` functions are not fully aware of heterogeneous ND-Parallelism strategies (mixing Pipeline, Data, Tensor, and Context Parallelism). This package ensures that the global norm is correctly calculated across all parallel dimensions and that `DTensor` sharding is handled without unnecessary full-tensor materialization.
+The standard PyTorch `clip_grad_norm_` does not know about ND parallelism, which mixes pipeline, data, tensor and context parallelism. This package computes the global norm correctly across all parallel dimensions. It handles `DTensor` sharding without materializing full tensors.
 
-## Concepts
+Tensors sharded on more than one mesh dimension are not supported.
 
-### Distributed Heterogeneity
+!!! warning "Internal API"
+    If you use the standard d9d training loop, you do not need to call this package. d9d clips the gradients itself. This page is for users who extend the internals of d9d.
 
-Some parameters might be `Shard`ed across a TP/FSDP mesh, while others are `Replicate`d. Also model may be pipelined.
+## Distributed Heterogeneity
 
-To handle this, we decompose the problem:
+Some parameters can be `Shard`ed across a TP or FSDP mesh, while others are `Replicate`d. The model can also be pipelined.
 
-1.  **Local Norm**: Calculate the norm of the tensor shards actually present in GPU memory (using `to_local()`).
-2.  **Horizontal Reduction**: Perform `all_reduce` strictly on the meshes where parameters are sharded. This ensures that sharded parameters contribute correctly to the global norm, while replicated parameters do not trigger double-counting or unnecessary communication for norm calculation.
-3.  **Pipeline Reduction**: Finally, norms are summed across the Pipeline Parallel mesh, as different stages hold completely different parameters.
+So the computation has three steps:
 
-### Grouping & Overlap
+1.  **Local norm**: compute the norm of the tensor shards present in GPU memory (with `to_local()`).
+2.  **Horizontal reduction**: run `all_reduce` only on the meshes where parameters are sharded. Sharded parameters then contribute correctly to the global norm. Replicated parameters are not counted twice and need no communication.
+3.  **Pipeline reduction**: sum the norms across the pipeline parallel mesh, because different stages hold different parameters.
 
-To optimize performance, `group_parameters_for_norm` groups parameters into `GradNormGroup` buckets. This grouping is based on:
+For the max norm (`inf`), both reductions take the maximum instead of the sum.
 
-1.  **Sharding Strategy**: Parameters sharded on the same mesh are grouped together so their norms can be reduced in a single collective operation.
-2.  **Device & DType**: Ensures compatibility for local math operations.
+## Grouping and Overlap
 
-The system attempts to overlap communication with computation. Groups containing sharded tensors are prioritized so their `all_reduce` operations can run asynchronously while local norms for other groups are being computed.
+`group_parameters_for_norm` groups parameters into `GradNormGroup` buckets by:
 
+1.  **Sharding**: parameters sharded on the same mesh share one collective for their norm.
+2.  **Device and dtype**: parameters in a group must be compatible for local math.
+
+Groups of sharded tensors come first. Their `all_reduce` runs asynchronously while the local norms of the other groups are computed.
 
 ## Mathematical Correctness
 
-The goal of distributed gradient clipping is to calculate the **Global Norm** ($\|\mathbf{g}\|$) of a **single model instance**, regardless of how that model is physically fragmented across GPUs.
+Distributed gradient clipping must compute the **global norm** ($\|\mathbf{g}\|$) of a **single model instance**, however the model is split across GPUs.
 
-Let the total set of model parameters $\mathcal{P}$ be divided into disjoint subsets based on parallelism strategy:
+Split the set of model parameters $\mathcal{P}$ into disjoint subsets by parallelism strategy:
 
-1.  $\mathcal{P}_{pp}$: Sets of parameters residing on different Pipeline stages.
-2.  $\mathcal{P}_{sharded}$: Parameters split across a TP/EP/FSDP group.
-3.  $\mathcal{P}_{repl}$: Parameters replicated across other groups.
+1.  $\mathcal{P}_{pp}$: the sets of parameters on different pipeline stages.
+2.  $\mathcal{P}_{sharded}$: parameters split across a TP, EP or FSDP group.
+3.  $\mathcal{P}_{repl}$: parameters replicated across other groups.
 
-The definition of the global $L_2$ norm is:
+The global $L_2$ norm is defined as:
 
 $$ \|\mathbf{g}\|_2 = \sqrt{ \sum_{p \in \mathcal{P}} \|g_p\|^2 } $$
 
-We prove that our strategy of separating aggregation logic based on placement prevents double-counting.
+The proofs below show that treating each placement separately prevents double counting.
 
 ### Proof for Sharded Parameters (TP/EP/FSDP)
+
 For a parameter $w \in \mathcal{P}_{sharded}$, the logical gradient tensor $G$ is split into physical shards $G_1, G_2, \dots, G_k$ across $k$ devices. By the definition of the Frobenius norm:
 
 $$
 \|G\|^2 = \sum_{rank=1}^{k} \|G_{rank}\|^2
 $$
 
-**Strategy:** We calculate local norms and apply `all_reduce(op=SUM)`.
+**Strategy:** compute the local norms and apply `all_reduce(op=SUM)`.
 
 ### Proof for Replicated Parameters (DP)
-For a parameter $w \in \mathcal{P}_{repl}$, the logical gradient tensor $G$ is identical on all $k$ devices (assuming DP synchronization has occurred).
+
+For a parameter $w \in \mathcal{P}_{repl}$, the logical gradient tensor $G$ is the same on all $k$ devices, once DP synchronization has happened.
+
 $$
 G_{rank_1} = G_{rank_2} = \dots = G
 $$
 
-If we were to sum these (as we did for TP), we would obtain:
+Summing them like the sharded case would give:
+
 $$
 \sum_{rank=1}^{k} \|G_{rank}\|^2 = k \cdot \|G\|^2 \quad (\text{Incorrect: Double Counting})
 $$
 
-**Strategy:** We group these parameters separately and do not communicate.
+**Strategy:** group these parameters separately and do not communicate.
 
 ### Proof for Pipeline Parallelism (PP)
-Pipeline stages hold disjoint sets of parameters. The total norm is simply the sum of the norms of the stages.
+
+Pipeline stages hold disjoint sets of parameters. The total norm is the sum of the norms of the stages.
 
 $$
 \|\mathbf{g}\|^2 = \|\mathbf{g}_{stage_1}\|^2 + \|\mathbf{g}_{stage_2}\|^2 + \dots
 $$
 
-**Strategy:** We apply `all_reduce(op=SUM)` across the PP mesh.
+**Strategy:** apply `all_reduce(op=SUM)` across the PP mesh.
 
 ### Result
-The final formula utilized by `d9d` ensures $1:1$ correspondence with a single-device baseline:
+
+d9d uses the formula below. It gives the same norm as a single-device baseline:
 
 $$
 \|\mathbf{g}\|_{global} = \sqrt{ \underbrace{\sum_{pp} \left( \underbrace{\sum_{tp} \|g_{sharded}\|^2}_{\text{Sum Unique Shards}} + \underbrace{\|g_{replicated}\|^2}_{\text{Do Not Duplicate}} \right)}_{\text{Sum Disjoint Layers}} }
 $$
 
+## API Reference
 
 ::: d9d.internals.grad_norm

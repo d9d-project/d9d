@@ -1,12 +1,14 @@
 # Metric Collection
 
-!!! warning "Internal API Warning"
-    If you are using the standard `d9d` `Trainer`, you **do not** need to interact with this package directly. It is handled automatically. This documentation is intended for users implementing custom training loops or logging infrastructure.
-
 ## About
 
-The `d9d.internals.metric_collector` package provides the infrastructure for non-blocking metric processing. 
+The `d9d.internals.metric_collector` package processes metrics without blocking the training loop.
 
-While the [`Metric`](../metric/overview.md) interface is synchronous by design, the `AsyncMetricCollector` wraps a metric instance and schedules its synchronization and computation on a secondary CUDA stream. This allows the main training loop to proceed immediately without waiting for metric reductions (all-reduce) to complete.
+The [`Metric`](../metric/overview.md) interface is synchronous. `AsyncMetricCollector` wraps a metric and runs its synchronization and computation on a side CUDA stream. So the training loop continues at once and does not wait for the metric all-reduce. The host waits only when you collect the results.
+
+!!! warning "Internal API"
+    If you use the standard d9d `Trainer`, you do not need to use this package directly. This page is for users who write their own training loop or logging.
+
+## API Reference
 
 ::: d9d.internals.metric_collector

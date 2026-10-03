@@ -9,12 +9,10 @@ from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
 
 
 class Profiler:
-    """Manages distributed performance profiling using PyTorch Profiler.
+    """Profiles the job periodically with ``torch.profiler``.
 
-    This class wraps `torch.profiler` to provide automatic trace exporting,
-    compression, and file naming consistent with the distributed DeviceMesh
-    topology. It configures the schedule to repeat periodically based on
-    the provided step counts.
+    The profiling cycle repeats every ``period_steps`` steps. Each trace is exported, compressed and named after
+    the coordinates of the rank in the device mesh.
     """
 
     def __init__(
@@ -27,16 +25,16 @@ class Profiler:
         with_stack: bool,
         dist_context: DistributedContext,
     ):
-        """Constructs a Profiler object.
+        """Constructs the ``Profiler`` object.
 
         Args:
-            save_dir: Directory where trace files will be saved.
-            period_steps: Total length of a profiling cycle (wait + warmup + active).
-            warmup_steps: Number of steps to ignore before recording to allow for warming-up.
-            active_steps: Number of steps to actively record traces.
+            save_dir: The directory to save the traces to.
+            period_steps: The length of one profiling cycle in steps (wait + warmup + active).
+            warmup_steps: The number of steps the profiler runs without recording, to warm up.
+            active_steps: The number of steps to record.
             record_shapes: Whether to record the input shapes of operators.
             with_stack: Whether to record the Python call stacks of operators.
-            dist_context: The distributed context object.
+            dist_context: The distributed context.
         """
         self._save_dir = save_dir
         self._period = period_steps
@@ -51,7 +49,7 @@ class Profiler:
             mesh_regular = self._dist_context.mesh_for(REGULAR_DOMAIN)
             coord = mesh_regular.get_coordinate()
             if coord is None:
-                raise RuntimeError("Invalid mesh")
+                raise RuntimeError("The current rank is not part of the regular device mesh.")
             coord_str = "-".join(str(x) for x in coord)
             rank = mesh_regular.get_rank()
             return f"rank-{rank}-coord-{coord_str}-trace.json"
@@ -76,22 +74,16 @@ class Profiler:
 
     @contextmanager
     def open(self, start_step: int):
-        """Opens a context manager for profiling execution.
+        """Profiles the code in the block.
 
-        This sets up the `torch.profiler.profile` with a schedule derived from
-        the initialization parameters. It captures both CPU and CUDA activities
-        on all threads, and records operator shapes and stack traces if enabled.
-
-        When the schedule triggers `on_trace_ready`, the trace is automatically
-        exported to the `save_dir`, compressed into a `.tar.gz` file, and the
-        raw JSON is removed to save space.
+        The profiler records CPU and CUDA activity on all threads. Each finished trace is saved to
+        ``save_dir/step_<step>/`` as a ``.tar.gz`` archive.
 
         Args:
-            start_step: The current global step number to initialize the
-                profiler state.
+            start_step: The current global step. The profiler counts steps from it.
 
         Yields:
-            The configured torch profiler instance.
+            The configured ``torch.profiler.profile`` object.
         """
         wait = self._period - (self._active + self._warmup)
         warmup = self._warmup
@@ -103,8 +95,8 @@ class Profiler:
             on_trace_ready=self._dump_trace,
             record_shapes=self._record_shapes,
             with_stack=self._with_stack,
-            # by default only the thread that enters the profiler is recorded, which misses background
-            # threads such as data prefetching; torch exposes this option only under a private name
+            # By default only the thread that enters the profiler is recorded, which misses background
+            # threads such as data prefetching; torch exposes this option only under a private name.
             experimental_config=tprof._ExperimentalConfig(profile_all_threads=True),  # noqa: SLF001 - no public name
         ) as profiler:
             profiler.step_num = start_step

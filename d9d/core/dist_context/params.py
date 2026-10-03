@@ -7,16 +7,16 @@ from .configured import DistributedContext
 
 
 class DeviceMeshParameters(BaseModel):
-    """Configuration parameters for initializing Distributed Device Meshes.
+    """Parallelism degrees to build the device meshes from.
 
     Attributes:
         pipeline_parallel: Degree of pipeline parallelism (PP).
-        data_parallel_replicate: Degree of data parallel replication (DDP).
-        data_parallel_shard: Degree of data parallel sharding (FSDP).
-        context_parallel_replicate: Degree of context parallel (CP) replication.
-        context_parallel_shard: Degree of context parallel (FSCP) sharding.
+        data_parallel_replicate: Degree of data-parallel replication (DDP).
+        data_parallel_shard: Degree of data-parallel sharding (FSDP).
+        context_parallel_replicate: Degree of context-parallel (CP) replication.
+        context_parallel_shard: Degree of context-parallel (CP) sharding.
         tensor_parallel: Degree of tensor parallelism (TP).
-        expert_parallel: Degree of expert parallelism (EP/MoE).
+        expert_parallel: Degree of expert parallelism (EP) for MoE layers.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -35,39 +35,42 @@ class DeviceMeshParameters(BaseModel):
 
     @property
     def has_pipeline_parallel(self) -> bool:
-        """Checks if pipeline parallelism is enabled (degree > 1)."""
+        """Whether pipeline parallelism is enabled (degree > 1)."""
         return self.pipeline_parallel > 1
 
     @property
     def has_data_parallel_replicate(self) -> bool:
-        """Checks if data parallel replication is enabled (degree > 1)."""
+        """Whether data parallel replication is enabled (degree > 1)."""
         return self.data_parallel_replicate > 1
 
     @property
     def has_data_parallel_shard(self) -> bool:
-        """Checks if data parallel sharding is enabled (degree > 1)."""
+        """Whether data parallel sharding is enabled (degree > 1)."""
         return self.data_parallel_shard > 1
 
     @property
     def has_context_parallel_replicate(self) -> bool:
+        """Whether context parallel replication is enabled (degree > 1)."""
         return self.context_parallel_replicate > 1
 
     @property
     def has_context_parallel_shard(self) -> bool:
+        """Whether context parallel sharding is enabled (degree > 1)."""
         return self.context_parallel_shard > 1
 
     @property
     def has_tensor_parallel(self) -> bool:
+        """Whether tensor parallelism is enabled (degree > 1)."""
         return self.tensor_parallel > 1
 
     @property
     def has_expert_parallel(self) -> bool:
-        """Checks if expert parallelism is enabled (degree > 1)."""
+        """Whether expert parallelism is enabled (degree > 1)."""
         return self.expert_parallel > 1
 
     @property
     def is_distributed(self) -> bool:
-        """Checks if any form of parallelism is enabled."""
+        """Whether any form of parallelism is enabled."""
         return (
             self.has_pipeline_parallel
             or self.has_data_parallel_replicate
@@ -97,9 +100,12 @@ class DeviceMeshParameters(BaseModel):
         return self
 
     def build(self, log_level: int = logging.INFO) -> "DistributedContext":
-        """Initializes the DistributedContext using these parameters.
+        """Builds a ``DistributedContext`` from these parameters.
+
+        Args:
+            log_level: The log level of the ``d9d`` logger.
 
         Returns:
-            A new DistributedContext instance containing the initialized device meshes.
+            A new ``DistributedContext`` with the built device meshes.
         """
         return DistributedContext(self, log_level)

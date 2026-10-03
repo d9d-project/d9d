@@ -13,26 +13,21 @@ from .placement_helper import dist_grad_from_local
 
 
 class AbstractGradientBucket(abc.ABC):
-    """Interface for a bucket containing a subset of model parameters.
+    """Interface for a bucket that holds a subset of the model parameters.
 
-    A bucket manages the memory layout and synchronization lifecycle of the
-    gradients associated with its parameters.
+    A bucket owns the memory layout of the parameter gradients and the lifecycle of their synchronization.
     """
 
     @abc.abstractmethod
     def bind(self):
-        """Initializes the bucket state.
+        """Prepares the bucket for gradient accumulation.
 
-        This involves allocating contiguous memory buffers (if applicable),
-        registering backward hooks, and preparing the gradients for accumulation.
+        Implementations can allocate a contiguous gradient buffer and register backward hooks.
         """
 
     @abc.abstractmethod
     def unbind(self):
-        """Cleans up the bucket state.
-
-        Removes hooks, deallocates buffers, and detaches gradients.
-        """
+        """Releases the bucket state: hooks, buffers and gradients."""
 
     @abc.abstractmethod
     def zero_grad(self):
@@ -47,7 +42,7 @@ class AbstractGradientBucket(abc.ABC):
         """Sets how many accumulations must happen before this bucket reduces gradients.
 
         Args:
-            require_accumulations: Number of accumulations required before sync.
+            require_accumulations: The number of accumulations required before the reduction.
         """
 
 
@@ -55,43 +50,43 @@ class LocalGradientBucket(AbstractGradientBucket):
     """A bucket for parameters that do not require distributed synchronization."""
 
     def __init__(self, params: list[nn.Parameter]):
-        """Constructs a LocalGradientBucket.
+        """Constructs the ``LocalGradientBucket`` object.
 
         Args:
-            params: List of parameters to manage.
+            params: The parameters to manage.
         """
         self._params = params
 
     def bind(self):
-        """No-op for local buckets as they do not require special buffering."""
+        """Does nothing: local gradients need no buffer."""
 
     def unbind(self):
-        """No-op for local buckets."""
+        """Does nothing."""
 
     def wait(self):
-        """No-op as no async communication is performed."""
+        """Does nothing: local buckets do not communicate."""
 
     @torch.no_grad()
     def zero_grad(self):
-        """Directly zeros the grad attribute of the parameters."""
+        """Sets the gradients of the parameters to ``None``."""
         for param in self._params:
             param.grad = None
 
     def mark_sync(self):
-        """No-op for local buckets."""
+        """Does nothing."""
 
     def set_required_accumulations(self, require_accumulations: int):
-        """No-op for local buckets as they never reduce."""
+        """Does nothing: local buckets never reduce."""
 
 
 class AccumulationCounter:
     """Tracks the number of gradient accumulation steps for a set of parameters."""
 
     def __init__(self, parameters: list[nn.Parameter]):
-        """Constructs an AccumulationCounter.
+        """Constructs the ``AccumulationCounter`` object.
 
         Args:
-            parameters: List of parameters to track.
+            parameters: The parameters to track.
         """
         self._require_accumulations: int | None = None
         self._param_to_sync_count = {param: 0 for param in parameters}
@@ -101,10 +96,10 @@ class AccumulationCounter:
         self._param_to_sync_count = {param: 0 for param in self._param_to_sync_count}
 
     def set_required_accumulations(self, require_accumulations: int):
-        """Updates the number of accumulations required before the bucket is ready to sync.
+        """Sets the number of accumulations required before the bucket is ready to sync.
 
         Args:
-            require_accumulations: Number of accumulations required before sync.
+            require_accumulations: The number of accumulations required before the sync.
         """
         self._require_accumulations = require_accumulations
 
@@ -117,24 +112,23 @@ class AccumulationCounter:
         self._param_to_sync_count[param] += 1
 
     def is_ready(self) -> bool:
-        """Checks if all parameters have reached the required number of accumulations.
+        """Checks whether all parameters reached the required number of accumulations.
 
         Returns:
-            True if synchronization can proceed.
+            ``True`` if the synchronization can start.
 
         Raises:
-            RuntimeError: If the required accumulation count has not been set for this step.
+            RuntimeError: If the required accumulation count is not set.
         """
         if self._require_accumulations is None:
-            raise RuntimeError("Required accumulation count was not set for this step")
+            raise RuntimeError("The required accumulation count was not set. Call set_required_accumulations() first.")
         return all(x == self._require_accumulations for x in self._param_to_sync_count.values())
 
 
 class SyncGradientBucket(AbstractGradientBucket):
-    """A bucket that manages a contiguous memory buffer for gradients and performs async reduction.
+    """A bucket that keeps its gradients in one contiguous buffer and reduces them asynchronously.
 
-    This bucket flattens the gradients of its parameters into a single contiguous
-    Tensor to enable efficient batched all-reduce operations.
+    With one buffer, a single all-reduce per process group covers all gradients of the bucket.
     """
 
     def __init__(
@@ -145,26 +139,26 @@ class SyncGradientBucket(AbstractGradientBucket):
         reduce_mesh: DeviceMesh,
         communicate_stream: torch.cuda.Stream,
     ):
-        """Constructs a SyncGradientBucket.
+        """Constructs the ``SyncGradientBucket`` object.
 
         Args:
-            parameters: List of parameters to manage.
-            device: Device where parameters reside.
-            grad_dtype: Data type for the gradients.
-            reduce_mesh: DeviceMesh on which reduction happens.
-            communicate_stream: Stream where all the asynchronous communications will be scheduled
+            parameters: The parameters to manage.
+            device: The device of the parameters.
+            grad_dtype: The dtype of the gradients.
+            reduce_mesh: The device mesh to reduce the gradients over.
+            communicate_stream: The CUDA stream to run the asynchronous communication on.
 
         Raises:
-            ValueError: If any parameter does not contain DTensor data.
+            ValueError: If any parameter does not hold ``DTensor`` data.
         """
         if not all(isinstance(x.data, DTensor) for x in parameters):
-            raise ValueError("All parameters passed in synchronizable bucket should contain DTensor data")
+            raise ValueError("All parameters of a SyncGradientBucket must hold DTensor data.")
 
         self._params = parameters
         self._accum_counter = AccumulationCounter(parameters)
         self._device = device
         self._grad_dtype = grad_dtype
-        # iterate from innermost to outermost group
+        # Iterate from innermost to outermost group.
         self._reduce_groups: list[dist.ProcessGroup] = reduce_mesh.get_all_groups()[::-1]
 
         self._buffer: Tensor | None = None
@@ -174,7 +168,7 @@ class SyncGradientBucket(AbstractGradientBucket):
         self._ready_to_sync = False
 
     def _bind_buffer(self):
-        """Allocates the flat buffer and redirects parameter gradients to view into it."""
+        """Allocates the flat buffer and makes the parameter gradients views into it."""
         buffer_size = sum(cast(DTensor, param.data).to_local().numel() for param in self._params)
 
         self._buffer = torch.zeros((buffer_size,), dtype=self._grad_dtype, device=self._device)
@@ -193,17 +187,14 @@ class SyncGradientBucket(AbstractGradientBucket):
 
     @torch.no_grad()
     def _post_accumulation_hook(self, param: nn.Parameter):
-        """Hook executed after backward pass for a parameter.
-
-        Updates the accumulation counter and triggers the asynchronous all-reduce
-        if the bucket is ready.
+        """Counts an accumulation of ``param`` and starts the asynchronous all-reduce once the bucket is ready.
 
         Args:
-            param: The parameter that finished backward pass.
+            param: The parameter whose gradient was accumulated.
 
         Raises:
-            ValueError: If the bucket is already ready to sync but hasn't been synced yet,
-                or if the buffer is not initialized (call bind first).
+            ValueError: If the previous reduction of the bucket was not waited for, or if the buffer is not
+                allocated.
         """
         self._accum_counter.update(param)
 
@@ -211,17 +202,20 @@ class SyncGradientBucket(AbstractGradientBucket):
             return
 
         if self._ready_to_sync:
-            raise ValueError("Tried to accumulate, but synchronization was not performed")
+            raise ValueError(
+                "The bucket is ready to reduce again, but its previous reduction was not waited for. "
+                "Call wait() on the synchronizer after each reduction."
+            )
 
         buffer = self._buffer
         if buffer is None:
-            raise ValueError("Buffer is not initialized")
+            raise ValueError("The gradient buffer is not allocated. Call bind() first.")
 
         with record_function("Gradient Sync"):
-            # wait for backward operation is complete
+            # The reduction must see the gradients that the backward pass wrote on the current stream.
             self._communicate_stream.wait_stream(torch.cuda.current_stream())
-            # execute all sync operations in sequential order (to ensure
-            # data safety), but in a DIFFERENT stream
+            # A side stream overlaps the reduction with the rest of the backward pass; the all-reduces share the
+            # buffer, so they run one after another on that stream.
             with torch.cuda.stream(self._communicate_stream):
                 for group in self._reduce_groups:
                     dist.all_reduce(buffer, op=dist.ReduceOp.SUM, group=group)
@@ -236,12 +230,12 @@ class SyncGradientBucket(AbstractGradientBucket):
 
     @torch.no_grad()
     def bind(self):
-        """Allocates the contiguous buffer and registers hooks."""
+        """Allocates the contiguous buffer and registers the hooks."""
         self._bind_buffer()
         self._bind_hooks()
 
     def _unbind_buffer(self):
-        """Deallocates the buffer and clears parameter gradients."""
+        """Frees the buffer and clears the parameter gradients."""
         self._buffer = None
 
         for param in self._params:
@@ -258,34 +252,31 @@ class SyncGradientBucket(AbstractGradientBucket):
 
     @torch.no_grad()
     def unbind(self):
-        """Cleans up buffer and hooks."""
+        """Frees the buffer, clears the gradients and removes the hooks."""
         self._unbind_buffer()
         self._unbind_hooks()
 
     @torch.no_grad()
     def zero_grad(self):
-        """Zeros the contiguous buffer, resets counters, and marks params as awaiting sync.
+        """Zeros the gradient buffer and resets the accumulation counters.
 
         Raises:
-            ValueError: If the buffer is not initialized (call bind first).
+            ValueError: If the buffer is not allocated.
         """
         buffer = self._buffer
         if buffer is None:
-            raise ValueError("Buffer is not initialized")
+            raise ValueError("The gradient buffer is not allocated. Call bind() first.")
 
         buffer.zero_()
         self._accum_counter.reset()
 
     def mark_sync(self):
         if not self._ready_to_sync:
-            raise ValueError("This bucket is not ready for sync.")
+            raise ValueError(
+                "The bucket is not ready to sync: its parameters did not reach the required accumulation count."
+            )
 
         self._ready_to_sync = False
 
     def set_required_accumulations(self, require_accumulations: int):
-        """Updates the accumulation count required before this bucket reduces gradients.
-
-        Args:
-            require_accumulations: Number of accumulations before triggering reduce.
-        """
         self._accum_counter.set_required_accumulations(require_accumulations)

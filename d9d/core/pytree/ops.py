@@ -12,31 +12,31 @@ TMapped = TypeVar("TMapped")
 TTree = TypeVar("TTree", bound=PyTree)
 
 PyTreeSpec = optree.PyTreeSpec
+"""The structure of a PyTree without its leaves. Alias of ``optree.PyTreeSpec``."""
 
 
 _flattener = PyTreeFlattener()
 
 
 def tree_flatten(tree: PyTree[TLeaf], is_leaf: IsLeaf | None = None) -> tuple[list[TLeaf], PyTreeSpec]:
-    """Flattens a pytree into its leaves and a structure specification.
+    """Flattens a PyTree into its leaves and a structure specification.
 
     Args:
         tree: The nested structure to flatten.
-        is_leaf: Optional predicate; when it returns ``True`` for a node, that node is kept as a leaf
-            and not traversed further.
+        is_leaf: An optional predicate. A node for which it returns ``True`` stays a leaf and is not
+            traversed further.
 
     Returns:
-        A tuple of the leaf list and a ``PyTreeSpec`` that can rebuild the structure via
-        `tree_unflatten`.
+        A tuple of the leaf list and a ``PyTreeSpec`` that ``tree_unflatten`` can rebuild the structure from.
     """
     return _flattener.flatten(tree, is_leaf)
 
 
 def tree_unflatten(treespec: PyTreeSpec, leaves: list[TLeaf]) -> PyTree[TLeaf]:
-    """Reconstructs a pytree from leaves and a structure specification.
+    """Reconstructs a PyTree from leaves and a structure specification.
 
     Args:
-        treespec: A specification produced by `tree_flatten`.
+        treespec: A specification produced by ``tree_flatten``.
         leaves: The leaves to place into the structure, in flatten order.
 
     Returns:
@@ -46,12 +46,12 @@ def tree_unflatten(treespec: PyTreeSpec, leaves: list[TLeaf]) -> PyTree[TLeaf]:
 
 
 def tree_leaves(tree: PyTree[TLeaf], is_leaf: IsLeaf | None = None) -> list[TLeaf]:
-    """Returns the leaves of a pytree in deterministic (sorted-key) order.
+    """Returns the leaves of a PyTree in deterministic (sorted-key) order.
 
     Args:
         tree: The nested structure to flatten.
-        is_leaf: Optional predicate; when it returns ``True`` for a node, that node is kept as a leaf
-            and not traversed further.
+        is_leaf: An optional predicate. A node for which it returns ``True`` stays a leaf and is not
+            traversed further.
 
     Returns:
         The list of leaves.
@@ -60,7 +60,7 @@ def tree_leaves(tree: PyTree[TLeaf], is_leaf: IsLeaf | None = None) -> list[TLea
 
 
 def tree_map(func: Callable[[TLeaf], TMapped], tree: PyTree[TLeaf]) -> PyTree[TMapped]:
-    """Applies ``func`` to every leaf of a pytree, returning a structurally-identical tree.
+    """Applies ``func`` to every leaf of a PyTree and returns a tree with the same structure.
 
     Args:
         func: The function to apply to each leaf.
@@ -78,15 +78,13 @@ def tree_map_only(
     func: Callable[[Any], Any],
     tree: TTree,
 ) -> TTree:
-    """Applies ``func`` only to leaves that are instances of ``type_or_types``.
+    """Applies ``func`` only to leaves that are instances of ``filters``.
 
-    Leaves of any other type are returned unchanged. This is the common case for tensor
-    operations over trees that also carry non-tensor bookkeeping (e.g. moving only tensors to a
-    device while leaving strings and ints alone). The returned tree preserves the structure and
-    leaf types of the input.
+    Leaves of other types stay unchanged. Use it for trees that mix tensors with other data, for example to move
+    only the tensors to a device. The returned tree has the same structure as the input.
 
     Args:
-        filters: The leaf type(s) that ``func`` should be applied to.
+        filters: The leaf type or types to apply ``func`` to.
         func: The function to apply to matching leaves.
         tree: The nested structure to map over.
 
@@ -99,15 +97,15 @@ def tree_map_only(
 
 
 def tree_leaves_with_path(tree: PyTree[TLeaf], is_leaf: IsLeaf | None = None) -> list[tuple[tuple[Any, ...], TLeaf]]:
-    """Returns ``(path, leaf)`` pairs for every leaf of a pytree.
+    """Returns ``(path, leaf)`` pairs for every leaf of a PyTree.
 
     Each path is a tuple of keys and indices reaching the leaf from the root: ``str`` for dict keys
     and dataclass field names, ``int`` for sequence indices.
 
     Args:
         tree: The nested structure to flatten.
-        is_leaf: Optional predicate; when it returns ``True`` for a node, that node is kept as a leaf
-            and not traversed further.
+        is_leaf: An optional predicate. A node for which it returns ``True`` stays a leaf and is not
+            traversed further.
 
     Returns:
         A list of ``(path, leaf)`` tuples in deterministic (sorted-key) order.

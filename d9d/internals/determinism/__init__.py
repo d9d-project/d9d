@@ -1,4 +1,4 @@
-"""This package provides utilities for making your distributed setup deterministic."""
+"""Package for making a distributed setup deterministic."""
 
 from .seed import set_seeds
 

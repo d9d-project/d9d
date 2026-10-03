@@ -2,13 +2,24 @@
 
 ## About
 
-The `d9d.core.pytree` package provides the framework's utilities for recursively traversing nested tensor structures ("pytrees"). It is a thin, dataclass-aware wrapper around [`optree`](https://github.com/metaopt/optree) and is used wherever the engine needs to apply an operation to every tensor in a nested structure - moving a microbatch to the device, detaching cached side-data, moving metric results to the CPU, or flattening a metric tree for logging.
+The `d9d.core.pytree` package traverses nested tensor structures (pytrees) recursively. It is a thin wrapper around [`optree`](https://github.com/metaopt/optree) that also descends into dataclasses. d9d uses it wherever it applies an operation to every tensor in a nested structure. Examples are moving a microbatch to the device, moving metric results to the CPU and flattening a metric tree for logging.
 
-It operates over the container types described by [`PyTree`](./types.md) - `dict`, `list`, `tuple` - nested arbitrarily deep, **and additionally over any dataclass**.
+## Supported Containers
 
-## Dataclasses Work Transparently
+The package traverses the containers that [`PyTree`](./types.md) describes (`dict`, `list`, `tuple`), nested to any depth. It also traverses **any dataclass**: the fields of a dataclass are its children in the tree.
 
-A caller can pass a dataclass - arbitrarily nested inside containers or other dataclasses - to any function in this package, and its fields are traversed as tree children.
+Nesting works in every direction. A dataclass inside a dict, a list of dataclasses and a dataclass with dicts of tensors as fields are all traversed.
+
+## Traversal Order
+
+Traversal order is deterministic:
+
+*   **`dict` keys** are traversed in **sorted** order, whatever the insertion order.
+*   **Dataclass fields** are traversed in **declaration** order.
+
+## Usage
+
+Pass a dataclass, nested in containers or in other dataclasses, to any function of this package.
 
 ```python
 import dataclasses
@@ -20,26 +31,15 @@ from d9d.core import pytree
 class Batch:
     tokens: torch.Tensor
     mask: torch.Tensor
-    doc_id: str  # non-tensor bookkeeping is fine
+    doc_id: str  # Non-tensor fields are allowed
 
 
 batch = Batch(tokens=torch.zeros(8), mask=torch.ones(8), doc_id="doc-42")
 
-# Every tensor field is moved; non-tensor fields ride along untouched.
+# Every tensor field moves to the GPU; other fields stay unchanged.
 on_cuda = pytree.tree_map_only(torch.Tensor, lambda t: t.cuda(), batch)
 ```
-
-Nesting composes in every direction - a dataclass inside a dict, a list of dataclasses, or a dataclass whose fields are dicts of tensors are all traversed correctly.
-
-## Determinism
-
-Traversal order is deterministic:
-
-* **`dict` keys** are traversed in **sorted** order, regardless of insertion order.
-* **dataclass fields** are traversed in **declaration** order.
 
 ## API Reference
 
 ::: d9d.core.pytree
-    options:
-        heading_level: 4

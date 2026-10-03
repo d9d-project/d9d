@@ -8,27 +8,26 @@ if TYPE_CHECKING:
 
 
 class DeviceMeshDomain(abc.ABC):
-    """Abstract base class for a Device Mesh provider.
+    """Builds the device mesh of one domain.
 
-    A Domain defines a specific strategy for organizing available GPUs into a
-    multidimensional grid (Mesh) to support specific parallelism techniques.
+    A domain arranges the GPUs into a multidimensional mesh that serves specific parallelism techniques.
     """
 
     @property
     @abc.abstractmethod
     def name(self) -> str:
-        """Returns the unique identifier for this mesh domain."""
+        """The unique name of this domain."""
         ...
 
     @abc.abstractmethod
     def build_mesh(self, params: "DeviceMeshParameters") -> DeviceMesh:
-        """Constructs the device mesh configuration.
+        """Builds the device mesh of this domain.
 
         Args:
-            params: Global configuration parameters for the distributed environment.
+            params: The parallelism degrees.
 
         Returns:
-            The initialized PyTorch DeviceMesh for this specific domain.
+            The device mesh of this domain.
         """
         ...
 

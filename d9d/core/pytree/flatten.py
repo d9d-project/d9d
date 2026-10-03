@@ -11,24 +11,25 @@ IsLeaf = Callable[[Any], bool]
 
 
 class PyTreeFlattener:
-    """Flattens pytrees into their leaves, descending into dataclasses as internal nodes."""
+    """Flattens PyTrees into their leaves, descending into dataclasses as internal nodes."""
 
     def __init__(self):
-        """Constructs a PyTreeFlattener."""
+        """Constructs the ``PyTreeFlattener`` object."""
         self._registered: set[type] = set()
         self._is_dataclass_memo: dict[type, bool] = {}
 
     def flatten(self, tree: Any, is_leaf: IsLeaf | None = None) -> tuple[list[Any], optree.PyTreeSpec]:
-        """Flattens ``tree``, lazily registering any dataclass types discovered as leaves.
+        """Flattens ``tree`` into its leaves, descending into dataclasses.
 
         Args:
             tree: The nested structure to flatten.
-            is_leaf: Optional predicate; when it returns ``True`` for a node, that node is treated as
-                a leaf and not traversed further (even if it is a dataclass or container).
+            is_leaf: An optional predicate. A node for which it returns ``True`` stays a leaf and is not
+                traversed further, even if it is a dataclass or a container.
 
         Returns:
             A tuple of the leaf list and the ``optree`` structure specification.
         """
+        # Each pass registers the dataclass types it found as leaves; repeat until none is left.
         while True:
             leaves, treespec = optree.tree_flatten(tree, is_leaf=is_leaf, namespace=_NAMESPACE)
             if self._register_unknown_nodes(leaves, is_leaf):
@@ -37,16 +38,17 @@ class PyTreeFlattener:
     def flatten_with_path(
         self, tree: Any, is_leaf: IsLeaf | None = None
     ) -> tuple[list[tuple[Any, ...]], list[Any], optree.PyTreeSpec]:
-        """Flattens ``tree`` alongside the path to each leaf, lazily registering dataclass types.
+        """Flattens ``tree`` into its leaves and the path to each leaf, descending into dataclasses.
 
         Args:
             tree: The nested structure to flatten.
-            is_leaf: Optional predicate; when it returns ``True`` for a node, that node is treated as
-                a leaf and not traversed further (even if it is a dataclass or container).
+            is_leaf: An optional predicate. A node for which it returns ``True`` stays a leaf and is not
+                traversed further, even if it is a dataclass or a container.
 
         Returns:
-            A tuple of the per-leaf paths, the leaf list, and the ``optree`` structure specification.
+            A tuple of the per-leaf paths, the leaf list and the ``optree`` structure specification.
         """
+        # Each pass registers the dataclass types it found as leaves; repeat until none is left.
         while True:
             paths, leaves, treespec = optree.tree_flatten_with_path(tree, is_leaf=is_leaf, namespace=_NAMESPACE)
             if self._register_unknown_nodes(leaves, is_leaf):

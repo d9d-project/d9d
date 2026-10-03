@@ -8,25 +8,23 @@ from d9d.metric import Metric
 
 
 class AsyncMetricCollector:
-    """Helper class to synchronize and compute metrics asynchronously on a separate CUDA stream.
+    """Synchronizes and computes a metric asynchronously on a side CUDA stream.
 
-    This class decouples metric synchronization and computation from the main training loop.
-    It schedules the heavy lifting (distributed reduction and tensor operations) on a
-    secondary stream.
+    The distributed reduction and the computation run on the side stream, off the main training stream.
     """
 
     def __init__(self, metric: Metric):
-        """Constructs AsyncMetricCollector object.
+        """Constructs the ``AsyncMetricCollector`` object.
 
         Args:
-            metric: The metric instance to collect and compute asynchronously.
+            metric: The metric to collect.
         """
         self._metric = metric
         self._stream: torch.cuda.Stream | None = None
         self._compute_buffer: PyTree[torch.Tensor] | None = None
 
     def bind(self):
-        """Moves the underlying metric to CUDA and initializes the side stream."""
+        """Moves the metric to CUDA and creates the side stream."""
         self._metric.to("cuda")
         self._stream = torch.cuda.Stream()
 
@@ -35,22 +33,20 @@ class AsyncMetricCollector:
         self._stream = None
 
     def schedule_collection(self, dist_context: DistributedContext):
-        """Schedules metric synchronization and computation on the side stream.
+        """Schedules the metric synchronization and computation on the side stream.
 
-        This method records a dependency on the current stream to ensure all data
-        required for the metric is available, then launches the synchronization
-        (if distributed) and computation tasks on the dedicated side stream.
+        In a distributed setup, the metric is synchronized across ranks before the computation.
 
         Args:
-            dist_context: Distributed context used for metric synchronization across ranks.
+            dist_context: The distributed context to synchronize the metric with.
 
         Raises:
-            RuntimeError: If the collector has not been bound via .bind().
+            RuntimeError: If the collector is not bound.
         """
         if self._stream is None:
-            raise RuntimeError("AsyncMetricSynchronizer is not bound. Call .bind() first.")
+            raise RuntimeError("AsyncMetricCollector is not bound. Call bind() first.")
 
-        # depend on main stream
+        # The side stream must see the metric updates queued on the current stream.
         self._stream.wait_stream(torch.cuda.current_stream())
 
         with torch.cuda.stream(self._stream), record_function("Async Metric Sync & Compute"):
@@ -59,35 +55,30 @@ class AsyncMetricCollector:
             self._compute_buffer = self._metric.compute()
 
     def collect_results(self) -> PyTree[float | int | bool]:
-        """Waits for the async computation to finish and retrieves results.
-
-        This method synchronizes the current stream with the side stream, moves
-        results to CPU, converts them to Python scalars, and resets the underlying metric.
+        """Waits for the asynchronous computation, returns its results and resets the metric.
 
         Returns:
-            A PyTree structure matching the metric's output containing python scalars
-            (float, int, or bool) located on the CPU.
+            A PyTree with the structure of the metric output and Python scalars (``float``, ``int`` or ``bool``)
+            as leaves.
 
         Raises:
-            RuntimeError: If the collector is not bound or if schedule_collection
-                was not called prior to this method.
+            RuntimeError: If the collector is not bound, or if ``schedule_collection`` was not called before.
         """
         if self._stream is None:
-            raise RuntimeError("AsyncMetricSynchronizer is not bound. Call .bind() first.")
+            raise RuntimeError("AsyncMetricCollector is not bound. Call bind() first.")
 
         if self._compute_buffer is None:
-            raise RuntimeError("sync_and_compute() was not called.")
+            raise RuntimeError("schedule_collection() was not called. Call it before collect_results().")
 
-        # wait for synchronization and computation to finish
         torch.cuda.current_stream().wait_stream(self._stream)
         results = self._compute_buffer
         self._compute_buffer = None
 
-        # sync to CPU
+        # Sync to CPU.
         results = pytree.tree_map(lambda x: x.cpu(), results)
         results = pytree.tree_map(lambda x: x.item(), results)
 
-        # reset on GPU safely
+        # Safe: the current stream already waited for the side stream that read the metric state.
         self._metric.reset()
 
         return results

@@ -6,19 +6,17 @@ from d9d.core.dist_context import DistributedContext
 
 
 def state_dict_main_process(dist_context: DistributedContext, obj: Stateful) -> dict[str, Any]:
-    """Retrieves the state dictionary of an object only on the main process.
+    """Returns the state dict of an object on the main process only.
 
-    This is useful for checkpointing components that track global state primarily
-    managed by the driver/main rank, ensuring that non-main ranks return an empty
-    state to avoid duplication or synchronization issues during checkpointing.
+    Use it to checkpoint components whose state is kept by the main rank. Other ranks save nothing, so the
+    checkpoint holds no duplicates.
 
     Args:
-        dist_context: The distributed context to check for main process status.
-        obj: The stateful object to serialize.
+        dist_context: The distributed context that tells whether this is the main process.
+        obj: The stateful object to save.
 
     Returns:
-        A dictionary containing the object's state under the 'main_process' key on
-            the main rank, and an empty dictionary on all other ranks.
+        The state of the object under the ``"main_process"`` key on the main rank, an empty dict on other ranks.
     """
     if dist_context.is_main_process:
         return {"main_process": obj.state_dict()}
@@ -27,12 +25,12 @@ def state_dict_main_process(dist_context: DistributedContext, obj: Stateful) -> 
 
 
 def load_state_dict_main_process(dist_context: DistributedContext, obj: Stateful, state_dict: dict[str, Any]):
-    """Restores the state dictionary of an object only on the main process.
+    """Restores the state of an object on the main process only.
 
     Args:
-        dist_context: The distributed context to check for main process status.
+        dist_context: The distributed context that tells whether this is the main process.
         obj: The stateful object to restore.
-        state_dict: The state dictionary created by "state_dict_main_process" function.
+        state_dict: The state dict created by ``state_dict_main_process``.
     """
     if dist_context.is_main_process:
         obj.load_state_dict(state_dict["main_process"])

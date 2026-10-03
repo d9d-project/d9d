@@ -5,22 +5,15 @@ import torch
 TLeaf = TypeVar("TLeaf")
 
 PyTree: TypeAlias = TLeaf | list["PyTree[TLeaf]"] | dict[str, "PyTree[TLeaf]"] | tuple["PyTree[TLeaf]", ...]
-"""
-A recursive type definition representing a tree of data.
+"""Type alias for a recursive tree of data.
 
-This type alias covers standard Python containers (dictionaries, lists, tuples)
-nested arbitrarily deep, terminating in a leaf node of type `TLeaf`.
-
-This is commonly used for handling nested state dictionaries or arguments
-passed to functions that support recursive traversal (similar to `torch.utils._pytree`).
+The tree nests standard Python containers (dicts, lists, tuples) to any depth. Its leaves have type ``TLeaf``.
+It describes nested state dicts and arguments of functions that traverse them recursively, similar to
+``torch.utils._pytree``.
 """
 
 TensorTree: TypeAlias = PyTree[torch.Tensor]
-"""
-A recursive tree structure where the leaf nodes are PyTorch Tensors.
-"""
+"""Type alias for a ``PyTree`` whose leaves are tensors."""
 
 ScalarTree: TypeAlias = PyTree[str | float | int | bool]
-"""
-A recursive tree structure where the leaf nodes are python scalars (str, float, int).
-"""
+"""Type alias for a ``PyTree`` whose leaves are Python scalars (``str``, ``float``, ``int``, ``bool``)."""

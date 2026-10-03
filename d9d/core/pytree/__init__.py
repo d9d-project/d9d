@@ -1,4 +1,4 @@
-"""Recursive traversal of nested tensor structures ("pytrees")."""
+"""Package for recursive traversal of nested tensor structures (PyTrees)."""
 
 from .ops import (
     PyTreeSpec,

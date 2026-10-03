@@ -3,17 +3,17 @@ import sys
 
 
 def build_dist_logger(qualifier: str, level: int) -> logging.Logger:
-    """Configures and returns a logger instance for d9d.
+    """Configures the ``d9d`` logger to write to stdout and returns it.
 
-    The logger is configured to write to stdout with a formatter that includes
-    the provided rank qualifier, allowing for easier debugging in distributed logs.
+    Each line includes the rank qualifier, so that ranks can be told apart in distributed logs. Existing
+    handlers of the ``d9d`` logger are removed.
 
     Args:
-        qualifier: A string identifying the current rank's position in the mesh.
-        level: Log level to set by default
+        qualifier: The string that identifies the position of the current rank in the mesh.
+        level: The log level.
 
     Returns:
-        A configured logging.Logger instance.
+        The configured ``d9d`` logger.
     """
     dist_logger = logging.getLogger("d9d")
     dist_logger.setLevel(level)

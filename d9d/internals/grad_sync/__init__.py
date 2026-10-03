@@ -1,8 +1,6 @@
-"""Gradient synchronization utilities.
+"""Package for gradient bucketing and asynchronous gradient reduction.
 
-This package provides the infrastructure for manual gradient bucketing and
-asynchronous reduction, similar to DistributedDataParallel but exposed
-for internal framework usage with DTensors.
+It works like ``DistributedDataParallel``, but on ``DTensor`` parameters and for internal use.
 """
 
 from .synchronizer import GradientSynchronizer

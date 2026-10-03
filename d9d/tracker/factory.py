@@ -8,6 +8,7 @@ from .provider.aim.config import AimConfig
 from .provider.null import NullTracker, NullTrackerConfig
 
 AnyTrackerConfig = Annotated[AimConfig | NullTrackerConfig, Field(discriminator="provider")]
+"""Union of all tracker configurations, discriminated by the ``provider`` field."""
 
 
 @dataclasses.dataclass
@@ -29,27 +30,23 @@ except ImportError as e:
 
 
 def tracker_from_config(config: AnyTrackerConfig) -> BaseTracker:
-    """Instantiates a specific tracker implementation based on the configuration.
-
-    Based on the 'provider' field in the config, this function selects the
-    appropriate backend (e.g., Aim, Null). It handles checking for missing
-    dependencies for optional backends.
+    """Creates the tracker that the ``provider`` field of the configuration selects.
 
     Args:
-        config: A specific tracker configuration object.
+        config: The tracker configuration.
 
     Returns:
-        An initialized BaseTracker instance.
+        The tracker.
 
     Raises:
-        ImportError: If the dependencies for the requested provider are not installed.
+        ImportError: If the optional dependency of the provider is not installed.
     """
     tracker_type = _MAP[type(config)]
 
     if isinstance(tracker_type, _TrackerImportFailed):
         raise ImportError(
-            f"The tracker configuration {config.provider} could not be loaded - "
-            f"ensure these dependencies are installed: {tracker_type.dependency}"
+            f"Tracker provider ({config.provider}) cannot be loaded. "
+            f"Install its dependency ({tracker_type.dependency})."
         ) from tracker_type.exception
 
     return tracker_type.from_config(config)

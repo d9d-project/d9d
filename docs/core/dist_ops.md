@@ -2,33 +2,31 @@
 
 ## About
 
-The `d9d.core.dist_ops` package provides high-level wrappers around `torch.distributed` collective operations.
+The `d9d.core.dist_ops` package wraps `torch.distributed` collective operations and allocates their output buffers for you. With plain PyTorch, you must pre-allocate the outputs yourself, for example a list of empty tensors for `all_gather`.
 
-While PyTorch's native distributed library is powerful, it often requires significant boilerplate code - specifically the manual pre-allocation of output buffers (e.g., creating a list of empty tensors for `all_gather`).
+The package also has operations for **variadic shapes**. They let ranks exchange tensors without knowing the shapes of the incoming tensors in advance.
 
-`d9d` simplifies this by handling buffer allocation automatically. It also introduces specialized operators for handling **Variadic Shapes**, allowing ranks to exchange tensors even when they do not know the incoming tensor shapes beforehand.
-
-## Usage Examples
+## Usage
 
 ### Gathering Tensors
 
-Gathering tensors of identical shapes from all ranks. d9d automatically allocates buffers for this operation.
+Gather tensors of the same shape from all ranks.
 
 ```python
 import torch
-from d9d.core.dist_context import DistributedContext, REGULAR_DOMAIN
+from d9d.core.dist_context import DistributedContext, FLAT_DOMAIN
 from d9d.core.dist_ops import all_gather
 
-# Setup
+# Setup.
 ctx: DistributedContext = ...
-group = ctx.mesh_for(REGULAR_DOMAIN).get_group()
-rank = ctx.mesh_for(REGULAR_DOMAIN).get_rank()
+mesh = ctx.mesh_for(FLAT_DOMAIN)
+group = mesh.get_group()
+rank = mesh.get_local_rank()
 
-# Each rank has a tensor of the same shape (e.g., [2, 2])
-# but different values
+# Each rank has a tensor of the same shape, but with different values.
 local_tensor = torch.ones((2, 2), device="cuda") * rank
 
-# Gather
+# Gather.
 gathered_tensors = all_gather(local_tensor, group=group)
 
 for i, t in enumerate(gathered_tensors):
@@ -37,54 +35,56 @@ for i, t in enumerate(gathered_tensors):
 
 ### Gathering Tensors with Variadic Shapes
 
-Gathering tensors where dimensions differ across ranks.
+Gather tensors whose shapes differ across ranks.
 
 ```python
 import torch
-from d9d.core.dist_context import DistributedContext, REGULAR_DOMAIN
+from d9d.core.dist_context import DistributedContext, FLAT_DOMAIN
 from d9d.core.dist_ops import all_gather_variadic_shape
 
-# Setup
+# Setup.
 ctx: DistributedContext = ...
-group = ctx.mesh_for(REGULAR_DOMAIN).get_group()
-rank = ctx.mesh_for(REGULAR_DOMAIN).get_rank()
+mesh = ctx.mesh_for(FLAT_DOMAIN)
+group = mesh.get_group()
+rank = mesh.get_local_rank()
 
-# Rank 0 has shape [1], Rank 1 has shape [2], ...
+# Rank 0 has shape (1,), rank 1 has shape (2,), ...
 local_tensor = torch.randn((rank + 1,), device="cuda")
 
-# Gather
-# The system automatically handles the shape mismatch
+# Gather: the shapes are exchanged first.
 gathered_tensors = all_gather_variadic_shape(local_tensor, group=group)
 
 for i, t in enumerate(gathered_tensors):
     print(f"Rank {i} sent shape: {t.shape}")
 ```
 
-### Object Communication
+### Gathering Objects
 
-Sending arbitrary Python objects between ranks. These objects must be picklable.
+Gather Python objects from all ranks. The objects must be picklable.
 
 ```python
-import torch.distributed as dist
-from d9d.core.dist_context import DistributedContext, REGULAR_DOMAIN
+from d9d.core.dist_context import DistributedContext, FLAT_DOMAIN
 from d9d.core.dist_ops import all_gather_object
 
-# Setup
+# Setup.
 ctx: DistributedContext = ...
-group = ctx.mesh_for(REGULAR_DOMAIN).get_group()
-rank = ctx.mesh_for(REGULAR_DOMAIN).get_rank()
+mesh = ctx.mesh_for(FLAT_DOMAIN)
+group = mesh.get_group()
+rank = mesh.get_local_rank()
 
-# Local data
+# Local data.
 my_metadata = {
     "rank": rank,
-    "the-strongest": "satoru-gojo"
+    "status": "ready"
 }
 
-# Gather
+# Gather.
 results = all_gather_object(my_metadata, group=group)
 
 for data in results:
     print(f"Rank {data['rank']} sent {data}")
 ```
+
+## API Reference
 
 ::: d9d.core.dist_ops
