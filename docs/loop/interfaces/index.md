@@ -1,4 +1,4 @@
-# Interfaces & Logic
+# Interfaces
 
 ## About
 

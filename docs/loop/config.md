@@ -1,4 +1,4 @@
-# Configuration Schemas
+# Configuration
 
 The `d9d.loop.config` package defines the structure for configuring the training job using Pydantic models. This ensures strict validation of configurations.
 

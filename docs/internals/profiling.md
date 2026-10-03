@@ -1,4 +1,4 @@
-# Distributed Profiling
+# Profiling
 
 !!! warning "Internal API Warning"
     If you are utilizing the standard `d9d` training infrastructure, you **do not** need to call these functions manually. The framework automatically handles profiling based on configuration. This package is primarily intended for users extending `d9d`.

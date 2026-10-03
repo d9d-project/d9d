@@ -25,7 +25,7 @@ nav = [
         "loop/train.md",
         "loop/inference.md",
         "loop/config.md",
-        { "Interfaces & Logic" = [
+        { "Interfaces" = [
             "loop/interfaces/index.md",
             "loop/interfaces/task.md",
             "loop/interfaces/model.md",

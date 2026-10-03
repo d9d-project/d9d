@@ -1,4 +1,4 @@
-# Creating Custom Metrics
+# Custom Metrics
 
 The `d9d` framework allows you to implement custom metrics by adhering to the `Metric` interface.
 

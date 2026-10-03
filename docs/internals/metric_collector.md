@@ -1,4 +1,4 @@
-# Async Metric Collection
+# Metric Collection
 
 !!! warning "Internal API Warning"
     If you are using the standard `d9d` `Trainer`, you **do not** need to interact with this package directly. It is handled automatically. This documentation is intended for users implementing custom training loops or logging infrastructure.

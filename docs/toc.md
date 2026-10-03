@@ -20,7 +20,7 @@ How to configure and run jobs.
 *   **[Training Loop](./loop/train.md)**: The lifecycle of the `Trainer`, dependency injection, and execution flow.
 *   **[Inference Loop](./loop/inference.md)**: The lifecycle of distributed `Inference` and forward-only execution.
 *   **[Configuration](./loop/config.md)**: Pydantic schemas for configuring jobs, scheduling, and logging.
-*   **[Interfaces (Providers & Tasks)](./loop/interfaces/index.md)**: How to inject your custom Model, Data, and Step logic (Train & Infer).
+*   **[Interfaces](./loop/interfaces/index.md)**: How to inject your custom Model, Data, and Step logic (Train & Infer).
 
 
 ## 💾 Data & State
@@ -47,24 +47,24 @@ Strategies for distributing computations.
 ## 🔧 Fine-Tuning (PEFT)
 Parameter-Efficient Fine-Tuning framework.
 
-*   **[Overview](./peft/overview.md)**: Injection lifecycle and state mapping.
-*   **Methods**: [LoRA](./peft/lora.md), [Full Tune](./peft/full_tune.md), and [Method Stacking](./peft/stack.md).
+*   **[PEFT Overview](./peft/overview.md)**: Injection lifecycle and state mapping.
+*   **Methods**: [LoRA](./peft/lora.md), [Full Fine-Tuning](./peft/full_tune.md), and [Method Stacking](./peft/stack.md).
 
 ## 📈 Optimization & Metrics
 
-*   **[Metrics](./metric/overview.md)**: Distributed-aware statistic accumulation.
+*   **[Metrics Overview](./metric/overview.md)**: Distributed-aware statistic accumulation.
 *   **[Metric Catalogue](./metric/metric_catalogue/index.md)**: Ready-to-use metric implementations.
 *   **[Custom Metrics](./metric/custom.md)**: Implementing custom metrics.
 *   **[Experiment Tracking](./internals/tracker_integration.md)**: Integration with logging backends (Aim).
-*   **[Piecewise Scheduler](./lr_scheduler/piecewise.md)**: Composable LR schedules and [Visualization](./lr_scheduler/visualization.md).
+*   **[Piecewise Scheduler](./lr_scheduler/piecewise.md)**: Composable LR schedules and [Schedule Visualization](./lr_scheduler/visualization.md).
 *   **[Stochastic Optimizers](./optimizer/stochastic.md)**: Low-precision training using stochastic rounding.
 
 ## ⚙️ Internals
 Deep dive into the engine room.
 
-*   **[AutoGrad Extensions](./core/autograd_extensions.md)**: How we do split-backward for Pipeline Parallel.
+*   **[Autograd Extensions](./core/autograd_extensions.md)**: How we do split-backward for Pipeline Parallel.
 *   **[Pipelining Internals](./internals/pipelining.md)**: How the VM and Schedules work.
-*   **[Gradient Sync](./internals/grad_sync.md)**: Custom backward hooks for overlapping comms.
+*   **[Gradient Synchronization](./internals/grad_sync.md)**: Custom backward hooks for overlapping comms.
 *   **[Gradient Norm & Clipping](./internals/grad_norm.md)**: Correct global norm calculation across hybrid meshes.
 *   **[Metric Collection](./internals/metric_collector.md)**: Custom overlapped metric synchronization & computation.
 *   **[Determinism](./internals/determinism.md)**: RNG seeding across distributed processes.
