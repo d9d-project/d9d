@@ -42,7 +42,7 @@ Top-level packages of the library.
 - `metric/` - distributed-aware metrics: `component` and `impl` (metric catalogue).
 - `optim/` - optimizers, including `stochastic` (stochastic-rounding low-precision).
 - `lr_scheduler/` - learning-rate schedules, including `piecewise` (composable schedules).
-- `tracker/` - experiment tracking integrations (`provider`, e.g. WandB, Aim).
+- `tracker/` - experiment tracking integrations (`provider`, e.g. Aim).
 - `kernel/` - custom kernels: `cce`, `flash_attn`, `gmm`, `moe`, `normalization`, `stochastic`, `swiglu`, `general`.
 - `internals/` - engine internals: `grad_sync`, `grad_norm`, `metric_collector`, `determinism`, `profiling`, `state`.
 

@@ -7,7 +7,7 @@ icon: lucide/table-of-contents
 ## 🌐 Distributed Core
 The foundational primitives managing the cluster.
 
-*   **[Distributed Context](./core/dist_context.md)**: The Source of Truth for topology. Understanding `DeviceMesh` domains (`dense`, `expert`, `batch`).
+*   **[Distributed Context](./core/dist_context.md)**: The source of truth for topology, and the `DeviceMesh` domains (`dense`, `expert`, `batch`).
 *   **[Distributed Operations](./core/dist_ops.md)**: Utilities for gathering var-length tensors and objects.
 *   **[State Offloading](./core/offload.md)**: Releasing GPU training state to host memory for colocated RL (the sleep/wake primitives).
 *   **[PyTree Traversal](./core/pytree.md)**: Dataclass-aware recursive mapping and flattening over nested tensor structures.
@@ -28,11 +28,11 @@ Managing data loading and model checkpoints.
 
 *   **[Model State Mapper](./model_states/mapper.md)**: The graph-based transformation engine for checkpoints (transform architectures on-the-fly).
 *   **[Model State I/O](./model_states/io.md)**: Streaming reader/writers for checkpoints.
-*   **[Datasets](./dataset/index.md)**: Distributed-aware dataset wrappers and smart bucketing.
+*   **[Datasets](./dataset/index.md)**: Distributed-aware dataset wrappers and length bucketing.
 
 
 ## 🧠 Modeling & Architecture
-Building blocks for modern LLMs.
+Building blocks for LLMs.
 
 *   **[Model Catalogue](./models/model_catalogue/index.md)**: Models available directly in d9d.
 *   **[Model Design](./models/model_design.md)**: Principles for creating compatible models.
@@ -55,7 +55,7 @@ Parameter-Efficient Fine-Tuning framework.
 *   **[Metrics](./metric/overview.md)**: Distributed-aware statistic accumulation.
 *   **[Metric Catalogue](./metric/metric_catalogue/index.md)**: Ready-to-use metric implementations.
 *   **[Custom Metrics](./metric/custom.md)**: Implementing custom metrics.
-*   **[Experiment Tracking](./internals/tracker_integration.md)**: Integration with logging backends (WandB, Aim).
+*   **[Experiment Tracking](./internals/tracker_integration.md)**: Integration with logging backends (Aim).
 *   **[Piecewise Scheduler](./lr_scheduler/piecewise.md)**: Composable LR schedules and [Visualization](./lr_scheduler/visualization.md).
 *   **[Stochastic Optimizers](./optimizer/stochastic.md)**: Low-precision training using stochastic rounding.
 
@@ -67,5 +67,5 @@ Deep dive into the engine room.
 *   **[Gradient Sync](./internals/grad_sync.md)**: Custom backward hooks for overlapping comms.
 *   **[Gradient Norm & Clipping](./internals/grad_norm.md)**: Correct global norm calculation across hybrid meshes.
 *   **[Metric Collection](./internals/metric_collector.md)**: Custom overlapped metric synchronization & computation.
-*   **[Determinism](./internals/determinism.md)**.
-*   **[Profiling](./internals/profiling.md)**.
+*   **[Determinism](./internals/determinism.md)**: RNG seeding across distributed processes.
+*   **[Profiling](./internals/profiling.md)**: A distributed-aware wrapper around the PyTorch Profiler.
