@@ -172,7 +172,20 @@ We follow the [Google Python style](https://google.github.io/styleguide/pyguide.
 
 *   **Say what a feature does and how to use it.** Leave internals (host syncs, alignment, fallback paths) to code
     comments.
-*   **Keep each section about one topic.** Follow the structure of the neighbouring pages.
+*   **Follow the page structure.** Start with `## About`: what the feature is, in one paragraph. Add topic sections.
+    Add `## Usage` with a short example for anything users call directly. End with `## API Reference` and the
+    `:::` blocks.
+*   **Keep each section about one topic.**
+*   **Write short, real examples.** Use real names from the API. Show configs and environment variables in the form
+    users type them.
+*   **State facts, not adjectives.** Do not write "efficient", "highly optimized", "powerful" or "seamless". Say what
+    makes it fast (a fused kernel, no host sync), or show a benchmark with the hardware and dtype in the heading.
+*   **State the limits users must know.** Name the required hardware, dtypes and extras (`d9d[...]`), and what the
+    feature does not support.
+*   **Do not repeat the API reference.** Arguments and return values come from the docstrings. Use prose for concepts
+    and choices.
+*   **Link the sources.** Link the paper for a method and the repository for an external library.
+*   **Update the documentation in the same PR.** If a change affects what users see or do, update the pages with it.
 
 ## Documentation
 
