@@ -56,8 +56,13 @@ provider = AutoDataProvider(
 
 # Hand it to the loop alongside the other providers.
 trainer = TrainingConfigurator(
+    mesh=...,
+    parameters=...,
+    model_provider=...,
+    task_provider=...,
     data_provider=provider,
-    ...,
+    optimizer_provider=...,
+    lr_scheduler_provider=...,
 ).configure()
 ```
 
@@ -91,6 +96,7 @@ from d9d.dataset import (
     BufferSortedDataset,
     DatasetImplementingSortKeyProtocol,
     FixedCountMicrobatchPacker,
+    PinMemoryMicrobatchPackStream,
     num_microbatches_for_global_batch,
     shard_dataset_data_parallel,
 )
@@ -132,7 +138,7 @@ class ProjectDataProvider(DataProvider):
         self._config = config
 
     def __call__(self, context: InitializeDataProviderContext) -> MicrobatchPackStream:
-        tokenizer = Tokenizer.from_file(str(self._config.tokenizer))
+        tokenizer = Tokenizer.from_file(self._config.tokenizer)
 
         # Rank 0 builds the cache first. The other ranks then load from it.
         with context.dist_context.main_process_first():
@@ -165,7 +171,10 @@ class ProjectDataProvider(DataProvider):
             global_batch_size=self._config.global_batch_size,
             microbatch_size=self._config.microbatch_size,
         )
-        return FixedCountMicrobatchPacker(loader, microbatches_per_step=microbatches_per_step, drop_last=True)
+        packer = FixedCountMicrobatchPacker(loader, microbatches_per_step=microbatches_per_step, drop_last=True)
+
+        # Pin the packs, so the loop copies them to the device asynchronously.
+        return PinMemoryMicrobatchPackStream(packer)
 ```
 
 ## API Reference

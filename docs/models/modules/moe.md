@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.block.moe` package implements sparse Mixture-of-Experts layers. `MoELayer` combines a router, a token dispatcher and the experts, with an optional shared expert. The layer requires the `d9d[moe]` extra. You must build and install [DeepEP](https://github.com/deepseek-ai/DeepEP) and [grouped-gemm](https://github.com/fanshiqing/grouped_gemm/) manually first.
+The `d9d.module.block.moe` package implements sparse Mixture-of-Experts layers. `MoELayer` combines a router, a token dispatcher and the experts, with an optional shared expert. The layer requires the `d9d[moe]` extra. You must build and install [grouped-gemm](https://github.com/fanshiqing/grouped_gemm/) manually first. Expert parallelism also needs [DeepEP](https://github.com/deepseek-ai/DeepEP), which you must build and install the same way.
 
 ## Expert Parallelism
 
@@ -19,7 +19,7 @@ To set up expert parallelism, see [Horizontal Parallelism](../horizontal_paralle
 `ExpertCommunicationHandler` is the interface that moves tokens to their experts and back.
 
 *   `NoCommunicationHandler` is the default. It is used when all experts are local, such as on a single GPU or with tensor parallelism.
-*   `DeepEpCommunicationHandler` is used with expert parallelism. It runs the all-to-all communication over NVLink and RDMA with [DeepEP](https://github.com/deepseek-ai/DeepEP).
+*   With expert parallelism, `parallelize_expert_parallel` switches the layer to a DeepEP handler. It runs the all-to-all communication over NVLink and RDMA with [DeepEP](https://github.com/deepseek-ai/DeepEP).
 
 ### Experts
 

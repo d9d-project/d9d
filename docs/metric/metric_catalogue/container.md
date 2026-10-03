@@ -17,6 +17,8 @@ import torch
 from d9d.metric.impl.aggregation import SumMetric, WeightedMeanMetric
 from d9d.metric.impl.container import ComposeMetric
 
+dist_context = ...  # The DistributedContext of the job.
+
 # 1. Group metrics together.
 metrics = ComposeMetric({
     "loss": WeightedMeanMetric(),

@@ -32,7 +32,7 @@ Most conventions are already documented. Always read relevant files (especially 
 
 Top-level packages of the library.
 
-- `core/` - distributed primitives: `dist_context` (the `DeviceMesh` source of truth), `dist_ops`, `sharding` (PyTree sharding), `offload` (sleep/wake state offloading), `autograd`, `protocol`, `types`.
+- `core/` - distributed primitives: `dist_context` (the `DeviceMesh` source of truth), `dist_ops`, `pytree` (PyTree traversal), `offload` (sleep/wake state offloading), `autograd`, `protocol`, `types`.
 - `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`).
 - `module/` - modeling building blocks: `base`, `block`, `model` (model catalogue), and `parallelism`.
 - `pipelining/` - pipeline parallelism: `api`, `factory`, `infra` (the VM and schedules), and `training`.
@@ -43,7 +43,7 @@ Top-level packages of the library.
 - `optim/` - optimizers, including `stochastic` (stochastic-rounding low-precision).
 - `lr_scheduler/` - learning-rate schedules, including `piecewise` (composable schedules).
 - `tracker/` - experiment tracking integrations (`provider`, e.g. Aim).
-- `kernel/` - custom kernels: `cce`, `flash_attn`, `gmm`, `moe`, `normalization`, `stochastic`, `swiglu`, `general`.
+- `kernel/` - custom kernels: `cce`, `gmm`, `moe`, `normalization`, `stochastic`, `swiglu`, `general`.
 - `internals/` - engine internals: `grad_sync`, `grad_norm`, `metric_collector`, `determinism`, `profiling`, `state`.
 
 ## Working agreements for agents

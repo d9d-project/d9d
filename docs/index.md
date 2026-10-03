@@ -4,7 +4,7 @@ icon: lucide/house
 
 # The d9d Project
 
-**d9d** is a distributed training framework built on top of PyTorch 2.0. It aims to be hackable, modular, and efficient, designed to scale from single-GPU debugging to massive clusters running 6D parallelism.
+**d9d** is a distributed training framework built on top of modern PyTorch. It aims to be hackable, modular, and efficient, designed to scale from single-GPU debugging to massive clusters running 6D parallelism.
 
 ## Installation
 
@@ -33,14 +33,18 @@ Install it with your package manager:
 *   `d9d[aim]`: [Aim](https://aimstack.io/) experiment tracker integration.
 *   `d9d[visualization]`: [Plotly](https://plotly.com/python/), for plotting learning rate schedules.
 *   `d9d[linear-attention]`: [Flash Linear Attention](https://github.com/fla-org/flash-linear-attention) kernels for linear attention.
-*   `d9d[backend-sdpa-flash-attention-2]`: [FlashAttention 2](https://github.com/Dao-AILab/flash-attention) SDPA backend kernels.
+*   `d9d[backend-sdpa-flash-attention-2]`: [FlashAttention 2](https://github.com/Dao-AILab/flash-attention) SDPA backend kernels. You may need to build FlashAttention 2 from source if no prebuilt wheel matches your setup.
 *   `d9d[backend-sdpa-flash-attention-4]`: [FlashAttention 4](https://github.com/Dao-AILab/flash-attention) SDPA backend kernels.
 *   `d9d[moe]`: Mixture-of-Experts (MoE) GPU kernels. You must build and install [DeepEP](https://github.com/deepseek-ai/DeepEP) and [grouped-gemm](https://github.com/fanshiqing/grouped_gemm/) manually first.
-*   `d9d[cce]`: Fused cross-entropy kernels. You must build and install [Cut Cross Entropy](https://github.com/apple/ml-cross-entropy) manually first.
+*   `d9d[cce]`: Fused cross-entropy kernels. You must install [Cut Cross Entropy](https://github.com/apple/ml-cross-entropy) from its repository first.
 
 ## Documentation
 
 Start with the [Table of Contents](./toc.md). You can read it from top to bottom.
+
+If a job hangs or fails, see [Troubleshooting](./troubleshooting.md).
+
+d9d is in alpha, so public APIs can change between minor releases. Read the [changelog](https://github.com/d9d-project/d9d/blob/main/CHANGELOG.md) before you upgrade.
 
 ## Examples
 
@@ -69,7 +73,7 @@ In terms of core concept:
 In terms of codebase and engineering:
 
 *   **IS** built on a strong engineering foundation: we enforce strict type checking and linting to catch errors before execution.
-*   **IS** reliable: a suite of over 450 tests covers unit logic, integration flows, and end-to-end distributed scenarios.
+*   **IS** reliable: a suite of over 900 tests covers unit logic, integration flows, and end-to-end distributed scenarios.
 *   **IS** eager to use performance hacks (like DeepEP or custom kernels) if they improve MFU, even if they aren't PyTorch-native.
 *   **IS NOT** for legacy setups: we do not maintain backward compatibility with older PyTorch versions or hardware. We prefer simplicity and modern APIs (like `DTensor`).
 
@@ -81,4 +85,4 @@ To balance hackability and performance, d9d follows these design principles:
 *   **White-Box Modeling**: We encourage standard PyTorch code. Models are not wrapped in metadata specifications. They are standard `nn.Module`s that implement small protocols.
 *   **Pragmatic Efficiency**: We prefer native PyTorch, but we integrate non-native solutions if they improve MFU. For example, our MoE uses DeepEP communications, reindexing kernels from Megatron-LM, and grouped GEMM kernels.
 *   **Graph-Based State Management**: Our I/O system treats model checkpoints as directed acyclic graphs. You can transform architectures (e.g. merge `q`, `k`, `v` into `qkv`) on the fly while streaming from disk, without loading the whole checkpoint into memory.
-*   **DTensors**: Distributed parameters must be `torch.distributed.tensor.DTensor`s. DTensors know their topology, which makes checkpointing simpler. We use modern PyTorch 2.0 APIs (`DeviceMesh`) wherever we can.
+*   **DTensors**: Distributed parameters must be `torch.distributed.tensor.DTensor`s. DTensors know their topology, which makes checkpointing simpler. We use modern PyTorch APIs (`DeviceMesh`) wherever we can.

@@ -18,7 +18,8 @@ def inject_peft_and_freeze(method: PeftMethod, module: nn.Module) -> ModelStateM
         module: The PyTorch module to modify.
 
     Returns:
-        A ``ModelStateMapper`` that loads checkpoint weights into the modified structure.
+        A ``ModelStateMapper`` that renames only the keys the method changes. Chain it after the checkpoint
+        mapper with ``ModelStateMapperSequential`` to load a full checkpoint.
     """
     for param in module.parameters():
         param.requires_grad = False
