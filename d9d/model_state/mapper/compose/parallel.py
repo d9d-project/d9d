@@ -7,18 +7,21 @@ from d9d.model_state.mapper.compose.helper import filter_empty_mappers
 
 
 class ModelStateMapperParallel(ModelStateMapper):
-    """Executes a list of states mappers independently alongside each other.
+    """Mapper that executes a list of state mappers independently of each other.
 
-    This class aggregates multiple mappers into a single logical unit.
-    It enforces strict isolation between the mappers: no two mappers can
-    consume the same input key (input collision) or produce the same output
-    key (output collision).
-
-    During execution (`apply`), it routes the specific subset of the input dictionary
-    to the sub-mapper responsible for those keys.
+    No two mappers can consume the same input key or produce the same output key. ``apply()`` routes each
+    group to the mapper that declared it.
     """
 
     def __init__(self, mappers: Sequence[ModelStateMapper]):
+        """Constructs the ``ModelStateMapperParallel`` object.
+
+        Args:
+            mappers: The mappers to run side by side. Mappers without inputs and outputs are dropped.
+
+        Raises:
+            ValueError: If two mappers share an input key or an output key.
+        """
         mappers_lst = filter_empty_mappers(mappers)
 
         all_groups = set()
@@ -31,11 +34,17 @@ class ModelStateMapperParallel(ModelStateMapper):
 
             for sub_group in sub_groups:
                 if not seen_inputs.isdisjoint(sub_group.inputs):
-                    raise ValueError(f"Found a colliding input group: {sub_group.inputs}")
+                    raise ValueError(
+                        f"Found colliding input keys ({sub_group.inputs}). "
+                        "Each input key must be consumed by one mapper only."
+                    )
                 seen_inputs.update(sub_group.inputs)
 
                 if not seen_outputs.isdisjoint(sub_group.outputs):
-                    raise ValueError(f"Found colliding output keys: {sub_group.outputs}")
+                    raise ValueError(
+                        f"Found colliding output keys ({sub_group.outputs}). "
+                        "Each output key must be produced by one mapper only."
+                    )
                 seen_outputs.update(sub_group.outputs)
 
                 all_groups.add(sub_group)
@@ -52,7 +61,8 @@ class ModelStateMapperParallel(ModelStateMapper):
 
         if group_keys not in self._inputs_to_mapper:
             raise ValueError(
-                "Tried to run a parallel mapper with undefined group. Perhaps you sent groups that are not isolated?"
+                f"Tried to run a parallel mapper with an undefined group ({sorted(group_keys)}). "
+                "Pass groups exactly as returned by state_dependency_groups()."
             )
 
         return self._inputs_to_mapper[group_keys].apply(group)

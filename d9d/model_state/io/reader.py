@@ -11,7 +11,7 @@ from d9d.model_state.mapper import ModelStateMapper
 
 
 class _StateLoadingFlow:
-    """Internal orchestration logic for loading and transforming model states in a streamed manner."""
+    """Loads and transforms model states file by file."""
 
     def __init__(
         self, src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool, position: int | None = None
@@ -20,7 +20,6 @@ class _StateLoadingFlow:
         self._mapper = mapper
         self._device = device
 
-        # I/O in constructor!
         self._weight_map = self._load_weight_map()
         self._groups_to_process = set(mapper.state_dependency_groups())
 
@@ -46,19 +45,19 @@ class _StateLoadingFlow:
         return index.weight_map
 
     def _load_single_file_weight_map(self) -> dict[str, str]:
-        """Builds the weight map out of a single-file checkpoint, which carries no index.
+        """Builds the weight map of a single-file checkpoint, which has no index.
 
         Returns:
-            Mapping from state name to the name of the .safetensors file holding it.
+            Mapping from state name to the name of the ``.safetensors`` file holding it.
 
         Raises:
-            FileNotFoundError: If the source directory carries neither an index nor a single-file checkpoint.
+            FileNotFoundError: If the source directory contains neither an index nor a single-file checkpoint.
         """
         single_file = self._src_dir / MODEL_STATE_SINGLE_FILE_NAME
         if not single_file.is_file():
             raise FileNotFoundError(
-                f"Cannot run state loading: {self._src_dir} contains neither {MODEL_STATE_INDEX_FILE_NAME} "
-                f"nor {MODEL_STATE_SINGLE_FILE_NAME}!"
+                f"Cannot load model state: src_dir ({self._src_dir}) contains neither {MODEL_STATE_INDEX_FILE_NAME} "
+                f"nor {MODEL_STATE_SINGLE_FILE_NAME}."
             )
 
         with safe_open(str(single_file), framework="pt") as st:
@@ -74,7 +73,7 @@ class _StateLoadingFlow:
         missing_inputs = will_process_inputs.difference(on_disk_inputs)
 
         if len(missing_inputs) > 0:
-            raise ValueError(f"Cannot run state loading: states {missing_inputs} are missing!")
+            raise ValueError(f"Cannot load model state: states ({missing_inputs}) are missing from the checkpoint.")
 
     def _update_in_memory_states(self, file_to_load: str, params_to_load: set[str]):
         with safe_open(str(self._src_dir / file_to_load), framework="pt", device=str(self._device)) as st:
@@ -113,23 +112,22 @@ class _StateLoadingFlow:
 def read_model_state(
     src_dir: Path, mapper: ModelStateMapper, device: str, show_progress: bool = True, position: int | None = None
 ) -> Iterable[tuple[str, torch.Tensor]]:
-    """Reads a model checkpoint from disk, transforming it on-the-fly according to the state mapper.
+    """Reads a model checkpoint from disk and transforms it on the fly with a state mapper.
 
-    This function uses a streaming approach. It analyzes the mapper to determine which files
-    need to be loaded. Tensors are loaded into memory only when needed and evicted immediately
-    after the mapper processes them.
+    Only files that hold inputs of ``mapper`` are read. A tensor stays in memory only until the mapper has
+    processed its group.
 
     Args:
-        src_dir: The directory containing the checkpoint: either sharded .safetensors files described by a
-            `model.safetensors.index.json` file, or a single unindexed `model.safetensors` file.
-        mapper: The transformation graph defining how to map on-disk keys to output keys.
-        device: The device to load tensors onto (e.g., "cpu", "cuda:0").
+        src_dir: The directory containing the checkpoint: either sharded ``.safetensors`` files described by a
+            ``model.safetensors.index.json`` file, or a single unindexed ``model.safetensors`` file.
+        mapper: The mapper from on-disk keys to output keys.
+        device: The device to load tensors onto, e.g. ``"cpu"`` or ``"cuda:0"``.
         show_progress: Whether to display a progress bar.
         position: Row index for the tqdm bar. Pass the process local rank to stack one bar
             per rank without interleaving. ``None`` lets tqdm use its default (single bar).
 
     Yields:
-        A tuple containing the transformed parameter name and its tensor value.
+        Pairs of transformed state name and tensor.
     """
     yield from _StateLoadingFlow(
         src_dir=src_dir, device=device, mapper=mapper, show_progress=show_progress, position=position

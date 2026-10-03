@@ -9,14 +9,19 @@ from d9d.core.protocol import OptimizerProtocol
 
 
 class PipelinedOptimizer(OptimizerProtocol, Offloadable):
-    """Wrapper that manages multiple optimizers for a pipeline parallel rank.
+    """Optimizer that combines the optimizers of all stages hosted on a pipeline-parallel rank.
 
-    In a pipeline parallel setup, a single rank might host multiple stages, each having its own parameters
-    and optimizer.
-    This class aggregates them into a single interface.
+    With pipeline parallelism, one rank can host several stages, each with its own parameters and
+    optimizer. This class exposes them as one optimizer.
     """
 
     def __init__(self, mesh_pp: DeviceMesh | None, optimizers: list[OptimizerProtocol]):
+        """Constructs the ``PipelinedOptimizer`` object.
+
+        Args:
+            mesh_pp: The pipeline-parallel mesh, or ``None`` without pipeline parallelism.
+            optimizers: One optimizer per stage hosted on this rank.
+        """
         super().__init__()
 
         self._pp_rank = mesh_pp.get_local_rank() if mesh_pp is not None else 0
@@ -44,9 +49,9 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
     def offload(self, ctx: OffloadContext) -> None:
         """Releases the GPU memory of the optimizer state, moving its tensors to host memory.
 
-        Each tensor entry of "optimizer.state" has its local storage swapped in place to a host
-        copy; the tensor objects (including DTensor wrappers) themselves are preserved, so the
-        state dict keys and the wrappers held by the optimizer step continue to be valid.
+        Each tensor in ``optimizer.state`` keeps its identity, including ``DTensor`` wrappers. Only its
+        local storage moves to host memory. The state dict keys and the tensors held by the optimizer
+        stay valid.
 
         Args:
             ctx: Context for this operation.
@@ -70,7 +75,7 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
         self._offload_mirror = mirror
 
     def onload(self, ctx: OnloadContext) -> None:
-        """Restores GPU residency of the optimizer state released by "offload".
+        """Moves the optimizer state released by ``offload`` back to GPU memory.
 
         Args:
             ctx: Context for this operation.
@@ -95,9 +100,9 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
         self._offload_mirror = None
 
     def is_offloaded(self) -> bool:
-        """Reports whether the optimizer state is currently on host memory.
+        """Reports whether the optimizer state is currently in host memory.
 
         Returns:
-            True if the state is offloaded, False otherwise.
+            ``True`` if the state is offloaded, ``False`` otherwise.
         """
         return self._offload_mirror is not None

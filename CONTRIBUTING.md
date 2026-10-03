@@ -150,7 +150,8 @@ PR descriptions.
 *   **Write "can" for what is allowed and "must" for what is required.**
 *   **Mark stopgaps.** If a design is a stopgap forced by a current limit, say so in one sentence and name the limit.
     In a DEP, list the deferred work explicitly.
-*   **Spell common terms one way.** Write "microbatch", "bf16" and "fp32". Write MiB and GiB for sizes in powers of two.
+*   **Spell common terms one way.** Write "microbatch", "bf16", "fp32", "I/O", "PyTree" and "Hugging Face". Write MiB
+    and GiB for sizes in powers of two. Use American spelling.
 
 ### Names
 
@@ -169,6 +170,8 @@ PR descriptions.
     `# noqa: BLE001 - re-raised in the consuming thread`. Lazy imports of optional dependencies (`PLC0415`) need no
     reason.
 *   **Write a TODO as `# TODO(owner): ...`,** once per item, with a link to its issue.
+*   **Write comments as sentences** ([PEP 8](https://peps.python.org/pep-0008/#comments)). Start with a capital
+    letter, unless the comment starts with a lowercase identifier, and end with a period.
 
 ### Docstrings
 
@@ -182,21 +185,25 @@ We follow the [Google Python style](https://google.github.io/styleguide/pyguide.
 *   **Document `__init__`:** Write a docstring even for `__init__`, but keep it short and to the point, e.g. `"""Constructs the ``Trainer`` object."""`.
 *   **Public API coverage:** Always write docstrings for everything considered public API.
 *   **Write the summary line in the third person.** It fits on one line and ends with a period, e.g. "Computes the
-    loss.". An `__init__` summary starts with "Constructs". A `Raises:` entry starts with "If".
+    loss.". An `__init__` summary reads "Constructs the ``X`` object.". A `Raises:` entry starts with "If".
 *   **Put identifiers and literals in double backticks,** e.g. ``` ``GroupedLinear`` ``` and ``` ``None`` ```. Do not
     use quotes or Sphinx roles such as `:class:`.
 *   **Write tensor shapes one way.** End the description with ```Shape: ``(batch, seq_len, hidden_size)``.```. Use
     parentheses and snake_case dimension names. Use the same name for the same dimension everywhere.
 *   **Document fields under `Attributes:`** in data classes, configs and enums. Other classes document their
     arguments in the `__init__` docstring.
-*   **Let overrides inherit the contract.** An override may omit its docstring. Document it only if its behaviour
+*   **Let overrides inherit the contract.** An override may omit its docstring. Document it only if its behavior
     differs from the base contract.
+*   **Write a class summary as a noun phrase** that says what an instance is, e.g. "The engine that runs a distributed
+    training job.". Do not write "Class that ...". A config starts with "Configuration for", a protocol with
+    "Protocol for" and an abstract class with "Abstract base class for".
 *   **Write a property docstring as a noun phrase,** e.g. "The current step.", without a `Returns:` section.
 
 ### Error Messages
 
 *   **Write a full sentence.** Name the offending value as `name ({value})`. If the caller can fix the problem, say
     how. Never raise an exception without a message.
+*   **Write calls with parentheses,** e.g. "Call configure_buffers() first."
 
 ### Documentation Pages
 
@@ -206,6 +213,12 @@ We follow the [Google Python style](https://google.github.io/styleguide/pyguide.
     Add `## Usage` with a short example for anything users call directly. End with `## API Reference` and the
     `:::` blocks.
 *   **Keep each section about one topic.**
+*   **Write one paragraph per line.** Do not wrap lines by hand. Use soft wrapping in your editor.
+*   **Indent list items by four characters.** Write `*   ` for bullets and `1.  ` for numbered items, so nested
+    blocks line up at four spaces.
+*   **Use bold only for labels and for a term where you define it.** Do not use bold for emphasis.
+*   **Write a labeled list item as `**Label**: Sentence.`** Put the colon outside the bold text. Start the text after
+    it with a capital letter and end it with a period.
 *   **Write short, real examples.** Use real names from the API. Show configs and environment variables in the form
     users type them.
 *   **State facts, not adjectives.** Do not write "efficient", "highly optimized", "powerful" or "seamless". Say what

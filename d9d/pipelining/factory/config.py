@@ -6,7 +6,10 @@ from pydantic import BaseModel, Field
 class PipelineScheduleInferenceConfig(BaseModel):
     """Configuration for inference-only pipeline execution.
 
-    This schedule runs all forward passes sequentially without any backward passes.
+    This schedule runs all forward passes and no backward passes.
+
+    Attributes:
+        schedule: Discriminator field. Always ``"inference"``.
     """
 
     schedule: Literal["inference"] = "inference"
@@ -15,18 +18,25 @@ class PipelineScheduleInferenceConfig(BaseModel):
 class PipelineScheduleGPipeConfig(BaseModel):
     """Configuration for GPipe execution.
 
-    This assumes a single stage per rank and processes all microbatches for the
-    forward pass before switching to the backward pass.
+    This schedule hosts one stage per rank. It runs the forward pass for all microbatches before it
+    starts the backward pass.
+
+    Attributes:
+        schedule: Discriminator field. Always ``"gpipe"``.
     """
 
     schedule: Literal["gpipe"] = "gpipe"
 
 
 class PipelineScheduleLoopedBFSConfig(BaseModel):
-    """Configuration for Looped Breadth-First Search execution.
+    """Configuration for Looped Breadth-First execution.
 
-    Similar to GPipe, but supports multiple stages per rank (virtualization).
-    It executes all available work for a specific stage before moving to the next.
+    This schedule works like GPipe but supports several stages per rank. It runs all work for one
+    stage before it moves to the next.
+
+    Attributes:
+        schedule: Discriminator field. Always ``"looped_bfs"``.
+        num_stages_per_rank: The number of stages hosted on each rank.
     """
 
     schedule: Literal["looped_bfs"] = "looped_bfs"
@@ -37,8 +47,13 @@ class PipelineScheduleLoopedBFSConfig(BaseModel):
 class PipelineSchedule1F1BConfig(BaseModel):
     """Configuration for Interleaved 1F1B and Interleaved Zero Bubble execution.
 
-    Supports assigning multiple stages per rank and sharding backward to dI and dW
-    to reduce pipeline bubbles.
+    This schedule supports several stages per rank. With ``zero_bubble``, it splits the backward pass
+    into input-gradient and weight-gradient parts to reduce pipeline bubbles.
+
+    Attributes:
+        schedule: Discriminator field. Always ``"1f1b"``.
+        num_stages_per_rank: The number of stages hosted on each rank.
+        zero_bubble: Whether to use the Interleaved Zero Bubble (ZB1P) variant.
     """
 
     schedule: Literal["1f1b"] = "1f1b"
@@ -50,8 +65,11 @@ class PipelineSchedule1F1BConfig(BaseModel):
 class PipelineScheduleZeroBubbleVConfig(BaseModel):
     """Configuration for Zero Bubble V (ZBV) execution.
 
-    A specialized V-shape topology schedule that splits backward passes into
-    Input and Weight gradients to maximize overlap. Requires exactly 2 stages per rank.
+    This schedule places stages in a V shape and splits the backward pass into input-gradient and
+    weight-gradient parts. It always hosts 2 stages per rank.
+
+    Attributes:
+        schedule: Discriminator field. Always ``"zero_bubble_v"``.
     """
 
     schedule: Literal["zero_bubble_v"] = "zero_bubble_v"
@@ -60,8 +78,12 @@ class PipelineScheduleZeroBubbleVConfig(BaseModel):
 class PipelineScheduleDualPipeVConfig(BaseModel):
     """Configuration for DualPipeV execution.
 
-    A bidirectional pipeline schedule for high-throughput training, utilizing
-    V-shape topology and reciprocal forward/backward scheduling.
+    This bidirectional schedule places stages in a V shape and pairs the forward pass of one
+    microbatch with the backward pass of another. It always hosts 2 stages per rank. The number of
+    microbatches per step must be at least twice the pipeline-parallel size.
+
+    Attributes:
+        schedule: Discriminator field. Always ``"dual_pipe_v"``.
     """
 
     schedule: Literal["dual_pipe_v"] = "dual_pipe_v"
@@ -78,7 +100,5 @@ AnyPipelineScheduleConfig = Annotated[
 ]
 """Union of all supported pipeline schedule configuration types.
 
-This type alias uses a Pydantic discriminator on the ``schedule`` field to allow
-polymorphic validation and serialization of specific schedule configs (e.g.
-Inference, GPipe, 1F1B, ZeroBubble, etc.).
+Pydantic selects the config class by the ``schedule`` field.
 """

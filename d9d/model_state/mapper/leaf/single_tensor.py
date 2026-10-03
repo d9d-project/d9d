@@ -4,9 +4,14 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperIdentity(ModelStateMapper):
-    """Passes a single state tensor through unchanged."""
+    """Mapper that passes a single state tensor through unchanged."""
 
     def __init__(self, name: str):
+        """Constructs the ``ModelStateMapperIdentity`` object.
+
+        Args:
+            name: The name of the tensor to pass through.
+        """
         self._name = name
 
     def state_dependency_groups(self) -> frozenset[StateGroup]:
@@ -17,14 +22,14 @@ class ModelStateMapperIdentity(ModelStateMapper):
 
 
 class ModelStateMapperTranspose(ModelStateMapper):
-    """Transposes an input tensor along two specified dimensions."""
+    """Mapper that transposes an input tensor along two specified dimensions."""
 
     def __init__(
         self,
         name: str,
         dims: tuple[int, int],
     ) -> None:
-        """Constructs ModelStateMapperTranspose object.
+        """Constructs the ``ModelStateMapperTranspose`` object.
 
         Args:
             name: Name of the tensor to operate on.
@@ -41,18 +46,18 @@ class ModelStateMapperTranspose(ModelStateMapper):
 
 
 class ModelStateMapperSqueeze(ModelStateMapper):
-    """Squeezes an input tensor along a specified dimension or all dimensions of size 1."""
+    """Mapper that squeezes an input tensor along a specified dimension or all dimensions of size 1."""
 
     def __init__(
         self,
         name: str,
         dim: int | None = None,
     ) -> None:
-        """Constructs ModelStateMapperSqueeze object.
+        """Constructs the ``ModelStateMapperSqueeze`` object.
 
         Args:
             name: Name of the tensor to operate on.
-            dim: Dimension to squeeze. If not provided, squeezes all dimensions of size 1.
+            dim: Dimension to squeeze. If ``None``, squeezes all dimensions of size 1.
         """
         self._name = name
         self._dim = dim
@@ -72,14 +77,14 @@ class ModelStateMapperSqueeze(ModelStateMapper):
 
 
 class ModelStateMapperUnsqueeze(ModelStateMapper):
-    """Unsqueezes an input tensor along a specified dimension."""
+    """Mapper that unsqueezes an input tensor along a specified dimension."""
 
     def __init__(
         self,
         name: str,
         dim: int,
     ) -> None:
-        """Constructs ModelStateMapperUnsqueeze object.
+        """Constructs the ``ModelStateMapperUnsqueeze`` object.
 
         Args:
             name: Name of the tensor to operate on.

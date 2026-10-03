@@ -13,20 +13,19 @@ from .job_schedule import JobSchedule
 
 
 class ManualGarbageCollector(AbstractContextManager):
-    """Manages efficient Python garbage collection during the training loop.
+    """Context manager for Python garbage collection during the training loop.
 
-    This context manager disables automatic garbage collection upon entry to prevent
-    unpredictable latency spikes during training steps. It allows performing
-    manual collection at specific intervals (periodic) or specific points (forced).
+    It disables automatic garbage collection on entry to avoid unpredictable
+    latency spikes during steps. Collections then run only at configured intervals or when forced.
     """
 
     def __init__(self, dist_ctx: DistributedContext, config: GarbageCollectionConfig, schedule: JobSchedule):
-        """Constructs the garbage collector manager.
+        """Constructs the ``ManualGarbageCollector`` object.
 
         Args:
             dist_ctx: The distributed context.
-            config: Configuration determining how often GC should run.
-            schedule: JobSchedule instance used to track the current training step.
+            config: The configuration that sets how often garbage collection runs.
+            schedule: The job schedule that tracks the current step.
         """
         self._dist_ctx = dist_ctx
         self._config = config
@@ -57,18 +56,12 @@ class ManualGarbageCollector(AbstractContextManager):
         self._collect(generation=2)
 
     def collect_periodic(self):
-        """Triggers garbage collection if the current step matches the configured period.
-
-        This typically performs a faster (generation 1) collection rather than a full sweep.
-        """
+        """Collects generations 0 and 1 if the current step matches the configured period."""
         if self._schedule.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=False):
             self._collect(generation=1)
 
     def collect_forced(self):
-        """Forces a full garbage collection run regardless of the step count.
-
-        This performs a generation 2 collection.
-        """
+        """Runs a full (generation 2) garbage collection regardless of the current step."""
         self._collect(generation=2)
 
     def _collect(self, generation: int):
@@ -76,4 +69,4 @@ class ManualGarbageCollector(AbstractContextManager):
             begin = time.monotonic()
             gc.collect(generation)
             end = time.monotonic()
-            self._dist_ctx.logger.info(f"[GC] Garbage collection for generation {generation} took {end - begin}s")
+            self._dist_ctx.logger.info(f"Garbage collection for generation {generation} took {end - begin:.2f} seconds")

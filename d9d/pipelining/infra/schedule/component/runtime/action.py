@@ -12,12 +12,12 @@ from .communications import PipelineCommunicationHandler
 
 @dataclasses.dataclass(kw_only=True, slots=True)
 class ActionContext(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
-    """Holds the runtime context required to execute a pipeline action.
+    """Runtime context required to execute a pipeline action.
 
     Attributes:
         pipeline_inputs_microbatches: Per-microbatch ``PipelineInput``, indexed by microbatch.
         pipeline_shared_microbatches: Per-microbatch ``SharedInput``, indexed by microbatch.
-        stages: A mapping of stage indices to their active PipelineStage instances.
+        stages: A mapping of stage indices to the ``PipelineStage`` objects on this rank.
         communications: The handler for P2P communications.
         callback: The handler for either loss computation or result processing.
     """
@@ -31,11 +31,11 @@ class ActionContext(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
 
 
 class ActionWorkType(StrEnum):
-    """Classifies the type of work performed by an action.
+    """Types of work that an action performs.
 
     Attributes:
-        compute: Indicates the action involves computation components (forward, backward).
-        communicate: Indicates the action involves network I/O components (send, receive).
+        compute: The action computes (a forward or backward pass).
+        communicate: The action communicates over the network (send or receive).
     """
 
     compute = "compute"
@@ -45,8 +45,8 @@ class ActionWorkType(StrEnum):
 class ActionBase(abc.ABC):
     """Abstract base class for all pipeline schedule actions.
 
-    An action represents an atomic unit of work in a pipeline schedule,
-    such as computing a microbatch or sending/receiving a tensor.
+    An action is an atomic unit of work in a pipeline schedule, such as computing a microbatch or
+    sending a tensor.
     """
 
     @abc.abstractmethod
@@ -61,28 +61,28 @@ class ActionBase(abc.ABC):
     @property
     @abc.abstractmethod
     def work_type(self) -> ActionWorkType:
-        """Returns the classification of work this action performs."""
+        """The type of work this action performs."""
         ...
 
     @property
     @abc.abstractmethod
     def has_backward_work(self) -> bool:
-        """Returns True if this action is part of the backward pass."""
+        """Whether this action is part of the backward pass."""
         ...
 
     @abc.abstractmethod
     def __str__(self) -> str:
-        """Returns a short string representation of the action for logging/visualization."""
+        """Returns a short string form of the action for logs and visualization."""
         ...
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ForwardSendAction(ActionBase):
-    """Action to schedule a forward pass tensor send operation.
+    """Action that starts sending the forward outputs of a microbatch.
 
     Attributes:
-        stage_idx: The integer index of the pipeline stage initiating the send operation.
-        microbatch_idx: The integer index of the microbatch being sent.
+        stage_idx: The index of the sending pipeline stage.
+        microbatch_idx: The index of the microbatch.
     """
 
     stage_idx: int
@@ -105,11 +105,11 @@ class ForwardSendAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BackwardSendAction(ActionBase):
-    """Action to schedule a backward pass gradient send operation.
+    """Action that starts sending the input gradients of a microbatch.
 
     Attributes:
-        stage_idx: The integer index of the pipeline stage initiating the send operation.
-        microbatch_idx: The integer index of the microbatch being sent.
+        stage_idx: The index of the sending pipeline stage.
+        microbatch_idx: The index of the microbatch.
     """
 
     stage_idx: int
@@ -132,11 +132,11 @@ class BackwardSendAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ForwardReceiveAction(ActionBase):
-    """Action to schedule a forward pass tensor receive operation.
+    """Action that starts receiving the forward inputs of a microbatch.
 
     Attributes:
-        stage_idx: The integer index of the pipeline stage expecting the receive operation.
-        microbatch_idx: The integer index of the microbatch being received.
+        stage_idx: The index of the receiving pipeline stage.
+        microbatch_idx: The index of the microbatch.
     """
 
     stage_idx: int
@@ -159,11 +159,11 @@ class ForwardReceiveAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BackwardReceiveAction(ActionBase):
-    """Action to schedule a backward pass gradient receive operation.
+    """Action that starts receiving the output gradients of a microbatch.
 
     Attributes:
-        stage_idx: The integer index of the pipeline stage expecting the receive operation.
-        microbatch_idx: The integer index of the microbatch being received.
+        stage_idx: The index of the receiving pipeline stage.
+        microbatch_idx: The index of the microbatch.
     """
 
     stage_idx: int
@@ -186,11 +186,11 @@ class BackwardReceiveAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ForwardComputeAction(ActionBase):
-    """Action to perform forward computation for a specific microbatch.
+    """Action that runs the forward pass of a microbatch.
 
     Attributes:
-        stage_idx: The integer index of the pipeline stage.
-        microbatch_idx: The integer index of the microbatch to compute.
+        stage_idx: The index of the pipeline stage.
+        microbatch_idx: The index of the microbatch.
     """
 
     stage_idx: int
@@ -229,14 +229,14 @@ class ForwardComputeAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BackwardFullInputComputeAction(ActionBase):
-    """Action to perform backward computation with respect to inputs.
+    """Action that runs the backward pass of a microbatch, for the inputs and optionally the weights.
 
     Attributes:
-        stage_idx: The integer index of the pipeline stage.
-        microbatch_idx: The integer index of the microbatch to compute.
-        full_backward: If True, performs a full backward pass including inputs
-            and weights. If False, may only compute gradients w.r.t inputs
-            (depending on schedule implementation).
+        stage_idx: The index of the pipeline stage.
+        microbatch_idx: The index of the microbatch.
+        full_backward: If ``True``, computes gradients for the inputs and the weights. If ``False``,
+            computes input gradients and defers the weight gradients to a
+            ``BackwardWeightComputeAction``.
     """
 
     stage_idx: int
@@ -276,11 +276,11 @@ class BackwardFullInputComputeAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BackwardWeightComputeAction(ActionBase):
-    """Action to perform gradient accumulation on weights.
+    """Action that runs the deferred weight backward of a microbatch.
 
     Attributes:
-        stage_idx: The integer index of the pipeline stage.
-        microbatch_idx: The integer index of the microbatch to compute.
+        stage_idx: The index of the pipeline stage.
+        microbatch_idx: The index of the microbatch.
     """
 
     stage_idx: int
@@ -305,9 +305,9 @@ class BackwardWeightComputeAction(ActionBase):
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class ComposeAction(ActionBase):
-    """Composite action scheduling multiple sub-actions sequentially.
+    """Composite action that runs several sub-actions in order.
 
-    Used for forward/backward overlapping.
+    Schedules use it to mark a forward pass and a backward pass for overlap.
 
     Attributes:
         actions: A tuple of sub-actions to be executed sequentially.
@@ -323,7 +323,10 @@ class ComposeAction(ActionBase):
     def work_type(self) -> ActionWorkType:
         sub_work_types = {x.work_type for x in self.actions}
         if len(sub_work_types) != 1:
-            raise ValueError("A ComposeAction must group sub-actions of a single work type")
+            raise ValueError(
+                "The sub-actions of a ComposeAction must share one work type, "
+                f"but they have work types ({sorted(sub_work_types)})."
+            )
         return next(iter(sub_work_types))
 
     @property

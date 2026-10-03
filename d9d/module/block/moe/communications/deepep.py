@@ -15,7 +15,7 @@ def get_hidden_state_bytes(x: torch.Tensor) -> int:
     """Calculates the byte size of a hidden state tensor row.
 
     Args:
-        x: Input tensor. Shape: `(?, hidden_size)`.
+        x: Input tensor. Shape: ``(num_tokens, hidden_size)``.
 
     Returns:
         The size of a row in bytes.
@@ -26,14 +26,13 @@ def get_hidden_state_bytes(x: torch.Tensor) -> int:
 def init_deepep_buffer(group: torch.distributed.ProcessGroup, hidden_bytes: int):
     """Initializes or expands the global DeepEP communication buffer.
 
-    Checks if the existing buffer is sufficient for the required hidden dimension
-    and process group size. If not, it allocates a new buffer.
+    Reuses the existing buffer if it has the same process group and enough space. Otherwise, allocates a new one.
 
     Args:
-        group: The process group intended for communication.
+        group: Process group for the communication.
         hidden_bytes: Size of a single hidden state vector in bytes.
     """
-    global _buffer  # noqa: PLW0603
+    global _buffer  # noqa: PLW0603 - one DeepEP buffer is shared by all MoE layers of the process
     num_nvl_bytes, num_rdma_bytes = 0, 0
     for config in (
         Buffer.get_dispatch_config(group.size()),
@@ -42,7 +41,6 @@ def init_deepep_buffer(group: torch.distributed.ProcessGroup, hidden_bytes: int)
         num_nvl_bytes = max(config.get_nvl_buffer_size_hint(hidden_bytes, group.size()), num_nvl_bytes)
         num_rdma_bytes = max(config.get_rdma_buffer_size_hint(hidden_bytes, group.size()), num_rdma_bytes)
 
-    # Allocate buffer if not existed or not enough buffer
     if (
         _buffer is None
         or _buffer.group != group
@@ -53,7 +51,7 @@ def init_deepep_buffer(group: torch.distributed.ProcessGroup, hidden_bytes: int)
 
 
 class DeepEpDispatch(torch.autograd.Function):
-    """Autograd function for the DeepEP Dispatch operation."""
+    """Autograd function for the DeepEP dispatch operation."""
 
     @staticmethod
     def forward(
@@ -115,7 +113,7 @@ class DeepEpDispatch(torch.autograd.Function):
 
 
 class DeepEpCombine(torch.autograd.Function):
-    """Autograd function for the DeepEP Combine operation."""
+    """Autograd function for the DeepEP combine operation."""
 
     @staticmethod
     def forward(ctx: FunctionCtx, x: torch.Tensor, handle: Any) -> torch.Tensor:
@@ -151,34 +149,44 @@ class DeepEpCombine(torch.autograd.Function):
 
 
 class DeepEpCommunicationHandler(ExpertCommunicationHandler):
-    """Handles MoE communication using the high-performance DeepEP library."""
+    """MoE communication handler for expert-parallel ranks, based on the DeepEP library.
+
+    Requires the ``d9d[moe]`` extra.
+    """
 
     def __init__(self, num_experts: int):
-        """Constructs the DeepEpCommunicationHandler."""
-        self._num_experts = num_experts
-        self._num_experts_per_shard = None  # late-initialization
+        """Constructs the ``DeepEpCommunicationHandler`` object.
 
-        # == fields saved for post-dispatch ==
+        Args:
+            num_experts: Total number of experts across all expert-parallel ranks.
+        """
+        self._num_experts = num_experts
+        # Set in setup().
+        self._num_experts_per_shard = None
+
+        # Saved by dispatch() for combine().
 
         self._handle = None
         self._hidden_shape_before_permute = None
         self._unpermute_mapping = None
 
     def setup(self, group: torch.distributed.ProcessGroup, hidden_size: int, hidden_dtype: torch.dtype):
-        """Initializes the backend buffer and calculates expert sharding.
+        """Initializes the DeepEP buffer and computes the number of experts per rank.
 
         Args:
-            group: The process group containing all experts.
-            hidden_size: Dimensionality of the hidden states.
+            group: Process group that spans the expert-parallel ranks.
+            hidden_size: Hidden size.
             hidden_dtype: Data type of the hidden states.
 
         Raises:
-            ValueError: If num_experts is not divisible by the group size.
+            ValueError: If ``num_experts`` is not divisible by the group size.
         """
         init_deepep_buffer(group, hidden_size * hidden_dtype.itemsize)
 
         if self._num_experts % group.size() != 0:
-            raise ValueError("num_experts must be divisible by distributed group size")
+            raise ValueError(
+                f"num_experts ({self._num_experts}) must be divisible by the process group size ({group.size()})."
+            )
 
         self._num_experts_per_shard = self._num_experts // group.size()
 
@@ -204,7 +212,7 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
 
     def combine(self, hidden_states: torch.Tensor) -> torch.Tensor:
         if self._handle is None:
-            raise ValueError("you fucked up moe communication order: you should dispatch first and after that combine")
+            raise ValueError("Cannot run combine() before dispatch(). Call dispatch() first.")
 
         hidden_states = moe_unpermute_mask(
             hidden_states,

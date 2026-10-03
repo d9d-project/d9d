@@ -9,7 +9,7 @@ from .types import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
 
 @dataclasses.dataclass
 class PipelineStageInfo:
-    """Holds information about the current position within the distributed pipeline.
+    """Position of the current stage in the distributed pipeline.
 
     Attributes:
         current_stage: The 0-based index of the current pipeline stage.
@@ -21,20 +21,12 @@ class PipelineStageInfo:
 
     @property
     def is_current_stage_first(self) -> bool:
-        """Determines if this is the first stage in the pipeline.
-
-        Returns:
-            True if current_stage is 0.
-        """
+        """Whether this is the first stage in the pipeline."""
         return self.current_stage == 0
 
     @property
     def is_current_stage_last(self) -> bool:
-        """Determines if this is the last stage in the pipeline.
-
-        Returns:
-            True if current_stage is the last index.
-        """
+        """Whether this is the last stage in the pipeline."""
         return self.current_stage == self.num_stages - 1
 
 
@@ -43,30 +35,26 @@ def distribute_layers_for_pipeline_stage(
 ) -> tuple[int, int]:
     """Calculates the layer index range for a specific pipeline stage.
 
-    This function distributes a given number of layers across multiple pipeline
-    stages as evenly as possible. It accounts for additional, non-layer
-    computational load on the first and last stages (e.g., embeddings and the
-    LM head) by using the concept of 'virtual layers' to reserve capacity.
+    This function spreads the layers across pipeline stages as evenly as possible. The first and last
+    stages also run non-layer modules, such as embeddings and the LM head. Virtual layers reserve
+    capacity for these modules.
 
     Args:
         num_layers: The total number of primary model layers to be distributed
-            (e.g., the transformer blocks).
-        num_virtual_layers_pre: The number of 'virtual' layers representing the
-            computational cost of modules on the *first* stage, before the main
-            layers (e.g., token and positional embeddings).
-        num_virtual_layers_post: The number of 'virtual' layers representing the
-            computational cost of modules on the *last* stage, after the main
-            layers (e.g., the final layer normalization and LM head).
-        stage: An object containing total stages and current stage index.
+            (e.g. the transformer blocks).
+        num_virtual_layers_pre: The number of virtual layers that represent the cost of modules on
+            the *first* stage, before the main layers (e.g. token and position embeddings).
+        num_virtual_layers_post: The number of virtual layers that represent the cost of modules on
+            the *last* stage, after the main layers (e.g. the final layer normalization and LM head).
+        stage: The position of the stage in the pipeline.
 
     Returns:
-        A tuple (start_index, end_index), representing the slice of layers for
-            the given stage. The start_index is inclusive and the end_index is
-            exclusive.
+        A tuple ``(start_index, end_index)`` with the layer range of the stage. ``start_index`` is
+        inclusive and ``end_index`` is exclusive.
 
     Raises:
-        ValueError: If the pipeline configuration results in a stage having zero
-            or negative layers assigned (pipeline too long for the model size).
+        ValueError: If a stage gets zero or fewer layers because the pipeline is too long for the
+            model.
     """
     num_layers_virtual = num_layers + num_virtual_layers_pre + num_virtual_layers_post
 
@@ -89,8 +77,8 @@ def distribute_layers_for_pipeline_stage(
 
         if actual_layers <= 0:
             raise ValueError(
-                f"Tried to distribute layers, but got {actual_layers} on "
-                f"stage {proposed_stage.current_stage}. Perhaps the pipeline is too long for this model?"
+                f"The layer count ({actual_layers}) for stage ({proposed_stage.current_stage}) must be positive. "
+                "Use fewer pipeline stages or fewer virtual layers."
             )
 
         layer_count_per_stage.append(actual_layers)
@@ -102,7 +90,7 @@ def distribute_layers_for_pipeline_stage(
 
 
 class StageBoundary(enum.Enum):
-    """Identifies which inter-stage edge of a stage a transfer spec describes.
+    """Edge of a stage that a transfer spec describes.
 
     Attributes:
         incoming: The ``StageTransfer`` this stage receives from the previous stage.
@@ -117,7 +105,7 @@ class StageBoundary(enum.Enum):
 class ModuleSupportsPipelining(typing.Protocol[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
     """Protocol for modules that can be split across pipeline stages.
 
-    A pipelined module carries four distinct IO roles, each an arbitrary PyTree (dataclasses are the
+    A pipelined module carries four distinct I/O roles, each an arbitrary PyTree (dataclasses are the
     recommended form). The module knows its position from the ``PipelineStageInfo`` it receives at
     construction and branches on it explicitly.
 
@@ -125,7 +113,7 @@ class ModuleSupportsPipelining(typing.Protocol[TPipelineInput, TStageTransfer, T
         TPipelineInput: Input consumed by the *first* stage.
         TStageTransfer: Payload transferred between adjacent stages. The outgoing transfer of stage
             ``N`` and the incoming transfer of stage ``N+1`` are the *same* type.
-        TSharedInput: Value passed to *every* stage's forward.
+        TSharedInput: Value passed to the forward pass of *every* stage.
         TPipelineOutput: Output produced by the *last* stage.
     """
 
@@ -148,14 +136,13 @@ class ModuleSupportsPipelining(typing.Protocol[TPipelineInput, TStageTransfer, T
     def stage_transfer_spec(self, pipeline_input: TPipelineInput, boundary: StageBoundary) -> PyTree[TensorSpec]:
         """Describes the ``StageTransfer`` crossing the given boundary of this stage.
 
-        The returned PyTree is structurally identical to the ``StageTransfer`` itself, with every
-        tensor leaf replaced by its ``TensorSpec``. Shapes are derived by cheap arithmetic on
-        ``pipeline_input``; the ``forward`` body is never executed.
+        The returned PyTree has the same structure as the ``StageTransfer``, with every tensor leaf
+        replaced by its ``TensorSpec``. Implementations derive the shapes from ``pipeline_input``
+        without running ``forward``.
 
-        The engine only calls this for boundaries that actually transfer, deciding terminality from
-        the pipeline topology — it is never called for the first stage's ``incoming`` edge nor the
-        last stage's ``outgoing`` edge. Implementations therefore do not need to special-case terminal
-        boundaries.
+        The engine calls this only for boundaries that transfer data. It never calls it for the
+        ``incoming`` edge of the first stage or the ``outgoing`` edge of the last stage, so
+        implementations need no special case for them.
 
         Args:
             pipeline_input: A representative single microbatch of pipeline input. Only shapes and

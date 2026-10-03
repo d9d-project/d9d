@@ -11,7 +11,7 @@ from .types import (
 
 
 class PipelineSchedule(abc.ABC, typing.Generic[TPipelineInput, TSharedInput, TPipelineOutput]):
-    """Abstract base class defining the interface for pipeline execution schedules.
+    """Abstract base class for pipeline execution schedules.
 
     Type parameters:
         TPipelineInput: The ``PipelineInput`` fed to the first stage.
@@ -28,7 +28,6 @@ class PipelineSchedule(abc.ABC, typing.Generic[TPipelineInput, TSharedInput, TPi
     ):
         """Executes a single pipeline step over one pack of microbatches.
 
-        The schedule receives the microbatches.
         The number of microbatches in the step is ``len(inputs_microbatches)`` and may vary between steps.
 
         Args:

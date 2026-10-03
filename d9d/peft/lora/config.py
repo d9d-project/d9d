@@ -5,11 +5,11 @@ from pydantic import BaseModel
 
 
 class LoRAParameters(BaseModel):
-    """Hyperparameters for LoRA layers.
+    """Configuration for LoRA layers.
 
     Attributes:
         r: Rank of the low-rank adaptation matrices.
-        alpha: Scaling factor for the learned weights.
+        alpha: Scaling factor for the learned weights. The LoRA output is scaled by ``alpha / r``.
         dropout: Dropout probability for the input to LoRA layers.
     """
 
@@ -22,8 +22,8 @@ class LoRAConfig(BaseModel):
     """Configuration for LoRA application.
 
     Attributes:
-        kind: Discriminator field, always "lora".
-        module_name_pattern: Regular expression matching module names to wrap with LoRA.
+        kind: Discriminator field. Always ``"lora"``.
+        module_name_pattern: Regular expression that must fully match the names of modules to wrap with LoRA.
         params: Hyperparameters for the LoRA layers.
     """
 

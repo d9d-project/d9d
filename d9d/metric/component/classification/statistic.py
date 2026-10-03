@@ -21,28 +21,27 @@ class ConfusionMatrixStatistic(Protocol):
 
 
 class PrecisionStatistic(ConfusionMatrixStatistic):
-    """Computes the precision statistic from a confusion matrix."""
+    """Precision statistic computed from a confusion matrix."""
 
     def __call__(self, matrix: ConfusionMatrix) -> torch.Tensor:
         return matrix.tp / (matrix.tp + matrix.fp)
 
 
 class RecallStatistic(ConfusionMatrixStatistic):
-    """Computes the recall statistic from a confusion matrix."""
+    """Recall statistic computed from a confusion matrix."""
 
     def __call__(self, matrix: ConfusionMatrix) -> torch.Tensor:
         return matrix.tp / (matrix.tp + matrix.fn)
 
 
 class FBetaStatistic(ConfusionMatrixStatistic):
-    """Computes the F-beta score from a confusion matrix."""
+    """F-beta score computed from a confusion matrix."""
 
     def __init__(self, beta: float) -> None:
-        """Constructs the FBetaStatistic object.
+        """Constructs the ``FBetaStatistic`` object.
 
         Args:
-            beta: The beta parameter determining the weight of recall mathematically
-                relative to precision.
+            beta: The weight of recall relative to precision. ``beta=1`` gives the F1 score.
         """
         self._beta_sq = beta**2
 
@@ -53,7 +52,7 @@ class FBetaStatistic(ConfusionMatrixStatistic):
 
 
 class AccuracyStatistic(ConfusionMatrixStatistic):
-    """Computes the accuracy statistic from a confusion matrix."""
+    """Accuracy statistic computed from a confusion matrix."""
 
     def __call__(self, matrix: ConfusionMatrix) -> torch.Tensor:
         return (matrix.tp + matrix.tn) / (matrix.tp + matrix.tn + matrix.fp + matrix.fn)

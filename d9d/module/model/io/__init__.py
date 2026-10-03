@@ -1,4 +1,4 @@
-"""Typed pipeline IO dataclasses for the model catalogue."""
+"""Typed pipeline I/O dataclasses for the model catalogue."""
 
 from .sequence import (
     SequenceHeadShared,

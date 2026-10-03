@@ -23,7 +23,10 @@ def _copy_pack_to_device(pack: MicrobatchPack, device: torch.types.Device) -> Mi
 
 
 class DevicePackStream(abc.ABC, Stateful):
-    """Hands the packs of a microbatch pack stream to the loop on the device; the data checkpoint boundary."""
+    """Abstract base class for streams that hand microbatch packs to the loop on the device.
+
+    Its state is the data state stored in checkpoints.
+    """
 
     @abc.abstractmethod
     def __iter__(self) -> Generator[MicrobatchPack, None, None]:  # noqa: PYI058 - the loop closes it
@@ -34,10 +37,10 @@ class DevicePackStream(abc.ABC, Stateful):
 
 
 class DirectDevicePackStream(DevicePackStream):
-    """Copies each pack to the device on the current CUDA stream when it is handed out."""
+    """Device pack stream that copies each pack to the device on the current CUDA stream when it is handed out."""
 
     def __init__(self, stream: MicrobatchPackStream, device: torch.types.Device):
-        """Constructs a DirectDevicePackStream object.
+        """Constructs the ``DirectDevicePackStream`` object.
 
         Args:
             stream: The stream of host-side packs.
@@ -109,7 +112,7 @@ class _BackgroundIterator(Generic[TItem]):
 
     def close(self):
         self._stop.set()
-        # wake the thread if it waits for a free slot, so it sees the stop request
+        # Wake the thread if it waits for a free slot, so it sees the stop request.
         self._free_slots.release()
         self._thread.join()
 
@@ -122,7 +125,7 @@ class _PrefetchedPack:
 
 
 class PrefetchingDevicePackStream(DevicePackStream):
-    """Copies packs to the device on a side CUDA stream ahead of the steps that consume them.
+    """Device pack stream that copies packs to the device on a side CUDA stream ahead of the steps that use them.
 
     A background thread pulls the packs from the stream, so their loading, pinning and copy launches stay off the
     loop's critical path. Prefetching runs the stream's state ahead of the job, so ``state_dict`` returns the stream
@@ -131,7 +134,7 @@ class PrefetchingDevicePackStream(DevicePackStream):
     """
 
     def __init__(self, stream: MicrobatchPackStream, device: torch.types.Device, prefetch_factor: int):
-        """Constructs a PrefetchingDevicePackStream object.
+        """Constructs the ``PrefetchingDevicePackStream`` object.
 
         Args:
             stream: The stream of host-side packs.
@@ -142,7 +145,7 @@ class PrefetchingDevicePackStream(DevicePackStream):
             ValueError: If ``prefetch_factor`` is not positive.
         """
         if prefetch_factor <= 0:
-            raise ValueError("prefetch_factor must be positive")
+            raise ValueError(f"prefetch_factor ({prefetch_factor}) must be positive.")
 
         self._stream = stream
         self._device = device
@@ -152,7 +155,7 @@ class PrefetchingDevicePackStream(DevicePackStream):
         self._handed_out_state: dict[str, Any] | None = None
 
     def _prefetch(self, device_index: int) -> Iterator[_PrefetchedPack]:
-        # runs on the background thread, which needs its own current device
+        # Runs on the background thread, which needs its own current device.
         torch.cuda.set_device(device_index)
         packs = iter(self._stream)
         while True:
@@ -170,7 +173,7 @@ class PrefetchingDevicePackStream(DevicePackStream):
     def _hand_over(self, prefetched: _PrefetchedPack) -> MicrobatchPack:
         current_stream = torch.cuda.current_stream()
         current_stream.wait_event(prefetched.copied)
-        # allocated on the copy stream, so keep the memory alive until the current stream is done with it
+        # Allocated on the copy stream, so keep the memory alive until the current stream is done with it.
         for leaf in pytree.tree_leaves(prefetched.pack):
             if isinstance(leaf, torch.Tensor):
                 leaf.record_stream(current_stream)
@@ -179,7 +182,7 @@ class PrefetchingDevicePackStream(DevicePackStream):
         return prefetched.pack
 
     def __iter__(self) -> Generator[MicrobatchPack, None, None]:
-        # nothing is pulled yet, so the stream's own state is exact
+        # Nothing is pulled yet, so the stream's own state is exact.
         self._handed_out_state = self._stream.state_dict()
 
         prefetched_packs = _BackgroundIterator(self._prefetch(torch.cuda.current_device()), self._prefetch_factor)
@@ -222,7 +225,7 @@ def build_device_pack_stream(
         ValueError: If ``prefetch_factor`` is negative.
     """
     if prefetch_factor < 0:
-        raise ValueError("prefetch_factor must be non-negative")
+        raise ValueError(f"prefetch_factor ({prefetch_factor}) must be non-negative.")
     if prefetch_factor == 0:
         return DirectDevicePackStream(stream, device)
     return PrefetchingDevicePackStream(stream, device, prefetch_factor)

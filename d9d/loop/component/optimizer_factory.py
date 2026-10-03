@@ -13,12 +13,7 @@ from .model_stage_factory import TrackedModules
 
 
 class OptimizerFactory:
-    """Factory for creating and configuring distributed optimizers and learning rate schedulers.
-
-    This factory handles the orchestration of optimizer creation for models potentially split across
-    pipeline stages. It uses the providers to instantiate underlying PyTorch optimizers and schedulers for each
-    tracked module, and wraps them in pipeline-aware interfaces.
-    """
+    """Factory of the optimizer and the learning rate scheduler for the model stages of this rank."""
 
     def __init__(
         self,
@@ -28,14 +23,14 @@ class OptimizerFactory:
         lr_scheduler_provider: LRSchedulerProvider,
         schedule: JobSchedule,
     ):
-        """Constructs the OptimizerFactory.
+        """Constructs the ``OptimizerFactory`` object.
 
         Args:
             dist_context: The distributed context.
-            tracked_modules: A container of model modules owned by the current rank.
-            optimizer_provider: A callable responsible for creating optimizer instances for a given model.
-            lr_scheduler_provider: A callable responsible for creating LR scheduler instances.
-            schedule: The job schedule providing information about total training steps.
+            tracked_modules: The model stages owned by the current rank.
+            optimizer_provider: The provider that creates an optimizer for one model stage.
+            lr_scheduler_provider: The provider that creates an LR scheduler for one optimizer.
+            schedule: The job schedule that provides the total number of steps.
         """
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
@@ -44,15 +39,13 @@ class OptimizerFactory:
         self._schedule = schedule
 
     def build_optimizer_and_scheduler(self) -> tuple[OptimizerProtocol, LRSchedulerProtocol]:
-        """Builds both the optimizer and learning rate scheduler.
+        """Builds the optimizer and the learning rate scheduler.
 
-        This method iterates through all local model modules. For each module, it creates an
-        optimizer and scheduler using the configured providers. Finally, it aggregates these individual
-        instances into a single `PipelinedOptimizer` and `PipelinedLRScheduler` capable of coordinated
-        stepping across the pipeline parallel dimension.
+        The providers create one optimizer and one scheduler per local model stage. They are combined
+        into a ``PipelinedOptimizer`` and a ``PipelinedLRScheduler`` that step all stages together.
 
         Returns:
-            A tuple containing the initialized pipeline-aware optimizer and scheduler.
+            A tuple of the pipeline-aware optimizer and scheduler.
         """
         optimizers: list[OptimizerProtocol] = []
         lr_schedulers: list[LRSchedulerProtocol] = []

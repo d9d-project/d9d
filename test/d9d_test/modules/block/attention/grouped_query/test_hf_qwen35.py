@@ -158,6 +158,3 @@ def test_consistent_to_hf(dtype):
 
     torch.testing.assert_close(inputs_d9d.pre.grad, inputs_hf.pre.grad, atol=1e-6, rtol=0.01)
     assert_mapped_gradients_close(from_module=module_hf, to_module=module_d9d, map_with=mapper)
-
-
-# TODO(max): add context parallel test with new context parallelism API

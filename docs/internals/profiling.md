@@ -1,18 +1,22 @@
-# Distributed Profiling
-
-!!! warning "Internal API Warning"
-    If you are utilizing the standard `d9d` training infrastructure, you **do not** need to call these functions manually. The framework automatically handles profiling based on configuration. This package is primarily intended for users extending `d9d`.
+# Profiling
 
 ## About
 
-The `d9d.internals.profiling` package provides a distributed-aware wrapper around the standard PyTorch Profiler. 
+The `d9d.internals.profiling` package wraps the PyTorch profiler for distributed jobs.
 
-In large-scale distributed training, profiling often becomes difficult due to:
+!!! warning "Internal API"
+    If you use the standard d9d training loop, you do not need to call this package. d9d profiles the job based on its configuration. This page is for users who extend d9d.
 
-1.  **File Naming**: Thousands of ranks writing to the same filename causes race conditions.
-2.  **Storage Space**: Raw Chrome tracing JSON files can grow to gigabytes very quickly.
-3.  **Synchronization**: Ensuring all ranks profile the same specific step without manual intervention.
+## Problems It Solves
 
-The `Profiler` class solves these issues by automatically handling file naming based on the `DeviceMesh` coordinates, compressing traces into `.tar.gz` archives on the fly, and managing the profiling schedule (wait/warmup/active).
+Profiling a large distributed job has three problems:
+
+1.  **File naming**: Thousands of ranks that write to the same file name cause race conditions.
+2.  **Storage space**: Raw Chrome trace JSON files can grow to several GiB quickly.
+3.  **Synchronization**: All ranks must profile the same steps without manual work.
+
+The `Profiler` class solves them. It names each trace file after the `DeviceMesh` coordinates of the rank. It compresses each trace into a `.tar.gz` archive right after export. It runs the same periodic schedule (wait, warmup, active) on all ranks.
+
+## API Reference
 
 ::: d9d.internals.profiling

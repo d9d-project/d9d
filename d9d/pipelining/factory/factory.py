@@ -22,7 +22,13 @@ from .registry import PIPELINE_PROGRAM_REGISTRY
 
 @dataclasses.dataclass(kw_only=True)
 class PipelineScheduleInfo(typing.Generic[TPipelineInput, TSharedInput, TPipelineOutput]):
-    """Contains the built pipeline schedule and rank-specific metadata."""
+    """The built pipeline schedule and its rank-specific metadata.
+
+    Attributes:
+        schedule: The schedule that runs the pipeline steps.
+        has_first_stage: Whether this rank hosts the first pipeline stage.
+        has_last_stage: Whether this rank hosts the last pipeline stage.
+    """
 
     schedule: PipelineSchedule[TPipelineInput, TSharedInput, TPipelineOutput]
     has_first_stage: bool
@@ -96,22 +102,18 @@ def build_schedule(
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     """Constructs the pipeline schedule and instantiates model stages.
 
-    This function coordinates the creation of the pipeline. If the context is
-    distributed, it builds a parallel schedule (`PipelineScheduleExecutor`) by
-    calculating topology and creating stages for the current rank. If the
-    context is local, it builds an offline schedule (`OfflinePipelineExecutor`)
-    for direct execution. The number of microbatches is decided per step, when
-    the schedule receives a pack, so it is not fixed here.
+    If the context is distributed, it builds a ``PipelineScheduleExecutor`` with the stages this
+    rank hosts. Otherwise, it builds an ``OfflinePipelineExecutor`` that runs the model directly.
+    The number of microbatches is not fixed here: each step takes it from the pack it receives.
 
     Args:
         dist_context: The distributed context.
         schedule_config: Configuration object determining the schedule strategy.
-        model_provider: A factory function that accepts stage info and returns an `nn.Module`
-            for that specific stage.
+        model_provider: A factory function that accepts stage info and returns the ``nn.Module``
+            for that stage.
 
     Returns:
-        A tuple containing the schedule info (executor and metadata) and a list
-        of local PyTorch modules created for this rank.
+        A tuple of the schedule info and the list of modules created on this rank.
     """
     if dist_context.mesh_params.is_distributed:
         return _build_schedule_distributed(

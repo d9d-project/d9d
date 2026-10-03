@@ -1,3 +1,5 @@
+"""Interfaces for training and inference tasks."""
+
 import abc
 import dataclasses
 import typing
@@ -42,8 +44,8 @@ class BuildForwardInputsResult(typing.Generic[TPipelineInput, TSharedInput, TSta
         input: The ``PipelineInput`` passed to the model pipeline as input data
             (first stage only if using pipeline parallelism).
         shared: The ``SharedInput`` passed to every pipeline stage.
-        state: Side-data (a PyTree, e.g. a TypedDict) carried to loss/output processing for this same
-            microbatch — labels, masks, anything the model forward does not return but the loss needs.
+        state: Side-data (a PyTree, e.g. a ``TypedDict``) carried to loss or output processing of the same
+            microbatch. It holds what the loss needs but the model does not return, e.g. labels and masks.
     """
 
     input: TPipelineInput
@@ -70,7 +72,7 @@ class FinalizeContext:
 
 
 class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch, TPipelineInput, TSharedInput, TState]):
-    """Abstract base class representing a unit of work (Task) in the training/inference loop.
+    """Abstract base class for a unit of work (task) in the training or inference loop.
 
     Type parameters:
         TBatch: The raw microbatch type produced by the data stream.
@@ -110,21 +112,20 @@ class BaseTask(abc.ABC, Stateful, typing.Generic[TBatch, TPipelineInput, TShared
         Args:
             state_dict: The state dictionary to load.
         """
-        # do nothing by default
+        # Do nothing by default.
 
     def register_events(self, context: RegisterTaskEventsContext) -> None:
-        """Register task-specific event subscriptions.
+        """Registers task-specific event subscriptions.
 
         Args:
-            context: Context providing access to the distributed environment
-                and the event bus.
+            context: Context with the distributed context and the event bus.
         """
 
     def finalize(self, ctx: FinalizeContext) -> None:
         """Performs cleanup or final actions when the task execution finishes.
 
         Args:
-             ctx: Context object.
+            ctx: Context object.
         """
 
 
@@ -135,7 +136,7 @@ class ComputeLossContext(typing.Generic[TPipelineOutput, TState]):
     Attributes:
         pipeline_results: The ``PipelineOutput`` returned by the model's forward pass.
         state: The side-data this microbatch's ``build_forward_inputs`` returned.
-        schedule: Component tracking the current step.
+        schedule: The job schedule that tracks the current step.
     """
 
     pipeline_results: TPipelineOutput
@@ -149,8 +150,8 @@ class ComputeLossResult:
 
     Attributes:
         loss: The scalar tensor representing the loss to be backpropagated.
-        loss_weight: The weight to apply to the loss (for synchronizing gradients using weighted mean).
-            None for 1.0.
+        loss_weight: The weight of the loss in the weighted mean used to synchronize gradients.
+            ``None`` means a weight of 1.
     """
 
     loss: torch.Tensor
@@ -164,10 +165,10 @@ class CreateMetricsContext:
 
 @dataclasses.dataclass(kw_only=True)
 class CreateMetricsResult:
-    """Result of metric initialization.
+    """The result of metric initialization.
 
     Attributes:
-        metrics: A dictionary mapping metric names to Metric instances.
+        metrics: A dictionary mapping metric names to ``Metric`` instances.
     """
 
     metrics: dict[str, "Metric"]
@@ -175,7 +176,7 @@ class CreateMetricsResult:
 
 @dataclasses.dataclass(kw_only=True)
 class UpdateMetricsContext(typing.Generic[TState]):
-    """Context data provided to update metrics after a step.
+    """Context data provided to update metrics after the loss of a microbatch is computed.
 
     Attributes:
         state: The side-data this microbatch's ``build_forward_inputs`` returned.
@@ -191,7 +192,7 @@ class TrainTask(
     abc.ABC,
     typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState],
 ):
-    """Abstract base class for defining training-specific logic."""
+    """Abstract base class for training-specific logic."""
 
     @abc.abstractmethod
     def compute_loss(self, ctx: ComputeLossContext[TPipelineOutput, TState]) -> ComputeLossResult:
@@ -209,7 +210,7 @@ class TrainTask(
         """Initializes metrics to be tracked during training.
 
         Args:
-             ctx: Context object.
+            ctx: Context object.
 
         Returns:
             Result object.
@@ -217,7 +218,7 @@ class TrainTask(
         return CreateMetricsResult(metrics={})
 
     def update_metrics(self, ctx: UpdateMetricsContext[TState]):
-        """Updates the state of the metrics at the end of training step.
+        """Updates the metrics after the loss of a microbatch is computed.
 
         Args:
             ctx: Context object.
@@ -234,7 +235,7 @@ class TrainTask(
 
 @dataclasses.dataclass(kw_only=True)
 class TrainTaskProviderContext:
-    """Context data provided to the factory creating a TrainTask.
+    """Context data provided to the factory creating a ``TrainTask``.
 
     Attributes:
         dist_context: Information about the distributed environment.
@@ -245,16 +246,16 @@ class TrainTaskProviderContext:
 
 @typing.runtime_checkable
 class TrainTaskProvider(Protocol):
-    """Protocol that creates a TrainTask instance."""
+    """Protocol for a callable that creates a ``TrainTask`` instance."""
 
     def __call__(self, ctx: TrainTaskProviderContext) -> TrainTask:
-        """Creates and returns a new TrainTask.
+        """Creates a new ``TrainTask``.
 
         Args:
             ctx: Context object.
 
         Returns:
-            An instantiated TrainTask.
+            The new ``TrainTask``.
         """
         ...
 
@@ -277,7 +278,7 @@ class InferenceTask(
     abc.ABC,
     typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState],
 ):
-    """Abstract base class for defining inference-specific logic."""
+    """Abstract base class for inference-specific logic."""
 
     @abc.abstractmethod
     def process_outputs(self, ctx: ProcessOutputsContext[TPipelineOutput, TState]):
@@ -291,7 +292,7 @@ class InferenceTask(
 
 @dataclasses.dataclass(kw_only=True)
 class InferenceTaskProviderContext:
-    """Context data provided to the factory creating an InferenceTask.
+    """Context data provided to the factory creating an ``InferenceTask``.
 
     Attributes:
         dist_context: Information about the distributed environment.
@@ -302,15 +303,15 @@ class InferenceTaskProviderContext:
 
 @typing.runtime_checkable
 class InferenceTaskProvider(Protocol):
-    """Protocol for a callable that creates an InferenceTask instance."""
+    """Protocol for a callable that creates an ``InferenceTask`` instance."""
 
     def __call__(self, ctx: InferenceTaskProviderContext) -> InferenceTask:
-        """Creates and returns a new InferenceTask.
+        """Creates a new ``InferenceTask``.
 
         Args:
-            ctx: Context providing distributed environment information.
+            ctx: Context object.
 
         Returns:
-            An instantiated InferenceTask.
+            The new ``InferenceTask``.
         """
         ...

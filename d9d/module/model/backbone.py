@@ -20,20 +20,19 @@ class DecoderBackbone(
 ):
     """Protocol for a decoder backbone that maps stage inputs to hidden states.
 
-    A backbone reports its ``hidden_size`` and the split-vocabulary layout it was built with, and
-    supports late init and pipelining. This is exactly the surface the task-head composition calls
-    on the backbone. The reported dimensions are read-only: they are fixed at construction, and a
-    head derives its own shapes from them.
+    A backbone reports its ``hidden_size`` and its split-vocabulary layout, and supports late init and
+    pipelining. The decoder compositions call only this surface. The reported dimensions are fixed at
+    construction, and task heads derive their shapes from them.
     """
 
     @property
     def hidden_size(self) -> int:
-        """Dimensionality of the backbone hidden states."""
+        """The size of the backbone hidden states."""
         ...
 
     @property
     def split_vocab_size(self) -> Mapping[str, int]:
-        """Mapping of vocabulary segment names to their sizes."""
+        """The mapping of vocabulary segment names to their sizes."""
         ...
 
     @property
@@ -44,7 +43,7 @@ class DecoderBackbone(
     def __call__(
         self, inputs: SequenceInput | SequenceTransfer[torch.Tensor], shared: SequenceShared
     ) -> SequenceTransfer[torch.Tensor]:
-        """Runs the backbone stage as a module, so the composition invokes it through its hooks.
+        """Runs the backbone stage through ``nn.Module.__call__``, so module hooks apply.
 
         Args:
             inputs: ``SequenceInput`` on the first stage; the incoming ``SequenceTransfer`` otherwise.
@@ -61,7 +60,7 @@ class DecoderBackbone(
         """Describes the ``SequenceTransfer`` crossing the given boundary of this stage.
 
         Args:
-            pipeline_input: A representative ``SequenceInput`` microbatch; only shapes are read.
+            pipeline_input: A representative ``SequenceInput`` microbatch. Only its shapes are read.
             boundary: Which inter-stage edge to describe.
 
         Returns:

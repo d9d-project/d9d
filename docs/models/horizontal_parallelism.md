@@ -2,162 +2,130 @@
 
 ## About
 
-The `d9d.module.parallelism` package provides high-level strategies for distributing model execution across device meshes.
-
-These strategies are "Horizontal" in the sense that they function within a specific stage of a pipeline (intra-layer parallelism), as opposed to Pipeline Parallelism which is "Vertical" (inter-layer).
+The `d9d.module.parallelism` package provides functions that distribute modules across device meshes. These strategies are "horizontal": they split work within one pipeline stage. Pipeline parallelism is "vertical": it splits the model into stages of layers.
 
 ## Design
 
-### DTensor-First Architecture
+### DTensor-First
 
-d9d enforces a **DTensor-first** philosophy. We mandate that every trainable parameter in the distributed environment be represented as a `torch.distributed.tensor.DTensor`.
+d9d requires every trainable parameter in a distributed run to be a `torch.distributed.tensor.DTensor`. This keeps the rest of the system simple:
 
-This constraint simplifies the system architecture significantly:
-
-*   **Universal Checkpointing**: The checkpointing engine does not need to know about specific parallel strategies (like "This is DP" or "This is TP"). It simply inspects the `DTensor.placements` attribute to automatically determine how to gather, deduplicate, and save tensors.
-*   **Native Synchronization**: Gradient synchronization for replicated parameters is handled entirely by the [d9d internals](../internals/grad_sync.md), that now knows which tensor dimensions are Replicated.
+*   **Checkpointing**: The checkpointing engine does not need to know the parallel strategy. It reads `DTensor.placements` to decide how to gather, deduplicate and save each tensor.
+*   **Gradient synchronization**: [Gradient Synchronization](../internals/grad_sync.md) reads the placements to find the mesh dimensions along which a parameter is replicated.
 
 ### Composition over Monoliths
 
-We explicitly reject monolithic wrappers like `torch.nn.parallel.DistributedDataParallel` (DDP).
+d9d does not use monolithic wrappers like `torch.nn.parallel.DistributedDataParallel` (DDP). DDP takes ownership of the whole model execution. Instead, d9d builds on PyTorch's `parallelize_module` API, which lets you choose a strategy for each submodule:
 
-While DDP is efficient for pure Data Parallelism, it acts as a "black box" that assumes ownership of the entire model execution loop.
-Instead, d9d relies on **PyTorch's `parallelize_module` API**. This allows for fine-grained, per-submodule parallelism decisions:
+*   Layer A can use tensor parallelism (row-wise or column-wise).
+*   Layer B, such as a router, can use replicate parallelism.
+*   Layer C, such as an MoE layer, can use expert parallelism.
 
-*   Layer A can use **Tensor Parallelism** (Row/Col wise).
-*   Layer B (e.g., a Router) can use **Replicate Parallelism**.
-*   Layer C (e.g., MLP) can use **Expert Parallelism**.
-
-By treating "Data Parallelism" simply as another tiling strategy ("Replicate") within the Tensor Parallel system, we achieve a unified interface for ND parallelism.
+Data parallelism is one more placement ("Replicate") in this system, so all strategies share one interface.
 
 ## Strategies
 
 ### Replicate Parallelism
 
-`parallelize_replicate` implements **Replicate Parallelism**. It replicates parameters across the mesh. Used for Data Parallelism or Context Parallelism.
+`parallelize_replicate` replicates parameters across the mesh. Use it for data parallelism or context parallelism.
 
-During the forward pass, it installs hooks that temporarily "unwrap" `DTensor` parameters into standard, local `torch.Tensor` objects. This allows standard PyTorch operations and custom kernels to run without modification, while accessing module's state dict and parameters still yields `DTensor` objects.
+During the forward pass, the module sees its parameters as plain local `torch.Tensor` objects. Standard PyTorch operations and custom kernels therefore run without changes. Outside the forward pass, the parameters and the state dict hold `DTensor` objects.
 
 ### Expert Parallelism (MoE)
 
-Mixture of Experts (MoE) requires a unique parallel strategy where:
-1.  **Experts** are sharded across the `ep_shard` mesh dimension (each GPU holds a subset of experts), optionally replicating along `ep_replicate` .
-2.  **Routers** are replicated (all GPUs have the same routing logic).
+`parallelize_expert_parallel` applies expert parallelism to an `MoELayer`:
 
-`parallelize_expert_parallel` applies sharding to `MoELayer` modules. It shards the `GroupedLinear` weights along the expert dimension. Simultaneously, it effectively applies `parallelize_replicate` to the router.
+1.  It shards the experts (the `GroupedLinear` weights) along the `ep_shard` mesh dimension, so each GPU holds a subset of experts. Along `ep_replicate`, the experts are replicated.
+2.  It replicates the router and the shared expert, if any, across the whole mesh.
 
 ### Fully Sharded Data Parallel (FSDP)
 
-`parallelize_fsdp` provides a thin wrapper around PyTorch's native `fully_shard`.
+`parallelize_fsdp` is a thin wrapper around PyTorch's `fully_shard`. It differs from plain FSDP in two ways:
 
-**Difference from standard FSDP:**
-
-* Standard FSDP averages gradients across the mesh (Sum / WorldSize) by default. d9d's wrapper forces the gradients being *summed* rather than *averaged*. This is required for our gradient accumulation logic that is handled externally.
-* `parallelize_fsdp` strictly requires a 1D DeviceMesh. To use it in multi-dimensional meshes (e.g., combining Replication and Sharding), use `parallelize_hsdp` or apply `parallelize_replicate` to the other dimensions manually first.
+*   Plain FSDP averages gradients across the mesh. `parallelize_fsdp` sums them instead, because d9d normalizes gradients itself.
+*   `parallelize_fsdp` requires a 1D mesh. For a multi-dimensional mesh, use `parallelize_hsdp`, or first apply `parallelize_replicate` to the other dimensions.
 
 ### Hybrid Sharded Data Parallel (HSDP)
 
-`parallelize_hsdp` is a high-level composite strategy for mixing Full Sharding with Replicate Parallel.
+`parallelize_hsdp` combines full sharding with replicate parallelism. It takes a multi-dimensional mesh and a `shard_dim`. It applies `parallelize_fsdp` along `shard_dim` and `parallelize_replicate` along all other dimensions. It skips dimensions of size 1.
 
-`parallelize_hsdp` accepts a multi-dimensional mesh and a target `shard_dim`. It identifies all dimensions *other than* `shard_dim` as **Replication Dimensions**. 
-It applies `parallelize_replicate` to the replication dimensions.
-It applies `parallelize_fsdp` to the specific sharding dimension.
+## Usage
 
-
-## Usage Examples
+The examples below use the mesh domains of [Distributed Context](../core/dist_context.md). `MyCustomLayer` stands for your own module.
 
 ### Replicate Parallelism
 
 ```python
-import torch
-from d9d.core.dist_context import DistributedContext, DENSE_DOMAIN
+from d9d.core.dist_context import DENSE_DOMAIN, DistributedContext
 from d9d.module.parallelism.api import parallelize_replicate
 
-# 1. Create a Distributed Context
 ctx: DistributedContext = ...
 
-# 2. Get Dense Domain Mesh
-dense_mesh = ctx.mesh_for(DENSE_DOMAIN)  # pp x dp_replicate x dp_cp_shard x cp_replicate x tp
+# Dimensions: pp, dp_replicate, dp_cp_shard, cp_replicate, tp.
+dense_mesh = ctx.mesh_for(DENSE_DOMAIN)
 
-# 2. Define Model
 model = MyCustomLayer(...)
 
-# 3. Parallelize
-parallelize_replicate(model, dense_mesh[['dp_replicate', 'cp_replicate']])
+parallelize_replicate(model, dense_mesh["dp_replicate", "cp_replicate"])
 ```
 
-### Applying Expert Parallelism
+### Expert Parallelism
 
 ```python
-import torch
-from d9d.core.dist_context import DistributedContext, EXPERT_DOMAIN
-from d9d.module.parallelism.api import parallelize_expert_parallel
+from d9d.core.dist_context import EXPERT_DOMAIN, DistributedContext
 from d9d.module.block.moe import MoELayer
+from d9d.module.parallelism.api import parallelize_expert_parallel
 
-# 1. Create a Distributed Context
 ctx: DistributedContext = ...
 
-# 2. Get Expert Domain Mesh
-expert_mesh = ctx.mesh_for(EXPERT_DOMAIN)  # pp x ep_replicate x ep_shard
+# Dimensions: pp, ep_replicate, ep_shard.
+expert_mesh = ctx.mesh_for(EXPERT_DOMAIN)
 
-# 3. Define Model
 model = MoELayer(...)
 
-# 4. Parallelize
 parallelize_expert_parallel(
-    model, 
-    mesh_experts=expert_mesh[['ep_replicate', 'ep_shard']],
-    expert_shard_dim='ep_shard'
+    model,
+    mesh_experts=expert_mesh["ep_replicate", "ep_shard"],
+    expert_shard_dim="ep_shard",
 )
 ```
 
-### Applying FSDP
+### FSDP
 
 ```python
-import torch
-from d9d.core.dist_context import DistributedContext, DENSE_DOMAIN
-from d9d.module.parallelism.api import parallelize_fsdp, parallelize_replicate
+from d9d.core.dist_context import DENSE_DOMAIN, DistributedContext
+from d9d.module.parallelism.api import parallelize_fsdp
 
-# 1. Create a Distributed Context
 ctx: DistributedContext = ...
-
-# 2. Define Model
-model = MyCustomLayer(...)
-
-# 3. Get Dense Domain Mesh
 
 dense_mesh = ctx.mesh_for(DENSE_DOMAIN)
 
-# 4. Parallelize
-
-parallelize_fsdp(
-    model, 
-    mesh=dense_mesh['dp_cp_shard']
-)
-```
-
-### Applying HSDP
-```python
-import torch
-from d9d.core.dist_context import DistributedContext, DENSE_DOMAIN
-from d9d.module.parallelism.api import parallelize_hsdp
-
-# 1. Create a Distributed Context
-ctx: DistributedContext = ...
-
-# 2. Get Mesh
-dense_mesh = ctx.mesh_for(DENSE_DOMAIN)  # pp x dp_replicate x dp_cp_shard x cp_replicate x tp
-
-# 3. Define Model
 model = MyCustomLayer(...)
 
-# 4. Parallelize
+parallelize_fsdp(model, mesh=dense_mesh["dp_cp_shard"])
+```
+
+### HSDP
+
+```python
+from d9d.core.dist_context import DENSE_DOMAIN, DistributedContext
+from d9d.module.parallelism.api import parallelize_hsdp
+
+ctx: DistributedContext = ...
+
+# Dimensions: pp, dp_replicate, dp_cp_shard, cp_replicate, tp.
+dense_mesh = ctx.mesh_for(DENSE_DOMAIN)
+
+model = MyCustomLayer(...)
+
 parallelize_hsdp(
     model,
     mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"],
-    shard_dim="dp_cp_shard"
+    shard_dim="dp_cp_shard",
 )
 ```
+
+## API Reference
 
 ::: d9d.module.parallelism.api
 

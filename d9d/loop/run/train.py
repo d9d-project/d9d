@@ -70,11 +70,10 @@ from d9d.metric.impl.container import ComposeMetric
 
 
 class TrainingConfigurator:
-    """Orchestrates the assembly of the distributed training environment.
+    """Configurator that assembles the distributed training environment.
 
-    This class binds the infrastructure configuration (DeviceMesh), the training
-    parameters (TrainerConfig), and the user-defined logic (Providers) to create
-    a fully initialized state object capable of running the training loop.
+    It combines the device mesh parameters, the ``TrainerConfig`` and the user-defined providers
+    into a ``Trainer`` that is ready to run the training loop.
     """
 
     def __init__(
@@ -87,7 +86,7 @@ class TrainingConfigurator:
         optimizer_provider: OptimizerProvider,
         lr_scheduler_provider: LRSchedulerProvider,
     ):
-        """Constructs a configurator capable of building the full training state.
+        """Constructs the ``TrainingConfigurator`` object.
 
         Args:
             mesh: Definition of the distributed device mesh topology.
@@ -231,14 +230,13 @@ class TrainingConfigurator:
         )
 
     def configure(self) -> "Trainer":
-        """Instantiates all training components and returns a configured Trainer.
+        """Builds all training components and returns a configured ``Trainer``.
 
-        This method triggers the creation of the distributed context, sets seeds,
-        builds the model, optimizer, data loaders, and attaches all auxiliary
-        components (logging, profiling, checkpointing).
+        It creates the distributed context, sets seeds and builds the model, the optimizer and the
+        data stream. It also builds the auxiliary components (logging, profiling, checkpointing).
 
         Returns:
-            Trainer: A ready-to-use trainer instance encapsulating the job state.
+            A ready-to-use trainer that holds the job state.
         """
         state = self._build_new_training_state()
 
@@ -253,7 +251,7 @@ class Trainer:
     """
 
     def __init__(self, state: TrainJobState):
-        """Constructs a Trainer from a pre-built job state.
+        """Constructs the ``Trainer`` object from a pre-built job state.
 
         Args:
             state: The encapsulated state object containing all initialized
@@ -279,7 +277,7 @@ class Trainer:
         self._state.checkpointer.load_last_checkpoint(self._state)
 
         if self._state.schedule.current_step >= self._state.schedule.total_steps:
-            self._state.dist_context.logger.info("Already trained fully, will do nothing")
+            self._state.dist_context.logger.info("Training is already complete, nothing to do")
             return
 
         self._state.dist_context.wait_world()
@@ -311,41 +309,36 @@ class Trainer:
                 device_pack = next(packs, None)
                 if device_pack is None:
                     raise RuntimeError(
-                        f"The data stream ended at step {self._state.schedule.current_step}, "
-                        f"before total_steps={self._state.schedule.total_steps}"
+                        f"The data stream ended at step ({self._state.schedule.current_step}) "
+                        f"before total_steps ({self._state.schedule.total_steps}). "
+                        "Lower total_steps or provide more data."
                     )
 
                 with self._state.event_bus.bounded(
                     EVENT_TRAIN_FORWARD_BACKWARD_PRE, EVENT_TRAIN_FORWARD_BACKWARD_POST, step_ctx
                 ):
-                    # we do both forward and backward passes over the whole pack of microbatches;
-                    # since GradientManager is installed - it should start performing
-                    # synchronization overlapping grad sync with compute. Loss/weight is accumulated
-                    # into the gradient manager per microbatch inside the loss callback.
+                    # The installed GradientManager overlaps gradient sync with compute. The loss callback
+                    # accumulates the loss and its weight per microbatch.
                     self._state.task_operator.forward_backward(device_pack)
 
-                # metrics were successfully accumulated during forward passes - we can schedule their synchronization
+                # Metrics are complete for this step, so their sync can start and overlap with the work below.
                 self._state.logger.trigger_sync()
 
-                # wait for gradient synchronization finishes and scale them
                 self._state.gradient_manager.sync_and_scale()
 
-                # clip grads after they are synced across world
+                # The norm must cover the synced gradients, so clip only after the sync.
                 self._state.gradient_clipper.clip_and_log(run)
 
-                # optimize (it won't sync grads - they are already Replicate-d)
+                # The optimizer does not sync gradients: they are already replicated.
                 with self._state.event_bus.bounded(
                     EVENT_TRAIN_OPTIMIZER_STEP_PRE, EVENT_TRAIN_OPTIMIZER_STEP_POST, step_ctx
                 ):
                     self._state.optimizer.step()
 
-                # update LR
                 self._state.lr_scheduler.step()
 
-                # log everything
                 self._state.logger.log(run, loss_value=self._state.gradient_manager.compute_global_loss())
 
-                # reset grads
                 self._state.gradient_manager.zero_grad()
 
                 gc.collect_periodic()
@@ -355,10 +348,10 @@ class Trainer:
                 self._state.event_bus.trigger(EVENT_TRAIN_STEP_POST, step_ctx)
                 self._state.schedule.step()
 
-                # checkpoint at the end of the step
+                # Checkpoint after schedule.step(), so the saved step counter includes this step.
                 self._state.checkpointer.checkpoint_if_needed(self._state)
 
-                # end the profiled step only now, so that it covers the step post events and the checkpoint
+                # End the profiled step only now, so that it covers the step post events and the checkpoint.
                 if profiler:
                     profiler.step()
 
@@ -368,56 +361,54 @@ class Trainer:
             self._state.event_bus.trigger(EVENT_TRAIN_FINISHED, EventTrainFinishedContext())
 
     def sleep(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
-        """Releases the GPU-resident training state selected by "tags" to host memory.
+        """Releases the GPU-resident training state selected by ``tags`` to host memory.
 
         This frees the GPU for a colocated workload, such as a rollout engine in colocated RL.
         The call is collective: every rank must invoke it with identical tags. Requesting a tag
         whose subsystem is already offloaded is a no-op.
 
         Args:
-            tags: The subsystems to offload. Defaults to "SleepTag.TENSOR_STATES".
+            tags: The subsystems to offload. Defaults to ``SleepTag.TENSOR_STATES``.
 
         Raises:
-            NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
+            NotImplementedError: If ``SleepTag.COMMS`` is requested. It is not implemented yet.
             RuntimeError: If called during an in-flight gradient accumulation.
         """
         self._sleeper.sleep(tags)
 
     def wake(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
-        """Restores GPU residency of the training state previously released by "sleep".
+        """Restores the training state released by ``sleep`` to the GPU.
 
         The call is collective: every rank must invoke it with identical tags. Requesting a tag
         whose subsystem is not offloaded is a no-op.
 
         Args:
-            tags: The subsystems to restore. Defaults to "SleepTag.TENSOR_STATES".
+            tags: The subsystems to restore. Defaults to ``SleepTag.TENSOR_STATES``.
 
         Raises:
-            NotImplementedError: If "SleepTag.COMMS" is requested, since it is not yet implemented.
+            NotImplementedError: If ``SleepTag.COMMS`` is requested. It is not implemented yet.
         """
         self._sleeper.wake(tags)
 
     def is_sleeping(self, tag: SleepTag) -> bool:
-        """Reports whether the subsystem identified by "tag" is currently offloaded.
+        """Reports whether the subsystem identified by ``tag`` is offloaded.
 
         Args:
             tag: The subsystem to query.
 
         Returns:
-            True if the subsystem is offloaded to host memory, False otherwise.
+            ``True`` if the subsystem is offloaded to host memory, otherwise ``False``.
         """
         return self._sleeper.is_sleeping(tag)
 
     def export(self, export_to: Path, load_checkpoint: bool):
         """Exports the current model state to the specified directory.
 
-        This handles the distributed saving logic, allowing the model to be
-        reconstituted later or used for inference.
+        The exported model can be loaded later, e.g. for inference.
 
         Args:
-            export_to: The directory path where the model artifacts will be saved.
-            load_checkpoint: If True, attempts to load the latest checkpoint
-                into the model before exporting.
+            export_to: The directory to save the model files to.
+            load_checkpoint: If ``True``, loads the latest checkpoint into the model before exporting.
         """
         if load_checkpoint:
             self._state.checkpointer.load_last_checkpoint(self._state)

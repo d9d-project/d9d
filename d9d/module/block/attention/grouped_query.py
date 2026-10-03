@@ -8,13 +8,14 @@ from d9d.module.block.positional import RotaryEmbeddingApplicator, RotaryEmbeddi
 
 
 class GroupedQueryAttention(nn.Module, ModuleLateInit):
-    """Implements Grouped Query Attention (GQA) with RoPE and optional QK Normalization.
+    """Grouped Query Attention (GQA) layer with RoPE and optional QK normalization.
 
-    This module performs the full attention mechanism pipeline:
-    1.  Linear projection to Q, K, V.
-    2.  Optional RMS Normalization on Q and K.
-    3.  Rotary Positional Embedding (RoPE) application.
-    4.  Scaled Dot Product Attention (via FlashAttention).
+    The layer runs these steps:
+
+    1.  Linear projection to Q, K and V.
+    2.  Optional RMSNorm on Q and K.
+    3.  Rotary position embedding (RoPE).
+    4.  Scaled dot-product attention with the configured SDPA backend.
     5.  Optional sigmoid output gating.
     6.  Output projection.
     """
@@ -33,22 +34,22 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         qk_norm_zero_centered: bool = False,
         sdpa_backend: AnySdpaBackendConfig | None = None,
     ) -> None:
-        """Constructs the GroupedQueryAttention layer.
+        """Constructs the ``GroupedQueryAttention`` object.
 
         Args:
             hidden_size: Hidden size.
-            num_attention_heads: Number of Query heads.
-            num_key_value_heads: Number of Key/Value heads. If less than `num_attention_heads`, GQA/MQA is enabled.
+            num_attention_heads: Number of query heads.
+            num_key_value_heads: Number of key/value heads. If less than ``num_attention_heads``, GQA/MQA is enabled.
             head_dim: Dimensionality of a single attention head.
-            qk_norm_eps: Epsilon for LayerNorm/RMSNorm applied to Q and K. If None, normalization is disabled.
-            is_causal: Whether to apply a causal mask (auto-regressive constraint).
-            rope_style: Rotary embedding layout style alignment.
+            qk_norm_eps: Epsilon for the RMSNorm applied to Q and K. If ``None``, normalization is disabled.
+            is_causal: Whether to apply a causal mask.
+            rope_style: Rotary embedding layout style.
             rope_dim: Dimension of the RoPE sub-vector. If ``None``, RoPE is applied to the full ``head_dim``.
-            enable_output_gate: If True, enables sigmoid output gating (Qwen 3.5 style).
-            qk_norm_zero_centered: If True, utilizes zero-centered scaling weights for the optional Q and K
+            enable_output_gate: If ``True``, enables sigmoid output gating (Qwen 3.5 style).
+            qk_norm_zero_centered: If ``True``, uses zero-centered scaling weights for the optional Q and K
                 RMSNorm layers (DeepSeek V3 style).
-            sdpa_backend: Configuration for the Scaled Dot-Product Attention backend. If ``None``,
-                the backend will be auto-detected via `build_sdpa_backend()`.
+            sdpa_backend: Configuration for the scaled dot-product attention backend. If ``None``,
+                the backend is auto-detected by ``build_sdpa_backend``.
         """
         super().__init__()
 
@@ -111,14 +112,13 @@ class GroupedQueryAttention(nn.Module, ModuleLateInit):
         """Computes the attention operation.
 
         Args:
-            hidden_states: Input tensor. Shape: `(batch, seq_len, hidden_size)`.
-            attention_mask: Optional mask associated with the inputs.
-            position_embeddings: Tuple of `(cos, sin)` tensors for RoPE application.
-                Each tensor should be of shape `(batch, seq_len, rope_dim)` when partial RoPE is used,
-                or `(batch, seq_len, head_dim)` otherwise.
+            hidden_states: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.
+            attention_mask: Optional attention mask passed to the SDPA backend.
+            position_embeddings: Tuple of ``(cos, sin)`` tensors for RoPE. Shape of each:
+                ``(batch, seq_len, rope_dim)`` with partial RoPE, ``(batch, seq_len, head_dim)`` otherwise.
 
         Returns:
-            The attention output tensor. Shape: `(batch, seq_len, hidden_size)`.
+            The attention output tensor. Shape: ``(batch, seq_len, hidden_size)``.
         """
         input_shape = hidden_states.shape[:-1]
         hidden_shape = (*input_shape, -1, self._head_dim)

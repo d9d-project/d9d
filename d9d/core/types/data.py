@@ -8,8 +8,7 @@ TDataTree = TypeVar("TDataTree", bound=PyTree)
 CollateFn: TypeAlias = Callable[[Sequence[TDataTree]], TDataTree]
 """Type alias for a function that collates a sequence of samples into a batch.
 
-The function receives a sequence of individual data point structures (PyTrees)
-and is responsible for stacking or merging them into a single batched structure.
+The function receives a sequence of samples (PyTrees) and stacks or merges them into one batched PyTree.
 """
 
 MicrobatchPack: TypeAlias = Sequence[TDataTree]

@@ -1,17 +1,14 @@
-# Interfaces & Logic
+# Interfaces
 
 ## About
 
-The `d9d` training loop is agnostic to the specific model or data being trained. You interact with the loop by implementing **Providers** (factories) and **Tasks** (step logic).
-
-For standard use cases (like standard Optimizers), `d9d` provides **Auto** implementations that can be configured purely via Pydantic models, avoiding the need to write custom provider classes.
+The d9d loop does not depend on a specific model or dataset. You plug your logic into the loop by implementing **providers** (factories) and **tasks** (step logic). For common cases, such as standard optimizers, d9d provides **Auto** implementations. You configure them with Pydantic models, so you do not need to write a provider class.
 
 ## Navigation
 
-
-*   **[User Tasks](./task.md)**: See how to implement `TrainTask` and `InferenceTask` to define your custom step logic, manipulate batch inputs, pass data across pipeline states, and compute losses.
-*   **[Model Definition](./model.md)**: Learn how to implement `ModelProvider` to initialize models, handle state mapping, and configure horizontal parallelism.
-*   **[Data Loading](./data.md)**: Understand the `DataProvider` for building the `MicrobatchPackStream`, managing data collation, and configuring distributed-aware sharding.
-*   **[Events & Hooks](./events.md)**: Discover how to hook into specific moments of the train or inference lifecycle using the declarative Event Bus.
-*   **[Optimizers](./optimizer.md)**: Learn about the `AutoOptimizerProvider` for easy Pydantic-based configuration of standard optimizers, or how to write your own `OptimizerProvider`.
-*   **[Learning Rate Scheduler](./lr_scheduler.md)**: Explore the `AutoLRSchedulerProvider` for piecewise scheduling (warmup, hold, decay) or the custom `LRSchedulerProvider` interface.
+*   **[User Tasks](./task.md)**: Implement `TrainTask` and `InferenceTask` to build model inputs, carry data to the loss and compute the loss.
+*   **[Model Definition](./model.md)**: Implement `ModelProvider` to initialize models, map their state and set up horizontal parallelism.
+*   **[Data Loading](./data.md)**: Use a `DataProvider` to build the `MicrobatchPackStream`, collate data and shard it across ranks.
+*   **[Event Bus and Hooks](./events.md)**: Hook into specific moments of the train or inference lifecycle through the event bus.
+*   **[Optimizer](./optimizer.md)**: Configure standard optimizers with `AutoOptimizerProvider`, or write your own `OptimizerProvider`.
+*   **[Learning Rate Scheduler](./lr_scheduler.md)**: Use `AutoLRSchedulerProvider` for piecewise schedules (warmup, hold, decay), or write your own `LRSchedulerProvider`.

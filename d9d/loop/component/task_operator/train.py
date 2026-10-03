@@ -22,7 +22,7 @@ TState = typing.TypeVar("TState", bound=PyTree)
 
 
 class LossComputer(typing.Generic[TPipelineOutput, TState]):
-    """Computes and accumulates the training loss for each microbatch of a step.
+    """Component that computes and accumulates the training loss for each microbatch of a step.
 
     This component bridges the raw outputs of the model pipeline and the user-defined training task.
     """
@@ -35,12 +35,12 @@ class LossComputer(typing.Generic[TPipelineOutput, TState]):
         gradient_manager: GradientManager,
         metrics: ComposeMetric,
     ):
-        """Constructs a new LossComputer.
+        """Constructs the ``LossComputer`` object.
 
         Args:
             state: Handler for the per-microbatch pipeline state.
             task: The user-defined training task containing loss computation logic.
-            schedule: Component tracking current step and progress.
+            schedule: The job schedule that tracks the current step.
             gradient_manager: Accumulator of loss/weight for gradient reduction.
             metrics: Metric collection updated per microbatch.
         """
@@ -79,7 +79,7 @@ class LossComputer(typing.Generic[TPipelineOutput, TState]):
 
 
 class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]):
-    """Orchestrates the forward and backward passes for a training task over one pack.
+    """Operator that orchestrates the forward and backward passes for a training task over one pack.
 
     It builds the per-microbatch inputs, reconfigures the pipeline schedule for the pack length, and
     drives execution. Loss/weight and metrics accumulate per microbatch through the loss callback.
@@ -95,7 +95,7 @@ class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPi
         job_schedule: JobSchedule,
         metrics: ComposeMetric,
     ):
-        """Constructs the TrainTaskOperator.
+        """Constructs the ``TrainTaskOperator`` object.
 
         Args:
             dist_context: The distributed context.
@@ -103,7 +103,7 @@ class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPi
             pipeline: Information about the pipeline schedule.
             pipeline_state: Handler for transient per-microbatch state during the step.
             gradient_manager: Gradient accumulator; told how many backward passes this step performs.
-            job_schedule: Component tracking current step and progress.
+            job_schedule: The job schedule that tracks the current step.
             metrics: Metric collection updated per microbatch.
         """
         self._dist_context = dist_context

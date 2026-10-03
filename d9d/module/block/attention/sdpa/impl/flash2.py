@@ -7,18 +7,25 @@ from ..protocol import SdpaBackend
 
 
 class FlashAttention2Sdpa(nn.Module, SdpaBackend):
-    """Scaled Dot Product Attention using Flash Attention 2.
-
-    Args:
-        config: Backend configuration.
-        params: Structural parameters.
-    """
+    """Scaled dot-product attention that uses FlashAttention 2."""
 
     def __init__(self, config: FlashAttention2SdpaBackendConfig, params: SdpaParameters) -> None:
+        """Constructs the ``FlashAttention2Sdpa`` object.
+
+        Args:
+            config: Backend configuration.
+            params: Structural layer parameters.
+
+        Raises:
+            ValueError: If ``params`` enables learnable sinks.
+        """
         super().__init__()
 
         if params.num_sinks is not None:
-            raise ValueError("Flash Attention 2 backend does not support learnable sinks (`num_sinks`).")
+            raise ValueError(
+                f"The FlashAttention 2 backend does not support learnable sinks, but num_sinks ({params.num_sinks}) "
+                f"is set. Use the FlashAttention 4 or eager backend."
+            )
 
         self._window_size = params.window_size
 
@@ -32,7 +39,10 @@ class FlashAttention2Sdpa(nn.Module, SdpaBackend):
         scale: float,
     ) -> torch.Tensor:
         if attention_mask is not None:
-            raise ValueError("Flash Attention 2 does not support setting attention mask explicitly")
+            raise ValueError(
+                "The FlashAttention 2 backend does not support an explicit attention mask. "
+                "Pass attention_mask=None or use the PyTorch SDPA or eager backend."
+            )
 
         left = self._window_size[0] if self._window_size[0] is not None else -1
         right = self._window_size[1] if self._window_size[1] is not None else -1

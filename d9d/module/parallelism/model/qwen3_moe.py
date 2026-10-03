@@ -1,3 +1,5 @@
+"""Horizontal parallelism for the Qwen3 MoE model."""
+
 from d9d.core.dist_context import DENSE_DOMAIN, EXPERT_DOMAIN, DistributedContext
 from d9d.module.model.qwen3_moe import Qwen3MoEModel
 from d9d.module.parallelism.api import parallelize_expert_parallel, parallelize_hsdp
@@ -5,32 +7,31 @@ from d9d.pipelining.api import PipelineStageInfo
 
 
 def parallelize_qwen3_moe_model(dist_context: DistributedContext, model: Qwen3MoEModel, stage: PipelineStageInfo):
-    """Parallelizes the base Qwen3 MoE model components.
+    """Parallelizes a Qwen3 MoE backbone within one pipeline stage.
 
-    This function configures the model layers for distributed execution within a pipeline
-    stage. It applies Hybrid Sharded Data Parallelism (HSDP) to dense components (embeddings,
-    norms, attention) and Expert Parallelism (EP) to the Mixture-of-Experts (MLP) layers.
-
-    Current usage constraints:
-    *   Tensor Parallelism is not supported (we may implement it later).
-    *   Context Parallelism is not supported (we will implement it later).
+    Applies Hybrid Sharded Data Parallel (HSDP) to the embeddings, norms and attention modules,
+    and expert parallelism to the MoE layers. Tensor parallelism and context parallelism are not
+    supported yet.
 
     Args:
         dist_context: The distributed context.
-        model: The Qwen3 MoE base model to parallelize.
-        stage: Information about the current pipeline stage.
+        model: The Qwen3 MoE backbone to parallelize.
+        stage: The current pipeline stage.
 
     Raises:
-        ValueError: If Tensor Parallel or Context Parallel is enabled in the context.
+        ValueError: If tensor parallelism or context parallelism is enabled.
     """
     dims = dist_context.mesh_params
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
     expert_mesh = dist_context.mesh_for(EXPERT_DOMAIN)
 
     if dims.has_tensor_parallel:
-        raise ValueError("Tensor Parallel currently is not supported for this model.")
+        raise ValueError("Tensor parallelism is not supported for this model yet. Set tensor_parallel to 1.")
     if dims.has_context_parallel_replicate or dims.has_context_parallel_shard:
-        raise ValueError("Context Parallel currently is not supported for this model.")
+        raise ValueError(
+            "Context parallelism is not supported for this model yet. "
+            "Set context_parallel_shard and context_parallel_replicate to 1."
+        )
 
     if stage.is_current_stage_first:
         parallelize_hsdp(model.embed_tokens, mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"])

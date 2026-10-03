@@ -1,8 +1,12 @@
 # Classification Metrics
 
-The `d9d` framework provides robust, distributed-ready classification metrics designed to handle large-scale data smoothly.
+## About
+
+d9d provides distributed classification metrics: an approximate binary AUROC and metrics computed from a confusion matrix, such as accuracy, precision, recall and F-beta. Their state has a fixed size, so it does not grow with the number of samples.
 
 ## Binary AUROC
+
+`BinaryAUROCMetric` approximates AUROC with histograms of predicted probabilities, as described by [Albakour et al., 2021](https://www.researchgate.net/publication/353020448_Fast_and_memory_efficient_AUC-ROC_approximation_for_Stream_Learning). More bins give a more accurate result and use more memory.
 
 ```python
 from d9d.metric.impl.classification import BinaryAUROCMetric
@@ -10,24 +14,19 @@ from d9d.metric.impl.classification import BinaryAUROCMetric
 auroc = BinaryAUROCMetric()
 ```
 
-::: d9d.metric.impl.classification.BinaryAUROCMetric
-    options:
-      heading_level: 3
+## Confusion Matrix-Based Metrics
 
-## Confusion Matrix-based Metrics
+Accuracy, precision, recall and F-beta are all computed from a confusion matrix. `confusion_matrix_metric()` returns a builder that defines such a metric in three steps:
 
-When evaluating categorical outcomes, many standard statistics (Accuracy, Precision, Recall, F-Beta) share an underlying reliance on the Confusion Matrix.
+1.  **Problem type**: `binary`, `multiclass` or `multilabel`.
+2.  **Statistic**: The formula to compute, e.g. `with_accuracy` or `with_f1`.
+3.  **Aggregation**: How to combine the per-class values: `micro`, `macro`, `weighted` or `per_class`. `binary()` and `multiclass()` with `top_k` select `micro` themselves.
 
-To provide maximum flexibility and code reuse, `d9d` exposes a fluent, safe builder pattern via `confusion_matrix_metric()`. You define your metric in three distinct steps:
-1. **Problem Type**: Define if this is `binary`, `multiclass`, or `multilabel`.
-2. **Statistic**: Choose the formula to evaluate (e.g., `with_accuracy`, `with_f1`).
-3. **Aggregation**: Choose how to reduce multi-dimensional data (`micro`, `macro`, `weighted`, or `per_class`).
-
-Below are several common examples of how to assemble these configurations.
+## Usage
 
 ### Binary Classification (Accuracy)
 
-For a simple binary problem, you specify a probability threshold (usually 0.5). Using `.with_accuracy()` makes the metric calculate the overall correct predictions without needing complex aggregation.
+For a binary problem, you set a probability threshold, usually 0.5.
 
 ```python
 from d9d.metric.impl.classification import confusion_matrix_metric
@@ -42,7 +41,7 @@ accuracy = (
 
 ### Multiclass Classification (Top-5 Accuracy)
 
-You can easily evaluate if the correct label appears within the top $K$ predicted probabilities by passing `top_k` into the multiclass configuration. Since `top_k` treats the evaluation as a single broad "hit or miss", it effectively becomes a binary classification problem.
+Pass `top_k` to check whether the correct label is among the $K$ highest predicted scores. Each prediction is then a single hit or miss, so the problem becomes a binary one.
 
 ```python
 from d9d.metric.impl.classification import confusion_matrix_metric
@@ -57,7 +56,7 @@ top5_acc = (
 
 ### Multiclass Classification (Per-Class Precision)
 
-Instead of collapsing results into a single global number, you might want to inspect the performance of strictly individual categories. Using the `.per_class()` aggregation bypasses global reductions entirely and returns a separate score (such as Precision) for every single class.
+To inspect individual classes, use the `.per_class()` aggregation. It returns a separate value, such as precision, for every class.
 
 ```python
 from d9d.metric.impl.classification import confusion_matrix_metric
@@ -71,9 +70,9 @@ per_class_precision = (
 )
 ```
 
-### Multilabel Classification (Macro F1-Score)
+### Multilabel Classification (Macro F1 Score)
 
-For multilabel problems, multiple correct categories can exist simultaneously. Each class is evaluated independently against a probability threshold. To compute a single global metric value, you can use reductions like `.macro()` to average the specific statistic (e.g., F1-score) evenly across all classes, regardless of their individual sample frequency.
+In a multilabel problem, several classes can be correct at the same time. Each class is compared against the probability threshold independently. The `.macro()` aggregation averages the statistic, e.g. the F1 score, over all classes with equal weight.
 
 ```python
 from d9d.metric.impl.classification import confusion_matrix_metric
@@ -87,10 +86,10 @@ macro_f1 = (
 )
 ```
 
+## API Reference
+
+::: d9d.metric.impl.classification.BinaryAUROCMetric
+
 ::: d9d.metric.impl.classification.confusion_matrix_metric
-    options:
-      heading_level: 3
 
 ::: d9d.metric.impl.classification.ConfusionMatrixMetricBuilder
-    options:
-      heading_level: 3

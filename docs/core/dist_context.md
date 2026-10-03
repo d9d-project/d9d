@@ -2,116 +2,110 @@
 
 ## About
 
-The `d9d.core.dist_context` package is the **Source of Truth** for the distributed execution environment. 
-
-In large-scale model training, ensuring that every rank agrees on the topology, global rank mapping, and communication groups is critical. This package provides the `DistributedContext` class, which serves as the central repository for this configuration. 
-
-It is extremely important to use this context for all distributed assertions (e.g., "Am I the main process?", "Which rank is my pipeline peer?") rather than checking raw `os.environ` variables or initializing ad-hoc process groups, which can lead to silent inconsistencies.
+The `d9d.core.dist_context` package is the single source of truth for the distributed execution environment. Its `DistributedContext` class holds the topology, the rank mapping and the communication groups, so that every rank agrees on them. Use the context for all distributed questions, such as "Am I the main process?" or "Which rank is my pipeline peer?". Do not read raw `os.environ` variables or create ad-hoc process groups: this can lead to silent inconsistencies. `DistributedContext` requires CUDA GPUs. It sets the current CUDA device of each process to its local rank.
 
 ## Comparison with Other Frameworks
 
-The problem of managing distributed topology is solved in a different ways across different distributed training frameworks.
+Distributed training frameworks solve topology management in different ways.
 
 ### Megatron-LM (`parallel_state`)
 
-Megatron-LM manages topology via a module often called `mpu` (Model Parallel Unit) or `core.parallel_state`.
+Megatron-LM manages topology in a module called `mpu` (Model Parallel Unit) or `core.parallel_state`.
 
-Megatron historically relies on global variables and manual rank arithmetic. To find a peer rank, developers often write code involving modulo operations (e.g., `rank % tp_size`). This is flexible but error-prone and brittle.
+It relies on global variables and manual rank arithmetic. To find a peer rank, developers often write modulo operations, such as `rank % tp_size`. This is flexible, but error-prone and brittle.
 
-### HuggingFace Accelerate (`PartialState`)
+### Hugging Face Accelerate (`PartialState`)
 
-Accelerate uses a class called `PartialState` to abstract the environment.
+Accelerate describes the environment with a class called `PartialState`.
 
-We find Accelerate's utility methods quite useful. d9d implements similar helpers, such as `wait_world()` (similar to `wait_for_everyone()`) and properties like `is_main_process` or `is_local_main_process`.
+Its helper methods are useful, and d9d has similar ones: `wait_world()` (like `wait_for_everyone()`), `is_main_process` and `is_local_main_process`.
 
-`PartialState` is primarily designed for "Flat" Data Parallelism (DDP/FSDP) and does not support complex multidimensional parallelisms natively.
+`PartialState` targets flat data parallelism (DDP and FSDP). It does not support multidimensional parallelism natively.
 
-`PartialState` is implemented as a Singleton. Instantiating it anywhere in the code returns the exact same global state. This makes flow of dependencies unclear and also could lead to initialization of your ProcessGroups and distributed environment in unexpected places in your code.
+`PartialState` is a singleton: every instantiation returns the same global state. This hides the flow of dependencies. It can also initialize process groups and the distributed environment in unexpected places.
 
 ### TorchTitan (`ParallelDims`)
 
-TorchTitan is the most similar framework to d9d in spirit, as both are built on top of native PyTorch 2.x `DeviceMesh` abstractions. 
+TorchTitan is the framework closest to d9d in spirit: both build on the native PyTorch `DeviceMesh`.
 
-However, `ParallelDims` in TorchTitan is more like a mesh factory rather than global distributed environment controller.
+However, `ParallelDims` in TorchTitan is a mesh factory, not a controller of the distributed environment.
 
 ### d9d (`DistributedContext`)
 
-d9d positions `DistributedContext` as the explicit controller for managing all the distributed environment.
+In d9d, `DistributedContext` is the explicit controller of the whole distributed environment.
 
-* `DistributedContext` is a standard object that is instantiated and passed explicitly to dependent components. This ensures that the initialization of process groups happens exactly when and where the developer intends, making the initialization flow transparent.
-* It replaces manual rank arithmetic with formalized and native to PyTorch `DeviceMesh` abstractions.
-* Functionally, it elevates the mesh system into an active runtime controller. It bundles timeout management, context-aware logging, and node-level synchronization.
-
+*   `DistributedContext` is a plain object. You create it and pass it explicitly to the components that need it. Process groups are initialized exactly when and where you intend.
+*   It replaces manual rank arithmetic with the native PyTorch `DeviceMesh`.
+*   It is an active runtime controller, not only a mesh factory. It also manages timeouts, rank-aware logging and synchronization between ranks.
 
 ## DeviceMesh Domains
 
-Modern architectures require different parallelism strategies for different parts of the model (e.g., standard dense layers vs. Mixture-of-Experts layers). d9d handles this by abstracting these strategies into specific **DeviceMesh Domains**.
+Different parts of a model need different parallelism strategies, for example dense layers and Mixture-of-Experts (MoE) layers. d9d describes each strategy as a **`DeviceMesh` domain**.
 
-The underlying physical GPUs are immutable, but how we view them changes depending on what we are working with (distributing MoE layers, Dense layers, distributing input batch). `DeviceMesh` object for specific domain is retrieved via `dist_ctx.mesh_for(domain_name)`.
+The physical GPUs stay the same, but each domain arranges them into a different mesh. There are domains for MoE layers, for dense layers and for the input batch. Get the `DeviceMesh` of a domain with `dist_ctx.mesh_for(domain_name)`.
 
-!!! info "Demonstration Video: "
-    For better understanding domains, we have prepared a quick demonstration video [on YouTube](https://www.youtube.com/watch?v=UZ2yHTGdzzU).
+!!! info "Demonstration Video"
+    To understand domains better, watch our short demonstration video [on YouTube](https://www.youtube.com/watch?v=UZ2yHTGdzzU).
 
 ### Regular Domain (`regular`)
 
 *   **Identifier**: `REGULAR_DOMAIN` or `"regular"`
-*   **Purpose**: The most granular mesh view for fully decomposed parallelism. Used for setting up logging and seeding.
-*   **Dimensions**: 
+*   **Purpose**: The most granular mesh, with every parallelism in its own dimension. d9d uses it for logging and seeding.
+*   **Dimensions**:
     1.  `pp`: Pipeline Parallel
     2.  `dp_replicate`: Data Parallel (DDP style)
     3.  `dp_shard`: Data Parallel (FSDP style)
     4.  `cp_shard`: Context Parallel (FSDP style)
     5.  `cp_replicate`: Context Parallel (DDP style)
-    6.  `tp`: Tensor Parallelism
+    6.  `tp`: Tensor Parallel
 
 ### Expert Domain (`expert`)
 
 *   **Identifier**: `EXPERT_DOMAIN` or `"expert"`
-*   **Purpose**: Mesh view optimized for distributing MoE (Mixture of Experts) layers. It is intended that sparse expert layers should be sharded across `ep_shard` dimension and replicated across `ep_replicate` dimension.
+*   **Purpose**: The mesh for MoE layers. Shard sparse expert layers across the `ep_shard` dimension and replicate them across the `ep_replicate` dimension.
 *   **Dimensions**:
     1.  `pp`: Pipeline Parallel
-    2.  `ep_replicate`: Combined Replication Dimension (`(DP * CP) // EP`)
-    3.  `ep_shard`: Expert Parallel Dimension
+    2.  `ep_replicate`: Combined replication dimension (`(DP * CP) // EP`)
+    3.  `ep_shard`: Expert Parallel
 
 ### Dense Domain (`dense`)
 
 *   **Identifier**: `DENSE_DOMAIN` or `"dense"`
-*   **Purpose**: Mesh view for distributing dense layers.
+*   **Purpose**: The mesh for dense layers.
 *   **Dimensions**:
     1.  `pp`: Pipeline Parallel
-    2.  `dp_replicate`: Data Parallel for replication using HSDP
-    3.  `dp_cp_shard`: Merged Data and Context Parallel dimension for sharding using HSDP
-    4.  `cp_replicate`: Context Parallel for replication
+    2.  `dp_replicate`: Data Parallel replication in HSDP
+    3.  `dp_cp_shard`: Data Parallel and Context Parallel merged, for sharding in HSDP
+    4.  `cp_replicate`: Context Parallel replication
     5.  `tp`: Tensor Parallel
 
 ### Batch Domain (`batch`)
 
 *   **Identifier**: `BATCH_DOMAIN` or `"batch"`
-*   **Purpose**: Mesh view for distributing batch tensor and setting up DataLoader sharding.
+*   **Purpose**: The mesh for distributing the input batch and sharding the data loader.
 *   **Dimensions**:
     1.  `pp`: Pipeline Parallel
-    2.  `dp`: Data Parallel
-    3.  `cp`: Context Parallel
+    2.  `dp`: Data Parallel (`dp_replicate * dp_shard`)
+    3.  `cp`: Context Parallel (`cp_replicate * cp_shard`)
     4.  `tp`: Tensor Parallel
-
 
 ### Flat Domain (`flat`)
 
 *   **Identifier**: `FLAT_DOMAIN` or `"flat"`
-*   **Purpose**: Mesh view with a single dimension.
+*   **Purpose**: A mesh with a single dimension that holds all processes.
 *   **Dimensions**:
-    1.  `world`: World Size
+    1.  `world`: World size
 
 ## Usage
 
 ### Initialization
 
-The system is usually initialized via `DeviceMeshParameters`.
+Build the context from `DeviceMeshParameters`.
 
 ```python
 from d9d.core.dist_context import DeviceMeshParameters
 
-# Define the topology
+# Define the topology.
 params = DeviceMeshParameters(
     pipeline_parallel=2,
     data_parallel_replicate=8,
@@ -137,30 +131,31 @@ mesh_dense: DeviceMesh = dist_ctx.mesh_for(DENSE_DOMAIN)
 ```
 
 ### Rank Utilities
-Accessing rank information.
 
 ```python
 if dist_ctx.is_main_process:
-    print("I am Global Rank 0 (Master)")
+    print("I am global rank 0")
 
 if dist_ctx.is_local_main_process:
-    print("I am Rank 0 on this specific node")
+    print("I am rank 0 on this node")
 
-# Synchronize
+# Synchronize.
 dist_ctx.wait_world()
 ```
 
 ### Context Managers
-Control execution flow across ranks.
+
+These context managers control the order in which ranks run a block.
 
 ```python
-# Ensure only one process per node downloads a file
+# Only one process per node downloads the file.
 with dist_ctx.local_main_process_first():
     if dist_ctx.is_local_main_process:
         download_dataset()
-    # Others wait here implicitly
-# All resume together
+    # Other ranks enter the block after the download.
+# All ranks continue together.
 ```
 
+## API Reference
 
 ::: d9d.core.dist_context

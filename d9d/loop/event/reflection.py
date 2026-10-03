@@ -9,10 +9,9 @@ _SUBSCRIBE_MARKER = "_d9d_subscribed_events"
 
 
 def subscribe(event: Event[TContext]) -> Callable[[Callable[[TContext], None]], Callable[[TContext], None]]:
-    """Decorator that tags a method to be subscribed to specific event.
+    """Marks a method to be subscribed to an event.
 
-    This decorator does not register the method immediately. Instead, it attaches
-    metadata to the function. To finalize registration, use `subscribe_annotated()`.
+    The decorator does not register the method. Call ``subscribe_annotated`` on the instance to register it.
 
     Args:
         event: Event descriptor to bind this method to.
@@ -29,13 +28,10 @@ def subscribe(event: Event[TContext]) -> Callable[[Callable[[TContext], None]], 
 
 
 def subscribe_annotated(bus: EventBus, target: object) -> None:
-    """Automatically subscribes all methods on the target object decorated with `@subscribe`.
-
-    This method uses introspection to find tagged methods and binds them to the
-    provided event bus.
+    """Subscribes all methods of the target object that are decorated with ``@subscribe``.
 
     Args:
-        bus: The EventBus instance to register the handlers to.
+        bus: The event bus to register the handlers on.
         target: The initialized class instance containing the decorated methods.
     """
     for _, method in inspect.getmembers(target, predicate=inspect.ismethod):

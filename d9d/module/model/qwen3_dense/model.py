@@ -30,9 +30,9 @@ class Qwen3DenseModel(
         SequenceInput, SequenceTransfer[torch.Tensor], SequenceShared, SequenceTransfer[torch.Tensor]
     ],
 ):
-    """The Qwen3 Dense Transformer Decoder backbone.
+    """The Qwen3 Dense transformer decoder backbone.
 
-    It is designed to be split across multiple pipeline stages.
+    The backbone supports pipeline parallelism: each instance holds the layers of one stage.
     """
 
     def __init__(
@@ -42,13 +42,13 @@ class Qwen3DenseModel(
         hidden_states_snapshot_mode: HiddenStatesAggregationMode,
         enable_checkpointing: bool,
     ):
-        """Constructs the Qwen3DenseModel object.
+        """Constructs the ``Qwen3DenseModel`` object.
 
         Args:
             params: Configuration parameters for the full model.
-            stage: Information about the pipeline stage this instance belongs to.
-            hidden_states_snapshot_mode: Configures intermediate hidden state aggregation & snapshotting mode.
-            enable_checkpointing: If True, enables activation checkpointing for transformer layers to save memory.
+            stage: The pipeline stage this instance belongs to.
+            hidden_states_snapshot_mode: How to aggregate intermediate hidden states into snapshots.
+            enable_checkpointing: Whether to apply activation checkpointing to each transformer layer.
         """
         super().__init__()
 
@@ -59,11 +59,11 @@ class Qwen3DenseModel(
                 split_order=params.split_vocab_order,
             )
 
-        # we use ModuleDict here to properly handle pipelining and loading weights after the model
-        # was pipelined
+        # A ModuleDict keyed by global layer index keeps the parameter FQNs the same on every
+        # pipeline stage, so checkpoints load regardless of the stage split.
         layer_start, layer_end = distribute_layers_for_pipeline_stage(
             num_layers=params.num_hidden_layers,
-            num_virtual_layers_pre=params.pipeline_num_virtual_layers_pre,  # embedding
+            num_virtual_layers_pre=params.pipeline_num_virtual_layers_pre,  # Embedding
             num_virtual_layers_post=params.pipeline_num_virtual_layers_post,  # LM head
             stage=stage,
         )
@@ -89,19 +89,19 @@ class Qwen3DenseModel(
         self._hidden_states_snapshot_mode = hidden_states_snapshot_mode
         self._enable_checkpointing = enable_checkpointing
 
-        # backbone-shared dimensions the composed task heads derive from
+        # Task heads read these dimensions from the backbone.
         self._hidden_size = params.layer.hidden_size
         self._split_vocab_size = params.split_vocab_size
         self._split_vocab_order = params.split_vocab_order
 
     @property
     def hidden_size(self) -> int:
-        """Dimensionality of the backbone hidden states."""
+        """The size of the backbone hidden states."""
         return self._hidden_size
 
     @property
     def split_vocab_size(self) -> Mapping[str, int]:
-        """Mapping of vocabulary segment names to their sizes."""
+        """The mapping of vocabulary segment names to their sizes."""
         return self._split_vocab_size
 
     @property
@@ -110,10 +110,10 @@ class Qwen3DenseModel(
         return self._split_vocab_order
 
     def output_dtype(self) -> torch.dtype:
-        """Returns the data type of the model output hidden states.
+        """Returns the dtype of the output hidden states.
 
         Returns:
-            The output hidden states data type.
+            The dtype of the output hidden states.
         """
         return self.layers[self._layers_iter[0]].input_layernorm.weight.dtype
 
@@ -125,13 +125,14 @@ class Qwen3DenseModel(
         """Executes the backbone forward pass for the current pipeline stage.
 
         Args:
-            inputs: ``SequenceInput`` (token ids) on the first stage; the incoming
-                ``SequenceTransfer`` otherwise.
-            shared: The backbone shared input (position ids and, if snapshotting is enabled, the
-                aggregation mask).
+            inputs: ``SequenceInput`` with token ids on the first stage, or the incoming
+                ``SequenceTransfer`` on other stages.
+            shared: The backbone shared input: position ids and, if snapshotting is enabled, the
+                aggregation mask.
 
         Returns:
-            The produced ``SequenceTransfer`` (hidden states and, optionally, the updated snapshot).
+            The produced ``SequenceTransfer`` with the hidden states and, if enabled, the updated
+                snapshot.
         """
         state_aggregator = create_hidden_states_aggregator(
             self._hidden_states_snapshot_mode, shared.hidden_states_agg_mask
@@ -170,7 +171,7 @@ class Qwen3DenseModel(
         )
 
     def reset_parameters(self):
-        """Resets module parameters."""
+        """Resets the module parameters."""
         if self._stage.is_current_stage_first:
             self.embed_tokens.reset_parameters()
 
@@ -189,7 +190,7 @@ class Qwen3DenseModel(
         """Describes the ``SequenceTransfer`` crossing the given boundary of this stage.
 
         Args:
-            pipeline_input: A representative ``SequenceInput`` microbatch; only shapes are read.
+            pipeline_input: A representative ``SequenceInput`` microbatch. Only its shapes are read.
             boundary: Which inter-stage edge to describe.
 
         Returns:

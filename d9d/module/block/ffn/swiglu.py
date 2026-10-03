@@ -6,18 +6,17 @@ from d9d.module.base import ModuleLateInit
 
 
 class SwiGLU(nn.Module, ModuleLateInit):
-    """Implements the SwiGLU Feed-Forward Network (FFN).
+    """SwiGLU feed-forward network (FFN).
 
-    This module applies the gated activation function: `down(SiLU(gate(x)) * up(x))`.
-    It corresponds to the standard MLP block used in architectures like LLaMA.
+    Computes ``down(SiLU(gate(x)) * up(x))``. This is the standard MLP block of architectures like LLaMA.
     """
 
     def __init__(self, hidden_size: int, intermediate_size: int, bias: bool = False):
-        """Constructs a SwiGLU object.
+        """Constructs the ``SwiGLU`` object.
 
         Args:
-            hidden_size: The hidden dim size.
-            intermediate_size: The intermediate dim size of the FFN.
+            hidden_size: Hidden size.
+            intermediate_size: Intermediate size of the FFN.
             bias: Whether to use bias in the linear projections.
         """
         super().__init__()
@@ -29,10 +28,10 @@ class SwiGLU(nn.Module, ModuleLateInit):
         """Applies the SwiGLU FFN to the input.
 
         Args:
-            x: Input tensor. Shape: `(batch_size, seq_len, hidden_dim)`.
+            x: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.
 
         Returns:
-            Output tensor. Shape: `(batch_size, seq_len, hidden_dim)`.
+            Output tensor. Shape: ``(batch, seq_len, hidden_size)``.
         """
         return self.down_proj(silu_mul(self.gate_proj(x), self.up_proj(x)))
 

@@ -1,4 +1,4 @@
-"""Pipelining Runtime Package."""
+"""Runtime that executes pipeline schedule programs."""
 
 from .action import (
     ActionBase,

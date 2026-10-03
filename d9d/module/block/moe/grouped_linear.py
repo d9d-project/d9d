@@ -10,11 +10,10 @@ from d9d.module.base import ModuleLateInit
 
 
 class GroupedLinear(nn.Module, ModuleLateInit):
-    """Applies a linear transformation using Grouped GEMM (Generalized Matrix Multiplication).
+    """Linear layer with a separate transformation for each group of tokens, computed with grouped GEMM.
 
-    This module allows efficient execution of multiple linear layers (experts) in parallel, where each expert
-    processes a variable number of tokens.
-    It is the computational core of the Mixture-of-Experts layer.
+    Each group (expert) has its own weight and processes a variable number of tokens. This is the compute core
+    of the Mixture-of-Experts layer. Requires the ``d9d[moe]`` extra.
     """
 
     def __init__(
@@ -25,12 +24,12 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
     ):
-        """Constructs the GroupedLinear layer.
+        """Constructs the ``GroupedLinear`` object.
 
         Args:
             n_groups: Number of groups (experts).
-            in_features: Input hidden size.
-            out_features: Output hidden size.
+            in_features: Size of each input sample.
+            out_features: Size of each output sample.
             device: Target device.
             dtype: Target data type.
         """
@@ -47,13 +46,13 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         """Performs the grouped matrix multiplication.
 
         Args:
-            x: Flattened input tensor containing tokens for all groups.
-                Shape: `(total_tokens, in_features)`.
-            x_groups: CPU Tensor indicating the number of tokens assigned to each group.
-                Must sum to `total_tokens`. Shape: `(n_groups,)`.
+            x: Input tokens of all groups, with the tokens of each group stored together.
+                Shape: ``(num_tokens, in_features)``.
+            x_groups: CPU tensor with the number of tokens in each group. Must sum to ``num_tokens``.
+                Shape: ``(n_groups,)``.
 
         Returns:
-            The output tensor. Shape: `(total_tokens, out_features)`.
+            The output tensor. Shape: ``(num_tokens, out_features)``.
         """
         weight: torch.Tensor = self.weight
 
@@ -63,5 +62,5 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         return gmm(x, weight, x_groups, a_grad_direction=GradDirection.inputs, b_grad_direction=GradDirection.weight)
 
     def reset_parameters(self):
-        """Initializes weights using a uniform distribution based on input features."""
+        """Initializes the weights from ``U(-1 / sqrt(in_features), 1 / sqrt(in_features))``."""
         nn.init.uniform_(self.weight, -1 / math.sqrt(self.in_features), 1 / math.sqrt(self.in_features))

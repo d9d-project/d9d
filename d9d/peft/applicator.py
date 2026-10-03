@@ -7,20 +7,18 @@ from .base import PeftMethod
 
 
 def inject_peft_and_freeze(method: PeftMethod, module: nn.Module) -> ModelStateMapper:
-    """Applies a PEFT method to a module, freezes non-trained parameters, and prepares state mapping.
+    """Applies a PEFT method to a module and freezes all parameters it does not train.
 
-    This function performs three main steps:
-
-    1. Sets `requires_grad=False` for all parameters in the module.
-    2. Calls the method's `inject` to modify the model structure.
-    3. Sets `requires_grad=True` for the parameters returned by the injection result.
+    1.  Sets ``requires_grad=False`` for all parameters in the module.
+    2.  Calls ``method.inject`` to modify the module structure.
+    3.  Sets ``requires_grad=True`` for the parameters returned by the injection.
 
     Args:
-        method: The PEFT method strategy to apply.
+        method: The PEFT method to apply.
         module: The PyTorch module to modify.
 
     Returns:
-        A ModelStateMapper capable of loading checkpoint weights into the modified structure.
+        A ``ModelStateMapper`` that loads checkpoint weights into the modified structure.
     """
     for param in module.parameters():
         param.requires_grad = False
@@ -37,7 +35,7 @@ def merge_peft(method: PeftMethod, module: nn.Module):
     """Merges PEFT adaptations back into the base model weights.
 
     Args:
-        method: The PEFT method strategy originally applied.
+        method: The PEFT method that was applied.
         module: The PyTorch module to merge.
     """
     method.merge(module)

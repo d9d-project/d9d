@@ -43,8 +43,8 @@ from torch.utils.data import Dataset
 
 
 class DataConfig(BaseModel):
-    dataset: str  # HuggingFace dataset path/name
-    split: str  # e.g., 'train', 'validation'
+    dataset: str  # Hugging Face dataset path/name
+    split: str  # E.g. 'train', 'validation'
     text_column: str  # The column containing the raw text
     use_samples: int  # Limit dataset size for testing/debugging
     shuffle_seed: int  # Distinct seed for shuffling the data
@@ -56,7 +56,7 @@ class DataConfig(BaseModel):
 
 class ModelProviderConfig(BaseModel):
     model: Qwen3MoEParameters  # Hyperparameters for the Qwen3 MoE backbone
-    checkpointing: bool  # Enable gradient checkpointing to save VRAM
+    checkpointing: bool  # Enable activation checkpointing to save GPU memory
 
 
 class ProjectConfig(BaseModel):
@@ -84,18 +84,16 @@ class ProjectDataset(Dataset, DatasetImplementingSortKeyProtocol):
 
     def __getitem__(self, index: int) -> TensorTree:
         item = self._dataset[index]
-        # Encode text to tokens
         tokens = torch.tensor(self._tokenizer.encode(item["text"]).ids, dtype=torch.long)
 
-        # Standard Causal LM logic:
+        # Standard causal LM shift:
         # Input: [A, B, C]
         # Label: [B, C, D]
-        # d9d models do NOT handle this logic to not introduce additional GPU overhead, so we do this in data
-        # processing on CPU:
+        # d9d models do not shift labels, to avoid extra GPU work. Shift them here, on the CPU.
         input_ids = tokens[:-1]
         labels = tokens[1:]
 
-        # Position IDs usually 0..N-1
+        # Position IDs are 0..N-1.
         position_ids = torch.arange(0, input_ids.shape[0], dtype=torch.long)
 
         return {
@@ -107,11 +105,11 @@ class ProjectDataset(Dataset, DatasetImplementingSortKeyProtocol):
     @classmethod
     def collate(cls, batch: Sequence[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
         return {
-            # Pad inputs to max length in this batch with 0
+            # Pad inputs to max length in this batch with 0.
             "input_ids": pad_stack_1d([x["input_ids"] for x in batch], pad_value=0),
-            # Pad labels with -100 (we ignore this value by default)
+            # Pad labels with LM_IGNORE_INDEX (-100), which the loss ignores.
             "labels": pad_stack_1d([x["labels"] for x in batch], pad_value=LM_IGNORE_INDEX),
-            # Pad position tokens
+            # Pad position IDs.
             "position_ids": pad_stack_1d([x["position_ids"] for x in batch], pad_value=0),
         }
 
@@ -126,7 +124,7 @@ def _count_tokens(item: dict, text_column: str, tokenizer: Tokenizer) -> dict:
 
 
 def build_dataset(config: DataConfig, dist_context: DistributedContext) -> Dataset:
-    """Builds the (unsharded) dataset. AutoDataProvider handles sharding, loading, and packing.
+    """Builds the unsharded dataset. ``AutoDataProvider`` shards, loads and packs it.
 
     Args:
         config: The data configuration.
@@ -137,9 +135,8 @@ def build_dataset(config: DataConfig, dist_context: DistributedContext) -> Datas
     """
     tokenizer = Tokenizer.from_file(str(config.tokenizer))
 
-    # IMPORTANT: main_process_first ensures that Rank 0 downloads/processes
-    # the dataset and builds the cache first. Ranks 1-N wait, then load from cache.
-    # Prevents race conditions and corruption on the HF cache.
+    # main_process_first lets rank 0 download and process the dataset and fill the cache first.
+    # The other ranks wait, then load from the cache. This avoids races on the Hugging Face cache.
     with dist_context.main_process_first():
         data = (
             datasets.load_dataset(config.dataset, split=config.split)
@@ -154,9 +151,8 @@ def build_dataset(config: DataConfig, dist_context: DistributedContext) -> Datas
 
     dataset = ProjectDataset(data, tokenizer)
 
-    # BufferSortedDataset acts as a buffer that shuffles data locally
-    # but outputs batches sorted by length (defined in sort_key above) to minimize padding overhead.
-    # Return it UNSHARDED - AutoDataProvider shards across data-parallel ranks itself.
+    # BufferSortedDataset groups samples of similar length (see sort_key above) and shuffles the groups.
+    # This minimizes padding. Return it unsharded: AutoDataProvider shards it across data-parallel ranks.
     return BufferSortedDataset(
         dataset,
         buffer_size=config.presort_buffer_size,
@@ -175,8 +171,8 @@ class ProjectModelProvider(ModelProvider[DecoderForCausalLM[Qwen3MoEModel]]):
         self._config = config
 
     def initialize_model_stage(self, context: InitializeModelStageContext) -> InitializeModelStageResult:
-        # Initialize the raw model on CPU or Meta device in BF16 precision.
-        # Compose the Qwen3 MoE backbone with a single causal LM head.
+        # The loop calls this method on the meta device, so no weights are allocated here.
+        # Compose the Qwen3 MoE backbone with a single causal LM head and cast it to bf16.
         backbone = Qwen3MoEModel(
             params=self._config.model,
             stage=context.stage,
@@ -191,15 +187,14 @@ class ProjectModelProvider(ModelProvider[DecoderForCausalLM[Qwen3MoEModel]]):
         )
 
     def parallelize_model_stage(self, context: ParallelizeModelStageContext):
-        # Applies specific distributed strategies suited for the Qwen3 MoE architecture:
-        # the per-family backbone routine on the backbone, then the head's own routine on the head.
+        # Apply the Qwen3 MoE parallelism routine to the backbone and the head routine to the head.
         # You can apply your own horizontal parallelism strategy here.
         parallelize_qwen3_moe_model(context.dist_context, context.model.model, context.stage)
         if context.stage.is_current_stage_last:
             parallelize_causal_lm_head(context.model.head, context.dist_context)
 
     def prepare_export_model_stage(self, context: PrepareExportModelStageContext) -> PrepareExportModelStageResult:
-        # When exporting, save model weights as-is
+        # When exporting, save model weights as-is.
 
         return PrepareExportModelStageResult(state_mapper=identity_mapper_from_module(context.model))
 
@@ -207,9 +202,9 @@ class ProjectModelProvider(ModelProvider[DecoderForCausalLM[Qwen3MoEModel]]):
         return self._config.model_dump(mode="json")
 
 
-# --------------
+# ---------------
 # Inference Logic
-# --------------
+# ---------------
 
 
 class PerplexityState(TypedDict):
@@ -233,7 +228,7 @@ class PerplexityTask(
     def build_forward_inputs(
         self, ctx: BuildForwardInputsContext
     ) -> BuildForwardInputsResult[SequenceInput, SequenceHeadShared[SequenceCausalLMHeadShared], PerplexityState]:
-        # ctx.batch contains the output of the Collator.
+        # ctx.batch contains the output of the collator.
 
         # Return the pipeline input (first stage only) plus the shared input (every stage) and the
         # typed side-data carried to output processing. The shared input routes position ids to the
@@ -250,11 +245,10 @@ class PerplexityTask(
     def process_outputs(self, ctx: ProcessOutputsContext[SequenceCausalLMOutput, PerplexityState]):
         logps = ctx.pipeline_results.logps
 
-        # Calculate number of valid tokens (ignoring the -100 padding)
-        # This is crucial for variable length batches.
+        # Count the valid tokens (labels that are not padding). The loss of a variable-length batch needs it.
         num_loss_tokens = (ctx.state["labels"] != LM_IGNORE_INDEX).sum()
 
-        # Calculate average loss per valid token
+        # Calculate average loss per valid token.
         perplexity = logps.sum() / num_loss_tokens
 
         self._cache.append(perplexity)

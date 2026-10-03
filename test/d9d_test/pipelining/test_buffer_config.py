@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.pipelining.infra.schedule.component.runtime.executor import _BufferConfig  # noqa: PLC2701
+from d9d.pipelining.infra.schedule.component.runtime.executor import _BufferConfig  # noqa: PLC2701 - unit under test
 
 
 @pytest.mark.local

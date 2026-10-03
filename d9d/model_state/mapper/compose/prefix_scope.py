@@ -14,21 +14,19 @@ def _build_groups(mapper: ModelStateMapper, source_prefix: str, target_prefix: s
 
 
 class ModelStateMapperPrefixScope(ModelStateMapper):
-    """Encapsulates a child mapper and isolates its execution by applying string prefixes.
+    """Mapper that runs a child mapper under key prefixes.
 
-    This mapper allows a child mapper designed for a specific submodule
-    (e.g., operating on "in_proj") to be seamlessly integrated into a larger
-    parent module's state dictionary by virtually scoping its operations
-    using completely independent input (source) and output (target) prefixes.
+    Use it to apply a mapper written for a submodule (e.g. one operating on ``"in_proj"``) to the state dict of
+    a parent module. Input (source) and output (target) prefixes are independent.
     """
 
     def __init__(self, mapper: ModelStateMapper, source_prefix: str = "", target_prefix: str = "") -> None:
-        """Constructs a ModelStateMapperPrefixScope object.
+        """Constructs the ``ModelStateMapperPrefixScope`` object.
 
         Args:
-            mapper: The encapsulated child mapper to execute within the scope.
-            source_prefix: The string prefix defining the scope boundary for incoming state keys.
-            target_prefix: The string prefix defining the scope boundary for outgoing state keys.
+            mapper: The child mapper to run within the scope.
+            source_prefix: The prefix added to the input keys of ``mapper``.
+            target_prefix: The prefix added to the output keys of ``mapper``.
         """
         self._mapper = mapper
         self._source_prefix = source_prefix

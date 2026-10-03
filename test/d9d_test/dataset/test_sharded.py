@@ -118,7 +118,7 @@ def test_config_validation():
         def __getitem__(self, index):
             return 0
 
-    with pytest.raises(ValueError, match="Dataset should implement __len__"):
+    with pytest.raises(ValueError, match="must implement __len__"):
         ShardedDataset(UnsizedDataset(), 2, 0, ShardIndexingMode.sequential, pad_to_equal_size_across_shards=False)
 
 

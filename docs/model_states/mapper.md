@@ -2,70 +2,63 @@
 
 ## About
 
-The `d9d.model_state.mapper` package solves the complexity of working with model checkpoints by providing 
-**a declarative, graph-based framework for transforming model states**.
+The `d9d.model_state.mapper` package is a declarative, graph-based framework for transforming model states. You describe which checkpoint keys map to which model keys, and d9d runs the transformation while it streams the checkpoint.
 
 ## Core Concept
 
-Loading large-scale models is rarely a simple 1-to-1 key matching operation. You often face challenges such as:
+Loading a large model is rarely a 1-to-1 key match. Common problems are:
 
-*   **Naming Mismatches**: HuggingFace uses `model.layers.0`, your custom model uses `transformer.h.0`.
-*   **Shape Mismatches**: The checkpoint stores `Q`, `K`, and `V` separately, but your model implementation expects a stacked `QKV` tensor.
-*   **Scale**: The checkpoint is 500GB. You cannot load the whole dictionary on every GPU to process it.
+*   **Naming mismatches**: Hugging Face uses `model.layers.0`, your model uses `transformer.h.0`.
+*   **Shape mismatches**: The checkpoint stores `q`, `k` and `v` separately, but your model expects one stacked `qkv` tensor.
+*   **Scale**: The checkpoint takes hundreds of GiB. You cannot load the whole dictionary on every GPU to process it.
 
-Instead of writing a manual loop that loads tensors and blindly modifies them, this framework treats state transformation as a **Directed Acyclic Graph (DAG)**.
+A mapper does not loop over tensors and modify them. It treats the transformation as a directed acyclic graph (DAG). Each mapper declares its dependency groups: which input keys produce which output keys. d9d uses these groups to load, transform and save a checkpoint in a stream, without holding the whole checkpoint in memory.
 
-Such a declarative approach makes it available for d9d to perform complex transform-save and transform-load operations 
-effectively in a streamed manner without loading the whole checkpoint into memory.
+Mappers come in three kinds:
 
-## Usage Examples
+*   **Leaf mappers** (`d9d.model_state.mapper.leaf`) transform individual tensors: rename, stack, chunk, transpose, distribute.
+*   **Composite mappers** (`d9d.model_state.mapper.compose`) combine other mappers: in parallel, in sequence, under a key prefix or restricted to one shard.
+*   **Adapters** (`d9d.model_state.mapper.adapters`) build identity mappers from a module or from another mapper.
 
-### Pass-through Mapping for PyTorch Module
+## Usage
 
-If you simply want to load a checkpoint where keys match the model definition (standard load_state_dict behavior), but 
-want to utilize d9d's streaming/sharding capabilities.
+### Pass-Through Mapping for a PyTorch Module
+
+Use `identity_mapper_from_module` when checkpoint keys match the model's state dict keys, as in standard `load_state_dict`. You still get d9d's streaming and sharding.
 
 ```python
 import torch.nn as nn
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
 
-# Define your PyTorch model
 model = nn.Sequential(
     nn.Linear(10, 10),
     nn.ReLU(),
     nn.Linear(10, 5)
 )
 
-# Automatically generate a mapper based on the model's actual parameter names
-# This creates Identity mappers for "0.weight", "0.bias", "2.weight", "2.bias"
+# Creates identity mappers for "0.weight", "0.bias", "2.weight" and "2.bias".
 mapper = identity_mapper_from_module(model)
 ```
 
-### Using Leaf Mappers
+### Leaf Mappers
 
-This example demonstrates using leaf mappers to handle common mismatch scenario: merging separate Query/Key/Value 
-tensors into a single tensor.
+This example merges separate query, key and value tensors into a single tensor.
 
 ```python
 import torch
-from d9d.model_state.mapper.leaf import (
-    ModelStateMapperRename,
-    ModelStateMapperStackTensors
-)
+from d9d.model_state.mapper.leaf import ModelStateMapperStackTensors
 
-# Stacking Tensors
-# Scenario: Checkpoint has separate Q, K, V linear layers, we need one QKV tensor
 stack_mapper = ModelStateMapperStackTensors(
     source_names=["attn.q.weight", "attn.k.weight", "attn.v.weight"],
     target_name="attn.qkv.weight",
     dim=0
 )
 
-# To show what this mapper needs:
+# Show what this mapper needs and produces.
 print(stack_mapper.state_dependency_groups())
-# Output: {StateGroup(inputs={'attn.q.weight', ...}, outputs={'attn.qkv.weight'})}
+# Output (abridged): {StateGroup(inputs={'attn.q.weight', ...}, outputs={'attn.qkv.weight'})}
 
-# To actually execute:
+# Run the transformation.
 dummy_data = {
     "attn.q.weight": torch.randn(64, 64),
     "attn.k.weight": torch.randn(64, 64),
@@ -76,24 +69,22 @@ print(result["attn.qkv.weight"].shape)
 # Output: torch.Size([3, 64, 64])
 ```
 
-### Composing Complex Pipelines
+### Composing Pipelines
 
-Converting an entire model state requires processing multiple keys in parallel, and potentially chaining 
-operations (e.g., Rename then Stack).
+A full model conversion processes many keys in parallel and can chain operations, e.g. rename, then stack.
 
 ```python
 from d9d.model_state.mapper.compose import ModelStateMapperSequential, ModelStateMapperParallel
 from d9d.model_state.mapper.leaf import ModelStateMapperRename, ModelStateMapperStackTensors
 
-# Define a transformation pipeline
 mapper = ModelStateMapperSequential([
-    # Step 1: Rename keys to standard format
+    # Step 1: Rename keys to a short format.
     ModelStateMapperParallel([
         ModelStateMapperRename("bert.encoder.layer.0.attention.self.query.weight", "layer.0.q"),
         ModelStateMapperRename("bert.encoder.layer.0.attention.self.key.weight", "layer.0.k"),
         ModelStateMapperRename("bert.encoder.layer.0.attention.self.value.weight", "layer.0.v"),
     ]),
-    # Step 2: Stack them into a specialized attention tensor
+    # Step 2: Stack them into one attention tensor.
     ModelStateMapperStackTensors(
         source_names=["layer.0.q", "layer.0.k", "layer.0.v"],
         target_name="layer.0.qkv",
@@ -101,6 +92,8 @@ mapper = ModelStateMapperSequential([
     )
 ])
 ```
+
+## API Reference
 
 ::: d9d.model_state.mapper
 

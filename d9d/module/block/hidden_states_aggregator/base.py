@@ -6,8 +6,7 @@ import torch
 class BaseHiddenStatesAggregator(abc.ABC):
     """Abstract base class for hidden states aggregation strategies.
 
-    This interface defines how hidden states should be collected (added) and
-    how they should be finalized (packed) combined with optional historical snapshots.
+    An aggregator collects hidden states and then packs them together with an optional earlier snapshot.
     """
 
     @abc.abstractmethod
@@ -15,21 +14,16 @@ class BaseHiddenStatesAggregator(abc.ABC):
         """Accumulates a batch of hidden states into the aggregator.
 
         Args:
-            hidden_states: The tensor containing the hidden states to process.
+            hidden_states: Hidden states to aggregate. Shape: ``(batch, seq_len, hidden_size)``.
         """
 
     @abc.abstractmethod
     def pack_with_snapshot(self, snapshot: torch.Tensor | None) -> torch.Tensor | None:
-        """Finalizes the aggregation and combines it with an optional previous snapshot.
-
-        This method typically retrieves the accumulated states, processes them
-        (if not done during addition), and concatenates them with the snapshot.
+        """Finalizes the aggregation and combines it with an optional earlier snapshot.
 
         Args:
-            snapshot: An optional tensor representing previously aggregated states
-                to be prepended to the current collection.
+            snapshot: Previously aggregated states to prepend to the current collection, or ``None``.
 
         Returns:
-            The combined result of the snapshot and the newly aggregated states,
-            or None if no states were collected.
+            The snapshot followed by the newly aggregated states, or ``None`` if no states were collected.
         """

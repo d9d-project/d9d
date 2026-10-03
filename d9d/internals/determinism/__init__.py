@@ -1,4 +1,4 @@
-"""This package provides utilities for making your distributed setup deterministic."""
+"""Seeding of random number generators across distributed processes."""
 
 from .seed import set_seeds
 

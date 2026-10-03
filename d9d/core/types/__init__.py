@@ -1,4 +1,4 @@
-"""Common type definitions used throughout the framework."""
+"""Common type definitions used across d9d."""
 
 from .data import CollateFn, MicrobatchPack
 from .pytree import PyTree, ScalarTree, TensorTree

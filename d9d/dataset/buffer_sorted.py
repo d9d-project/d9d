@@ -1,4 +1,4 @@
-import pickle  # noqa: S403
+import pickle  # noqa: S403 - only for the RNG state that this class writes and reads itself
 import random
 from typing import Any, Protocol, TypeVar
 
@@ -9,10 +9,9 @@ _T_co = TypeVar("_T_co", covariant=True)
 
 
 class DatasetImplementingSortKeyProtocol(Protocol[_T_co]):
-    """Protocol for datasets that support retrieval of a specific key for sorting purposes.
+    """Protocol for datasets that return a sort key for an item without loading it.
 
-    This is typically used for length-based bucketing/sorting where the dataset
-    needs to expose the length of an item without loading the full item.
+    It is typically used for length-based bucketing, where the dataset exposes the length of an item.
     """
 
     def __len__(self) -> int:
@@ -26,30 +25,30 @@ class DatasetImplementingSortKeyProtocol(Protocol[_T_co]):
             index: The index of the item.
 
         Returns:
-            A comparable value (e.g., int length) used for sorting.
+            A comparable value used for sorting, e.g. the item length.
         """
         ...
 
     def __getitem__(self, item: int) -> _T_co:
-        """Retrieves the item at the specific index."""
+        """Returns the item at the given index."""
         ...
 
 
 class BufferSortedDataset(Dataset[_T_co], Stateful):
-    """A dataset wrapper that groups items into buffers, sorts them, and yields them with local shuffling.
+    """Dataset wrapper that serves items sorted within buffers, with local shuffling.
 
-    This prevents extreme padding in variable-length training (by grouping similar lengths)
-    while maintaining enough randomness to ensure statistical variance in updates.
+    Items of similar length end up in the same pack, which reduces padding in variable-length training.
+    The shuffling keeps enough randomness in the order of updates.
 
     Algorithm:
 
-    1. Select a range of indices (size `buffer_size`).
-    2. Generate sort keys: (base_dataset.sort_key(), random_tie_breaker).
-    3. Sort indices by this tuple.
-    4. Group sorted list into packs of size `pack_size`.
-    5. Shuffle the order of these packs (inter-pack shuffle).
-    6. Shuffle the items within these packs (intra-pack shuffle).
-    7. Flatten and serve.
+    1.  Select a range of ``buffer_size`` indices.
+    2.  Build sort keys: ``(base_dataset.sort_key(index), random_tie_breaker)``.
+    3.  Sort the indices by these keys.
+    4.  Split the sorted list into packs of ``pack_size`` items.
+    5.  Shuffle the order of the packs.
+    6.  Shuffle the items within each pack.
+    7.  Flatten and serve.
     """
 
     def __init__(
@@ -59,12 +58,12 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
         pack_size: int,
         init_seed: int | None = None,
     ):
-        """Constructs a BufferSortedDataset object.
+        """Constructs the ``BufferSortedDataset`` object.
 
         Args:
             base_dataset: The underlying dataset.
-            buffer_size: The number of items to load into the buffer for sorting.
-            pack_size: The size of local groups (batches/micro-batches).
+            buffer_size: The number of items sorted together.
+            pack_size: The size of a group of similar items, usually the batch or microbatch size.
             init_seed: Seed for the random number generator.
         """
         self._base_dataset = base_dataset
@@ -83,7 +82,8 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
         base_idx = list(range(select_start, select_end))
 
         sort_keys = [
-            (self._base_dataset.sort_key(idx), self._rng.random())  # use random tiebreaker
+            # The random tie-breaker shuffles items with equal sort keys.
+            (self._base_dataset.sort_key(idx), self._rng.random())
             for idx in base_idx
         ]
 
@@ -124,7 +124,7 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
         return ret
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        self._rng.setstate(pickle.loads(state_dict["seed"]))  # noqa: S301
+        self._rng.setstate(pickle.loads(state_dict["seed"]))  # noqa: S301 - our own checkpoint, from state_dict()
         self._buffer_idx = state_dict["buffer_idx"]
         self._buffer_indices = state_dict["buffer_indices"]
         if isinstance(self._base_dataset, Stateful):

@@ -7,15 +7,15 @@ from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedul
 
 
 class OfflinePipelineExecutor(PipelineSchedule[Any, Any, Any]):
-    """Executes the model immediately without pipeline parallelism.
+    """Executor that runs the model immediately without pipeline parallelism.
 
-    This schedule treats the execution as a single stage, running the forward and optionally backward
-    pass directly for every microbatch in the pack. This is primarily used for single-device execution
-    within the pipeline abstraction.
+    This schedule treats the model as a single stage. It runs the forward pass, and optionally the
+    backward pass, for every microbatch in the pack. It serves single-device runs through the pipeline
+    API.
     """
 
     def __init__(self, model: nn.Module, do_backward: bool):
-        """Constructs the offline pipeline executor.
+        """Constructs the ``OfflinePipelineExecutor`` object.
 
         Args:
             model: The PyTorch module to execute.
@@ -32,9 +32,12 @@ class OfflinePipelineExecutor(PipelineSchedule[Any, Any, Any]):
     ):
         num_microbatches = len(inputs_microbatches)
         if num_microbatches == 0:
-            raise ValueError("Cannot run a pipeline step over an empty pack")
+            raise ValueError("Cannot run a pipeline step over an empty pack.")
         if len(shared_microbatches) != num_microbatches:
-            raise ValueError("inputs_microbatches and shared_microbatches must have the same length")
+            raise ValueError(
+                f"inputs_microbatches ({num_microbatches}) and shared_microbatches ({len(shared_microbatches)}) "
+                "must have the same length."
+            )
 
         for microbatch_idx in range(num_microbatches):
             inputs = inputs_microbatches[microbatch_idx]
@@ -45,6 +48,7 @@ class OfflinePipelineExecutor(PipelineSchedule[Any, Any, Any]):
 
             if self._do_backward:
                 if not isinstance(processing_result, torch.Tensor):
-                    raise ValueError("Loss should be torch.Tensor")
-                del result  # do not peak memory
+                    raise ValueError(f"The callback result ({type(processing_result).__name__}) must be a loss tensor.")
+                # Drop the outputs before the backward pass to lower peak memory.
+                del result
                 processing_result.backward()

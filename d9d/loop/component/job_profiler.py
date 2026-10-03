@@ -11,19 +11,18 @@ from .job_schedule import JobSchedule
 
 
 class JobProfiler:
-    """Manages profiling sessions during a job loop.
+    """Manager of profiling sessions during a job loop.
 
-    This class coordinates the initialization and activation of the internal
-    profiler based on the current step count provided by the schedule.
+    The profiling window follows the current step of the job schedule.
     """
 
     def __init__(self, dist_context: DistributedContext, config: ProfilingConfig | None, schedule: JobSchedule):
-        """Constructs JobProfiler object.
+        """Constructs the ``JobProfiler`` object.
 
         Args:
             dist_context: The distributed context.
-            config: Configuration settings for profiling.
-            schedule: Object tracking the current global step of the training loop.
+            config: The profiling configuration. ``None`` disables profiling.
+            schedule: The schedule that tracks the current step of the loop.
         """
         self._config = config
         if config is None or not config.enabled:
@@ -42,10 +41,10 @@ class JobProfiler:
 
     @contextmanager
     def open(self) -> Generator[torch.profiler.profile | None]:
-        """Context manager to activate profiling for the job loop.
+        """Activates profiling for the job loop.
 
         Yields:
-            The active Profiler instance if profiling is enabled, otherwise None.
+            The active profiler if profiling is enabled, otherwise ``None``.
         """
         if self._profiler is None:
             yield None

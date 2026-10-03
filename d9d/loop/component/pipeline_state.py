@@ -11,16 +11,16 @@ TState = TypeVar("TState", bound=PyTree)
 
 
 class PipelineStateHandler(Generic[TState]):
-    """Holds the transient per-microbatch side-data of one step.
+    """Store for the transient per-microbatch side-data of one step.
 
     Data returned by ``build_forward_inputs`` for microbatch ``i`` is stored here and read back when
     processing the outputs of the same microbatch ``i``. Stored state is detached from the autograd
-    graph both when it is stored and when a ``scope`` closes, so caching it across the forward/backward
-    never keeps the graph alive.
+    graph both when it is stored and when a ``scope`` closes, so caching it across the forward and
+    backward passes never keeps the graph alive.
     """
 
     def __init__(self):
-        """Constructs a PipelineStateHandler object."""
+        """Constructs the ``PipelineStateHandler`` object."""
         self._state: dict[int, TState] = {}
 
     def store(self, microbatch_idx: int, state: TState):

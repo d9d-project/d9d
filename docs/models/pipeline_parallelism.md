@@ -1,32 +1,32 @@
 # Pipeline Parallelism
 
-## The d9d Approach
+## About
 
-d9d implements a modern, highly modular pipelining engine designed for performance, stability and customization.
+Pipeline parallelism splits a model into stages and places them on the ranks of the `pp` mesh dimension. Each rank builds only the stages it hosts. A schedule runs the microbatches of a step through the stages and exchanges stage outputs and gradients over P2P communication. d9d supports several schedules, from GPipe to DualPipeV, and runs them all on one execution engine.
 
-### Dynamic Shapes & Algorithmic Shape Inference
+## Shape Inference
 
-To run P2P (Point-to-Point) communication, the receiver must know the shape of the incoming tensor to pre-allocate buffers. d9d asks your model to implement a lightweight protocol (`ModuleSupportsPipelining`) to calculate the shape of the payload transferred between stages mathematically, without performing a heavy forward pass or doing a distributed graph tracing.
+A P2P receiver must know the shape of the incoming tensor to allocate its buffer. d9d asks your model to compute these shapes with a small protocol (`ModuleSupportsPipelining`). The model derives the shapes from the input arithmetically. d9d does not run a forward pass or trace the graph to find them.
 
-This allows supporting **Dynamic Shapes** (e.g., varying sequence lengths) efficiently across runs.
+Shapes can therefore change between steps, for example when the sequence length varies.
 
-### Construction Consistency (No Patching)
-A common anti-pattern in distributed training is "Instantiate-then-Delete": creating a huge model on CPU/Meta device and then hacking it apart `del model.layers[N:]`. 
+## Construction Consistency
 
-We reject this pattern because of:
+A common pattern in distributed training is "instantiate, then delete": build the full model on a CPU or meta device, then cut it apart with `del model.layers[N:]`.
 
-1.  **Fragility**: Changes to model architecture require changes to the external slicing script.
-2.  **Leaky Abstractions**: Forward methods become full of `if self.layer is not None`.
-3.  **Invalid States**: The model object exists in a "zombie" state until sliced.
+d9d rejects this pattern for three reasons:
 
-In d9d, models are **Pipeline-Aware**. Each pipeline rank constructs **only** the sub-graph it owns. The object returned is compliant, complete, and valid immediately.
+1.  **Fragility**: A change to the model architecture requires a change to the external slicing script.
+2.  **Leaky abstractions**: Forward methods fill up with checks like `if self.layer is not None`.
+3.  **Invalid states**: The model object is half-built until it is sliced.
+
+In d9d, models are **pipeline-aware**. Each pipeline rank builds only the stages it owns. The returned module is complete and valid right away.
 
 ## Making Models Compatible
 
-### The Four IO Roles
+### The Four I/O Roles
 
-A pipelined model moves data across stage boundaries as four **explicitly-named, generic PyTree
-types** (dataclasses are the recommended form):
+A pipelined model moves data across stage boundaries as four explicitly named, generic PyTree types. Dataclasses are the recommended form.
 
 | Role             | Meaning                                                     | Crosses P2P? |
 |------------------|-------------------------------------------------------------|--------------|
@@ -35,29 +35,20 @@ types** (dataclasses are the recommended form):
 | `PipelineOutput` | Output of the **last** stage (to loss / result callback)    | no           |
 | `SharedInput`    | Value passed to **every** stage, rebuilt locally per rank   | no           |
 
-Only `StageTransfer` crosses the wire, so it is the only role that needs a `TensorSpec`.
+Only `StageTransfer` crosses the network, so it is the only role that needs a `TensorSpec`.
 
 ### The Protocol
 
-To use Pipeline Parallelism, your model implements
-`d9d.pipelining.api.ModuleSupportsPipelining[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]`:
+To use pipeline parallelism, your model implements `d9d.pipelining.api.ModuleSupportsPipelining[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]`:
 
-* **`forward(inputs, shared)`** — `inputs` is the `PipelineInput` on the first stage and the incoming
-  `StageTransfer` otherwise; it returns the outgoing `StageTransfer` on non-last stages and the
-  `PipelineOutput` on the last stage. The stage knows its position from the `PipelineStageInfo` it
-  received at construction, so it branches on `is_current_stage_first` / `is_current_stage_last`
-  explicitly.
-* **`stage_transfer_spec(pipeline_input, boundary)`** — returns a PyTree **structurally identical to
-  `StageTransfer`** with every tensor leaf replaced by a `TensorSpec`. The `boundary`
-  (`StageBoundary.incoming` / `outgoing`) selects which inter-stage edge to size.
+*   **`forward(inputs, shared)`**: `inputs` is the `PipelineInput` on the first stage and the incoming `StageTransfer` on the other stages. It returns the outgoing `StageTransfer` on non-last stages and the `PipelineOutput` on the last stage. The stage knows its position from the `PipelineStageInfo` it gets at construction. It branches on `is_current_stage_first` and `is_current_stage_last` explicitly.
+*   **`stage_transfer_spec(pipeline_input, boundary)`**: Returns a PyTree with the same structure as `StageTransfer`, with every tensor leaf replaced by a `TensorSpec`. The `boundary` (`StageBoundary.incoming` or `outgoing`) selects which stage edge to describe.
 
-Because stage *N*'s `outgoing` transfer and stage *N+1*'s `incoming` transfer are the **same
-dataclass type**, `pytree.tree_flatten` yields identical leaf orderings on both ends. Sender and
-receiver therefore agree on the wire order **by construction** — no name/shape handshake is needed.
+The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* have the same dataclass type. So `pytree.tree_flatten` gives the same leaf order on both ends. Sender and receiver agree on the order by construction, and they need no handshake.
 
 ### Example
 
-Below is a skeleton of a Transformer-like model implemented for d9d pipelining.
+Below is a skeleton of a Transformer-like model that supports d9d pipelining.
 
 ```python
 import dataclasses
@@ -83,7 +74,7 @@ class MyTransfer:           # StageTransfer (the only role crossing P2P)
 
 
 @dataclasses.dataclass
-class MyShared:             # SharedInput (broadcast to every stage)
+class MyShared:             # SharedInput (passed to every stage)
     position_ids: torch.Tensor
 
 
@@ -101,22 +92,22 @@ class MyModelChunk(
         self.stage = stage
         self.config = config
 
-        # 1. Determine what layers live here
+        # 1. Determine which layers live here.
         self.start_layer, self.end_layer = distribute_layers_for_pipeline_stage(
             config.n_layers, num_virtual_layers_pre=1, num_virtual_layers_post=1, stage=stage
         )
 
-        # 2. Build sub-modules (using ModuleDict - for compatibility)
+        # 2. Build sub-modules (ModuleDict keys keep the global layer index in parameter names).
         self.layers = nn.ModuleDict({
             str(layer): TransformerBlock(...)
             for layer in range(self.start_layer, self.end_layer)
         })
 
-        # Only build embeddings on first stage
+        # Only build embeddings on the first stage.
         if stage.is_current_stage_first:
             self.embed = nn.Embedding(...)
 
-        # Only build head on last stage
+        # Only build the head on the last stage.
         if stage.is_current_stage_last:
             self.head = nn.Linear(...)
 
@@ -127,59 +118,72 @@ class MyModelChunk(
         else:
             x = inputs.hidden_states
 
-        # Run local layers
+        # Run local layers.
         for layer_idx in range(self.start_layer, self.end_layer):
             x = self.layers[str(layer_idx)](x)
 
-        # Last stage produces the PipelineOutput; everyone else produces a StageTransfer.
+        # The last stage produces the PipelineOutput; every other stage produces a StageTransfer.
         if self.stage.is_current_stage_last:
             return MyOutput(logits=self.head(x))
         return MyTransfer(hidden_states=x)
 
     # --- Protocol Implementation ---
-    # Receives a single representative microbatch of PipelineInput (not a global batch), so shapes are
-    # used as-is, and returns a StageTransfer of TensorSpec descriptors — no tensors are allocated.
-    # The engine never calls this for the first stage's `incoming` nor the last stage's `outgoing`
-    # edge, so terminal boundaries need no special-casing.
+    # Receives one microbatch of PipelineInput (not a global batch), so shapes are used as they are.
+    # Returns a StageTransfer of TensorSpec descriptors and allocates no tensors.
+    # The engine never calls this for the `incoming` edge of the first stage or the `outgoing` edge
+    # of the last stage, so these edges need no special case.
     def stage_transfer_spec(self, pipeline_input: MyInput, boundary: StageBoundary) -> MyTransfer:
-        micro_batch_size, seq_len = pipeline_input.input_ids.shape
+        batch_size, seq_len = pipeline_input.input_ids.shape
         return MyTransfer(
             hidden_states=TensorSpec(
-                shape=(micro_batch_size, seq_len, self.config.hidden_dim), dtype=torch.bfloat16
+                shape=(batch_size, seq_len, self.config.hidden_size), dtype=torch.bfloat16
             )
         )
 ```
 
-## Using the Pipeline
+## Supported Schedules
 
-### Supported Schedules
+| Example JSON                                                          | Description                                                                                                                                                                                                       |
+|:----------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `{"schedule": "inference"}`                                           | Inference only. Runs all forward passes and no backward passes.                                                                                                                                                   |
+| `{"schedule": "gpipe"}`                                               | [GPipe](https://arxiv.org/abs/1811.06965). Hosts one stage per rank. Runs the forward pass of all microbatches before the backward pass.                                                                          |
+| `{"schedule": "looped_bfs", "num_stages_per_rank": 2}`                | [Looped Breadth-First](https://arxiv.org/abs/2211.05953). Hosts several stages per rank. Runs all work for one stage before it moves to the next.                                                                 |
+| `{"schedule": "1f1b", "num_stages_per_rank": 1, "zero_bubble": true}` | [Interleaved 1F1B](https://arxiv.org/abs/2104.04473), or [Interleaved Zero Bubble](https://arxiv.org/abs/2401.10241) with `zero_bubble`. Hosts several stages per rank. Zero Bubble splits the backward pass into input-gradient and weight-gradient parts. |
+| `{"schedule": "zero_bubble_v"}`                                       | [Zero Bubble V](https://arxiv.org/abs/2401.10241). Hosts 2 stages per rank in a V shape. Splits the backward pass into input-gradient and weight-gradient parts.                                                  |
+| `{"schedule": "dual_pipe_v"}`                                         | [DualPipeV](https://github.com/deepseek-ai/DualPipe). A bidirectional schedule that hosts 2 stages per rank in a V shape and pairs forward and backward passes of different microbatches.                         |
 
-| Example JSON                                                          | Description                                                                                                                                                             |
-|:----------------------------------------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `{"schedule": "inference"}`                                           | Configuration for inference-only pipeline execution. Runs all forward passes sequentially without any backward passes.                                                  |
-| `{"schedule": "gpipe"}`                                               | Standard GPipe execution. Assumes a single stage per rank and processes all microbatches for the forward pass before switching to the backward pass.                    |
-| `{"schedule": "looped_bfs", "num_stages_per_rank": 2}`                | Looped Breadth-First Search execution. Supports multiple stages per rank (virtualization) and executes all work for a specific stage before moving to the next.         |
-| `{"schedule": "1f1b", "num_stages_per_rank": 1, "zero_bubble": true}` | Interleaved 1F1B and Interleaved Zero Bubble execution. Supports multiple stages per rank. Handles sharding backward passes to dI and dW when `zero_bubble` is enabled. |
-| `{"schedule": "zero_bubble_v"}`                                       | Zero Bubble V (ZBV) execution. A specialized V-shape topology schedule that splits backward passes into Input and Weight gradients. Requires exactly 2 stages per rank. |
-| `{"schedule": "dual_pipe_v"}`                                         | DualPipeV execution. A bidirectional pipeline schedule for high-throughput training using V-shape topology and reciprocal forward/backward scheduling.                  |
+Some schedules limit the number of microbatches per step:
 
-### Microbatches and packs
+*   `dual_pipe_v` needs at least `2 * pp_size` microbatches.
+*   `1f1b` needs a microbatch count that is divisible by `max(1, num_microbatches // pp_size)`. A multiple of `pp_size` always works.
 
-Pipelining consumes a **pack**: a sequence of ready microbatches for one step. The pack length (and therefore the batch size) may vary from step to step. Buffers are sized
-**per microbatch** — each stage infers shapes for every microbatch in the pack independently — so the
-microbatches within a single pack may also differ in shape.
-The schedule recompiles its program when the microbatch count changes and reallocates buffers when any
-microbatch's shape changes.
+## Microbatches and Packs
 
-### Usage within the Trainer
+Pipelining consumes a **pack**: a sequence of ready microbatches for one step. The pack length, and so the batch size, can change from step to step. Each stage infers buffer shapes per microbatch, so the microbatches in one pack can also differ in shape.
 
-Pipelining is available in the [Trainer](../loop/train.md) framework. When configuring the Trainer, simply provide an `AnyPipelineScheduleConfig` in your training arguments. The Trainer handles the construction of the schedule and the distribution of layers automatically.
+The schedule composes its program once per microbatch count and reuses it. It reallocates buffers when a microbatch shape differs from the previous step.
 
-### Advanced - Manual Usage
+## Usage
 
-If you want to use pipelining outside the Trainer (e.g., custom loops), you use the `build_schedule` factory.
+### Within the Trainer
 
-The `build_schedule` function requires a **Model Provider** logic. Instead of passing an instantiated model, you pass a function that accepts `PipelineStageInfo` and returns the `nn.Module` for that stage. This ensures construction consistency.
+Pipelining is available in the [`Trainer`](../loop/train.md) framework. Set the schedule in the `pipelining` section of the `Trainer` config:
+
+```json
+{
+  "pipelining": {
+    "schedule": {"schedule": "1f1b", "num_stages_per_rank": 2, "zero_bubble": true}
+  }
+}
+```
+
+The `Trainer` builds the schedule and distributes the layers.
+
+### Manual Usage
+
+To use pipelining outside the `Trainer`, for example in a custom loop, call the `build_schedule` factory.
+
+`build_schedule` takes a model provider instead of a built model. The model provider is a function that accepts a `PipelineStageInfo` and returns the `nn.Module` for that stage. This keeps construction consistent.
 
 ```python
 from torch import Tensor
@@ -189,33 +193,33 @@ from d9d.core.dist_context import DistributedContext
 from d9d.pipelining.factory import build_schedule, PipelineSchedule1F1BConfig
 
 
-# 0. Define an object that manages loss calculation per microbatch. It receives the PipelineOutput
+# 0. Define an object that computes the loss per microbatch. It receives the PipelineOutput
 #    produced by the last stage and reads its fields by attribute.
 class MyLossHandler:
     def __init__(self, targets_microbatches: list[Tensor]):
         self._targets = targets_microbatches
 
     def compute_loss(self, outputs: MyOutput, microbatch_idx: int):
-        # Implement any custom logic here
+        # Implement any custom logic here.
         current_target = self._targets[microbatch_idx]
         return F.cross_entropy(outputs.logits.view(-1, outputs.logits.shape[-1]), current_target.view(-1))
 
 
-# 1. Define configuration
+# 1. Define the configuration.
 dist_context: DistributedContext = ...
 model_config = ...
 schedule_config = PipelineSchedule1F1BConfig(
-    num_stages_per_rank=4,  # 4 Virtual stages per rank
-    zero_bubble=True  # Enable ZB1P optimization
+    num_stages_per_rank=4,  # 4 virtual stages per rank
+    zero_bubble=True  # Use the ZB1P variant
 )
 
-# 2. Build the per-microbatch inputs (the "pack"). The number of microbatches is decided here, per
+# 2. Build the per-microbatch inputs (the pack). The number of microbatches is decided here, per
 #    step. Each stage receives one PipelineInput and one SharedInput per microbatch.
 inputs_microbatches = tuple(MyInput(input_ids=mb) for mb in my_input_microbatches)
 shared_microbatches = tuple(MyShared(position_ids=pos) for pos in my_position_microbatches)
-targets_microbatches = [...]  # one target tensor per microbatch
+targets_microbatches = [...]  # One target tensor per microbatch
 
-# 3. Build the schedule and model shards (the callback is supplied per step, not here)
+# 3. Build the schedule and the model stages (the callback is passed per step, not here).
 loss_handler = MyLossHandler(targets_microbatches)
 schedule_info, modules = build_schedule(
     dist_context=dist_context,
@@ -223,14 +227,16 @@ schedule_info, modules = build_schedule(
     model_provider=lambda stage: MyModelChunk(stage, model_config),  # Factory function
 )
 
-# 4. Execution
-# The callback is passed to each step, so it can close over per-step data (here, the targets).
+# 4. Run the step.
+# The callback is passed to each step, so it can use per-step data (here, the targets).
 schedule_info.schedule.step(
     inputs_microbatches=inputs_microbatches,
     shared_microbatches=shared_microbatches,
     callback=loss_handler.compute_loss,
 )
 ```
+
+## API Reference
 
 ::: d9d.pipelining.api
 

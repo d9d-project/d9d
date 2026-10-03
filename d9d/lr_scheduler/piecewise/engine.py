@@ -5,14 +5,14 @@ from .curves import CurveBase
 
 @dataclasses.dataclass
 class SchedulePhase:
-    """Data container representing a single phase in a piecewise schedule.
+    """A single phase of a piecewise schedule.
 
     Attributes:
-        start_step: The absolute step index where this phase begins.
-        end_step: The absolute step index where this phase ends.
-        start_value: The multiplier value at start_step.
-        end_value: The multiplier value at end_step.
-        curve: The interpolation logic for this phase.
+        start_step: Global step at which this phase starts.
+        end_step: Global step at which this phase ends (exclusive).
+        start_value: Multiplier at ``start_step``.
+        end_value: Multiplier at ``end_step``.
+        curve: Curve that interpolates between ``start_value`` and ``end_value``.
     """
 
     start_step: int
@@ -23,19 +23,19 @@ class SchedulePhase:
 
 
 class PiecewiseScheduleEngine:
-    """Runtime engine that calculates multipliers based on a list of defined phases."""
+    """Engine that computes learning rate multipliers from a list of phases."""
 
     def __init__(self, phases: list[SchedulePhase]):
-        """Constructs the schedule engine.
+        """Constructs the ``PiecewiseScheduleEngine`` object.
 
         Args:
-            phases: A sequential list of schedule phases.
+            phases: Schedule phases, in order.
 
         Raises:
-            ValueError: If the phases list is empty.
+            ValueError: If ``phases`` is empty.
         """
         if len(phases) == 0:
-            raise ValueError("Scheduler should contain at least one phase")
+            raise ValueError("A piecewise schedule must contain at least one phase.")
 
         self._phases = phases
 
@@ -46,8 +46,8 @@ class PiecewiseScheduleEngine:
             step: The global training step.
 
         Returns:
-            The calculated multiplier. If the step is outside defined phases,
-            it clamps to the nearest boundary value.
+            The multiplier. Steps before the first phase get its start value. Steps after the last phase get
+            its end value.
         """
         if step < 0:
             return self._phases[0].start_value

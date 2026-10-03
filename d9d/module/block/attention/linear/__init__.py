@@ -1,3 +1,5 @@
+"""Linear attention layers."""
+
 from .gated_deltanet import (
     AnyDecayGateParameters,
     GatedDeltaNet,

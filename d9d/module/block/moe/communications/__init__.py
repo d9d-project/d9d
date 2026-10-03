@@ -1,4 +1,4 @@
-"""Provides communication strategies for Mixture-of-Experts routing operations."""
+"""Communication strategies that route tokens between MoE experts."""
 
 from .base import ExpertCommunicationHandler
 from .naive import NoCommunicationHandler

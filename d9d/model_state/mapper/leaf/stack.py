@@ -4,10 +4,7 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperStackTensors(ModelStateMapper):
-    """Stacks multiple input tensors into a single output tensor.
-
-    A new stacking dimension is produced.
-    """
+    """Mapper that stacks multiple input tensors into a single output tensor along a new dimension."""
 
     def __init__(
         self,
@@ -15,7 +12,7 @@ class ModelStateMapperStackTensors(ModelStateMapper):
         target_name: str,
         dim: int,
     ) -> None:
-        """Constructs ModelStateMapperStackTensors object.
+        """Constructs the ``ModelStateMapperStackTensors`` object.
 
         Args:
             source_names: Names of the input tensors to read.
@@ -37,10 +34,7 @@ class ModelStateMapperStackTensors(ModelStateMapper):
 
 
 class ModelStateMapperUnstackTensors(ModelStateMapper):
-    """Unstacks a single input tensor into multiple output tensors.
-
-    The tensor is unstacked along a specified dimension.
-    """
+    """Mapper that unstacks a single input tensor into multiple output tensors along a specified dimension."""
 
     def __init__(
         self,
@@ -48,7 +42,7 @@ class ModelStateMapperUnstackTensors(ModelStateMapper):
         target_names: list[str],
         dim: int,
     ) -> None:
-        """Constructs ModelStateMapperUnstackTensors object.
+        """Constructs the ``ModelStateMapperUnstackTensors`` object.
 
         Args:
             source_name: Name of the input tensor to read.
@@ -73,7 +67,7 @@ class ModelStateMapperUnstackTensors(ModelStateMapper):
 
 
 class ModelStateMapperChunkTensors(ModelStateMapper):
-    """Chunks a single input tensor into multiple output tensors along a specified dimension."""
+    """Mapper that chunks a single input tensor into multiple output tensors along a specified dimension."""
 
     def __init__(
         self,
@@ -81,7 +75,7 @@ class ModelStateMapperChunkTensors(ModelStateMapper):
         target_names: list[str],
         dim: int,
     ) -> None:
-        """Constructs ModelStateMapperChunkTensors object.
+        """Constructs the ``ModelStateMapperChunkTensors`` object.
 
         Args:
             source_name: Name of the input tensor to read.
@@ -106,9 +100,9 @@ class ModelStateMapperChunkTensors(ModelStateMapper):
 
 
 class ModelStateMapperConcatenateTensors(ModelStateMapper):
-    """Concatenates ('unchunks') multiple input tensors into a single output tensor.
+    """Mapper that concatenates multiple input tensors into a single output tensor along a specified dimension.
 
-    The tensors are concatenated along a specified dimension.
+    It is the inverse of ``ModelStateMapperChunkTensors``.
     """
 
     def __init__(
@@ -117,11 +111,11 @@ class ModelStateMapperConcatenateTensors(ModelStateMapper):
         target_name: str,
         dim: int,
     ) -> None:
-        """Constructs ModelStateMapperUnchunkTensors object.
+        """Constructs the ``ModelStateMapperConcatenateTensors`` object.
 
         Args:
             source_names: Names of the input tensors to read.
-            target_name: Name of the resulting concatenated (unchunked) output tensor.
+            target_name: Name of the resulting concatenated output tensor.
             dim: Dimension along which to concatenate the tensors.
         """
         self._source_names = source_names

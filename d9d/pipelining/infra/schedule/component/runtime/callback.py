@@ -6,10 +6,10 @@ from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, TPipelineOutput
 
 
 class PipelineResultHandler(Generic[TPipelineOutput]):
-    """Wraps a callback function to handle results from pipeline execution."""
+    """Wrapper of a callback function that handles results from pipeline execution."""
 
     def __init__(self, callback_fn: PipelineResultFn[TPipelineOutput]):
-        """Constructs PipelineResultHandler object.
+        """Constructs the ``PipelineResultHandler`` object.
 
         Args:
             callback_fn: The function called with results.
@@ -21,16 +21,16 @@ class PipelineResultHandler(Generic[TPipelineOutput]):
 
         Args:
             forward_result: The ``PipelineOutput`` produced by the last stage.
-            microbatch_index: The index of the current micro-batch.
+            microbatch_index: The index of the current microbatch.
         """
         self._callback_fn(forward_result, microbatch_index)
 
 
 class PipelineLossHandler(Generic[TPipelineOutput]):
-    """Manages loss computation and state caching across forward and backward passes."""
+    """Manager of loss computation and state caching across forward and backward passes."""
 
     def __init__(self, callback_fn: PipelineLossFn[TPipelineOutput]):
-        """Constructs the loss handler.
+        """Constructs the ``PipelineLossHandler`` object.
 
         Args:
             callback_fn: The callable that computes loss from model outputs.
@@ -51,9 +51,7 @@ class PipelineLossHandler(Generic[TPipelineOutput]):
     def acquire_loss(self, microbatch_index: int) -> torch.Tensor:
         """Retrieves and releases the cached loss tensor for the backward pass.
 
-        Consume-once: the loss is removed from the cache, so the handler drops its reference to it.
-        The loss is triggered once and acquired once, so a second acquire for the same microbatch
-        raises.
+        The loss is removed from the cache, so each loss can be acquired only once.
 
         Args:
             microbatch_index: The index of the microbatch.
@@ -62,9 +60,12 @@ class PipelineLossHandler(Generic[TPipelineOutput]):
             The previously computed loss tensor.
 
         Raises:
-            ValueError: If the loss for this microbatch has not been computed (or was already acquired).
+            ValueError: If the loss for this microbatch was not computed or was already acquired.
         """
         if microbatch_index not in self._cached_values:
-            raise ValueError(f"No cached loss for microbatch {microbatch_index}; it must be triggered before backward")
+            raise ValueError(
+                f"No cached loss for microbatch_index ({microbatch_index}). "
+                "The loss must be computed in the forward pass and acquired only once."
+            )
 
         return self._cached_values.pop(microbatch_index)

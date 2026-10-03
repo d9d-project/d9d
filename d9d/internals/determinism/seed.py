@@ -13,23 +13,18 @@ def set_seeds(
     seed: int,
     distinct_seed_mesh_dim: str = "pp",
 ) -> None:
-    """Sets random seeds for Python, NumPy, and PyTorch.
+    """Sets the random seeds of Python, NumPy and PyTorch.
 
-    This function sets seeds deterministically based on the provided base seed and the
-    process's rank within a specific mesh dimension.
-
-    The seed is shifted by the rank in the `distinct_seed_mesh_dim` (e.g., Pipeline Parallel rank).
-    This ensures that processes in different pipeline stages operate with different random states,
-    while processes that should share randomness (like Expert Parallel peers) can be synchronized.
+    The seed is the base seed plus the rank in ``distinct_seed_mesh_dim``, e.g. the pipeline-parallel rank.
+    So different pipeline stages get different random states, while ranks along other dimensions share one.
+    In a distributed setup, the function also seeds the ``DTensor`` random generator over the other dimensions.
 
     Args:
         dist_context: The distributed context.
         seed: The base random seed.
-        distinct_seed_mesh_dim: The name of the mesh dimension along which seeds should
-            be distinct (e.g., 'pp' for pipeline parallelism). Ranks along other dimensions
-            will share the seed.
+        distinct_seed_mesh_dim: The name of the mesh dimension along which seeds differ, e.g. ``"pp"``. Ranks
+            along other dimensions share the seed.
     """
-    # Mutate seed based on PP rank if distributed
     if dist_context.mesh_params.is_distributed:
         distinct_mesh = dist_context.mesh_for(REGULAR_DOMAIN)[distinct_seed_mesh_dim]
         seed = (seed + distinct_mesh.get_local_rank()) % 2**64
@@ -47,7 +42,6 @@ def set_seeds(
     except ImportError:
         pass
 
-    # Set DTensor seeding if distributed
     if dist_context.mesh_params.is_distributed:
         mesh_regular = dist_context.mesh_for(REGULAR_DOMAIN)
         duplicate_seed_mesh_dim = tuple(
@@ -56,4 +50,5 @@ def set_seeds(
         duplicate_seed_mesh = mesh_regular[duplicate_seed_mesh_dim] if len(duplicate_seed_mesh_dim) != 0 else None
 
         if duplicate_seed_mesh and duplicate_seed_mesh.get_coordinate() is not None:
-            torch.distributed.tensor._random.manual_seed(seed, duplicate_seed_mesh)  # noqa: SLF001
+            # torch can seed the DTensor random generator for a given mesh only through a private function.
+            torch.distributed.tensor._random.manual_seed(seed, duplicate_seed_mesh)  # noqa: SLF001 - no public API

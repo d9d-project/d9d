@@ -7,26 +7,24 @@ from .config import LoRAParameters
 
 
 class LoRALinear(nn.Module):
-    """A LoRA wrapper around a standard PyTorch Linear layer.
-
-    Wraps a base linear layer and adds low-rank adaptation matrices A and B.
+    """Wrapper that adds low-rank adaptation matrices A and B to an ``nn.Linear`` layer.
 
     Attributes:
-        lora_A: The A matrix (in_features -> r).
-        lora_B: The B matrix (r -> out_features).
-        base: The original base Linear layer.
-        dropout: Scaling dropout layer.
+        lora_A: The A matrix (``in_features -> r``).
+        lora_B: The B matrix (``r -> out_features``).
+        base: The original ``nn.Linear`` layer.
+        dropout: Dropout applied to the input of the LoRA path.
     """
 
     def __init__(self, base_layer: nn.Linear, params: LoRAParameters):
-        """Constructs a LoRALinear layer.
+        """Constructs the ``LoRALinear`` object.
 
         Args:
-            base_layer: The original Linear layer to wrap.
-            params: LoRA hyperparameters (r, alpha, dropout).
+            base_layer: The original ``nn.Linear`` layer to wrap.
+            params: LoRA hyperparameters.
 
         Raises:
-            ValueError: If the base layer has a bias (currently unsupported).
+            ValueError: If ``base_layer`` has a bias.
         """
         super().__init__()
         self.lora_A = nn.Linear(
@@ -42,7 +40,9 @@ class LoRALinear(nn.Module):
         self.base = base_layer
 
         if base_layer.bias is not None:
-            raise ValueError("LoRA is unsupported with biased linear layers")
+            raise ValueError(
+                "LoRA does not support linear layers with a bias. Apply it only to layers with bias=False."
+            )
 
         self.dropout: nn.Dropout = nn.Dropout(params.dropout)
 
@@ -51,13 +51,13 @@ class LoRALinear(nn.Module):
         self.reset_parameters()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Takes input tensor, computes base output and LoRA adaptation, and returns the sum.
+        """Computes the base output plus the scaled LoRA update.
 
         Args:
             x: Input tensor.
 
         Returns:
-            The output of base(x) + scale * (B @ A @ dropout(x)).
+            ``base(x) + alpha / r * lora_B(lora_A(dropout(x)))``.
         """
         base_x = self.base(x)
         adapt_x = self._scale * self.lora_B(self.lora_A(self.dropout(x)))
@@ -65,36 +65,39 @@ class LoRALinear(nn.Module):
 
     @torch.no_grad()
     def merge_with_base_(self) -> nn.Linear:
-        """Collapse the LoRA weights into the base linear layer.
+        """Merges the LoRA weights into the base linear layer in place.
 
         Returns:
-            The modified base linear layer with updated weights.
+            The base linear layer with updated weights.
         """
         mod = self.base
         mod.weight.data += (self.lora_B.weight.data @ self.lora_A.weight.data) * self._scale
         return mod
 
     def reset_parameters(self):
-        """Resets LoRA parameters. A is random, B is zeroed."""
+        """Resets the LoRA parameters.
+
+        ``lora_A`` gets a random initialization and ``lora_B`` is zeroed, so the LoRA update starts at zero.
+        """
         self.lora_A.reset_parameters()
         nn.init.zeros_(self.lora_B.weight)
 
 
 class LoRAGroupedLinear(nn.Module):
-    """A LoRA wrapper around a GroupedLinear layer (commonly used in MoE or grouped query attention).
+    """Wrapper that adds low-rank adaptation matrices A and B to a ``GroupedLinear`` layer, as used by MoE experts.
 
     Attributes:
-        lora_A: The A matrix (grouped linear).
-        lora_B: The B matrix (grouped linear).
-        base: The original base GroupedLinear layer.
-        dropout: Scaling dropout layer.
+        lora_A: The A matrix (``in_features -> r`` for each group).
+        lora_B: The B matrix (``r -> out_features`` for each group).
+        base: The original ``GroupedLinear`` layer.
+        dropout: Dropout applied to the input of the LoRA path.
     """
 
     def __init__(self, base_layer: GroupedLinear, params: LoRAParameters):
-        """Constructs a LoRAGroupedLinear layer.
+        """Constructs the ``LoRAGroupedLinear`` object.
 
         Args:
-            base_layer: The original GroupedLinear layer to wrap.
+            base_layer: The original ``GroupedLinear`` layer to wrap.
             params: LoRA hyperparameters.
         """
         super().__init__()
@@ -121,14 +124,15 @@ class LoRAGroupedLinear(nn.Module):
         self.reset_parameters()
 
     def forward(self, x: torch.Tensor, x_groups: torch.Tensor) -> torch.Tensor:
-        """Computes forward pass for grouped inputs.
+        """Computes the base output plus the scaled LoRA update for grouped inputs.
 
         Args:
-            x: Input tensor.
-            x_groups: A tensor indicating group indices for each input.
+            x: Input tokens of all groups, with the tokens of each group stored together.
+                Shape: ``(num_tokens, in_features)``.
+            x_groups: CPU tensor with the number of tokens in each group. Shape: ``(n_groups,)``.
 
         Returns:
-            Combined output of base and LoRA path.
+            The sum of the base and LoRA outputs. Shape: ``(num_tokens, out_features)``.
         """
         base_x = self.base(x, x_groups)
         adapt_x = self._scale * self.lora_B(self.lora_A(self.dropout(x), x_groups), x_groups)
@@ -136,16 +140,19 @@ class LoRAGroupedLinear(nn.Module):
 
     @torch.no_grad()
     def merge_with_base_(self) -> GroupedLinear:
-        """Collapse the LoRA weights into the base GroupedLinear layer.
+        """Merges the LoRA weights into the base ``GroupedLinear`` layer in place.
 
         Returns:
-            The modified GroupedLinear layer.
+            The base ``GroupedLinear`` layer with updated weights.
         """
         mod = self.base
         mod.weight.data += (torch.bmm(self.lora_A.weight.data, self.lora_B.weight.data)) * self._scale
         return mod
 
     def reset_parameters(self):
-        """Resets LoRA parameters. A is random, B is zeroed."""
+        """Resets the LoRA parameters.
+
+        ``lora_A`` gets a random initialization and ``lora_B`` is zeroed, so the LoRA update starts at zero.
+        """
         self.lora_A.reset_parameters()
         nn.init.zeros_(self.lora_B.weight)

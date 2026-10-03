@@ -1,104 +1,98 @@
-# Event Bus & Hooks
+# Event Bus and Hooks
 
-## Overview
+## About
 
-Instead of hardcoding a fixed set of lifecycle methods (like `on_step_start` or `on_post_optimizer`), `d9d` uses a typed **Event Bus** for extending both the training and inference loops.
+d9d does not use a fixed set of lifecycle methods, such as `on_step_start` or `on_post_optimizer`. Instead, a typed **event bus** lets you extend both the training and the inference loops. Any user component (`TrainTask`, `ModelProvider`, etc.) can subscribe to specific points of the execution. You subscribe *only* to the events you need, so your code does not depend on the internal execution order.
 
-This publish-subscribe mechanism allows any user component (`TrainTask`, `ModelProvider`, etc.) to hook into specific execution points natively. You subscribe *only* to the events you care about, keeping your code clean and decoupled from the framework's internal execution order.
+## How It Works
 
-## How it Works
+The system has three core concepts:
 
-The system revolves around three core concepts:
+1.  **`Event[TContext]`**: A typed descriptor of a specific moment in the lifecycle.
+2.  **Contexts**: Data classes (e.g. `EventStepContext`) that hold the state relevant to the event.
+3.  **`EventBus`**: The dispatcher that passes contexts to the subscribed handlers.
 
-1. **`Event[TContext]`**: A lightweight, typed descriptor representing a specific moment in the lifecycle.
-2. **Contexts**: Data Classes (e.g., `EventStepContext`) holding the state relevant to the event.
-3. **`EventBus`**: The central dispatcher that routes contexts to subscribed handlers.
-
-**Note:** Event Bus is fail-fast: if your handler raises an exception, the loop terminates immediately.
+!!! note
+    The event bus does not catch exceptions. If a handler raises, the loop stops immediately.
 
 ## Registering Handlers
 
-Both `BaseTask` (and by extension `TrainTask` and `InferenceTask`) and `ModelProvider` expose a `register_events` hook. The framework calls this during configuration, passing an object containing the `EventBus`.
+`BaseTask` (and so `TrainTask` and `InferenceTask`) and `ModelProvider` have a `register_events` hook. The loop calls it during configuration and passes a context that holds the `EventBus`.
 
 ### Declarative Registration (Recommended)
 
-To provide a clean developer experience, `d9d` offers a `@subscribe` decorator. Instead of manually binding each method to the event bus, you can tag your methods and use the `subscribe_annotated` helper to register them all at once.
+Mark your methods with the `@subscribe` decorator. Then call `subscribe_annotated` to register all of them at once.
 
 ```python
-from d9d.loop.control import TrainTask, RegisterTaskEventsContext
-from d9d.loop.event import (
-    subscribe,
-    subscribe_annotated
-)
-from d9d.loop.event.catalogue.train import (
-    EVENT_TRAIN_MODEL_STAGES_READY,
-    EVENT_TRAIN_STEP_POST,
-    EventModelStagesReadyContext,
-    EventStepContext,
-)
+from d9d.loop.control import RegisterTaskEventsContext, TrainTask
+from d9d.loop.event import subscribe, subscribe_annotated
+from d9d.loop.event.catalogue.common import EventModelStagesReadyContext, EventStepContext
+from d9d.loop.event.catalogue.train import EVENT_TRAIN_MODEL_STAGES_READY, EVENT_TRAIN_STEP_POST
+
 
 class CustomTrainTask(TrainTask):
     def __init__(self):
         self._modules = []
 
     def register_events(self, ctx: RegisterTaskEventsContext) -> None:
-        # Automatically scans this instance for @subscribe decorators
+        # Registers every method of this instance marked with @subscribe.
         subscribe_annotated(ctx.event_bus, self)
 
     @subscribe(EVENT_TRAIN_MODEL_STAGES_READY)
     def _on_model_ready(self, ctx: EventModelStagesReadyContext) -> None:
         self._modules = ctx.modules
-    
+
     @subscribe(EVENT_TRAIN_STEP_POST)
     def _on_step_post(self, ctx: EventStepContext) -> None:
-        for module in self._modules:
-            print(f"Step {ctx.schedule.current_step} completed; MoE routing stats: {module.moe_stats}.")
+        print(f"Step {ctx.schedule.current_step} of {ctx.schedule.total_steps} completed.")
 
     def compute_loss(self, ctx):
-        ... # Task math overrides
+        ...  # Task logic
 ```
 
 ### Manual Registration
 
-You can also interact with the `EventBus` directly, which is useful when registering simple lambda callbacks or dynamically creating handlers.
+You can also call the `EventBus` directly. This is useful for simple lambda callbacks or handlers created at runtime.
 
 ```python
-from d9d.loop.control import TrainTask, RegisterTaskEventsContext
-from d9d.loop.event import subscribe
-from d9d.loop.event.catalogue.train import (
-    EVENT_TRAIN_OPTIMIZER_READY
-)
+from d9d.loop.control import RegisterTaskEventsContext, TrainTask
+from d9d.loop.event.catalogue.train import EVENT_TRAIN_OPTIMIZER_READY
+
 
 class CustomTrainTask(TrainTask):
     def register_events(self, ctx: RegisterTaskEventsContext) -> None:
         ctx.event_bus.subscribe(
-            EVENT_TRAIN_OPTIMIZER_READY, 
-            lambda event_ctx: print(f"Optimizer loaded: {event_ctx.optimizer}")
+            EVENT_TRAIN_OPTIMIZER_READY,
+            lambda event_ctx: print(f"Optimizer loaded: {event_ctx.optimizer}"),
         )
 ```
 
 ## Custom Events
 
-You can easily define and trigger your own events inside custom logic.
+You can define and trigger your own events in custom logic.
 
 ```python
-from d9d.loop.event import EventBus, Event
 import dataclasses
 from pathlib import Path
+
+from d9d.loop.event import Event, EventBus
+
 
 @dataclasses.dataclass(kw_only=True)
 class CheckpointContext:
     step: int
     path: Path
 
-# Define a new event
+
+# Define a new event.
 EVENT_CHECKPOINT_SAVED = Event[CheckpointContext](id="user.checkpoint_saved")
 
-# Trigger it from somewhere in your task
+
+# Trigger it from your task.
 def process_something(bus: EventBus):
     bus.trigger(
-        EVENT_CHECKPOINT_SAVED, 
-        CheckpointContext(step=1000, path=Path("/checkpoints/step_1000"))
+        EVENT_CHECKPOINT_SAVED,
+        CheckpointContext(step=1000, path=Path("/checkpoints/step_1000")),
     )
 ```
 
@@ -108,22 +102,22 @@ def process_something(bus: EventBus):
 
 ::: d9d.loop.event
     options:
-      heading_level: 3
+      heading_level: 4
 
 ### Common Events
 
 ::: d9d.loop.event.catalogue.common
     options:
-      heading_level: 3
+      heading_level: 4
 
 ### Training Events
 
 ::: d9d.loop.event.catalogue.train
     options:
-      heading_level: 3
+      heading_level: 4
 
 ### Inference Events
 
 ::: d9d.loop.event.catalogue.inference
     options:
-      heading_level: 3
+      heading_level: 4

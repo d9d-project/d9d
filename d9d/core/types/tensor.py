@@ -5,7 +5,7 @@ import torch
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class TensorSpec:
-    """Describes a tensor by its metadata, without allocating it on any device.
+    """Metadata of a tensor that is not allocated on any device.
 
     Attributes:
         shape: The tensor shape.

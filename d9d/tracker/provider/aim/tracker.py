@@ -11,18 +11,20 @@ from .config import AimConfig
 
 
 class AimState(TypedDict):
-    """State dictionary format for persisting Aim tracker state."""
+    """Format of the saved Aim tracker state."""
 
     restart_hash: str | None
 
 
 class AimRun(BaseTrackerRun):
-    """Active run implementation for Aim.
-
-    Wraps the underlying `aim.Run` object to adhere to the d9d BaseTrackerRun interface.
-    """
+    """Tracking run that logs to an ``aim.Run``."""
 
     def __init__(self, run: Run):
+        """Constructs the ``AimRun`` object.
+
+        Args:
+            run: The Aim run to log to.
+        """
         self._run = run
         self._step = 0
         self._context: dict[str, str] = {}
@@ -56,12 +58,17 @@ class AimRun(BaseTrackerRun):
 
 
 class AimTracker(BaseTracker[AimConfig]):
-    """Aim-based tracker implementation.
+    """Tracker that logs to Aim.
 
-    Caches the run hash to allow experiment resumption from checkpoints.
+    It saves the run hash in its state, so a job restored from a checkpoint continues the same run.
     """
 
     def __init__(self, config: AimConfig):
+        """Constructs the ``AimTracker`` object.
+
+        Args:
+            config: The Aim configuration.
+        """
         self._config = config
 
         self._restart_hash: str | None = None

@@ -1,3 +1,5 @@
+"""Interface for providing an optimizer."""
+
 import abc
 import dataclasses
 import typing

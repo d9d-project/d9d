@@ -8,7 +8,7 @@ from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 
 
 class GroupedGemm(Function):
-    """Autograd function for Grouped GEMM (Generalized Matrix Multiplication) with explicit gradient control."""
+    """Autograd function for grouped GEMM (general matrix multiplication) with explicit gradient control."""
 
     @staticmethod
     def forward(
@@ -27,7 +27,7 @@ class GroupedGemm(Function):
         return backend.gmm(a, b, batch_sizes, trans_a=False, trans_b=trans_b)
 
     @staticmethod
-    def backward(  # type: ignore[invalid-method-override]
+    def backward(  # ty: ignore[invalid-method-override] - torch declares backward with variadic grad_outputs
         ctx: Any, grad: torch.Tensor
     ) -> tuple[torch.Tensor | None, torch.Tensor | None, None, None, None, None]:
         grad = grad.contiguous()
@@ -56,17 +56,21 @@ def gmm(
     b_grad_direction: GradDirection | None,
     trans_b: bool = False,
 ) -> torch.Tensor:
-    """The Grouped GEMM (Generalized Matrix Multiplication) function with explicit gradient control.
+    """Computes a grouped GEMM (general matrix multiplication) with explicit gradient control.
+
+    Each group of consecutive rows of ``a`` is multiplied by its own matrix from ``b``.
 
     Args:
-        a: Left-hand side tensor.
-        b: Right-hand side tensor.
-        batch_sizes: Sizes of batches/groups.
-        a_grad_direction: Gradient category for `a` (e.g., `GradDirection.inputs`).
-        b_grad_direction: Gradient category for `b` (e.g., `GradDirection.weight`).
-        trans_b: Whether to transpose `b`.
+        a: Left-hand side, with the rows of each group stored together. Shape: ``(num_tokens, in_features)``.
+        b: Right-hand side, one matrix per group. Shape: ``(num_groups, in_features, out_features)``, or
+            ``(num_groups, out_features, in_features)`` if ``trans_b`` is ``True``.
+        batch_sizes: CPU tensor with the number of rows of ``a`` in each group. Must sum to ``num_tokens``.
+            Shape: ``(num_groups,)``.
+        a_grad_direction: Gradient category for ``a`` (e.g. ``GradDirection.inputs``).
+        b_grad_direction: Gradient category for ``b`` (e.g. ``GradDirection.weight``).
+        trans_b: Whether to transpose each matrix of ``b``.
 
     Returns:
-        Result of matrix multiplication.
+        The result. Shape: ``(num_tokens, out_features)``.
     """
     return GroupedGemm.apply(a, b, batch_sizes, a_grad_direction, b_grad_direction, trans_b)

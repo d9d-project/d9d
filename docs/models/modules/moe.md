@@ -2,43 +2,63 @@
 
 ## About
 
-The `d9d.module.block.moe` package provides a complete, high-performance implementation of Sparse Mixture-of-Experts layers.
+The `d9d.module.block.moe` package implements sparse Mixture-of-Experts layers. `MoELayer` combines a router, a token dispatcher and the experts, with an optional shared expert. The layer requires the `d9d[moe]` extra. You must build and install [DeepEP](https://github.com/deepseek-ai/DeepEP) and [grouped-gemm](https://github.com/fanshiqing/grouped_gemm/) manually first.
 
 ## Expert Parallelism
 
-For information on setting up Expert Parallelism, see [this page](../models/horizontal_parallelism.md).
+To set up expert parallelism, see [Horizontal Parallelism](../horizontal_parallelism.md).
 
-## Features
+## Components
 
-### Sparse Expert Router
+### Router
 
-`TopKRouter` is a learnable router implementation.
+`TopKRouter` is a learned router that selects the top-k experts for each token. It computes the routing probabilities in fp32 for numerical stability. An optional expert bias changes which experts are selected but not their probabilities. You can use it for loss-free load balancing.
 
-It computes routing probabilities in FP32 to ensure numeric stability.
+### Token Dispatcher
 
-### Sparse Expert Token Dispatcher
+`ExpertCommunicationHandler` is the interface that moves tokens to their experts and back.
 
-`ExpertCommunicationHandler` is the messaging layer.
+*   `NoCommunicationHandler` is the default. It is used when all experts are local, such as on a single GPU or with tensor parallelism.
+*   `DeepEpCommunicationHandler` is used with expert parallelism. It runs the all-to-all communication over NVLink and RDMA with [DeepEP](https://github.com/deepseek-ai/DeepEP).
 
-`NoCommunicationHandler` is used by default for single-GPU or Tensor Parallel setups where no token movement is needed.
+### Experts
 
-`DeepEpCommunicationHandler` is enabled if using Expert Parallelism. It uses the [DeepEP](https://github.com/deepseek-ai/DeepEP) library for highly optimized all-to-all communication over NVLink/RDMA, enabling scaling to thousands of experts.
+`GroupedSwiGLU` holds a set of SwiGLU experts. It does not loop over experts. It runs all experts in one [grouped GEMM](https://github.com/fanshiqing/grouped_gemm/) per projection, for any number of tokens per expert. It computes `SiLU(gate(x)) * up(x)` with a fused Triton kernel.
 
-### Sparse Experts
-
-`GroupedSwiGLU` provides a sparse SwiGLU experts module implementation.
-
-Instead of looping over experts, it uses [Grouped GEMM](https://github.com/fanshiqing/grouped_gemm/) kernels to execute all experts in parallel, regardless of how many tokens each expert received.
-
-Uses efficient fused SiLU-Mul kernel.
-
-#### Kernel Benchmarks (BF16, H100)
+#### Kernel Benchmarks (bf16, H100)
 
 ![](./benchmark/silu_mul_bf16.png)
 
 ### Shared Experts
 
-A shared expert processes all tokens passing through the MoE layer regardless of the router's sparse choices, providing a dense computational backbone. It is configured using `SharedExpertParameters` and includes an optionally enabled linear gating mechanism to dynamically scale the shared expert's output.
+A shared expert processes every token, whatever the router chooses. Configure it with `SharedExpertParameters`. It can scale its output with a learned sigmoid gate (`enable_gate`).
+
+## Usage
+
+```python
+import torch
+
+from d9d.module.block.moe import MoELayer, SharedExpertParameters
+
+moe = MoELayer(
+    hidden_dim=2048,
+    intermediate_dim_grouped=768,
+    num_grouped_experts=128,
+    top_k=8,
+    router_renormalize_probabilities=True,
+    shared_expert=SharedExpertParameters(intermediate_size=4096, enable_gate=True),
+).to(device="cuda", dtype=torch.bfloat16)
+moe.reset_parameters()
+
+hidden_states = torch.randn(2, 16, 2048, device="cuda", dtype=torch.bfloat16)
+output = moe(hidden_states)  # (2, 16, 2048)
+
+# Number of tokens routed to each expert since the last reset.
+print(moe.tokens_per_expert)
+moe.reset_stats()
+```
+
+## API Reference
 
 ::: d9d.module.block.moe
 

@@ -1,3 +1,5 @@
+"""Interface for providing training and inference data."""
+
 import dataclasses
 import typing
 from typing import Protocol
@@ -19,7 +21,7 @@ class InitializeDataProviderContext:
 
 @typing.runtime_checkable
 class DataProvider(Protocol):
-    """Protocol that allows users to define how the data pipeline is built.
+    """Protocol for defining how the data pipeline is built.
 
     A ``DataProvider`` is the factory the user supplies to the train/eval loop, exactly like
     ``ModelProvider`` or ``OptimizerProvider``. Given the run context, it composes and returns a

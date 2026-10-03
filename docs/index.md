@@ -4,11 +4,11 @@ icon: lucide/house
 
 # The d9d Project
 
-**d9d** is a distributed training framework built on top of PyTorch 2.0. It aims to be hackable, modular, and efficient, designed to scale from single-GPU debugging to massive clusters running 6D-Parallelism.
+**d9d** is a distributed training framework built on top of PyTorch 2.0. It aims to be hackable, modular, and efficient, designed to scale from single-GPU debugging to massive clusters running 6D parallelism.
 
 ## Installation
 
-Just use your favourite package manager:
+Install it with your package manager:
 
 === "pip"
 
@@ -30,55 +30,55 @@ Just use your favourite package manager:
 
 ### Extras
 
-* `d9d[aim]`: [Aim](https://aimstack.io/) experiment tracker integration.
-* `d9d[visualization]`: Plotting libraries required to some advanced visualization functionality.
-* `d9d[linear-attention]`: Efficient Linear Attention kernels.
-* `d9d[backend-sdpa-flash-attention-2]`: [FlashAttention 2](https://github.com/Dao-AILab/flash-attention) SDPA backend kernels.
-* `d9d[backend-sdpa-flash-attention-4]`: [FlashAttention 4](https://github.com/Dao-AILab/flash-attention) SDPA backend kernels.
-* `d9d[moe]`: Efficient Mixture of Experts GPU kernels. You should build and install some dependencies manually before installation: [DeepEP](https://github.com/deepseek-ai/DeepEP), [grouped-gemm](https://github.com/fanshiqing/grouped_gemm/).
-* `d9d[cce]`: Efficient Fused Cross-Entropy kernels. You should build and install some dependencies manually before installation: [Cut Cross Entropy](https://github.com/apple/ml-cross-entropy).
+*   `d9d[aim]`: [Aim](https://aimstack.io/) experiment tracker integration.
+*   `d9d[visualization]`: [Plotly](https://plotly.com/python/), for plotting learning rate schedules.
+*   `d9d[linear-attention]`: [Flash Linear Attention](https://github.com/fla-org/flash-linear-attention) kernels for linear attention.
+*   `d9d[backend-sdpa-flash-attention-2]`: [FlashAttention 2](https://github.com/Dao-AILab/flash-attention) SDPA backend kernels.
+*   `d9d[backend-sdpa-flash-attention-4]`: [FlashAttention 4](https://github.com/Dao-AILab/flash-attention) SDPA backend kernels.
+*   `d9d[moe]`: Mixture-of-Experts (MoE) GPU kernels. You must build and install [DeepEP](https://github.com/deepseek-ai/DeepEP) and [grouped-gemm](https://github.com/fanshiqing/grouped_gemm/) manually first.
+*   `d9d[cce]`: Fused cross-entropy kernels. You must build and install [Cut Cross Entropy](https://github.com/apple/ml-cross-entropy) manually first.
 
 ## Documentation
 
-Please navigate through our [Table of Contents](./toc.md) - you can safely read everything from top to bottom.
+Start with the [Table of Contents](./toc.md). You can read it from top to bottom.
 
 ## Examples
 
-* **[Qwen3-MoE Pretraining](https://github.com/d9d-project/d9d/blob/main/example/qwen3_moe/pretrain.py):** an example showing causal LM pretraining for the Qwen3-MoE model.
+*   **[Qwen3-MoE Pretraining](https://github.com/d9d-project/d9d/blob/main/example/qwen3_moe/pretrain.py)**: Causal LM pretraining of a Qwen3-MoE model.
 
 ---
 
 ## About
 
-### Why another framework?
+### Why Another Framework?
 
-Distributed training frameworks such as **Megatron-LM** are monolithic in the way you run a script from the command line to train any of a set of *predefined* models, using *predefined* regimes. While powerful, these systems can be difficult to hack and integrate into novel research workflows. Their focus is often on providing a complete, end-to-end solution, which can limit flexibility for experimentally-driven research.
+Distributed training frameworks such as Megatron-LM are monolithic: you run a script from the command line to train one of a set of *predefined* models, using *predefined* regimes. These systems are hard to hack and to integrate into new research workflows. They aim to be a complete end-to-end solution, which limits flexibility for experiment-driven research.
 
-Conversely, creating your own distributed training solution from scratch is tricky. You have to implement many low-level components (like distributed checkpoints and synchronization) that are identical across setups, and manually tackle common performance bottlenecks.
+Writing your own distributed training solution from scratch is also hard. You must implement many low-level components that are the same across setups, such as distributed checkpoints and synchronization. You must also fix common performance bottlenecks yourself.
 
-**d9d** was designed to fill the gap between monolithic frameworks and homebrew setups, providing a modular yet effective solution for distributed training.
+d9d fills the gap between monolithic frameworks and homebrew setups. It gives you modular building blocks for distributed training.
 
-### What d9d is and isn't
+### What d9d Is and Isn't
 
-In terms of **core concept**:
+In terms of core concept:
 
 *   **IS** a pluggable framework for implementing distributed training regimes for your deep learning models.
 *   **IS** built on clear interfaces and building blocks that may be composed and implemented in your own way.
-*   **IS NOT** an all-in-one CLI platform for setting up pre-training and post-training like **torchtitan**, **Megatron-LM**, or **torchforge**.
+*   **IS NOT** an all-in-one CLI platform for setting up pre-training and post-training like torchtitan, Megatron-LM, or torchforge.
 
-In terms of **codebase & engineering**:
+In terms of codebase and engineering:
 
-*   **IS** built on a **strong engineering foundation**: We enforce strict type-checking and rigorous linting to catch errors before execution.
-*   **IS** reliable: The framework is backed by a suite of **over 450 tests**, covering unit logic, integration flows, and End-to-End distributed scenarios.
-*   **IS** eager to use performance hacks (like **DeepEp** or custom kernels) if they improve MFU, even if they aren't PyTorch-native.
-*   **IS NOT** for legacy setups: We do not maintain backward compatibility with older PyTorch versions or hardware. We prioritize simplicity and modern APIs (like `DTensor`).
+*   **IS** built on a strong engineering foundation: we enforce strict type checking and linting to catch errors before execution.
+*   **IS** reliable: a suite of over 450 tests covers unit logic, integration flows, and end-to-end distributed scenarios.
+*   **IS** eager to use performance hacks (like DeepEP or custom kernels) if they improve MFU, even if they aren't PyTorch-native.
+*   **IS NOT** for legacy setups: we do not maintain backward compatibility with older PyTorch versions or hardware. We prefer simplicity and modern APIs (like `DTensor`).
 
 ### Key Philosophies
 
-To achieve the balance between hackability and performance, d9d adheres to specific design principles:
+To balance hackability and performance, d9d follows these design principles:
 
-*   **Composition over Monoliths**: We avoid "God Classes" like `DistributedDataParallel` or `ParallelDims` that assume ownership of the entire execution loop. Instead, we provide composable and extendable APIs. For instance, specific horizontal parallelism strategies for specific layers (`parallelize_replicate`, `parallelize_expert_parallel`, ...).
-*   **White-Box Modelling**: We encourage standard PyTorch code. Models are not wrapped in obscure metadata specifications; they are standard `nn.Module`s that implement lightweight protocols.
-*   **Pragmatic Efficiency**: While we prefer native PyTorch, we are eager to integrate non-native solutions if they improve MFU. For example, we implement MoE using **DeepEp** communications, reindexing kernels from **Megatron-LM**, and efficient grouped-GEMM implementations.
-*   **Graph-Based State Management**: Our IO system treats model checkpoints as directed acyclic graphs. This allows you to transform architectures (e.g., merging `q`, `k`, `v` into `qkv`) on-the-fly while streaming from disk, without massive memory overhead.
-*   **DTensors**: We mandate that distributed parameters be represented as `torch.distributed.tensor.DTensor`. This simplifies checkpointing by making them topology-aware automatically. We leverage modern PyTorch 2.0 APIs (`DeviceMesh`) as much as possible.
+*   **Composition over Monoliths**: We avoid "God Classes" like `DistributedDataParallel` or `ParallelDims` that own the entire execution loop. Instead, we provide composable and extendable APIs, such as per-layer horizontal parallelism strategies (`parallelize_replicate`, `parallelize_expert_parallel`, ...).
+*   **White-Box Modeling**: We encourage standard PyTorch code. Models are not wrapped in metadata specifications. They are standard `nn.Module`s that implement small protocols.
+*   **Pragmatic Efficiency**: We prefer native PyTorch, but we integrate non-native solutions if they improve MFU. For example, our MoE uses DeepEP communications, reindexing kernels from Megatron-LM, and grouped GEMM kernels.
+*   **Graph-Based State Management**: Our I/O system treats model checkpoints as directed acyclic graphs. You can transform architectures (e.g. merge `q`, `k`, `v` into `qkv`) on the fly while streaming from disk, without loading the whole checkpoint into memory.
+*   **DTensors**: Distributed parameters must be `torch.distributed.tensor.DTensor`s. DTensors know their topology, which makes checkpointing simpler. We use modern PyTorch 2.0 APIs (`DeviceMesh`) wherever we can.

@@ -9,45 +9,41 @@ def _prepare_rope_inverse_frequencies(rope_base: float, inside_dim: int) -> torc
 
 
 class RopeScaling(ABC):
-    """Abstract base class for Rotary Position Embedding (RoPE) scaling strategies."""
+    """Abstract base class for rotary position embedding (RoPE) scaling strategies."""
 
     @abstractmethod
     def inverse_frequencies(self, rope_base: int, head_dim: int) -> torch.Tensor:
-        """Calculates the inverse frequencies for the given RoPE scaling strategy.
+        """Computes the RoPE inverse frequencies for this scaling strategy.
 
         Args:
-            rope_base: The base value used for calculating frequencies.
-            head_dim: The dimension of the attention head.
+            rope_base: Base of the geometric progression of RoPE frequencies.
+            head_dim: Dimensionality of the attention head.
 
         Returns:
-            The computed inverse frequencies tensor.
+            The inverse frequencies. Shape: ``(head_dim // 2,)``.
         """
 
     @property
     def attention_mscale(self) -> float:
-        """Calculates the attention multiplier scale.
-
-        Returns:
-            The attention multiplier scale.
-        """
+        """The attention scale multiplier (mscale) applied to the cosine and sine embeddings."""
         return 1.0
 
 
 class NoRopeScaling(RopeScaling):
-    """Strategy that applies no scaling to Rotary Position Embeddings."""
+    """Strategy that applies no scaling to rotary position embeddings."""
 
     def inverse_frequencies(self, rope_base: int, head_dim: int) -> torch.Tensor:
         return _prepare_rope_inverse_frequencies(rope_base, head_dim)
 
 
 class LinearRopeScaling(RopeScaling):
-    """Linear scaling strategy for Rotary Position Embeddings."""
+    """Linear scaling strategy for rotary position embeddings."""
 
     def __init__(self, factor: float) -> None:
-        """Constructs a linear RoPE scaling object.
+        """Constructs the ``LinearRopeScaling`` object.
 
         Args:
-            factor: The linear scaling factor to apply.
+            factor: Linear scaling factor. The inverse frequencies are divided by it.
         """
         self._factor = factor
 
@@ -59,7 +55,7 @@ class YarnRopeScaling(RopeScaling):
     """YaRN (Yet another RoPE extensioN) scaling strategy for position embeddings.
 
     References:
-        https://arxiv.org/abs/2309.00071
+        [YaRN: Efficient Context Window Extension of Large Language Models](https://arxiv.org/abs/2309.00071)
     """
 
     def __init__(
@@ -69,19 +65,19 @@ class YarnRopeScaling(RopeScaling):
         beta_slow: float,
         original_max_position_embeddings: int,
     ) -> None:
-        """Constructs a YaRN RoPE scaling object.
+        """Constructs the ``YarnRopeScaling`` object.
 
         Args:
-            factor: The context scaling extension factor.
-            beta_fast: The fast boundary (upper bound) frequency multiplier.
-            beta_slow: The slow boundary (lower bound) frequency multiplier.
-            original_max_position_embeddings: The original context limit of the base model.
+            factor: Context extension factor.
+            beta_fast: Fast boundary (upper bound) of the frequency ramp, in rotations.
+            beta_slow: Slow boundary (lower bound) of the frequency ramp, in rotations.
+            original_max_position_embeddings: Original context length of the base model.
 
         Raises:
-            ValueError: If beta_fast is less than or equal to beta_slow.
+            ValueError: If ``beta_fast`` is less than or equal to ``beta_slow``.
         """
         if beta_fast <= beta_slow:
-            raise ValueError(f"beta_fast ({beta_fast}) must exceed beta_slow ({beta_slow})")
+            raise ValueError(f"beta_fast ({beta_fast}) must exceed beta_slow ({beta_slow}).")
 
         self._factor = factor
         self._beta_fast = beta_fast
@@ -121,14 +117,14 @@ class NtkRopeScaling(RopeScaling):
     """NTK-Aware (Neural Tangent Kernel) scaling strategy for position embeddings.
 
     References:
-        https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/
+        [NTK-Aware Scaled RoPE](https://www.reddit.com/r/LocalLLaMA/comments/14lz7j5/ntkaware_scaled_rope_allows_llama_models_to_have/)
     """
 
     def __init__(self, factor: float) -> None:
-        """Constructs an NTK-Aware RoPE scaling object.
+        """Constructs the ``NtkRopeScaling`` object.
 
         Args:
-            factor: The sequence length expansion factor.
+            factor: Sequence length expansion factor.
         """
         self._factor = factor
 

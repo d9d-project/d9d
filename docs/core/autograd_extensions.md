@@ -2,54 +2,45 @@
 
 ## About
 
-The `d9d.core.autograd` package provides utilities to exert fine-grained control over PyTorch's automatic differentiation engine.
-
+The `d9d.core.autograd` package gives fine-grained control over the PyTorch autograd engine. Its main tool is the global grad context. It tells custom autograd functions which gradients to compute in a partial backward pass, as split-backward pipeline schedules such as Zero Bubble need.
 
 ## The Global Grad Context
 
 ### Why
 
-The primary purpose of so-called Global Grad Context is to solve specific limitations in `torch.autograd.Function` 
-regarding partial backward passes, which are critical for advanced distributed training schedules like Zero-Bubble Pipeline Parallelism.
+Split-backward pipeline schedules compute activation gradients and weight gradients at different times. They run a backward pass for a subset of tensors, e.g. `torch.autograd.backward(..., inputs=[activations])`.
 
-In standard PyTorch operations (like `torch.matmul`), the autograd engine is highly optimized. 
-If you perform a backward pass specifying only a subset of inputs (e.g., `torch.autograd.backward(..., inputs=[activations])`), 
-PyTorch will intelligently skip computing gradients for parameters (weights) to save compute.
+For built-in operations such as `torch.matmul`, PyTorch then skips the weight gradients.
 
-However, custom `torch.autograd.Function` implementations **do not** share this intelligence. 
-PyTorch sets `ctx.needs_input_grad` to `True` for every input that has `requires_grad=True`, regardless of whether 
-that specific edge is actually being computed in the current `backward()` call.
+Custom `torch.autograd.Function` implementations do not get this behavior. PyTorch sets `ctx.needs_input_grad` to `True` for every input with `requires_grad=True`. It does so even if the current `backward()` call does not compute that edge.
 
-This behavior makes it impossible to implement split-backward pipeline schedules (where activation gradients and weight 
-gradients are computed at different times) using custom operations (like GroupedGEMM) without performing redundant 
-calculations.
+So a custom operation, such as a grouped GEMM, computes all its gradients in every partial backward pass. This wastes compute in split-backward schedules.
 
 For more details, see [PyTorch Issue #174017](https://github.com/pytorch/pytorch/issues/174017).
 
-### How it Works
+### How It Works
 
-To bypass this limitation, `d9d` introduces the `GlobalGradContext`. It acts as a side-channel state manager that 
-allows the training loop to explicitly signal its intent to the custom operators.
+d9d adds the `GlobalGradContext` to work around this limitation. It is shared state through which the training loop tells custom operations which gradients it needs.
 
-1.  **Orchestrator**: The training loop sets the context (e.g., "I only want Input gradients now").
-2.  **Operator**: The custom `backward` checks this context. Even if PyTorch says `needs_input_grad=True`, the operator will verify with `GlobalGradContext` before computation.
+1.  **Training loop**: Sets the enabled gradient directions, e.g. "input gradients only".
+2.  **Operation**: The custom `backward` checks the context. It computes a gradient only if `needs_input_grad` is `True` and the context enables its direction.
 
-### Usage
+By default, `GLOBAL_GRAD_CONTEXT` enables both input and weight gradients.
 
-#### In Custom Autograd Functions
+## Usage
 
-When writing a custom operation, you must tag your gradients with a semantic `GradDirection` and check the context before computation.
+### In Custom Autograd Functions
+
+When you write a custom operation, assign a `GradDirection` to each gradient. Check the context before you compute it.
 
 ```python
 import torch
 from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 
+
 class MyCustomOp(torch.autograd.Function):
     @staticmethod
     def forward(ctx, inputs, weight):
-        # Save which direction 'inputs' and 'weight' correspond to
-        ctx.dir_inputs = GradDirection.inputs
-        ctx.dir_weight = GradDirection.weight
         ctx.save_for_backward(inputs, weight)
         return torch.matmul(inputs, weight)
 
@@ -57,28 +48,30 @@ class MyCustomOp(torch.autograd.Function):
     def backward(ctx, grad_output):
         inputs, weight = ctx.saved_tensors
         grad_input = grad_weight = None
-        
-        # Check 1: Does PyTorch need it? AND Check 2: Does Context allow it?
-        
-        # Calculate Input Gradients (Activation)
-        if ctx.needs_input_grad[0] and GLOBAL_GRAD_CONTEXT.check_direction(ctx.dir_inputs):
+
+        # Compute a gradient only if PyTorch needs it AND the context enables its direction.
+        if ctx.needs_input_grad[0] and GLOBAL_GRAD_CONTEXT.check_direction(GradDirection.inputs):
             grad_input = torch.matmul(grad_output, weight.t())
 
-        # Calculate Weight Gradients
-        if ctx.needs_input_grad[1] and GLOBAL_GRAD_CONTEXT.check_direction(ctx.dir_weight):
+        if ctx.needs_input_grad[1] and GLOBAL_GRAD_CONTEXT.check_direction(GradDirection.weight):
             grad_weight = torch.matmul(inputs.t(), grad_output)
 
         return grad_input, grad_weight
 ```
 
-#### In Training Loops
+### In Training Loops
 
-By default, the `GLOBAL_GRAD_CONTEXT` is set to compute both input and weight gradients. 
+The d9d pipelining schedules set the context for split-backward passes. If you use them, directly or through the [`Trainer`](../loop/train.md), you do not need to do anything.
 
-The d9d pipelining API configures it for split-backward automatically.
-So, if you use the [Trainer](../loop/train.md), **everything will work out of the box**.
+If you write your own split-backward logic, you must set the context yourself:
 
-If you use your own training loop implementation - you have to configure the context manually.
+```python
+import torch
+from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+
+with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs):
+    torch.autograd.backward(outputs, grad_tensors=output_grads, inputs=stage_inputs, retain_graph=True)
+```
 
 ## API Reference
 

@@ -14,12 +14,10 @@ from .model_stage_factory import TrackedModules
 
 
 class GradientManager(Offloadable):
-    """Manages the lifecycle of gradients during the training loop.
+    """Lifecycle manager for gradients during the training loop.
 
-    This class handles gradient synchronization across ranks,
-    gradient data type configuration, and loss scaling based on accumulated weights.
-    It orchestrates the `GradientSynchronizer` and ensures gradients are correctly
-    prepared before the optimizer step.
+    It synchronizes gradients across ranks through a ``GradientSynchronizer``, sets the gradient dtype
+    and divides gradients by the accumulated loss weight before the optimizer step.
     """
 
     def __init__(
@@ -28,12 +26,12 @@ class GradientManager(Offloadable):
         tracked_modules: TrackedModules,
         config: GradientManagerConfig,
     ):
-        """Constructs the GradientManager and initializes the internal synchronizer.
+        """Constructs the ``GradientManager`` object.
 
         Args:
             dist_context: The distributed context.
-            tracked_modules: Container of model modules to manage gradients for.
-            config: Configuration for gradient handling.
+            tracked_modules: The model stages whose gradients are managed.
+            config: The gradient handling configuration.
         """
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
@@ -77,7 +75,7 @@ class GradientManager(Offloadable):
 
     def _scale_grads(self):
         if self._grads_to_scale is None:
-            raise ValueError("You should bind the manager first.")
+            raise ValueError("Gradients are not bound. Call sync_and_scale() inside the install() context.")
 
         scale_factor = 1.0 / self._loss.accumulated_weight
         if len(self._grads_to_scale) > 0:
@@ -94,11 +92,10 @@ class GradientManager(Offloadable):
 
     @contextmanager
     def install(self):
-        """Context manager to activate gradient handling for a forward/backward pass.
+        """Activates gradient handling while the context is open.
 
-        This sets up gradient dtypes, install backward hooks for synchronization via
-        the `GradientSynchronizer`, and binds gradients for later scaling. It acts
-        as the boundary for the accumulation phase.
+        It sets the gradient dtype, installs the backward hooks that synchronize gradients
+        and binds the gradients for later scaling.
         """
         self._bind()
         self._installed = True
@@ -109,8 +106,8 @@ class GradientManager(Offloadable):
     def set_required_accumulations(self, require_accumulations: int):
         """Sets how many backward passes are accumulated before gradients are reduced this step.
 
-        Must be called before the backward passes of the step, since pack length (and therefore the
-        number of accumulations) may vary between steps.
+        It must be called before the backward passes of each step, because the pack length (and so the
+        number of accumulations) can vary between steps.
 
         Args:
             require_accumulations: Number of backward passes in the current step.
@@ -122,7 +119,7 @@ class GradientManager(Offloadable):
 
         Args:
             loss: The computed loss scalar.
-            loss_weight: The weight asscociated with this loss.
+            loss_weight: The weight associated with this loss.
         """
         self._loss.update(loss, loss_weight)
         self._in_flight_count += 1
@@ -132,10 +129,10 @@ class GradientManager(Offloadable):
 
         This method performs the following operations:
 
-        1. Waits for all gradient synchronization hooks to complete.
-        2. Synchronizes the accumulated loss/weights across the distributed context.
-        3. Scales the gradients by the inverse of the total accumulated weight to
-           normalize them.
+        1.  Waits for all gradient synchronization hooks to complete.
+        2.  Synchronizes the accumulated loss/weights across the distributed context.
+        3.  Scales the gradients by the inverse of the total accumulated weight to
+            normalize them.
         """
         with record_function("Wait & Scale Gradients"):
             self._grad_sync.wait()
@@ -164,16 +161,15 @@ class GradientManager(Offloadable):
 
     @property
     def has_in_flight_gradients(self) -> bool:
-        """Checks whether a gradient accumulation is currently in flight.
+        """Whether a gradient accumulation is in flight.
 
-        The counter is raised by "add_loss_with_weight" and reset by "zero_grad". While it is
-        non-zero, partial accumulation state lives in the synchronizer buckets, so offloading
-        the gradient state would lose it.
+        It becomes ``True`` after ``add_loss_with_weight`` and ``False`` after ``zero_grad``. During an
+        accumulation, partial gradients live in the synchronizer buckets, so offloading would lose them.
         """
         return self._in_flight_count > 0
 
     def offload(self, ctx: OffloadContext) -> None:
-        """Releases the GPU memory of the gradient state to host memory.
+        """Releases the GPU memory held by the gradient state.
 
         The synchronizer bucket buffers are released and the residual loss accumulator is reset.
 
@@ -181,8 +177,7 @@ class GradientManager(Offloadable):
             ctx: Context for this operation.
 
         Raises:
-            RuntimeError: If the gradient state is already offloaded, or if the manager has
-                not been installed.
+            RuntimeError: If the gradient state is already offloaded, or if the manager is not installed.
         """
         if self._offloaded:
             raise RuntimeError("GradientManager is already offloaded.")
@@ -194,7 +189,7 @@ class GradientManager(Offloadable):
         self._offloaded = True
 
     def onload(self, ctx: OnloadContext) -> None:
-        """Restores GPU residency of the gradient state released by "offload".
+        """Reallocates on the GPU the gradient state released by ``offload``.
 
         Args:
             ctx: Context for this operation.
@@ -211,9 +206,9 @@ class GradientManager(Offloadable):
         self._offloaded = False
 
     def is_offloaded(self) -> bool:
-        """Reports whether the gradient state is currently on host memory.
+        """Reports whether the gradient state is offloaded.
 
         Returns:
-            True if the gradient state is offloaded, False otherwise.
+            ``True`` if the gradient state is offloaded, otherwise ``False``.
         """
         return self._offloaded

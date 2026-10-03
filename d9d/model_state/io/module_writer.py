@@ -54,17 +54,18 @@ def _state_generator(models: list[nn.Module]) -> Iterable[tuple[str, torch.Tenso
 def save_model_state(
     dest_dir: Path, mapper: ModelStateMapper, model: nn.Module, shard_size_gb: float = 4.0, show_progress: bool = True
 ):
-    """High-level utility to save a PyTorch model to disk on a **single** process.
+    """Saves a PyTorch module to disk from a **single** process.
 
-    NOTICE: Only states specified in `mapper` will be saved! You can use
-    `d9d.model_state.mapper.adapters.identity_mapper_from_module(module)` to create a mapper that will save every
-    model state without changing it.
+    ``DTensor`` states are gathered into full tensors before saving.
+
+    Only states listed in the inputs of ``mapper`` are saved. To save every model state unchanged, build the
+    mapper with ``d9d.model_state.mapper.adapters.identity_mapper_from_module``.
 
     Args:
-        dest_dir: The directory to save .safetensors shards and index.
-        mapper: Topology defining how model keys map to disk keys.
+        dest_dir: The directory to save ``.safetensors`` shards and the index to.
+        mapper: The mapper from model keys to on-disk keys.
         model: The PyTorch module to save.
-        shard_size_gb: Max size per shard file in Gigabytes.
+        shard_size_gb: Maximum size of a shard file in GiB.
         show_progress: Whether to display a progress bar.
     """
     write_model_state_local(
@@ -86,28 +87,25 @@ def save_model_state_pipeline_parallel(
     show_progress: bool = True,
     position: int | None = None,
 ):
-    """High-level utility to save a model in a Distributed Pipeline Parallel environment to disk.
+    """Saves a pipeline-parallel model to disk.
 
-    Features:
+    Every rank must call this function.
 
-    1. **Auto-Gather**: Converts `DTensor` parameters to full tensors before saving.
+    1.  **Gathering**: ``DTensor`` states are gathered into full tensors before saving.
+    2.  **Single writer**: For each pipeline stage, only one rank writes files, so ranks do not overwrite each
+        other.
+    3.  **Index merging**: The indices of all pipeline stages are merged into one global index file.
 
-    2. **Distribution Awareness**: Uses the `device_mesh` to ensure that for a given pipeline stage,
-       only the master rank writes the checkpoint, preventing Write-After-Write conflicts.
-
-    3. **Index Merging**: Aggregates metadata from all independent pipeline stages into one global index file.
-
-    NOTICE: Only states specified in `mapper` will be saved! You can use
-    `d9d.model_state.mapper.adapters.identity_mapper_from_module(module)` to create a mapper that will save every
-    model state without changing it.
+    Only states listed in the inputs of ``mapper`` are saved. To save every model state unchanged, build the
+    mapper with ``d9d.model_state.mapper.adapters.identity_mapper_from_module``.
 
     Args:
-        dest_dir: directory to save .safetensors shards and index file.
-        mapper: Topology defining how model keys map to disk keys.
-        device_mesh: The cluster topology mesh.
-        pipeline_dim_name: The specific dimension name in the mesh used for pipelining.
-        models: A list of modules (pipeline stages) processed by this PP rank.
-        shard_size_gb: Max size per shard file in Gigabytes.
+        dest_dir: The directory to save ``.safetensors`` shards and the index to.
+        mapper: The mapper from model keys to on-disk keys.
+        device_mesh: The device mesh of the whole job.
+        pipeline_dim_name: The name of the pipeline-parallel dimension in ``device_mesh``.
+        models: The modules (pipeline stages) held by this rank.
+        shard_size_gb: Maximum size of a shard file in GiB.
         show_progress: Whether to display a progress bar.
         position: Row index for the tqdm bar. Pass the process local rank to stack one bar
             per rank without interleaving. ``None`` lets tqdm use its default (single bar).

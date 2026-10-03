@@ -1,3 +1,5 @@
+"""Streaming readers and writers for model checkpoints."""
+
 from .module_reader import load_model_state
 from .module_writer import (
     save_model_state,

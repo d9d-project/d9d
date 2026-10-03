@@ -1,4 +1,4 @@
-"""Package for Low-Rank Adaptation (LoRA) implementation."""
+"""Low-rank adaptation (LoRA)."""
 
 from .config import LoRAConfig, LoRAParameters
 from .layer import LoRAGroupedLinear, LoRALinear

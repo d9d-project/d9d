@@ -21,10 +21,9 @@ from d9d.metric.component.classification import (
 
 
 class ConfusionMatrixMetric(Metric[torch.Tensor]):
-    """A generic metric computed from a confusion matrix.
+    """Metric for a statistic, such as accuracy, precision, recall or F1 score, computed from a confusion matrix.
 
-    This class composes a processor, accumulator, and aggregator to compute
-    metrics like Accuracy, Precision, Recall, or F1-Score via a confusion matrix.
+    Use ``confusion_matrix_metric()`` to build it.
     """
 
     def __init__(
@@ -33,80 +32,55 @@ class ConfusionMatrixMetric(Metric[torch.Tensor]):
         accumulator: ConfusionMatrixAccumulator,
         aggregator: ConfusionMatrixAggregator,
     ) -> None:
-        """Constructs the ConfusionMatrixMetric object.
+        """Constructs the ``ConfusionMatrixMetric`` object.
 
         Args:
-            processor: The strategy used to convert raw predictions and targets into
-                a format suitable for the confusion matrix.
-            accumulator: The component responsible for tracking the confusion matrix
-                counts (TP, FP, TN, FN) across batches.
-            aggregator: The component responsible for computing the final statistic
-                from the accumulated confusion matrix state.
+            processor: Converts raw predictions and targets into binary tensors.
+            accumulator: Tracks the confusion matrix counts (TP, FP, TN, FN) across batches.
+            aggregator: Computes the final statistic from the accumulated confusion matrix.
         """
         self._processor = processor
         self._accumulator = accumulator
         self._aggregator = aggregator
 
     def update(self, preds: torch.Tensor, targets: torch.Tensor) -> None:
-        """Processes and accumulates a new batch of predictions and targets.
+        """Processes and accumulates a batch of predictions and targets.
 
         Args:
-            preds: The raw prediction outputs.
-            targets: The ground truth targets.
+            preds: The raw predictions. The expected shape depends on the problem type.
+            targets: The ground truth targets. The expected shape depends on the problem type.
         """
         p, t = self._processor(preds, targets)
         self._accumulator.update(p, t)
 
     def sync(self, dist_context: DistributedContext) -> None:
-        """Synchronizes the accumulated metric state across distributed workers.
-
-        Args:
-            dist_context: The distributed context containing synchronization details.
-        """
         self._accumulator.sync()
 
     def compute(self) -> torch.Tensor:
-        """Computes the final aggregated metric value.
-
-        Returns:
-            The calculated metric statistic tensor.
-        """
         return self._aggregator(self._accumulator.state)
 
     def reset(self) -> None:
-        """Resets the accumulated confusion matrix state to zero."""
         self._accumulator.reset()
 
     def to(self, device: str | torch.device | int) -> None:
-        """Moves the internal metric states to the specified device.
-
-        Args:
-            device: The target target device.
-        """
         self._accumulator.to(device)
 
     def state_dict(self) -> dict[str, Any]:
-        """Retrieves the metric's current internal state dictionary.
-
-        Returns:
-            A dictionary of the accumulator's state.
-        """
         return self._accumulator.state_dict()
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        """Restores the metric's internal state from a dictionary.
-
-        Args:
-            state_dict: The saved state dictionary to load.
-        """
         self._accumulator.load_state_dict(state_dict)
 
 
 class ConfusionMatrixMetricBuilder:
-    """Builder for safely configuring a ConfusionMatrixMetric pipeline."""
+    """Step-by-step builder of a ``ConfusionMatrixMetric``.
+
+    Choose one problem type, one statistic and, unless the problem type sets it, one aggregation method. Then call
+    ``build()``.
+    """
 
     def __init__(self) -> None:
-        """Constructs the ConfusionMatrixMetric object."""
+        """Constructs the ``ConfusionMatrixMetricBuilder`` object."""
         self._num_outputs: int | None = None
         self._processor: ClassificationPredictionsProcessor | None = None
         self._statistic: ConfusionMatrixStatistic | None = None
@@ -116,25 +90,30 @@ class ConfusionMatrixMetricBuilder:
         if self._processor is not None:
             raise ValueError(
                 "A problem type (binary, multiclass, multilabel) has already been configured. "
-                "You cannot chain multiple problem definitions."
+                "Call only one of binary(), multiclass() or multilabel()."
             )
 
     def _ensure_no_statistic(self) -> None:
         if self._statistic is not None:
             raise ValueError(
-                "A target statistic has already been configured. "
-                "You cannot evaluate multiple primary statistics in a single pipeline."
+                "A statistic has already been configured. A metric computes a single statistic, "
+                "so call only one with_*() method."
             )
 
     def _ensure_no_aggregation(self) -> None:
         if self._aggregation_method is not None:
-            raise ValueError("An aggregation methodology has already been selected.")
+            raise ValueError(
+                "An aggregation method has already been selected. "
+                "Note that binary() and multiclass() with top_k select micro aggregation themselves."
+            )
 
     def binary(self, threshold: float = 0.5) -> Self:
-        """Configures the metric for binary classification problems.
+        """Configures the metric for binary classification.
+
+        It also selects micro aggregation.
 
         Args:
-            threshold: Value boundary for assigning positive boolean classes.
+            threshold: Predictions strictly above this value are positive.
 
         Returns:
             The current builder instance.
@@ -146,12 +125,12 @@ class ConfusionMatrixMetricBuilder:
         return self
 
     def multiclass(self, num_classes: int, top_k: int | None = None) -> Self:
-        """Configures the metric for multiclass classification problems.
+        """Configures the metric for multiclass classification.
 
         Args:
-            num_classes: The total number of unique mutually-exclusive classes.
-            top_k: If provided, alters the underlying evaluation to measure if the
-                target falls within the top K highest probabilities.
+            num_classes: The number of mutually exclusive classes.
+            top_k: If set, a prediction counts as correct when the target is among the ``top_k`` highest scores.
+                This also selects micro aggregation.
 
         Returns:
             The current builder instance.
@@ -169,11 +148,11 @@ class ConfusionMatrixMetricBuilder:
         return self
 
     def multilabel(self, num_classes: int, threshold: float = 0.5) -> Self:
-        """Configures the metric for multilabel classification problems.
+        """Configures the metric for multilabel classification.
 
         Args:
-            num_classes: The total number of unique independent classes.
-            threshold: Value boundary for assigning positive boolean hits independently.
+            num_classes: The number of independent classes.
+            threshold: Predictions strictly above this value are positive, for each class independently.
 
         Returns:
             The current builder instance.
@@ -185,7 +164,7 @@ class ConfusionMatrixMetricBuilder:
         return self
 
     def with_accuracy(self) -> Self:
-        """Assigns conventional accuracy computations as the target statistic to evaluate.
+        """Selects accuracy as the statistic.
 
         Returns:
             The current builder instance.
@@ -195,7 +174,7 @@ class ConfusionMatrixMetricBuilder:
         return self
 
     def with_f1(self) -> Self:
-        """Assigns harmonic mean calculations (F1) as the target statistic to evaluate.
+        """Selects the F1 score as the statistic.
 
         Returns:
             The current builder instance.
@@ -205,10 +184,10 @@ class ConfusionMatrixMetricBuilder:
         return self
 
     def with_fbeta(self, beta: float) -> Self:
-        """Assigns variable recall-focused FBeta score as the target statistic to evaluate.
+        """Selects the F-beta score as the statistic.
 
         Args:
-            beta: Emphasis coefficient towards recall impact strictly mathematically.
+            beta: The weight of recall relative to precision.
 
         Returns:
             The current builder instance.
@@ -218,7 +197,7 @@ class ConfusionMatrixMetricBuilder:
         return self
 
     def with_precision(self) -> Self:
-        """Assigns target hit accuracy distribution (Precision) as the target statistic.
+        """Selects precision as the statistic.
 
         Returns:
             The current builder instance.
@@ -228,7 +207,7 @@ class ConfusionMatrixMetricBuilder:
         return self
 
     def with_recall(self) -> Self:
-        """Assigns target missing reduction distribution (Recall) as the target statistic.
+        """Selects recall as the statistic.
 
         Returns:
             The current builder instance.
@@ -238,10 +217,10 @@ class ConfusionMatrixMetricBuilder:
         return self
 
     def with_statistic(self, statistic: ConfusionMatrixStatistic) -> Self:
-        """Assigns entirely custom formulas interpreting matrix states natively.
+        """Selects a custom statistic.
 
         Args:
-            statistic: Instantiated formulation protocol.
+            statistic: The statistic to compute from the confusion matrix.
 
         Returns:
             The current builder instance.
@@ -251,10 +230,10 @@ class ConfusionMatrixMetricBuilder:
         return self
 
     def with_aggregation(self, method: ClassificationAggregationMethod) -> Self:
-        """Configures general target methodology formulas defining multi-dimensional matrices.
+        """Selects how the statistic is aggregated across classes.
 
         Args:
-            method: Constant identifier pointing to strategy options available.
+            method: The aggregation method.
 
         Returns:
             The current builder instance.
@@ -264,7 +243,7 @@ class ConfusionMatrixMetricBuilder:
         return self
 
     def micro(self) -> Self:
-        """Computes the metric globally by summing the confusion matrices first.
+        """Selects micro aggregation: the metric is computed from the confusion matrix summed over classes.
 
         Returns:
             The current builder instance.
@@ -272,7 +251,7 @@ class ConfusionMatrixMetricBuilder:
         return self.with_aggregation(ClassificationAggregationMethod.MICRO)
 
     def macro(self) -> Self:
-        """Computes the metric for each class independently and finds their unweighted mean.
+        """Selects macro aggregation: the unweighted mean of the per-class metrics.
 
         Returns:
             The current builder instance.
@@ -280,10 +259,9 @@ class ConfusionMatrixMetricBuilder:
         return self.with_aggregation(ClassificationAggregationMethod.MACRO)
 
     def weighted(self) -> Self:
-        """Computes the per-class metric averaged with weighting by class support.
+        """Selects weighted aggregation: the mean of the per-class metrics, weighted by class support.
 
-        The metric is computed for each class independently and averaged, weighted
-        by the number of true instances (support) for each class.
+        The support of a class is its number of true instances.
 
         Returns:
             The current builder instance.
@@ -291,7 +269,7 @@ class ConfusionMatrixMetricBuilder:
         return self.with_aggregation(ClassificationAggregationMethod.WEIGHTED)
 
     def per_class(self) -> Self:
-        """Computes and returns the metric for each class independently without aggregating.
+        """Selects no aggregation: the metric is returned for each class.
 
         Returns:
             The current builder instance.
@@ -299,22 +277,27 @@ class ConfusionMatrixMetricBuilder:
         return self.with_aggregation(ClassificationAggregationMethod.NONE)
 
     def build(self) -> ConfusionMatrixMetric:
-        """Bakes pipeline configurations into a ``ConfusionMatrixMetric``.
+        """Builds the configured ``ConfusionMatrixMetric``.
 
         Returns:
-            A ready-to-process configured metric wrapper instance.
+            The configured metric.
 
         Raises:
-            ValueError: If the problem type or statistic calculation is not specified.
+            ValueError: If the problem type, the statistic or the aggregation method is not configured.
         """
         if self._processor is None or self._num_outputs is None:
-            raise ValueError("A problem type (binary, multiclass, multilabel) must be configured.")
+            raise ValueError(
+                "A problem type must be configured. Call binary(), multiclass() or multilabel() before build()."
+            )
 
         if self._statistic is None:
-            raise ValueError("A statistic calculation strategy must be configured.")
+            raise ValueError("A statistic must be configured. Call one of the with_*() methods before build().")
 
         if self._aggregation_method is None:
-            raise ValueError("Aggregation method must be configured.")
+            raise ValueError(
+                "An aggregation method must be configured. "
+                "Call micro(), macro(), weighted(), per_class() or with_aggregation() before build()."
+            )
 
         accumulator = ConfusionMatrixAccumulator(self._num_outputs)
         aggregator = ConfusionMatrixAggregator(self._aggregation_method, self._statistic)
@@ -327,9 +310,9 @@ class ConfusionMatrixMetricBuilder:
 
 
 def confusion_matrix_metric() -> ConfusionMatrixMetricBuilder:
-    """Creates a new builder for configuring a ConfusionMatrixMetric.
+    """Creates a builder for a ``ConfusionMatrixMetric``.
 
     Returns:
-        A fresh builder instance to begin metric pipeline configuration.
+        A new builder.
     """
     return ConfusionMatrixMetricBuilder()

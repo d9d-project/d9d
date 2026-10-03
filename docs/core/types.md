@@ -2,9 +2,9 @@
 
 ## About
 
-The `d9d.core.types` package gathers common Type Aliases used throughout the framework.
+The `d9d.core.types` package holds common type aliases used across d9d, such as `PyTree` and `TensorTree`. The `d9d.core.protocol` package defines protocols for standard PyTorch components that the training loop uses, such as the optimizer, the learning rate scheduler and the data loader.
 
-The `d9d.core.protocol` package defines standard interfaces (Protocols) for standard PyTorch components used in the distributed training loop.
+## API Reference
 
 ::: d9d.core.types
 

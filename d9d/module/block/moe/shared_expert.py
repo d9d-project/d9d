@@ -7,11 +7,11 @@ from d9d.module.block.ffn import SwiGLU
 
 
 class SharedExpertParameters(BaseModel):
-    """Configuration parameters for a shared expert.
+    """Configuration for a shared expert.
 
     Attributes:
-        intermediate_size: Dimensionality of the intermediate projection.
-        enable_gate: Whether to enable the linear gating mechanism.
+        intermediate_size: Intermediate size of the SwiGLU FFN.
+        enable_gate: Whether to scale the output with a learned sigmoid gate.
     """
 
     intermediate_size: int
@@ -19,19 +19,14 @@ class SharedExpertParameters(BaseModel):
 
 
 class SharedSwiGLU(nn.Module, ModuleLateInit):
-    """A shared expert module using the SwiGLU activation function with an optional gating mechanism.
-
-    Attributes:
-        expert: The underlying SwiGLU computation module.
-        gate: The optional linear layer used for the gating mechanism.
-    """
+    """Shared expert: a SwiGLU FFN with an optional sigmoid output gate."""
 
     def __init__(self, hidden_size: int, params: SharedExpertParameters):
-        """Constructs the SharedSwiGLU object.
+        """Constructs the ``SharedSwiGLU`` object.
 
         Args:
-            hidden_size: Dimensionality of the hidden state.
-            params: Configuration parameters for the shared expert.
+            hidden_size: Hidden size.
+            params: Shared expert configuration.
         """
         super().__init__()
         self.expert = SwiGLU(hidden_size=hidden_size, intermediate_size=params.intermediate_size)
@@ -45,10 +40,10 @@ class SharedSwiGLU(nn.Module, ModuleLateInit):
         """Applies the shared expert computation to the input.
 
         Args:
-            hidden_states: Input tensor to process.
+            hidden_states: Input tensor. Shape: ``(num_tokens, hidden_size)``.
 
         Returns:
-            Output tensor after applying the expert and optional gating.
+            Output tensor. Shape: ``(num_tokens, hidden_size)``.
         """
         x = self.expert(hidden_states)
 

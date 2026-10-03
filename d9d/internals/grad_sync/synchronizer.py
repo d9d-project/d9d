@@ -11,16 +11,16 @@ from .bucket import AbstractGradientBucket, LocalGradientBucket, SyncGradientBuc
 
 
 def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
-    """Identifies the sub-mesh required for gradient reduction based on tensor placements.
+    """Finds the sub-mesh to reduce the gradient over, from the placements of the parameter.
 
     Args:
         data: The parameter tensor.
 
     Returns:
-        The DeviceMesh subset needed for reduction, or None if no reduction is needed.
+        The sub-mesh of the replicated dimensions, or ``None`` if no reduction is needed.
 
     Raises:
-        ValueError: If a tensor placement is unknown.
+        ValueError: If a placement is neither ``Replicate`` nor ``Shard``.
     """
     reduce_dims: set[int] = set()
 
@@ -31,14 +31,16 @@ def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
             case Shard():
                 pass
             case _:
-                raise ValueError(f"Unknown grad placement: {dim_placement}")
+                raise ValueError(
+                    f"Gradient placement ({dim_placement}) is not supported. Use Replicate or Shard placements."
+                )
 
     if len(reduce_dims) == 0:
         return None
 
     device_mesh: DeviceMesh = data.device_mesh
 
-    # we are sure that device mesh contain dim names so we cast(...)
+    # d9d builds every device mesh with dimension names.
     mesh_dim_names = cast(tuple[str, ...], device_mesh.mesh_dim_names)
     reduce_mesh = device_mesh[tuple(mesh_dim_names[dim_i] for dim_i in reduce_dims)]
 
@@ -47,7 +49,7 @@ def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
 
 @dataclasses.dataclass(frozen=True)
 class _ParameterGroupMarker:
-    """Identifier for grouping compatible parameters into buckets."""
+    """Key that groups the parameters which can share a bucket."""
 
     group_i: int
     reduce_mesh: DeviceMesh | None
@@ -58,17 +60,18 @@ class _ParameterGroupMarker:
 def _group_params_for_buckets(
     param_groups: list[list[nn.Parameter]],
 ) -> dict[_ParameterGroupMarker, list[nn.Parameter]]:
-    """Sorts parameters into groups based on their synchronization requirements.
+    """Sorts parameters into groups by their synchronization requirements.
 
     Args:
-        param_groups: List of parameter groups (from optimizer).
+        param_groups: The parameter groups, usually from the optimizer.
 
     Returns:
-        Dictionary mapping group markers to lists of parameters.
+        A dict that maps group markers to their parameters.
     """
     regrouped_params = defaultdict(list)
     for param_group_i, param_group in enumerate(param_groups):
-        # iterate in reverse order to maximize overlap
+        # The backward pass produces gradients roughly in reverse parameter order, so reversed buckets
+        # fill up and start their reduction earlier.
         for param in param_group[::-1]:
             if not param.requires_grad:
                 continue
@@ -92,19 +95,19 @@ def _make_bucket(
     parameters: list[nn.Parameter],
     communicate_stream: torch.cuda.Stream,
 ) -> AbstractGradientBucket:
-    """Factory function to create the appropriate bucket type.
+    """Creates a local bucket or a sync bucket, depending on the reduce mesh.
 
     Returns:
         The created bucket.
 
     Raises:
-        ValueError: If the gradient dtype is None for a sync bucket.
+        ValueError: If the gradient dtype is ``None`` for a sync bucket.
     """
     if group_marker.reduce_mesh is None:
         return LocalGradientBucket(parameters)
     else:
         if group_marker.grad_dtype is None:
-            raise ValueError("Gradient dtype could not be None")
+            raise ValueError("Gradient dtype cannot be None for parameters that need gradient synchronization.")
 
         return SyncGradientBucket(
             parameters=parameters,
@@ -120,18 +123,16 @@ def _fill_buckets(
     bucket_size_mb: int,
     communicate_stream: torch.cuda.Stream,
 ) -> list[AbstractGradientBucket]:
-    """Splits grouped parameters into buckets based on size constraints.
+    """Splits grouped parameters into buckets of limited size.
 
     Args:
-        param_groups: Parameters grouped by sync requirements.
-        bucket_size_mb: Max size for each bucket in megabytes.
-        communicate_stream: CUDA stream used for asynchronous gradient communication.
+        param_groups: Parameters grouped by synchronization requirements.
+        bucket_size_mb: The maximum size of one bucket in MiB.
+        communicate_stream: The CUDA stream for asynchronous gradient communication.
 
     Returns:
-        List of configured gradient buckets.
+        The gradient buckets.
     """
-    # TODO: Better grouping - probably we could trace autograd graph and use some topological clustering here
-    # TODO: to maximize overlap even better - current implementation just iterates over parameters in reverse order
     buckets = []
 
     bucket_size = bucket_size_mb * 1024 * 1024
@@ -167,19 +168,18 @@ def _fill_buckets(
 
 
 class GradientSynchronizer:
-    """Manages gradient synchronization for distributed training.
+    """Gradient synchronizer for replicated parameters. It reduces the gradients during the backward pass.
 
-    This class handles the bucketing of parameters, memory allocation for flat
-    gradient buffers, and the orchestration of asynchronous all-reduce operations
-    during the backward pass.
+    It splits the parameters into buckets, allocates flat gradient buffers and runs asynchronous all-reduce
+    operations.
     """
 
     def __init__(self, param_groups: list[list[nn.Parameter]], bucket_size_mb: int):
-        """Constructs a GradientSynchronizer.
+        """Constructs the ``GradientSynchronizer`` object.
 
         Args:
-            param_groups: List of parameter groups.
-            bucket_size_mb: Maximal size of a single gradient bucket in MB.
+            param_groups: The parameter groups.
+            bucket_size_mb: The maximum size of one gradient bucket in MiB.
         """
         self._param_groups = param_groups
         self._bucket_size_mb = bucket_size_mb
@@ -190,10 +190,9 @@ class GradientSynchronizer:
         self._buckets: list[AbstractGradientBucket] = []
 
     def bind(self):
-        """Initializes the synchronizer for training.
+        """Builds the buckets, allocates their gradient buffers and registers the backward hooks.
 
-        Groups parameters, creates buckets, allocates memory, and registers hooks.
-        Must be called before the backward pass.
+        It must be called before the backward pass.
         """
         stream = torch.cuda.Stream()
         self._communicate_stream = stream
@@ -206,17 +205,13 @@ class GradientSynchronizer:
         for bucket in self._buckets:
             bucket.bind()
 
-        # Re-apply the accumulation count to the freshly built buckets if it was already set for this
-        # step (e.g. after an offload/onload rebind mid-training).
+        # A rebind in the middle of training (e.g. after offload and onload) keeps the count of the current step.
         if self._require_accumulations is not None:
             for bucket in self._buckets:
                 bucket.set_required_accumulations(self._require_accumulations)
 
     def unbind(self):
-        """Releases resources.
-
-        Destroys buckets, frees memory buffers, and removes hooks.
-        """
+        """Destroys the buckets, frees their buffers and removes the hooks."""
         for bucket in self._buckets:
             bucket.unbind()
 
@@ -224,14 +219,14 @@ class GradientSynchronizer:
         self._communicate_stream = None
 
     def wait(self):
-        """Waits for all bucket operations (async reductions) to complete.
+        """Makes the current stream wait for all asynchronous reductions and marks the buckets as synchronized.
 
         Raises:
-            ValueError: If the synchronizer is not bound (call bind first).
+            ValueError: If the synchronizer is not bound.
         """
         stream = self._communicate_stream
         if stream is None:
-            raise ValueError("Synchronizer is not bound")
+            raise ValueError("The synchronizer is not bound. Call bind() first.")
 
         torch.cuda.current_stream().wait_stream(stream)
 
@@ -244,13 +239,13 @@ class GradientSynchronizer:
             bucket.zero_grad()
 
     def set_required_accumulations(self, require_accumulations: int):
-        """Sets the accumulation count for the current step across all buckets.
+        """Sets the accumulation count of the current step for all buckets.
 
-        The count may change per step (pack length varies), so it is applied live to the already-bound
-        buckets and also stored so subsequent binds (e.g. after offload/onload) use the latest value.
+        The count can change from step to step, because the pack length varies. Later binds, for example after
+        offload and onload, reuse the latest count.
 
         Args:
-            require_accumulations: Number of accumulations required before reducing gradients.
+            require_accumulations: The number of accumulations required before the gradients are reduced.
         """
         self._require_accumulations = require_accumulations
         for bucket in self._buckets:

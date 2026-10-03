@@ -5,7 +5,13 @@ from d9d.loop.config.config import TimeoutConfig
 
 
 class TimeoutState(StrEnum):
-    """Represents the lifecycle states of the timeout manager configuration."""
+    """Lifecycle states of the ``TimeoutManager``.
+
+    Attributes:
+        none: No timeout was set yet.
+        set_initial: The initialization timeout is active.
+        set_regular: The step timeout is active.
+    """
 
     none = "none"
     set_initial = "set_initial"
@@ -13,15 +19,14 @@ class TimeoutState(StrEnum):
 
 
 class TimeoutManager:
-    """Manages the dynamic adjustment of distributed timeouts during the job loop.
+    """Manager that adjusts the distributed timeouts dynamically during the job loop.
 
-    This manager handles the transition from initialization timeouts (which may need
-    to be longer due to JIT compilation, caching, or startup overhead) to regular
-    step execution timeouts.
+    The manager switches from the initialization timeout to the step timeout. The initialization
+    timeout can be longer to cover compilation, caching and other startup work.
     """
 
     def __init__(self, dist_context: DistributedContext, config: TimeoutConfig):
-        """Constructs the TimeoutManager object.
+        """Constructs the ``TimeoutManager`` object.
 
         Args:
             dist_context: The distributed context where timeouts are applied.
@@ -34,14 +39,13 @@ class TimeoutManager:
     def set_init(self):
         """Sets the distributed backend timeout to the initialization value.
 
-        This allows for a longer timeout duration during the startup phase of the
-        application where compilation or heavy loading operations might occur.
-
         Raises:
-            ValueError: If the timeout state has already been initialized.
+            ValueError: If a timeout was already set.
         """
         if self._state != TimeoutState.none:
-            raise ValueError("Can only set init timeout from initial state")
+            raise ValueError(
+                f"Timeout state ({self._state}) is not initial. Call set_init() only once, before set_periodic()."
+            )
 
         self._dist_context.set_timeout(self._config.init_timeout)
         self._state = TimeoutState.set_initial
@@ -49,18 +53,18 @@ class TimeoutManager:
     def set_periodic(self):
         """Transitions the distributed backend timeout to the regular step value.
 
-        If the manager is currently in the initialization state, this updates the
-        backend timeout to the configured step timeout. If already in the regular
-        state, no action is taken.
+        Does nothing if the step timeout is already set.
 
         Raises:
-            ValueError: If the manager has not been initialized.
+            ValueError: If ``set_init`` was not called before.
         """
         match self._state:
             case TimeoutState.set_initial:
                 self._dist_context.set_timeout(self._config.step_timeout)
                 self._state = TimeoutState.set_regular
             case TimeoutState.set_regular:
-                pass  # do nothing
+                pass
             case _:
-                raise ValueError("Unknown timeout state")
+                raise ValueError(
+                    f"Timeout state ({self._state}) has no init timeout. Call set_init() before set_periodic()."
+                )

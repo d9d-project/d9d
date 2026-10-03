@@ -10,40 +10,35 @@ class ExpertCommunicationHandler(abc.ABC):
     def dispatch(
         self, hidden_states: torch.Tensor, topk_ids: torch.Tensor, topk_weights: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Prepares and routes local hidden states to their target experts (possibly on other workers).
+        """Routes local hidden states to their target experts, which can be on other ranks.
 
-        This process involves:
-
-        1. All-to-All Communication: Transfers hidden states to workers containing the assigned experts. States
-        assigned to multiple experts are replicated.
-
-        2. Permutation: Sorts tokens by expert ID to prepare for Grouped GEMM.
+        Tokens assigned to several experts are replicated. The received tokens are sorted by expert index,
+        as grouped GEMM requires.
 
         Args:
-            hidden_states: Input tokens. Shape: `(num_tokens, hidden_size)`.
-            topk_ids: Indices of the top-k experts selected for each token. Shape: `(num_tokens, k)`.
-            topk_weights: Routing weights associated with the selected experts. Shape: `(num_tokens, k)`.
+            hidden_states: Input tokens. Shape: ``(num_tokens, hidden_size)``.
+            topk_ids: Indices of the experts selected for each token. Shape: ``(num_tokens, top_k)``.
+            topk_weights: Routing weights of the selected experts. Shape: ``(num_tokens, top_k)``.
 
         Returns:
-            A tuple containing:
+            A tuple of:
 
-            - Permuted hidden states received by this rank. Shape: `(num_received_tokens, hidden_size)`.
-            - Permuted weights matching the hidden states order. Shape: `(num_received_tokens)`.
-            - Expert count tensor indicating how many tokens each local expert received. Shape: `(num_local_experts)`.
+            *   Sorted hidden states received by this rank. Shape: ``(num_received_tokens, hidden_size)``.
+            *   Routing weights in the same order. Shape: ``(num_received_tokens,)``.
+            *   CPU tensor with the number of tokens each local expert received. Shape: ``(num_local_experts,)``.
         """
         ...
 
     @abc.abstractmethod
     def combine(self, hidden_states: torch.Tensor) -> torch.Tensor:
-        """Restores hidden states to their original order and location.
+        """Returns processed hidden states to their original order and rank.
 
-        Undoes the permutation and performs the reverse All-to-All communication
-        to return processed results to the workers that originated the requests.
+        Replicated tokens are summed. Must be called after ``dispatch``.
 
         Args:
-            hidden_states: The processed hidden states. Shape: `(num_received_tokens, hidden_size)`.
+            hidden_states: Processed hidden states. Shape: ``(num_received_tokens, hidden_size)``.
 
         Returns:
-            The combined hidden states with the original shape and order. Shape: `(num_tokens, hidden_size)`.
+            The combined hidden states in the original order. Shape: ``(num_tokens, hidden_size)``.
         """
         ...

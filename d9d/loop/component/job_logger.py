@@ -30,11 +30,9 @@ def _flatten_pytree_for_metrics(tree: PyTree[float]) -> dict[str, float]:
 
 
 class JobLogger(Stateful):
-    """Handles the logging of training metrics and loss values.
+    """Logger that sends the loss and the metrics of a job to the experiment tracker.
 
-    This class coordinates with the distributed context and metric calculators
-    to log instantaneous loss values and periodic aggregated metrics to the
-    configured experiment tracker.
+    The loss is logged every step. Metrics are aggregated across ranks and logged periodically.
     """
 
     def __init__(
@@ -46,15 +44,15 @@ class JobLogger(Stateful):
         run_config: RunConfig,
         additional_hparams: ScalarTree,
     ):
-        """Constructs JobLogger object.
+        """Constructs the ``JobLogger`` object.
 
         Args:
             dist_context: The distributed context.
-            config: Configuration settings.
-            metrics: The composite metric collection to be computed and logged.
-            schedule: Object tracking the current global step.
-            run_config: Run configuration.
-            additional_hparams: Supplemental hyperparameters to log for this run.
+            config: The logging configuration.
+            metrics: The metrics to compute and log.
+            schedule: The job schedule that tracks the current step.
+            run_config: The tracker run configuration.
+            additional_hparams: Additional hyperparameters to log for this run.
         """
         self._dist_context = dist_context
         self._config = config
@@ -74,7 +72,7 @@ class JobLogger(Stateful):
 
     @contextmanager
     def new_run(self) -> Generator[BaseTrackerRun, None, None]:
-        """Creates a context manager for a new experiment run.
+        """Opens a new experiment run.
 
         Yields:
             The active tracker run interface.
@@ -84,22 +82,15 @@ class JobLogger(Stateful):
 
     @contextmanager
     def install(self):
-        """Prepares the metric collector resources (e.g., CUDA streams).
-
-        This context manager ensures async metrics are bound to the device before
-        usage and unbound afterwards.
-        """
+        """Binds the async metric collector to the device while the context is open."""
         self._metric_collector.bind()
         yield
         self._metric_collector.unbind()
 
     def trigger_sync(self):
-        """Conditionally initiates the synchronization of distributed metrics.
+        """Starts the async aggregation of metrics across ranks if this step logs metrics.
 
-        Checks if the current step is scheduled for metric logging. If so, it
-        triggers the asynchronous communication required to aggregate metric values
-        across ranks. This allows communication to overlap with other operations
-        before `log` is called.
+        The communication overlaps with other work until ``log`` is called.
         """
         if not self._schedule.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
             return
@@ -107,16 +98,13 @@ class JobLogger(Stateful):
         self._metric_collector.schedule_collection(self._dist_context)
 
     def log(self, run: BaseTrackerRun, loss_value: torch.Tensor):
-        """Logs the current loss and conditional metric results.
+        """Logs the current loss and, on logging steps, the metric results.
 
-        This method always logs the provided loss value. Periodically (determined
-        by the schedule configuration), it retrieves the asynchronous results from
-        the metric collector (initiated by `trigger_sync`), flattens the result
-        structure, and logs them to the tracker.
+        The metric results are the ones started by ``trigger_sync``.
 
         Args:
-            run: The active tracker run interface for sending data.
-            loss_value: Tensor containing the scalar loss for the current step.
+            run: The active tracker run.
+            loss_value: The scalar loss of the current step.
         """
         with record_function("Logging"):
             run.scalar("loss", loss_value.item())

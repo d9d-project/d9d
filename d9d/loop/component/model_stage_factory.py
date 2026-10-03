@@ -20,35 +20,40 @@ StatefulPredicate = Callable[[str, torch.Tensor], bool]
 
 
 def _stateful_predicate_requires_grad(key: str, value: torch.Tensor) -> bool:
-    """Predicate that allows saving only tensors that require gradients.
+    """Allows saving only tensors that require gradients.
 
     Returns:
-        True if the tensor requires gradients, False otherwise.
+        ``True`` if the tensor requires gradients, otherwise ``False``.
     """
     return value.requires_grad
 
 
 def _stateful_predicate_always(key: str, value: torch.Tensor) -> bool:
-    """Predicate that always allows saving.
+    """Always allows saving.
 
     Returns:
-        Always returns True.
+        Always ``True``.
     """
     return True
 
 
 class TrackedModules(Stateful, Offloadable):
-    """Wraps a list of model stages and manages their state for distributed checkpointing.
+    """Wrapper of a list of model stages that manages their state for distributed checkpointing.
 
-    This class implements the PyTorch Distributed `Stateful` protocol, aggregating
-    the state dictionaries of multiple pipeline stages assigned to the current rank.
-    It handles namespacing to ensure uniqueness across pipeline ranks and stages.
+    It implements the PyTorch Distributed ``Stateful`` protocol over all pipeline stages of the current
+    rank. State keys are namespaced by pipeline rank and stage, so they are unique across ranks.
     """
 
     def __init__(
         self, dist_context: DistributedContext, modules: list[nn.Module], stateful_predicate: StatefulPredicate
     ):
-        """Constructs a TrackedModules object."""
+        """Constructs the ``TrackedModules`` object.
+
+        Args:
+            dist_context: The distributed context.
+            modules: The model stages held by the current rank.
+            stateful_predicate: Selects the parameters and buffers stored in the state dict.
+        """
         if dist_context.mesh_params.is_distributed:
             self._pp_rank = dist_context.mesh_for(REGULAR_DOMAIN)["pp"].get_local_rank()
         else:
@@ -61,7 +66,7 @@ class TrackedModules(Stateful, Offloadable):
 
     @property
     def modules(self) -> list[nn.Module]:
-        """Returns the list of underlying PyTorch model modules."""
+        """The model stages held by the current rank."""
         return self._modules
 
     def _tensors(self) -> Iterator[torch.Tensor]:
@@ -77,10 +82,9 @@ class TrackedModules(Stateful, Offloadable):
     def offload(self, ctx: OffloadContext) -> None:
         """Releases the GPU memory of all model parameters and buffers, moving them to host memory.
 
-        Each tensor's local storage is swapped in place for a host copy. The parameter/buffer
-        objects themselves - including DTensor wrappers - are preserved, so optimizer state keys,
-        gradient hooks and any external references (e.g. a frozen reference model held by a task)
-        remain valid.
+        Each tensor's local storage is swapped in place for a host copy. The parameter and buffer
+        objects, including ``DTensor`` wrappers, are kept. So optimizer state keys, gradient hooks and
+        external references (e.g. a frozen reference model held by a task) stay valid.
 
         Args:
             ctx: Context for this operation.
@@ -100,7 +104,7 @@ class TrackedModules(Stateful, Offloadable):
         self._offload_mirror = mirror
 
     def onload(self, ctx: OnloadContext) -> None:
-        """Restores GPU residency of all model parameters and buffers released by "offload".
+        """Restores all model parameters and buffers released by ``offload`` to the GPU.
 
         Args:
             ctx: Context for this operation.
@@ -120,10 +124,10 @@ class TrackedModules(Stateful, Offloadable):
         self._offload_mirror = None
 
     def is_offloaded(self) -> bool:
-        """Reports whether the model parameters and buffers are currently on host memory.
+        """Reports whether the model parameters and buffers are offloaded to host memory.
 
         Returns:
-            True if the model is offloaded, False otherwise.
+            ``True`` if the model is offloaded, otherwise ``False``.
         """
         return self._offload_mirror is not None
 
@@ -142,9 +146,8 @@ class TrackedModules(Stateful, Offloadable):
     def state_dict(self) -> dict[str, Any]:
         """Generates the state dictionary for all tracked modules.
 
-        The keys are namespaced using the current pipeline rank and stage index
-        (e.g., `pp_0_stage_0`). Only parameters satisfying the `stateful_predicate`
-        are included.
+        The keys are namespaced by the current pipeline rank and stage index, e.g. ``pp_0_stage_0``.
+        Only parameters and buffers accepted by ``stateful_predicate`` are included.
 
         Returns:
             A dictionary containing the states of all managed modules.
@@ -162,9 +165,9 @@ class TrackedModules(Stateful, Offloadable):
         extra_keys = set(loading_result.unexpected_keys)
 
         if len(whitelist.intersection(missing_keys)) > 0:
-            raise ValueError(f"Missing keys: {whitelist.intersection(missing_keys)}")
+            raise ValueError(f"The state dict is missing keys ({whitelist.intersection(missing_keys)}).")
         if len(extra_keys) > 0:
-            raise ValueError(f"Extra keys: {extra_keys}")
+            raise ValueError(f"The state dict has unexpected keys ({extra_keys}).")
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         """Loads the state dictionary into the tracked modules.
@@ -174,22 +177,21 @@ class TrackedModules(Stateful, Offloadable):
                 to the pipeline rank and stage indices managed by this instance.
 
         Raises:
-            ValueError: If required keys are missing or unexpected keys are present
-                based on the allow-list predicate.
+            ValueError: If keys accepted by ``stateful_predicate`` are missing or unexpected keys are present.
         """
         for i, module in enumerate(self._modules):
             self._load_state_dict_stage(module, state_dict[f"pp_{self._pp_rank}_stage_{i}"])
 
 
 class ModelStageFactory:
-    """Factory class responsible for creating, initializing, and parallelizing model stages.
+    """Factory that creates, initializes and parallelizes model stages.
 
-    This class coordinates the `ModelProvider` with the distributed context to:
+    It drives the ``ModelProvider`` to:
 
-    1. Initialize models on a meta device.
-    2. Apply horizontal distribution strategy (TP, DP, FSDP, etc).
-    3. Materialize weights on the target device.
-    4. Load initial model states from checkpoints.
+    1.  Initialize models on the meta device.
+    2.  Apply horizontal parallelism (TP, DP, FSDP, etc.).
+    3.  Materialize weights on the target device.
+    4.  Load the initial model state from a checkpoint.
     """
 
     def __init__(
@@ -199,14 +201,21 @@ class ModelStageFactory:
         config_model: ModelStageFactoryConfig,
         config_pipelining: PipeliningConfig,
     ):
-        """Constructs a ModelStageFactory object."""
+        """Constructs the ``ModelStageFactory`` object.
+
+        Args:
+            model_provider: The provider that builds and parallelizes each model stage.
+            dist_context: The distributed context.
+            config_model: The model initialization configuration.
+            config_pipelining: The pipeline parallelism configuration.
+        """
         self._model_provider = model_provider
         self._dist_context = dist_context
         self._config_model = config_model
         self._config_pipelining = config_pipelining
 
     def _build_model_stage(self, stage: PipelineStageInfo) -> nn.Module:
-        # create a model with no real memory occupied
+        # Build on the meta device, so no memory is allocated yet.
         with torch.device("meta"):
             factored = self._model_provider.initialize_model_stage(
                 InitializeModelStageContext(
@@ -218,18 +227,18 @@ class ModelStageFactory:
         model = factored.model
 
         if not isinstance(model, ModuleLateInit) or not isinstance(model, nn.Module):
-            raise ValueError("Model stage is required to be nn.Module instance implementing ModuleLateInit protocol")
+            raise ValueError(
+                f"Model stage ({type(model).__name__}) must be an nn.Module that implements ModuleLateInit."
+            )
 
-        # if current context is distributed - parallelize this model
         if self._dist_context.mesh_params.is_distributed:
             self._model_provider.parallelize_model_stage(
                 ParallelizeModelStageContext(model=model, stage=stage, dist_context=self._dist_context)
             )
 
-        # move state that is bound to current device to it
         model.to_empty(device=self._dist_context.current_device)
 
-        # reinitialize model parameters (only these are on current device)
+        # to_empty allocates uninitialized storage, so initialize the parameters.
         with torch.no_grad():
             model.reset_parameters()
 
@@ -239,20 +248,18 @@ class ModelStageFactory:
                 model=model,
                 mapper=factored.state_mapper,
                 device=f"cuda:{torch.cuda.current_device()}",
-                position=self._dist_context.local_rank,  # progress bar is displayed once per rank inside this node
+                position=self._dist_context.local_rank,  # Progress bar is displayed once per rank inside this node
             )
 
-        # set training state
         model.train()
 
         return model
 
     def build_pipeline_and_modules(self) -> tuple[PipelineScheduleInfo, TrackedModules]:
-        """Constructs the execution schedule and the model container.
+        """Builds the pipeline schedule and the model stages.
 
         Returns:
-           The pipeline schedule information.
-           The `TrackedModules` instance wrapping the created model stage(s).
+            A tuple of the pipeline schedule info and the ``TrackedModules`` that wrap the model stages.
         """
         if self._config_model.checkpoint_only_trainable_parameters:
             stateful_predicate = _stateful_predicate_requires_grad

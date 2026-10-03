@@ -10,29 +10,26 @@ from .replicate_parallel import parallelize_replicate
 def parallelize_hsdp(
     module: nn.Module, mesh: DeviceMesh, shard_dim: str = "dp_cp_shard", *fsdp_args: Any, **fsdp_kwargs: Any
 ):
-    """Applies Hybrid Sharded Data Parallelism (HSDP) to a module.
+    """Applies Hybrid Sharded Data Parallel (HSDP) to a module.
 
-    This function decomposes the provided device mesh into sharding dimensions
-    and replication dimensions. It applies replication parallelism
-    across the replication dimensions and Fully Sharded Data Parallelism (FSDP)
-    across the specified shard dimension.
+    The module is sharded with FSDP along ``shard_dim`` and replicated along every other mesh
+    dimension. Dimensions of size 1 are skipped.
 
     Args:
         module: The module to parallelize.
-        mesh: The device mesh over which to distribute the module.
-        shard_dim: The name of the mesh dimension used for FSDP sharding. Any
-            dimension in the mesh not matching this name will be treated as a
-            replication dimension.
+        mesh: The device mesh to distribute the module over.
+        shard_dim: The name of the mesh dimension to shard along. All other dimensions are
+            replication dimensions.
         *fsdp_args: Positional arguments passed to the underlying FSDP parallelizer.
         **fsdp_kwargs: Keyword arguments passed to the underlying FSDP parallelizer.
 
     Raises:
-        ValueError: If the device mesh does not have named dimensions.
+        ValueError: If the device mesh has no dimension names.
     """
     replicate_dims = mesh.mesh_dim_names
 
     if replicate_dims is None:
-        raise ValueError("Cannot use with unnamed device meshes")
+        raise ValueError("parallelize_hsdp() requires a device mesh with named dimensions.")
 
     replicate_dims = tuple(x for x in replicate_dims if x != shard_dim and mesh[x].size() > 1)
 

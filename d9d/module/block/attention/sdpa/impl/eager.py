@@ -7,16 +7,18 @@ from ..protocol import SdpaBackend
 
 
 class EagerSdpa(nn.Module, SdpaBackend):
-    """Scaled Dot Product Attention implemented with explicit PyTorch ops.
+    """Scaled dot-product attention implemented with explicit PyTorch ops.
 
-    This is a portable, dependency-free reference backend.
-
-    Args:
-        config: Backend configuration.
-        params: Structural parameters.
+    This is a reference backend with no extra dependencies.
     """
 
     def __init__(self, config: EagerSdpaBackendConfig, params: SdpaParameters) -> None:
+        """Constructs the ``EagerSdpa`` object.
+
+        Args:
+            config: Backend configuration.
+            params: Structural layer parameters.
+        """
         super().__init__()
 
         self.sinks = nn.Parameter(torch.zeros(params.num_sinks)) if params.num_sinks is not None else None
@@ -28,13 +30,11 @@ class EagerSdpa(nn.Module, SdpaBackend):
         is_causal: bool,
         device: torch.device,
     ) -> torch.Tensor | None:
-        """Builds a boolean mask of disallowed positions, shape ``(seq_len, seq_len)``.
-
-        ``True`` marks positions that must be masked out.
+        """Builds a boolean mask of disallowed positions.
 
         Returns:
-            A boolean mask tensor, or ``None`` when neither causal masking nor a
-            sliding window is requested.
+            A boolean mask where ``True`` marks masked-out positions, or ``None`` if neither causal masking nor a
+            sliding window is requested. Shape: ``(seq_len, seq_len)``.
         """
         left, right = self._window_size
         has_window = left is not None or right is not None
@@ -72,7 +72,7 @@ class EagerSdpa(nn.Module, SdpaBackend):
         num_kv_heads = key_states.shape[2]
         groups = num_q_heads // num_kv_heads
 
-        # (B, S, H, D) -> (B, H, S, D)
+        # (batch, seq_len, num_heads, head_dim) -> (batch, num_heads, seq_len, head_dim)
         query = query_states.transpose(1, 2)
         key = key_states.transpose(1, 2).repeat_interleave(groups, dim=1)
         value = value_states.transpose(1, 2).repeat_interleave(groups, dim=1)
@@ -96,5 +96,5 @@ class EagerSdpa(nn.Module, SdpaBackend):
 
         out = torch.matmul(scores.to(value.dtype), value)
 
-        # (B, H, S, D) -> (B, S, H, D)
+        # (batch, num_heads, seq_len, head_dim) -> (batch, seq_len, num_heads, head_dim)
         return out.transpose(1, 2).contiguous()

@@ -32,16 +32,19 @@ def _build_mesh_domains(params: "DeviceMeshParameters") -> dict[str, DeviceMesh]
 
 
 class DistributedContext:
-    """Acts as the single source of truth for the distributed execution environment.
+    """The single source of truth for the distributed execution environment.
 
-    It acts as the central repository for the distributed configuration, managing the creation
-    and synchronization of PyTorch DeviceMeshes for different domains (Regular domain, Expert Parallel domain, ...).
-
-    All assertions regarding rank placement, group memberships, and parallel topology
-    must be derived from this context to ensure consistency.
+    It builds a PyTorch ``DeviceMesh`` for each domain (regular, expert, dense, ...). Rank placement, group
+    membership and parallel topology must all come from this context, so that they stay consistent.
     """
 
     def __init__(self, params: "DeviceMeshParameters", log_level: int):
+        """Constructs the ``DistributedContext`` object and sets the current CUDA device to the local rank.
+
+        Args:
+            params: The parallelism degrees to build the device meshes from.
+            log_level: The log level of the ``d9d`` logger.
+        """
         self._params = params
 
         if params.is_distributed:
@@ -76,60 +79,65 @@ class DistributedContext:
 
     @property
     def logger(self) -> logging.Logger:
-        """Returns the logger instance configured for distributed logging."""
+        """The logger configured for distributed logging."""
         return self._logger
 
     def mesh_for(self, domain: str) -> DeviceMesh:
         """Returns the device mesh view associated with a specific logical domain.
 
-        Available Domains and Dimensions:
-            *   `regular` (`REGULAR_DOMAIN`): The most granular mesh for fully decomposed parallelism.
-                Dimensions: ``('pp', 'dp_replicate', 'dp_shard', 'cp_shard', 'cp_replicate', 'tp')``
-            *   `expert` (`EXPERT_DOMAIN`): Mesh optimized for distributing MoE (Mixture of Experts) layers.
-                Dimensions: ``('pp', 'replicate', 'ep')``
-            *   `dense` (`DENSE_DOMAIN`): Mesh optimized for distributing dense layers.
-                Dimensions: ``('pp', 'dp_replicate', 'dp_cp_shard', 'cp_replicate', 'tp')``
-            *   `batch` (`BATCH_DOMAIN`): Mesh optimized for distributing input data.
-                Dimensions: ``('pp', 'dp', 'cp', 'tp')``
-            *   `flat` (`FLAT_DOMAIN`): Mesh containing a single dimension with all the processes.
-                Dimensions: ``('world')``
+        The available domains:
+
+        *   ``"regular"`` (``REGULAR_DOMAIN``): the most granular mesh, with every parallelism in its own dimension.
+            Dimensions: ``("pp", "dp_replicate", "dp_shard", "cp_shard", "cp_replicate", "tp")``.
+        *   ``"expert"`` (``EXPERT_DOMAIN``): the mesh for Mixture-of-Experts (MoE) layers.
+            Dimensions: ``("pp", "ep_replicate", "ep_shard")``.
+        *   ``"dense"`` (``DENSE_DOMAIN``): the mesh for dense layers.
+            Dimensions: ``("pp", "dp_replicate", "dp_cp_shard", "cp_replicate", "tp")``.
+        *   ``"batch"`` (``BATCH_DOMAIN``): the mesh for distributing input data.
+            Dimensions: ``("pp", "dp", "cp", "tp")``.
+        *   ``"flat"`` (``FLAT_DOMAIN``): a single dimension with all the processes.
+            Dimensions: ``("world",)``.
 
         Args:
-            domain: The name of the domain to retrieve.
+            domain: The name of the domain.
 
         Returns:
-            The PyTorch DeviceMesh configured for the requested domain.
+            The device mesh of the domain.
 
         Raises:
-            ValueError: If the specified domain does not exist.
+            ValueError: If the domain does not exist.
         """
         if domain not in self._meshes:
-            raise ValueError(f"Domain {domain} does not exist")
+            raise ValueError(
+                f"Domain ({domain}) does not exist. Use one of the available domains ({list(self._meshes)})."
+            )
         return self._meshes[domain]
 
     @property
     def is_main_process(self) -> bool:
-        """Checks if the current process is the global rank 0."""
+        """Whether the current process is global rank 0."""
         return self._global_rank == 0
 
     @property
     def is_local_main_process(self) -> bool:
-        """Checks if the current process is the rank 0 on the specific node."""
+        """Whether the current process is local rank 0 on its node."""
         return self._local_rank == 0
 
     def wait_world(self):
-        """Blocks process execution until all ranks reach this point."""
+        """Blocks until all ranks reach this point and the current CUDA device finishes its queued work."""
         if self._params.is_distributed:
             torch.distributed.barrier(device_ids=[torch.cuda.current_device()])
         torch.cuda.synchronize()
 
     def set_timeout(self, timeout_seconds: float):
-        """Updates the NCCL/process group timeout for all underlying meshes.
+        """Sets the timeout of the default process group and of all mesh process groups.
+
+        Does nothing in a non-distributed setup.
 
         Args:
-            timeout_seconds: New timeout duration in seconds.
+            timeout_seconds: The new timeout in seconds.
         """
-        if not self._params.is_distributed:  # does nothing for local setups
+        if not self._params.is_distributed:
             return
 
         self.logger.info(f"Setting global timeout to {timeout_seconds} seconds")
@@ -145,10 +153,10 @@ class DistributedContext:
 
     @contextmanager
     def local_main_process_first(self):
-        """Context manager that executes the block on the local main process first.
+        """Runs the block on the local main processes first.
 
-        Other local ranks wait at the entrance. The local main process waits at the
-        exit to synchronize before continuing.
+        Other ranks wait before entering the block. Local main processes wait after leaving it, so all ranks
+        continue together.
         """
         if not self.is_local_main_process:
             self.wait_world()
@@ -160,10 +168,10 @@ class DistributedContext:
 
     @contextmanager
     def main_process_first(self):
-        """Context manager that executes the block on the global main process first.
+        """Runs the block on the global main process first.
 
-        All other ranks wait at the entrance. The global main process waits at the
-        exit to synchronize before continuing.
+        Other ranks wait before entering the block. The global main process waits after leaving it, so all ranks
+        continue together.
         """
         if not self.is_main_process:
             self.wait_world()
@@ -175,30 +183,30 @@ class DistributedContext:
 
     @property
     def current_device(self) -> torch.device:
-        """Returns the CUDA device associated with this rank."""
+        """The CUDA device of this rank."""
         return self._current_device
 
     @property
     def mesh_params(self) -> "DeviceMeshParameters":
-        """Returns the parameters used to initialize this context."""
+        """The parameters this context was built from."""
         return self._params
 
     @property
     def master_addr(self) -> str:
-        """Returns the IP address or domain name of the master node."""
+        """The IP address or host name of the master node."""
         return self._master_addr
 
     @property
     def node_rank(self) -> int:
-        """Returns the index of the node this process is running on."""
+        """The index of the node this process runs on."""
         return self._node_rank
 
     @property
     def local_rank(self) -> int:
-        """Returns the rank of the current process within its node."""
+        """The rank of the current process within its node."""
         return self._local_rank
 
     @property
     def num_nodes(self) -> int:
-        """Returns the total number of nodes in the cluster."""
+        """The total number of nodes in the cluster."""
         return self._num_nodes

@@ -20,17 +20,16 @@ def named_modules_without_lora(
 ):
     """Yields named modules, skipping submodules that are already LoRA layers.
 
-    This prevents recursively re-injecting LoRA into an already wrapped layer during
-    traversal.
+    This prevents injecting LoRA into an already wrapped layer again. Mirrors ``nn.Module.named_modules``.
 
     Args:
         module: The root module to traverse.
-        memo: Set of processed modules to avoid duplicates.
-        prefix: Current namespace prefix.
-        remove_duplicate: Whether to skip modules seen in memo.
+        memo: Set of visited modules.
+        prefix: Current name prefix.
+        remove_duplicate: Whether to skip modules that are already in ``memo``.
 
     Yields:
-        Tuple of (name, module).
+        Pairs of ``(name, module)``.
     """
     if isinstance(module, _LORA_MODULES):
         return
@@ -54,21 +53,18 @@ def named_modules_without_lora(
 
 
 class LoRA(PeftMethod[LoRAConfig]):
-    """Implements the Low-Rank Adaptation (LoRA) injection strategy.
+    """PEFT method for Low-Rank Adaptation (LoRA).
 
-    It scans the module structure for `nn.Linear` or `GroupedLinear` layers matching
-    the configured name pattern. Matched layers are replaced with LoRA wrappers.
-
-    It also generates `ModelStateMapperRename` objects. Since the original weight
-    `layer.weight` is now at `layer.base.weight` inside the wrapper, the mapper
-    ensures that loading a standard checkpoint still works by redirecting the key.
+    ``inject`` replaces every ``nn.Linear`` or ``GroupedLinear`` layer whose name matches the configured pattern
+    with a LoRA wrapper. The original ``layer.weight`` moves to ``layer.base.weight``. For each wrapped layer,
+    ``inject`` returns a ``ModelStateMapperRename``, so standard checkpoints still load.
     """
 
     def __init__(self, config: LoRAConfig):
-        """Constructs a LoRA method.
+        """Constructs the ``LoRA`` object.
 
         Args:
-            config: LoRA configuration containing patterns and hyperparameters.
+            config: LoRA configuration with the module name pattern and hyperparameters.
         """
         self._config = config
 
@@ -89,7 +85,7 @@ class LoRA(PeftMethod[LoRAConfig]):
             elif isinstance(mod, GroupedLinear):
                 lora_mod = LoRAGroupedLinear(mod, self._config.params)
             else:
-                raise ValueError(f"Unknown layer {type(mod)} for LoRA")
+                raise ValueError(f"LoRA does not support layer type ({type(mod).__name__}).")
 
             params_to_train.extend(lora_mod.lora_A.parameters())
             params_to_train.extend(lora_mod.lora_B.parameters())

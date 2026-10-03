@@ -10,8 +10,8 @@ class PeftStackConfig(BaseModel):
     """Configuration for applying a stack of multiple PEFT methods sequentially.
 
     Attributes:
-        kind: Discriminator field, always "stack".
-        methods: A list of specific PEFT configurations (e.g., LoRA, FullTune) to apply in order.
+        kind: Discriminator field. Always ``"stack"``.
+        methods: The PEFT configurations (e.g. LoRA, full tune) to apply in order.
     """
 
     kind: Literal["stack"] = "stack"
@@ -23,6 +23,4 @@ AnyPeftConfig = Annotated[
     LoRAConfig | FullTuneConfig | PeftStackConfig,
     Field(discriminator="kind"),
 ]
-"""
-Union type representing any valid PEFT configuration, discriminated by the 'kind' field.
-"""
+"""Any valid PEFT configuration, discriminated by the ``kind`` field."""

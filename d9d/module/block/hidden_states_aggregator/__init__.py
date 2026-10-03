@@ -1,4 +1,4 @@
-"""Aggregation utilities for model hidden states."""
+"""Aggregation of model hidden states."""
 
 from .base import BaseHiddenStatesAggregator
 from .factory import HiddenStatesAggregationMode, create_hidden_states_aggregator

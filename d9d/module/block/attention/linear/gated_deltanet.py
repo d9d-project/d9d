@@ -15,10 +15,10 @@ from d9d.module.block.normalization import RMSNorm
 
 
 class CausalShortDepthwiseConv1d(nn.Module, ModuleLateInit):
-    """Causal 1D depthwise convolution (short convolution) as used in Mamba/FLA architectures.
+    """Causal 1D depthwise convolution (short convolution) as used in Mamba and FLA architectures.
 
-    Applies a grouped (depthwise) 1D convolution with left-padding to ensure causality,
-    followed by an optional activation function.
+    Applies a depthwise 1D convolution with left padding, so each position sees only past positions,
+    followed by a SiLU activation.
     """
 
     def __init__(
@@ -26,7 +26,7 @@ class CausalShortDepthwiseConv1d(nn.Module, ModuleLateInit):
         hidden_size: int,
         kernel_size: int,
     ) -> None:
-        """Constructs a CausalShortDepthwiseConv1d object.
+        """Constructs the ``CausalShortDepthwiseConv1d`` object.
 
         Args:
             hidden_size: Number of input and output channels.
@@ -37,14 +37,15 @@ class CausalShortDepthwiseConv1d(nn.Module, ModuleLateInit):
         self.weight = nn.Parameter(torch.empty(hidden_size, kernel_size))
 
     def forward(self, x: torch.Tensor, mask: torch.Tensor | None = None) -> torch.Tensor:
-        """Runs the forward pass for causal short depthwise convolution.
+        """Applies the causal short convolution.
 
         Args:
-            x: Input tensor of shape `(batch, seq_len, hidden_size)`.
-            mask: Optional attention mask of shape `(batch, seq_len)`.
+            x: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.
+            mask: Optional padding mask. Masked positions are zeroed before the convolution.
+                Shape: ``(batch, seq_len)``.
 
         Returns:
-            Output tensor of shape `(batch, seq_len, hidden_size)`.
+            Output tensor. Shape: ``(batch, seq_len, hidden_size)``.
         """
         if mask is not None:
             x = x * mask.unsqueeze(-1)
@@ -56,54 +57,53 @@ class CausalShortDepthwiseConv1d(nn.Module, ModuleLateInit):
             output_final_state=False,
             activation="silu",
             backend="triton",
-        )  # ty:ignore[call-non-callable]  -- fla-core has bad typings unfortunately
+        )  # ty: ignore[call-non-callable] - fla-core has wrong type annotations for causal_conv1d
 
         return x
 
     def reset_parameters(self) -> None:
-        """Resets the learnable parameters."""
+        """Resets module parameters."""
         nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
 
 
 class LogSigmoidDecayGate(nn.Module, ModuleLateInit):
-    """Decay gate using scaled log-sigmoid.
+    """Decay gate that uses a scaled log-sigmoid.
 
-    Used in GLA, original Delta Net, HGRN-2.
+    Used in GLA, the original DeltaNet and HGRN-2.
     """
 
     def __init__(self, hidden_size: int, num_heads: int, normalizer: float = 16.0) -> None:
-        """Constructs a LogSigmoidDecayGate object.
+        """Constructs the ``LogSigmoidDecayGate`` object.
 
         Args:
-            hidden_size: Input dimension.
+            hidden_size: Hidden size.
             num_heads: Number of attention heads (output dimension).
-            normalizer: Temperature τ dividing the logsigmoid output.
+            normalizer: Temperature that divides the log-sigmoid output.
         """
         super().__init__()
         self.proj = nn.Linear(hidden_size, num_heads, bias=False)
         self._normalizer = normalizer
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Runs the forward pass for LogSigmoidDecayGate.
+        """Computes the decay gate.
 
         Args:
-            x: Input tensor of shape `(batch, seq_len, hidden_size)`.
+            x: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.
 
         Returns:
-            Decay gate in log-space of shape `(batch, seq_len, num_heads)`, with values
-                in `(-∞, 0]`.
+            Decay gate in log space, with values in ``(-inf, 0]``. Shape: ``(batch, seq_len, num_heads)``.
         """
         return F.logsigmoid(self.proj(x)) / self._normalizer
 
     def reset_parameters(self) -> None:
-        """Resets the learnable parameters."""
+        """Resets module parameters."""
         self.proj.reset_parameters()
 
 
 class MambaDecayGate(nn.Module, ModuleLateInit):
-    """Mamba-style decay gate with learnable A_log and dt_bias.
+    """Mamba-style decay gate with learnable ``A_log`` and ``dt_bias``.
 
-    Used in Mamba, Mamba-2, Qwen3-Next, Qwen3.5.
+    Used in Mamba, Mamba-2, Qwen3-Next and Qwen3.5.
     """
 
     def __init__(
@@ -115,12 +115,12 @@ class MambaDecayGate(nn.Module, ModuleLateInit):
         dt_max: float = 0.1,
         dt_init_floor: float = 1e-4,
     ) -> None:
-        """Constructs a MambaDecayGate object.
+        """Constructs the ``MambaDecayGate`` object.
 
         Args:
-            hidden_size: Input dimension.
+            hidden_size: Hidden size.
             num_heads: Number of attention heads.
-            normalizer: Upper bound for uniform A initialization.
+            normalizer: Upper bound of the uniform initialization of ``A``.
             dt_min: Minimum dt for initialization.
             dt_max: Maximum dt for initialization.
             dt_init_floor: Floor for dt clamping during initialization.
@@ -140,14 +140,13 @@ class MambaDecayGate(nn.Module, ModuleLateInit):
         self.reset_parameters()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Runs the forward pass for MambaDecayGate.
+        """Computes the decay gate.
 
         Args:
-            x: Input tensor of shape `(batch, seq_len, hidden_size)`.
+            x: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.
 
         Returns:
-            Decay gate in log-space of shape `(batch, seq_len, num_heads)`, with values
-                in `(-∞, 0]`.
+            Decay gate in log space, with values in ``(-inf, 0]``. Shape: ``(batch, seq_len, num_heads)``.
         """
         gk = self.proj(x).unsqueeze(-1)
         gate = fused_kda_gate(gk, A_log=self.A_log, dt_bias=self.dt_bias)
@@ -155,7 +154,7 @@ class MambaDecayGate(nn.Module, ModuleLateInit):
         return gate.squeeze(-1)
 
     def reset_parameters(self) -> None:
-        """Resets the learnable parameters for this module."""
+        """Resets module parameters."""
         self.proj.reset_parameters()
 
         nn.init.uniform_(self.A_log, 0.0, self._normalizer)
@@ -169,7 +168,15 @@ class MambaDecayGate(nn.Module, ModuleLateInit):
 
 
 class MambaDecayGateParameters(BaseModel):
-    """Configuration parameters for the Mamba-style decay gate."""
+    """Configuration for the Mamba-style decay gate.
+
+    Attributes:
+        type: Discriminator field. Always ``"mamba"``.
+        normalizer: Upper bound of the uniform initialization of ``A``.
+        dt_min: Minimum ``dt`` for initialization.
+        dt_max: Maximum ``dt`` for initialization.
+        dt_init_floor: Floor for ``dt`` clamping during initialization.
+    """
 
     type: Literal["mamba"] = "mamba"
     normalizer: float
@@ -179,7 +186,12 @@ class MambaDecayGateParameters(BaseModel):
 
 
 class LogSigmoidDecayGateParameters(BaseModel):
-    """Configuration parameters for the LogSigmoid decay gate."""
+    """Configuration for the log-sigmoid decay gate.
+
+    Attributes:
+        type: Discriminator field. Always ``"logsigmoid"``.
+        normalizer: Temperature that divides the log-sigmoid output.
+    """
 
     type: Literal["logsigmoid"] = "logsigmoid"
     normalizer: float
@@ -196,18 +208,18 @@ def _build_decay_gate(
     hidden_size: int,
     num_heads: int,
 ) -> MambaDecayGate | LogSigmoidDecayGate:
-    """Constructs a decay gate module based on the provided configuration.
+    """Builds a decay gate module for the given configuration.
 
     Args:
-        config: Decay gate configuration object determining gate type and settings.
+        config: Decay gate configuration.
         hidden_size: Hidden size.
         num_heads: Number of attention heads.
 
     Returns:
-        An instantiated decay gate module.
+        The decay gate module.
 
     Raises:
-        ValueError: If an unknown decay gate configuration type is provided.
+        ValueError: If the decay gate configuration type is unknown.
     """
     match config:
         case MambaDecayGateParameters():
@@ -226,23 +238,21 @@ def _build_decay_gate(
                 normalizer=config.normalizer,
             )
         case _:
-            raise ValueError(f"Unknown decay gate config type: {type(config)}")
+            raise ValueError(f"Unknown decay gate config type ({type(config)}).")
 
 
 class GatedDeltaNet(nn.Module, ModuleLateInit):
-    """Implements Gated DeltaNet (GDN) attention mechanism.
+    """Gated DeltaNet (GDN) attention layer.
 
-    This module combines linear attention based on the Delta Rule with Mamba-style
-    data-dependent gating and short causal convolutions.
+    The layer combines linear attention based on the delta rule with Mamba-style data-dependent gating and
+    short causal convolutions. It runs these steps:
 
-    Pipeline:
-        1.  Linear projections for Q, K, V, output gate (G), decay gate (GK), and
-            write strength (Beta).
-        2.  Causal short depthwise convolution applied to Q, K, V.
-        3.  Data-dependent decay computation (Mamba-style or log-sigmoid).
-        4.  GQA/MQA head expansion for Q and K.
-        5.  Chunked Gated Delta Rule (with optional internal L2 norm on Q/K).
-        6.  Per-head RMSNorm and SiLU-gated output projection.
+    1.  Linear projections for Q, K, V, the output gate, the decay gate and the write strength (beta).
+    2.  Causal short depthwise convolution on Q, K and V.
+    3.  Data-dependent decay (Mamba-style or log-sigmoid).
+    4.  GQA/MQA head expansion for Q and K.
+    5.  Chunked gated delta rule, with optional L2 normalization of Q and K.
+    6.  Per-head RMSNorm and SiLU-gated output projection.
     """
 
     def __init__(
@@ -257,21 +267,21 @@ class GatedDeltaNet(nn.Module, ModuleLateInit):
         decay_gate: AnyDecayGateParameters,
         use_qk_l2norm: bool = True,
     ) -> None:
-        """Constructs a GatedDeltaNet object.
+        """Constructs the ``GatedDeltaNet`` object.
 
         Args:
             hidden_size: Hidden size.
-            num_query_key_heads: Number of query and key attention heads before grouped expansion.
-            num_value_heads: Number of value attention heads.
-            head_qk_dim: Dimension allocated for a single query or key per head.
-            head_v_dim: Dimension allocated for a single value per head.
-            norm_eps: Small constant added for numerical stability to the normalization layer.
-            conv_size: Size of the causal convolution kernel context.
-            decay_gate: Structured parameters to initialize the selected decay gate mechanism.
-            use_qk_l2norm: Whether to enable L2 normalization applied to Q/K internally.
+            num_query_key_heads: Number of query and key heads before grouped expansion.
+            num_value_heads: Number of value heads.
+            head_qk_dim: Dimension of a single query or key head.
+            head_v_dim: Dimension of a single value head.
+            norm_eps: Epsilon for the output RMSNorm.
+            conv_size: Kernel size of the short causal convolution.
+            decay_gate: Decay gate configuration.
+            use_qk_l2norm: Whether to L2-normalize Q and K inside the kernel.
 
         Raises:
-            ValueError: When num_value_heads is not uniformly divisible by num_query_key_heads.
+            ValueError: If ``num_value_heads`` is not divisible by ``num_query_key_heads``.
         """
         super().__init__()
 
@@ -294,7 +304,6 @@ class GatedDeltaNet(nn.Module, ModuleLateInit):
 
         self._qkv_split_sizes = [q_dim, k_dim, v_dim]
 
-        # --- Linear projections ---
         self.qkv_proj = nn.Linear(hidden_size, q_dim + k_dim + v_dim, bias=False)
         self.g_proj = nn.Linear(hidden_size, v_dim, bias=False)
         self.b_proj = nn.Linear(hidden_size, num_value_heads, bias=False)
@@ -304,10 +313,8 @@ class GatedDeltaNet(nn.Module, ModuleLateInit):
             num_heads=num_value_heads,
         )
 
-        # --- Short causal convolutions ---
         self.qkv_conv1d = CausalShortDepthwiseConv1d(q_dim + k_dim + v_dim, conv_size)
 
-        # --- Output normalization & projection ---
         self.out_norm = RMSNorm(head_v_dim, eps=norm_eps)
         self.o_proj = nn.Linear(v_dim, hidden_size, bias=False)
 
@@ -316,14 +323,14 @@ class GatedDeltaNet(nn.Module, ModuleLateInit):
         hidden_states: torch.Tensor,
         attention_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
-        """Runs forward pass.
+        """Computes Gated DeltaNet attention.
 
         Args:
-            hidden_states: Input tensor sequence of shape `(batch, seq_len, hidden_size)`.
-            attention_mask: Optional padding mask tensor of shape `(batch, seq_len)`.
+            hidden_states: Input tensor. Shape: ``(batch, seq_len, hidden_size)``.
+            attention_mask: Optional padding mask. Shape: ``(batch, seq_len)``.
 
         Returns:
-            Processed tensor possessing the identical shape as the input.
+            Output tensor. Shape: ``(batch, seq_len, hidden_size)``.
         """
         b, seq_len, _ = hidden_states.shape
 
@@ -371,7 +378,7 @@ class GatedDeltaNet(nn.Module, ModuleLateInit):
         return self.o_proj(out)
 
     def reset_parameters(self) -> None:
-        """Resets learnable parameters of this module."""
+        """Resets module parameters."""
         self.qkv_proj.reset_parameters()
         self.g_proj.reset_parameters()
         self.b_proj.reset_parameters()

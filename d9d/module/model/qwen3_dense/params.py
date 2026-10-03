@@ -2,15 +2,15 @@ from pydantic import BaseModel
 
 
 class Qwen3DenseLayerParameters(BaseModel):
-    """Configuration parameters for a single Qwen3 Dense layer.
+    """Configuration for a single Qwen3 Dense layer.
 
     Attributes:
-        hidden_size: Dimension of the model's hidden states.
-        intermediate_size: Dimension of the feed-forward hidden state.
-        num_attention_heads: Number of attention heads for the query.
-        num_key_value_heads: Number of attention heads for key and value.
-        rms_norm_eps: Epsilon value found in the RMSNorm layers.
-        head_dim: Dimension of a single attention head.
+        hidden_size: Size of the hidden states.
+        intermediate_size: Size of the feed-forward hidden layer.
+        num_attention_heads: Number of query attention heads.
+        num_key_value_heads: Number of key and value attention heads.
+        rms_norm_eps: Epsilon of the RMSNorm layers.
+        head_dim: Size of a single attention head.
     """
 
     hidden_size: int
@@ -22,21 +22,21 @@ class Qwen3DenseLayerParameters(BaseModel):
 
 
 class Qwen3DenseParameters(BaseModel):
-    """Configuration parameters for the Qwen3 Dense model backbone.
+    """Configuration for the Qwen3 Dense model backbone.
 
     Attributes:
         layer: Configuration shared across all transformer layers.
-        num_hidden_layers: The total number of transformer layers.
-        rope_base: Base value for RoPE frequency calculation.
+        num_hidden_layers: Total number of transformer layers.
+        rope_base: Base of the RoPE frequencies.
         max_position_ids: Maximum sequence length.
-        split_vocab_size: A dictionary mapping vocabulary segment names to their sizes.
-        split_vocab_order: The sequence in which vocabulary splits are correctly ordered.
-        pipeline_num_virtual_layers_pre: The number of 'virtual' layers representing the
-            computational cost of modules on the *first* stage, before the main
-            layers (e.g., token and positional embeddings).
-        pipeline_num_virtual_layers_post: The number of 'virtual' layers representing the
-            computational cost of modules on the *last* stage, after the main
-            layers (e.g., the final layer normalization and LM head).
+        split_vocab_size: Mapping of vocabulary segment names to their sizes.
+        split_vocab_order: Order in which the vocabulary segments are concatenated.
+        pipeline_num_virtual_layers_pre: Number of virtual layers that stand for the compute cost of
+            modules on the first stage before the main layers, such as token embeddings. Pipeline
+            layer distribution uses it.
+        pipeline_num_virtual_layers_post: Number of virtual layers that stand for the compute cost of
+            modules on the last stage after the main layers, such as the final norm and the LM head.
+            Pipeline layer distribution uses it.
     """
 
     layer: Qwen3DenseLayerParameters

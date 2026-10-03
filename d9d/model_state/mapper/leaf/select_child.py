@@ -4,13 +4,19 @@ from d9d.model_state.mapper.abc import ModelStateMapper, StateGroup
 
 
 class ModelStateMapperSelectChildModules(ModelStateMapper):
-    """Selects keys belonging to a parent module and strips that prefix.
+    """Mapper that selects the keys of a child module and strips the module prefix.
 
-    This is effectively a batch rename operation that "hoists" parameters
-    from a submodule scope to the current scope.
+    It is a batch rename that moves parameters from a submodule scope to the current scope.
     """
 
     def __init__(self, base_names: list[str], parent_name: str):
+        """Constructs the ``ModelStateMapperSelectChildModules`` object.
+
+        Args:
+            base_names: The keys relative to the child module, e.g. ``"weight"``.
+            parent_name: The name of the child module, e.g. ``"in_proj"``. Input keys are
+                ``"{parent_name}.{base_name}"``.
+        """
         self._base_names = base_names
         self._parent_prefix = f"{parent_name}."
 

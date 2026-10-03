@@ -10,9 +10,11 @@ from d9d.core.dist_context import BATCH_DOMAIN, DistributedContext
 
 
 class ShardIndexingMode(StrEnum):
-    """Defines how the dataset is split across shards.
+    """Ways to split a dataset across shards.
 
-    Modes:
+    The examples show 14 items split across 4 shards.
+
+    Attributes:
         sequential: Round-robin distribution.
 
             shard0: 0, 4, 8, 12
@@ -36,11 +38,10 @@ _T_co = TypeVar("_T_co", covariant=True)
 
 
 class ShardedDataset(Dataset[_T_co], Stateful):
-    """A dataset wrapper that acts as a view onto a specific shard of the underlying dataset.
+    """Dataset wrapper that exposes only one shard of a dataset.
 
-    This is useful for Data Parallel training where each process should only see
-    a subset of the data. It supports different indexing modes and optional padding
-    to ensure all shards have equal length (preventing hangs in distributed collectives).
+    Use it for data-parallel training, where each process sees only a subset of the data. Optional padding gives
+    all shards the same length, so no rank waits forever in a collective.
     """
 
     def __init__(
@@ -51,21 +52,21 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         indexing_mode: ShardIndexingMode,
         pad_to_equal_size_across_shards: bool,
     ):
-        """Constructs a ShardedDataset object.
+        """Constructs the ``ShardedDataset`` object.
 
         Args:
             dataset: The underlying dataset to shard.
-            total_shards: The total number of shards (e.g., number of DP ranks).
-            current_shard: The index of the current shard (e.g., current DP rank).
-            indexing_mode: How indices are assigned to shards (sequential/round-robin or chunked).
-            pad_to_equal_size_across_shards: If True, the length of the dataset will be padded
-                so that all shards report the same length. The last standard element is repeated.
+            total_shards: The total number of shards, e.g. the number of data-parallel ranks.
+            current_shard: The index of the current shard, e.g. the current data-parallel rank.
+            indexing_mode: How indices are assigned to shards.
+            pad_to_equal_size_across_shards: If ``True``, all shards report the same length. Padding repeats
+                the last item of the dataset.
 
         Raises:
-            ValueError: If the dataset does not implement __len__.
+            ValueError: If ``dataset`` does not implement ``__len__``.
         """
         if not isinstance(dataset, Sized):
-            raise ValueError("Dataset should implement __len__ method")
+            raise ValueError(f"Dataset ({type(dataset).__name__}) must implement __len__() to be sharded.")
 
         self._dataset = dataset
 
@@ -79,7 +80,7 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         return index * self._total_shards + self._current_shard
 
     def _get_base_index_unsafe(self, index: int) -> int:
-        """Calculates the underlying dataset index for a given shard index, without boundary checking.
+        """Computes the underlying dataset index for a shard index, without bounds checking.
 
         Returns:
             The index in the underlying dataset.
@@ -98,13 +99,13 @@ class ShardedDataset(Dataset[_T_co], Stateful):
 
                 return shard_start_offset + index
             case _:
-                raise ValueError(f"Unknown shard indexing mode: {self._indexing_mode}")
+                raise ValueError(f"Unknown shard indexing mode ({self._indexing_mode}).")
 
     def __getitem__(self, index: int) -> _T_co:
-        """Retrieves an item from the underlying dataset mapping logic shard index to physical index.
+        """Returns the item at an index relative to this shard.
 
-        If padding is enabled and the index exceeds the valid data for this shard,
-        the last item in the dataset is returned.
+        If the index points past the end of the dataset, which happens only with padding, returns the last item of
+        the dataset.
 
         Args:
             index: The index relative to this shard.
@@ -118,10 +119,9 @@ class ShardedDataset(Dataset[_T_co], Stateful):
         return self._dataset[base_index]
 
     def __len__(self) -> int:
-        """Returns the number of items in this specific shard.
+        """Returns the number of items in this shard.
 
-        If `pad_to_equal_size_across_shards` is True, this returns the ceiling
-        length (max length across all shards).
+        If ``pad_to_equal_size_across_shards`` is ``True``, returns the maximum shard length.
 
         Returns:
             The number of items in the shard.
@@ -146,15 +146,18 @@ class ShardedDataset(Dataset[_T_co], Stateful):
                 else:
                     return ceil_len - (self._total_shards - shards_remainder)
             case _:
-                raise ValueError(f"Unknown ShardIndexingMode: {self._indexing_mode}")
+                raise ValueError(f"Unknown shard indexing mode ({self._indexing_mode}).")
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         if isinstance(self._dataset, Stateful):
             self._dataset.load_state_dict(state_dict["dataset"])
 
-        # check whether env mismatched
+        # Shard contents depend on total_shards, so a checkpoint from another shard count is not valid here.
         if state_dict["total_shards"] != self._total_shards:
-            raise ValueError("Shard count mismatch")
+            raise ValueError(
+                f"Shard count mismatch: the checkpoint has total_shards ({state_dict['total_shards']}), "
+                f"but this dataset has total_shards ({self._total_shards}). Resume with the same number of shards."
+            )
         self._total_shards = state_dict["total_shards"]
 
         self._current_shard = state_dict["current_shard"]
@@ -172,16 +175,16 @@ def shard_dataset_data_parallel(
     indexing_mode: ShardIndexingMode = ShardIndexingMode.sequential,
     pad_to_equal_size_across_shards: bool = True,
 ) -> Dataset[_T_co]:
-    """Wraps a dataset into a ShardedDataset based on the Data Parallel dimension of the distributed context.
+    """Wraps a dataset into a ``ShardedDataset`` over the data-parallel ranks.
 
-    This is a helper function to automatically determine the correct rank and world size
-    from the 'dp' (Data Parallel) mesh dimension within the batch domain DeviceMesh.
+    The shard count and index come from the ``"dp"`` dimension of the batch domain mesh. Without distributed
+    training, the dataset has a single shard.
 
     Args:
         dataset: The source dataset to shard.
         dist_context: The distributed context.
-        indexing_mode: The strategy for splitting data indices (sequential/round-robin or chunked).
-        pad_to_equal_size_across_shards: If True, ensures all shards have the same length by padding.
+        indexing_mode: How indices are assigned to shards.
+        pad_to_equal_size_across_shards: If ``True``, all shards have the same length.
 
     Returns:
         A dataset instance representing the local shard.

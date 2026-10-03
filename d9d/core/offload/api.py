@@ -6,13 +6,13 @@ from d9d.core.dist_context import DistributedContext
 
 
 class SleepTag(StrEnum):
-    """Subsystem selector for Trainer.sleep and Trainer.wake.
+    """Subsystems that ``Trainer.sleep`` and ``Trainer.wake`` act on.
 
     Attributes:
-        TENSOR_STATES: All GPU tensor state - model parameters and buffers, optimizer state,
-            gradient buckets and the residual loss accumulator. Always offloaded as a unit.
-        COMMS: NCCL process groups. Opt-in; its implementation is deferred to a second phase,
-            so requesting it currently raises NotImplementedError.
+        TENSOR_STATES: All GPU tensor state: model parameters and buffers, optimizer state, gradient buckets and
+            the residual loss accumulator. They are always offloaded together.
+        COMMS: NCCL process groups. Opt-in. It is not implemented yet, so requesting it raises
+            ``NotImplementedError``.
     """
 
     TENSOR_STATES = "tensor_states"
@@ -20,12 +20,12 @@ class SleepTag(StrEnum):
 
 
 DEFAULT_SLEEP_TAGS = frozenset({SleepTag.TENSOR_STATES})
-"""The default tag set for Trainer.sleep and Trainer.wake: tensor state only, no comms."""
+"""The default tags for ``Trainer.sleep`` and ``Trainer.wake``: tensor state only, no comms."""
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
 class OffloadContext:
-    """Context passed to Offloadable.offload.
+    """Context passed to ``Offloadable.offload``.
 
     Attributes:
         dist_context: The distributed context the subsystem was built under.
@@ -38,7 +38,7 @@ class OffloadContext:
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
 class OnloadContext:
-    """Context passed to Offloadable.onload.
+    """Context passed to ``Offloadable.onload``.
 
     Attributes:
         dist_context: The distributed context the subsystem was built under.
@@ -51,9 +51,9 @@ class OnloadContext:
 class Offloadable(Protocol):
     """Protocol for subsystems that own GPU-resident state and can release it to host memory.
 
-    An "offload" followed by an "onload" must be observationally a no-op: parameter identities,
-    optimizer state keys, DTensor wrapper instances, placements and dtypes are all preserved
-    across the round trip. Only the underlying device storages are reallocated.
+    An ``offload`` followed by an ``onload`` must not change anything observable. Parameter identities,
+    optimizer state keys, ``DTensor`` instances, placements and dtypes stay the same. Only the device storage
+    is allocated again.
     """
 
     def offload(self, ctx: OffloadContext) -> None:
@@ -64,15 +64,15 @@ class Offloadable(Protocol):
         """
 
     def onload(self, ctx: OnloadContext) -> None:
-        """Restores GPU residency of the state previously released by "offload".
+        """Moves the state that ``offload`` released back to GPU memory.
 
         Args:
             ctx: Context for this operation.
         """
 
     def is_offloaded(self) -> bool:
-        """Reports whether this subsystem currently has its state on host memory.
+        """Reports whether this subsystem currently has its state in host memory.
 
         Returns:
-            True if the subsystem is offloaded, False otherwise.
+            ``True`` if the subsystem is offloaded, ``False`` otherwise.
         """

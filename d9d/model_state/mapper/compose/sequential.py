@@ -10,27 +10,29 @@ from d9d.model_state.mapper.leaf.single_tensor import ModelStateMapperIdentity
 
 
 class ModelStateMapperSequential(ModelStateMapper):
-    """Executes a list of mappers in a specific sequence (pipeline).
+    """Mapper that executes a list of mappers one after another.
 
-    This class manages the data flow from one mapper to the next. It abstracts
-    away intermediate states, exposing only the inputs required by the first
-    relevant stage and the outputs produced by the final relevant stage.
+    Intermediate states stay hidden: the mapper exposes only the inputs of the first stage and the outputs of the
+    last stage.
 
-    Key Features:
-
-    1. **Gap Filling**: Automatically injects `Identity` mappers if a tensor needs
-       to pass through a stage without modification to reach a later stage or
-       the final output.
-
-    2. **Group Merging**: Computes the net dependency graph. If Stage A requires 'x'
-       and produces 'y', and Stage B requires 'y' and produces 'z', the
-       Sequential mapper reports a single group `{x} -> {z}`.
+    1.  **Gap filling**: If a tensor must pass a stage unchanged to reach a later stage or the final output, an
+        identity mapper is added for it.
+    2.  **Group merging**: The mapper reports the net dependency graph. If stage A maps ``x`` to ``y`` and stage B
+        maps ``y`` to ``z``, the mapper reports a single group ``{x} -> {z}``.
     """
 
     def __init__(self, mappers: list[ModelStateMapper]):
+        """Constructs the ``ModelStateMapperSequential`` object.
+
+        Args:
+            mappers: The stages in execution order. Mappers without inputs and outputs are dropped.
+
+        Raises:
+            ValueError: If no mapper with inputs or outputs is given.
+        """
         mappers = filter_empty_mappers(mappers)
         if not mappers:
-            raise ValueError("Mappers list cannot be empty.")
+            raise ValueError("Mappers list cannot be empty. Pass at least one mapper with inputs or outputs.")
 
         mappers = self._fill_gaps(mappers)
 
@@ -41,7 +43,7 @@ class ModelStateMapperSequential(ModelStateMapper):
     def _fill_gaps(mappers: list[ModelStateMapper]) -> list[ModelStateMapper]:
         mappers = mappers.copy()
 
-        # propagate inputs from bottom to top
+        # Propagate inputs from bottom to top.
         for stage_i in range(1, len(mappers))[::-1]:
             groups_current = mappers[stage_i].state_dependency_groups()
             groups_prev = mappers[stage_i - 1].state_dependency_groups()
@@ -54,7 +56,7 @@ class ModelStateMapperSequential(ModelStateMapper):
                 [mappers[stage_i - 1]] + [ModelStateMapperIdentity(x) for x in needs_to_pass_through]
             )
 
-        # propagate outputs from top to bottom
+        # Propagate outputs from top to bottom.
         for stage_i in range(0, len(mappers) - 1):
             groups_current = mappers[stage_i].state_dependency_groups()
             groups_next = mappers[stage_i + 1].state_dependency_groups()
@@ -73,7 +75,8 @@ class ModelStateMapperSequential(ModelStateMapper):
     def _compute_pipeline_groups(mappers: list[ModelStateMapper]) -> frozenset[StateGroup]:
         outputs_depend_on_inputs = {}
 
-        # given a fully connected graph, we can just go upwards
+        # _fill_gaps made each stage consume only keys the previous stage produces,
+        # so each output group can be traced back stage by stage.
         for last_group_traced in mappers[-1].state_dependency_groups():
             required_inputs = last_group_traced.inputs
 

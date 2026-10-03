@@ -1,36 +1,34 @@
-# Overview
+# PEFT Overview
 
 ## About
 
-The `d9d.peft` package provides a flexible framework for fine-tuning models using parameter-efficient strategies or targeted full fine-tuning.
+The `d9d.peft` package fine-tunes models with parameter-efficient methods, such as LoRA, or with full fine-tuning of selected modules.
 
-## Core Concepts
+## Apply Before State Loading
 
-### Apply Before State Loading
+This package is built on the [model state mapping](../model_states/mapper.md) framework.
 
-This package is deeply integrated with the [model state mapping](../model_states/mapper.md) ecosystem. 
+Methods like LoRA change the model structure. For example, an `nn.Linear` layer becomes a `LoRALinear` wrapper. The keys in the original checkpoint (e.g. `layers.0.linear.weight`) then no longer match the model keys (e.g. `layers.0.linear.base.weight`). `d9d.peft` returns the `ModelStateMapper` that loads standard checkpoints into the modified structure.
 
-When you apply methods like LoRA, the model structure changes (e.g., a `Linear` layer becomes a `LoRALinear` wrapper). 
+So you can apply a PEFT method before the model is initialized or [horizontally distributed](../models/horizontal_parallelism.md). Other PEFT frameworks usually require initialized weights before they apply PEFT. That can break your horizontal parallelism setup or make it harder to reuse.
 
-Consequently, the keys in your original checkpoint (e.g., `layers.0.linear.weight`) no longer match the keys in the efficient model (e.g., `layers.0.linear.base.weight`). 
+## Configuration
 
-`d9d.peft` automatically generates the necessary `ModelStateMapper` objects to load standard checkpoints into modified architectures. 
+Every PEFT method has a Pydantic configuration. Pydantic validates the hyperparameters and serializes the configuration. `d9d.peft.all.peft_method_from_config` builds the method for any configuration (see [Method Stacking](./stack.md)).
 
-It is useful since framework user may apply a PEFT method to a model that was not initialized or [horizontally distributed](../models/horizontal_parallelism.md) yet. 
-Other PEFT frameworks usually want you to initialize model weights **before** applying PEFT which may break your horizontal parallelism setup logic or make it less reusable.
+## The Injection Lifecycle
 
+Every PEFT method implements `PeftMethod` and follows an **inject, train, merge** lifecycle:
 
-### Configuration
+1.  **Inject** (`inject_peft_and_freeze`): The method finds the target layers in the `nn.Module` and replaces them with adapter layers if needed. All parameters are frozen except those the method trains.
+2.  **State mapping**: The injection returns a `ModelStateMapper`. It maps the *original* checkpoint keys to the *new* model structure.
+3.  **Train**: You train the model.
+4.  **Merge** (`merge_peft`): After training, the method merges the adapters into the base weights and restores the original architecture.
 
-All PEFT methods are driven by Pydantic configurations. This allows for custom validation of hyperparameters and easy serialization/deserialization.
+## Usage
 
-### The Injection Lifecycle (`PeftMethod`)
+See [LoRA](./lora.md), [Full Fine-Tuning](./full_tune.md) and [Method Stacking](./stack.md) for examples.
 
-The framework operates on an **Inject → Train → Merge** lifecycle:
-
-1.  **Inject** (`inject_peft_and_freeze`): The `PeftMethod` inspects the generic `nn.Module`. It locates target layers, replaces them with adapter layers (if necessary), and marks parameters that have to be trained with `requires_grad=True`.
-2.  **State Mapping**: The injection process returns a `ModelStateMapper` object. This mapper describe how to map the *original* checkpoint keys to the *new, injected* model structure.
-3.  **Train**: Here you train your model.
-4.  **Merge** (`merge_peft`): Once training is complete, this method collapses the adapters back into the base weights, restoring the original architecture.
+## API Reference
 
 ::: d9d.peft

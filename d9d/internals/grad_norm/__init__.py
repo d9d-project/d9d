@@ -1,3 +1,5 @@
+"""Gradient norm computation and clipping across device meshes."""
+
 from .group import ParametersForNorm, group_parameters_for_norm
 from .norm import clip_grad_norm_distributed_
 

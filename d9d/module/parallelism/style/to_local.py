@@ -30,23 +30,20 @@ class _ModulePatch:
 
 
 class ToLocalParallel(ParallelStyle):
-    """Parallel style that distributes parameters and gradients but executes with local tensors.
+    """Parallel style that stores parameters as ``DTensor`` but computes with local tensors.
 
-    This style wraps standard tensor distribution (via ``DTensor``) but injects
-    runtime hooks to temporarily unwrap ``DTensor`` parameters into local ``torch.Tensor``
-    during the forward pass.
-
-    This is useful for parallel strategies (like Replicate)
-    where the underlying calculation logic is not DTensor-aware, but the parameters must remain
-    distributed for gradient synchronization and for distributed checkpointing.
+    Parameters become ``DTensor`` objects with the given placements. During the forward pass, the
+    module sees them as local ``torch.Tensor`` objects. Use it for strategies such as Replicate, where
+    the module code is not ``DTensor``-aware but gradient sync and checkpointing need ``DTensor``.
     """
 
     def __init__(self, param_placement: tuple[Placement, ...], grad_placement: tuple[Placement, ...]):
-        """Constructs ToLocalParallel object.
+        """Constructs the ``ToLocalParallel`` object.
 
         Args:
-            param_placement: Tuple of placements defining how parameters are distributed.
-            grad_placement: Tuple of placements defining how gradients are synchronized.
+            param_placement: The placements of the parameters, one per mesh dimension.
+            grad_placement: The placements of the gradients, one per mesh dimension. They are passed to
+                ``DTensor.to_local`` as ``grad_placements``.
         """
         self._grad_placement = grad_placement
         self._param_placement = param_placement
@@ -70,5 +67,7 @@ class ToLocalParallel(ParallelStyle):
 
             distribute_module(submod, device_mesh, self._distribute_params)
 
+        # Swap each submodule to a subclass whose parameter attributes return local tensors for the
+        # forward pass. Restore the original classes afterwards, so parameter access returns DTensors again.
         module.register_forward_pre_hook(_ModulePatch(patched_classes))
         module.register_forward_hook(_ModulePatch(original_classes))

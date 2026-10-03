@@ -55,11 +55,10 @@ from d9d.pipelining.factory import PipelineScheduleInferenceConfig
 
 
 class InferenceConfigurator:
-    """Orchestrates the assembly of the distributed inference environment.
+    """Configurator that assembles the distributed inference environment.
 
-    This class binds the infrastructure configuration (DeviceMesh), the inference
-    parameters, and the user-defined logic (Providers) to create a fully
-    initialized state object capable of running the inference loop.
+    It combines the device mesh parameters, the ``InferenceConfig`` and the user-defined providers
+    into an ``Inference`` object that is ready to run the inference loop.
     """
 
     def __init__(
@@ -70,7 +69,7 @@ class InferenceConfigurator:
         model_provider: ModelProvider,
         data_provider: DataProvider,
     ):
-        """Constructs a configurator capable of building the full inference state.
+        """Constructs the ``InferenceConfigurator`` object.
 
         Args:
             mesh: Definition of the distributed device mesh topology.
@@ -159,13 +158,13 @@ class InferenceConfigurator:
         )
 
     def configure(self) -> "Inference":
-        """Instantiates all inference components and returns a configured Inference engine.
+        """Builds all inference components and returns a configured ``Inference`` object.
 
-        This method triggers the creation of the distributed context, sets seeds,
-        builds the model, data loaders, and attaches all auxiliary components.
+        It creates the distributed context, sets seeds and builds the model, the data stream
+        and the auxiliary components.
 
         Returns:
-            Inference: A ready-to-use inference engine instance encapsulating the job state.
+            A ready-to-use inference engine that holds the job state.
         """
         state = self._build_new_state()
 
@@ -176,12 +175,12 @@ class Inference:
     """The main execution engine for running a distributed inference job.
 
     This class manages the inference loop, lifecycle events, distributed synchronization,
-    and periodic side-effects (profiling, checkpointing). It ensures the model is in
-    evaluation mode and runs within a `torch.inference_mode` context.
+    and periodic side effects (profiling, checkpointing). The model runs in evaluation mode
+    inside ``torch.inference_mode``.
     """
 
     def __init__(self, state: InferenceJobState):
-        """Constructs an Inference engine from a pre-built job state.
+        """Constructs the ``Inference`` object from a pre-built job state.
 
         Args:
             state: The encapsulated state object containing all initialized components.
@@ -197,12 +196,12 @@ class Inference:
 
         This method:
 
-        1. Waits for world synchronization.
-        2. Loads the latest checkpoint if available.
-        3. Iterates through the data loader.
-        4. Executes the pipeline forward pass for every batch.
-        5. Handles periodic garbage collection and profiling.
-        6. Finalizes the task upon completion.
+        1.  Waits for all ranks.
+        2.  Loads the latest checkpoint if available.
+        3.  Iterates through the data stream.
+        4.  Runs the pipeline forward pass for every pack.
+        5.  Runs periodic garbage collection and profiling.
+        6.  Finalizes the task on completion.
 
         Raises:
             RuntimeError: If the data stream ends before ``total_steps``.
@@ -215,7 +214,7 @@ class Inference:
             self._state.checkpointer.load_last_checkpoint(self._state)
 
             if self._state.schedule.current_step >= self._state.schedule.total_steps:
-                self._state.dist_context.logger.info("Already ran, will do nothing")
+                self._state.dist_context.logger.info("Inference is already complete, nothing to do")
                 return
 
             self._state.dist_context.wait_world()
@@ -241,8 +240,9 @@ class Inference:
                     device_pack = next(packs, None)
                     if device_pack is None:
                         raise RuntimeError(
-                            f"The data stream ended at step {self._state.schedule.current_step}, "
-                            f"before total_steps={self._state.schedule.total_steps}"
+                            f"The data stream ended at step ({self._state.schedule.current_step}) "
+                            f"before total_steps ({self._state.schedule.total_steps}). "
+                            "Lower total_steps or provide more data."
                         )
 
                     with self._state.event_bus.bounded(
@@ -257,10 +257,10 @@ class Inference:
                     self._state.event_bus.trigger(EVENT_INFERENCE_STEP_POST, step_ctx)
                     self._state.schedule.step()
 
-                    # checkpoint at the end of the step
+                    # Checkpoint after schedule.step(), so the saved step counter includes this step.
                     self._state.checkpointer.checkpoint_if_needed(self._state)
 
-                    # end the profiled step only now, so that it covers the step post events and the checkpoint
+                    # End the profiled step only now, so that it covers the step post events and the checkpoint.
                     if profiler:
                         profiler.step()
 

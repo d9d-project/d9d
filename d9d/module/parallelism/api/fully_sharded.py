@@ -12,13 +12,11 @@ def _force_fsdp_grad_reduction_policy(module: FSDPModule):
 
 
 def parallelize_fsdp(module: nn.Module, mesh: DeviceMesh, *args: Any, **kwargs: Any):
-    """Applies Fully Sharded Data Parallel (FSDP) with forced gradient summation.
+    """Applies Fully Sharded Data Parallel (FSDP) with gradient summation.
 
-    This function wraps the provided module with PyTorch's ``fully_shard`` API using
-    the specified device mesh. Unlike standard FSDP usage, this function explicitly
-    configures the module to sum gradients across the mesh
-    instead of averaging them and disables internal all-sum-reduce hooks.
-    This is intended for d9d to handle gradient normalization and reduction across replicas externally.
+    The module is sharded with PyTorch's ``fully_shard`` over ``mesh``. Unlike default FSDP, gradients
+    are summed across the mesh instead of averaged, and FSDP does not all-reduce them across
+    replicas. d9d normalizes and reduces gradients across replicas itself.
 
     Args:
         module: The module to shard.
@@ -28,14 +26,15 @@ def parallelize_fsdp(module: nn.Module, mesh: DeviceMesh, *args: Any, **kwargs: 
 
     Raises:
         ValueError: If the mesh does not have exactly one dimension.
-        RuntimeError: If the module was not converted to an FSDPModule.
+        RuntimeError: If ``fully_shard`` did not convert the module to an ``FSDPModule``.
     """
     if mesh.ndim != 1:
         raise ValueError(
-            "FSDP mesh should contain exactly one dimension - for HSDP, please apply parallelize_replicate(...) first!"
+            f"mesh.ndim ({mesh.ndim}) must be 1 for FSDP. "
+            f"For HSDP, use parallelize_hsdp() or apply parallelize_replicate() to the other dimensions first."
         )
 
     fully_shard(module, *args, mesh=mesh, **kwargs)
     if not isinstance(module, FSDPModule):
-        raise RuntimeError("Torch FSDP did not convert the module into FSDPModule")
+        raise RuntimeError(f"fully_shard() did not convert the module ({type(module).__name__}) to FSDPModule.")
     _force_fsdp_grad_reduction_policy(module)

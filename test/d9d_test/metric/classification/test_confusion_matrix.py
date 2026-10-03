@@ -25,7 +25,7 @@ def test_builder_exceptions():
     with pytest.raises(ValueError, match="already been selected"):
         confusion_matrix_metric().binary().micro()
 
-    with pytest.raises(ValueError, match="calculation strategy must be configured"):
+    with pytest.raises(ValueError, match="statistic must be configured"):
         confusion_matrix_metric().binary().build()
 
 
@@ -34,7 +34,7 @@ def test_execution_exceptions():
     metric = confusion_matrix_metric().multiclass(num_classes=3).with_accuracy().micro().build()
 
     # 1. Prediction's trailing dimension doesn't match configured num_classes
-    with pytest.raises(ValueError, match="Expected last dimension of preds to equal num_classes=3"):
+    with pytest.raises(ValueError, match=r"must equal num_classes \(3\)"):
         metric.update(preds=torch.rand(2, 4), targets=torch.randint(0, 3, (2,)))
 
     # 2. Incompatible target shapes (neither match (...), (..., 1), nor (..., C))
@@ -45,7 +45,7 @@ def test_execution_exceptions():
     binary_metric = confusion_matrix_metric().binary().with_accuracy().build()
 
     # 3. Accumulated state shape mismatch in binary component
-    with pytest.raises(ValueError, match="preds and targets must have same shape"):
+    with pytest.raises(ValueError, match="must match targets shape"):
         # The ThresholdProcessor fixes 1D to 2D but doesn't fix entirely broken pairs
         binary_metric.update(preds=torch.rand(4), targets=torch.rand(5))
 

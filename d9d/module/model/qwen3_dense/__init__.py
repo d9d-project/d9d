@@ -1,3 +1,5 @@
+"""Qwen3 Dense model and its Hugging Face state mappers."""
+
 from .decoder_layer import Qwen3DenseLayer
 from .huggingface import (
     mapper_from_huggingface_qwen3_dense,

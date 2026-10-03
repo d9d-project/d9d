@@ -6,13 +6,12 @@ from d9d.core.types import MicrobatchPack, PyTree
 
 @runtime_checkable
 class DataLoaderProtocol(Protocol):
-    """Protocol defining an interface for a sized, stateful stream of single microbatches.
+    """Protocol for a sized, stateful stream of single microbatches.
 
-    This protocol ensures that the loader yields one collated microbatch at a time, reports its
-    length in microbatches, and supports state checkpointing via the ``Stateful`` interface
-    (``state_dict``/``load_state_dict``).
+    A conforming loader yields one collated microbatch at a time and reports its length in microbatches.
+    It supports checkpointing through the ``Stateful`` interface (``state_dict`` and ``load_state_dict``).
 
-    A torchdata ``StatefulDataLoader`` satisfies it out of the box.
+    A torchdata ``StatefulDataLoader`` conforms to it.
     """
 
     def __iter__(self) -> Iterator[PyTree]:
@@ -50,13 +49,14 @@ class DataLoaderProtocol(Protocol):
 
 @runtime_checkable
 class MicrobatchPackStream(Protocol):
-    """Protocol defining an interface for a stateful, iterable stream of microbatch packs that the loop drives.
+    """Protocol for a stateful stream of microbatch packs that the loop drives.
 
-    This protocol ensures that iterating the stream yields packs - one pack is exactly one step's
-    worth of microbatches - and that it supports state checkpointing via the ``Stateful`` interface
-    (``state_dict``/``load_state_dict``), acting as the single checkpoint boundary for the data
-    stream. It yields CPU (optionally memory-pinned) tensors; moving each pack to the device is the
-    loop's responsibility. When prefetching, the loop iterates it on a background thread.
+    One pack holds exactly one step's worth of microbatches. The stream supports checkpointing through the
+    ``Stateful`` interface (``state_dict`` and ``load_state_dict``). It is the only checkpoint boundary of the
+    data pipeline.
+
+    The stream yields CPU tensors, which can be in pinned memory. The loop moves each pack to the device.
+    When prefetching, the loop iterates the stream on a background thread.
     """
 
     def __iter__(self) -> Iterator[MicrobatchPack]:
@@ -69,19 +69,18 @@ class MicrobatchPackStream(Protocol):
 
     @property
     def total_steps(self) -> int | None:
-        """The number of steps (packs) this stream will yield, if known.
+        """The number of steps (packs) this stream yields, or ``None`` if it is not known ahead of time.
 
-        Returns:
-            The step count, or ``None`` when it cannot be determined ahead of time (e.g. a streaming
-            or data-dependent source). When ``None``, the job duration must come from ``JobScheduleConfig``.
+        A streaming or data-dependent source returns ``None``. In that case, the job duration must come from
+        ``JobScheduleConfig``.
         """
         ...
 
     def state_dict(self) -> dict[str, Any]:
         """Returns the stream's checkpointable state.
 
-        It may be used for prefetching, so keep it lightweight and do not return objects that
-        further iteration mutates.
+        When prefetching, the loop calls this method after every pack. Keep it cheap, and do not return
+        objects that later iteration mutates.
 
         Returns:
             A dictionary representing the stream's state.

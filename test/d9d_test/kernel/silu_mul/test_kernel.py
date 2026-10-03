@@ -44,10 +44,10 @@ def test_silu_mul_errors():
     x = torch.randn((100,), device="cuda")
 
     # Shape mismatch
-    with pytest.raises(ValueError, match="same shape"):
+    with pytest.raises(ValueError, match="must match y shape"):
         y_bad = torch.randn((101,), device="cuda")
         silu_mul(x, y_bad)
 
-    with pytest.raises(ValueError, match="same device"):
+    with pytest.raises(ValueError, match="must match y shape"):
         y_cpu = torch.randn((100,), device="cpu")
         silu_mul(x, y_cpu)

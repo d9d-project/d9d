@@ -1,3 +1,5 @@
+"""Events of the inference loop."""
+
 import dataclasses
 
 from d9d.loop.event import Event
@@ -38,10 +40,10 @@ EVENT_INFERENCE_READY = Event[EventInferenceReadyContext](id="inference.ready")
 """Triggered right before the main inference loop starts, after configuration is complete and checkpoints are loaded."""
 
 EVENT_INFERENCE_STEP_PRE = Event[EventStepContext](id="inference.step.pre")
-"""Triggered at the absolute beginning of an inference step iteration."""
+"""Triggered at the start of an inference step."""
 
 EVENT_INFERENCE_STEP_POST = Event[EventStepContext](id="inference.step.post")
-"""Triggered at the very end of an inference step iteration (excluding checkpointing)."""
+"""Triggered at the end of an inference step, before checkpointing."""
 
 EVENT_INFERENCE_FORWARD_PRE = Event[EventStepContext](id="inference.forward.pre")
 """Triggered immediately before the forward pass sequence begins."""

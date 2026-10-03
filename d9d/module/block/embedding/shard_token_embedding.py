@@ -24,23 +24,21 @@ def _build_token_start_end_indices(
 
 
 class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
-    """A token embedding layer composed of multiple named, independent embedding tables.
+    """Token embedding layer composed of several named, independent embedding tables.
 
-    This class maintains a dictionary of embedding layers, mapping contiguous
-    ranges of global vocabulary indices to specific named splits (e.g., 'orig',
-    'special', 'prompt_prefix'). This is useful for model adaptation strategies where
-    different sets of tokens require different initialization  training behaviors.
+    Each named split (e.g. ``"orig"``, ``"special"``, ``"prompt_prefix"``) owns a contiguous range of global
+    vocabulary indices. This is useful for model adaptation, where different sets of tokens need different
+    initialization or training behavior.
     """
 
     def __init__(self, split_vocab_size: dict[str, int], split_order: Sequence[str], hidden_size: int):
-        """Constructs the SplitTokenEmbeddings object.
+        """Constructs the ``SplitTokenEmbeddings`` object.
 
         Args:
-            split_vocab_size: A dictionary mapping split names to their vocabulary sizes.
-            split_order: A sequence defining the order in which splits are concatenated
-                to form the global vocabulary. Keys provided here must exist in
-                split_vocab_size.
-            hidden_size: The dimensionality of the embedding vectors.
+            split_vocab_size: Mapping from split names to their vocabulary sizes.
+            split_order: Order in which splits are concatenated to form the global vocabulary.
+                Every name must be a key of ``split_vocab_size``.
+            hidden_size: Dimensionality of the embedding vectors.
         """
         super().__init__()
 
@@ -54,16 +52,16 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
         self._split_order = split_order
 
     def forward(self, input_ids: torch.Tensor) -> torch.Tensor:
-        """Retrieves embeddings for the input indices by routing them to appropriate internal layers.
+        """Looks up embeddings for global vocabulary indices.
 
         Args:
-            input_ids: Tensor of arbitrary shape containing global vocabulary indices.
+            input_ids: Global vocabulary indices. Can have any shape.
 
         Returns:
-            Tensor of same shape as input_ids plus a last dimension of hidden_size.
+            Embeddings. Shape: ``(*input_ids.shape, hidden_size)``.
 
         Raises:
-            ValueError: If no splits were configured.
+            ValueError: If ``split_order`` is empty.
         """
         output_embeds: torch.Tensor | None = None
 
@@ -82,11 +80,11 @@ class SplitTokenEmbeddings(nn.Module, ModuleLateInit):
                 output_embeds = output_embeds + masked_embed
 
         if output_embeds is None:
-            raise ValueError("Embeddings are empty - perhaps no splits were configured")
+            raise ValueError(f"split_order ({self._split_order}) must contain at least one split.")
 
         return output_embeds
 
     def reset_parameters(self):
-        """Resets parameters for all registered embedding splits."""
+        """Resets the parameters of all embedding splits."""
         for layer in self.token_embedding.values():
             layer.reset_parameters()
