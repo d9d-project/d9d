@@ -45,7 +45,7 @@ def test_execution_exceptions():
     binary_metric = confusion_matrix_metric().binary().with_accuracy().build()
 
     # 3. Accumulated state shape mismatch in binary component
-    with pytest.raises(ValueError, match="preds and targets must have the same shape"):
+    with pytest.raises(ValueError, match="must match targets shape"):
         # The ThresholdProcessor fixes 1D to 2D but doesn't fix entirely broken pairs
         binary_metric.update(preds=torch.rand(4), targets=torch.rand(5))
 

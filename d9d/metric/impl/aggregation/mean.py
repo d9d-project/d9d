@@ -8,17 +8,20 @@ from d9d.metric.component import MetricAccumulator
 
 
 class WeightedMeanMetric(Metric[torch.Tensor]):
-    """Computes the weighted mean of values.
-
-    Tracks the sum of weighted values and the sum of weights.
-    """
+    """Computes the weighted mean of values."""
 
     def __init__(self):
-        """Constructs a WeightedMeanMetric object."""
+        """Constructs the ``WeightedMeanMetric`` object."""
         self._value = MetricAccumulator(torch.scalar_tensor(0, dtype=torch.float32))
         self._weight = MetricAccumulator(torch.scalar_tensor(0, dtype=torch.float32))
 
     def update(self, values: torch.Tensor, weights: torch.Tensor):
+        """Adds values with their weights to the running mean.
+
+        Args:
+            values: The values to average.
+            weights: The weight of each value. Must broadcast with ``values``.
+        """
         self._value.update((values * weights).sum())
         self._weight.update(weights.sum())
 
@@ -39,11 +42,7 @@ class WeightedMeanMetric(Metric[torch.Tensor]):
 
     @property
     def accumulated_weight(self) -> torch.Tensor:
-        """Returns the total weight accumulated so far.
-
-        Returns:
-            Scalar tensor with total weight.
-        """
+        """The total weight accumulated so far, as a scalar tensor."""
         return self._weight.value
 
     def state_dict(self) -> dict[str, Any]:

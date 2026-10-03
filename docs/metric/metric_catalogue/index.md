@@ -2,8 +2,8 @@
 
 ## About
 
-The `d9d.metric.impl` package provides ready-to-use metrics.
-They implement the `Metric` interface, so they synchronize across ranks like any other metric.
+
+The `d9d.metric.impl` package provides ready-to-use metrics. They implement the `Metric` interface, so they synchronize across ranks like any other metric.
 
 ## Navigation
 

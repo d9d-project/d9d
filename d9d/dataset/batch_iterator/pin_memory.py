@@ -9,8 +9,8 @@ from d9d.core.types import MicrobatchPack
 
 
 def _pin_pack(pack: MicrobatchPack) -> MicrobatchPack:
-    # a parallel host copy can spend most of its time synchronizing the intra-op thread pool, so pin with a single
-    # thread, as the DataLoader's pin thread does; the setting is per thread and restored afterwards
+    # A parallel host copy can spend most of its time synchronizing the intra-op thread pool. So pin with a single
+    # thread, as the DataLoader's pin thread does. The setting is per thread and is restored afterwards.
     num_threads = torch.get_num_threads()
     torch.set_num_threads(1)
     try:
@@ -23,14 +23,14 @@ class PinMemoryMicrobatchPackStream(MicrobatchPackStream):
     """Wraps a microbatch pack stream to copy every tensor of each pack into page-locked (pinned) host memory.
 
     Pinned memory lets the loop copy packs to the device asynchronously. Unlike the ``pin_memory`` option of
-    ``torch.utils.data.DataLoader``, the traversal uses the d9d pytree, so tensors nested in dataclasses are
+    ``torch.utils.data.DataLoader``, the traversal uses ``d9d.core.pytree``, so tensors nested in dataclasses are
     pinned as well. Pinning runs in the iterating thread.
 
     Its ``total_steps`` and state are those of the wrapped stream.
     """
 
     def __init__(self, inner: MicrobatchPackStream):
-        """Constructs a PinMemoryMicrobatchPackStream object.
+        """Constructs the ``PinMemoryMicrobatchPackStream`` object.
 
         Args:
             inner: The wrapped stream that owns the data and its position.
@@ -48,11 +48,7 @@ class PinMemoryMicrobatchPackStream(MicrobatchPackStream):
 
     @property
     def total_steps(self) -> int | None:
-        """Returns the number of packs (steps) the wrapped stream yields.
-
-        Returns:
-            The step count of the wrapped stream, or ``None`` if it is unknown.
-        """
+        """The number of packs (steps) the wrapped stream yields, or ``None`` if it is unknown."""
         return self._inner.total_steps
 
     def state_dict(self) -> dict[str, Any]:

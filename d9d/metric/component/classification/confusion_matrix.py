@@ -8,10 +8,10 @@ class ConfusionMatrix:
     """Represents a confusion matrix for classification evaluation.
 
     Attributes:
-        tp: Tensor containing the count of true positives.
-        fp: Tensor containing the count of false positives.
-        tn: Tensor containing the count of true negatives.
-        fn: Tensor containing the count of false negatives.
+        tp: The count of true positives.
+        fp: The count of false positives.
+        tn: The count of true negatives.
+        fn: The count of false negatives.
     """
 
     tp: torch.Tensor

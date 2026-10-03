@@ -2,21 +2,22 @@
 
 ## About
 
-The `d9d.peft.lora` package implements Low-Rank Adaptation. It works by wrapping existing Linear layers (both standard `nn.Linear` and d9d's [`GroupedLinear`](../modules/moe.md)) with a container that holds the original frozen layer (`base`) and two low-rank trainable matrices (`lora_A` and `lora_B`).
+The `d9d.peft.lora` package implements [Low-Rank Adaptation](https://arxiv.org/abs/2106.09685). It wraps linear layers, both `nn.Linear` and d9d's [`GroupedLinear`](../models/modules/moe.md). The wrapper holds the original frozen layer (`base`) and two trainable low-rank layers (`lora_A` and `lora_B`).
 
-Because the original layer is moved to a submodule (`base`), the state keys change. The LoRA method automatically generates a `ModelStateMapperRename` to handle this transparently during checkpoint loading.
+Because the original layer moves to the `base` submodule, its state keys change. LoRA returns a `ModelStateMapperRename` for each wrapped layer, so standard checkpoints still load.
 
-## Usage Example
+LoRA does not support `nn.Linear` layers with a bias.
+
+## Usage
 
 ```python
-import torch
 import re
 from d9d.peft import inject_peft_and_freeze, merge_peft
 from d9d.peft.lora import LoRA, LoRAConfig, LoRAParameters
 
-# 1. Configuration
+# 1. Configure LoRA for the attention query projections.
 config = LoRAConfig(
-    module_name_pattern=re.compile(r".*attention\.q_proj.*"),  # Target Attention Q projections
+    module_name_pattern=re.compile(r".*self_attn\.q_proj"),
     params=LoRAParameters(
         r=16,
         alpha=32,
@@ -24,21 +25,22 @@ config = LoRAConfig(
     )
 )
 
-# 2. Instantiate Method
+# 2. Create the method.
 method = LoRA(config)
 
-# 3. Inject
-# This replaces nn.Linear with LoRALinear layers in-place.
-# 'mapper' knows how to route 'q_proj.weight' -> 'q_proj.base.weight'
+# 3. Inject.
+# Replaces the matching nn.Linear layers with LoRALinear layers in place.
+# The mapper routes "q_proj.weight" to "q_proj.base.weight".
 mapper = inject_peft_and_freeze(method, model)
 
-# ... pass 'mapper' object to d9d's Trainer or manually load a model checkpoint ...
+# ... pass the mapper to d9d's Trainer or load a checkpoint with it ...
 
-# ... train a model ...
+# ... train the model ...
 
-# 4. Merge - for exporting a model
+# 4. Merge the adapters into the base weights before exporting the model.
 merge_peft(method, model)
 ```
 
+## API Reference
 
 ::: d9d.peft.lora

@@ -11,11 +11,10 @@ TComputeResult = TypeVar("TComputeResult", bound=TensorTree)
 
 
 class Metric(abc.ABC, Stateful, Generic[TComputeResult]):
-    """Abstract base class for all metrics.
+    """Base class for all metrics.
 
-    Metrics track statistics over time (e.g., during training) and can be synchronized
-    across distributed processes. They also support state persistence via the Stateful
-    interface.
+    A metric tracks statistics over time, e.g. during training, and can be synchronized across distributed
+    processes. It supports checkpointing through the ``Stateful`` interface.
     """
 
     @abc.abstractmethod
@@ -31,8 +30,7 @@ class Metric(abc.ABC, Stateful, Generic[TComputeResult]):
     def sync(self, dist_context: DistributedContext):
         """Synchronizes the metric state across distributed processes.
 
-        This method aggregates statistics from all ranks (e.g., via all-reduce)
-        to ensure the metric state is consistent globally.
+        It aggregates statistics from all ranks, e.g. with an all-reduce, so that every rank has the global state.
 
         Args:
             dist_context: The distributed context.
@@ -43,17 +41,15 @@ class Metric(abc.ABC, Stateful, Generic[TComputeResult]):
         """Computes the current value of the metric.
 
         Returns:
-            The computed metric result (of type `TComputeResult`).
-                This can be a single `torch.Tensor` or `PyTree` structure (dict, list, etc.)
-                containing tensors, depending on how the subclass was typed.
+            The metric value: a single tensor or a PyTree of tensors, as declared by ``TComputeResult``.
         """
 
     @abc.abstractmethod
     def reset(self):
-        """Resets the internal state of the metric to the initial values."""
+        """Resets the metric state to its initial values."""
 
     def to(self, device: str | torch.device | int):
-        """Moves a metric state to a specified device.
+        """Moves the metric state to a device.
 
         Args:
             device: The device to move the metric state to.

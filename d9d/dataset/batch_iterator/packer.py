@@ -7,17 +7,18 @@ from d9d.core.types import MicrobatchPack, PyTree
 
 
 class FixedCountMicrobatchPacker(MicrobatchPackStream):
-    """The default ``MicrobatchPackStream`` that groups ``microbatches_per_step`` microbatches from a loader per pack.
+    """Groups the microbatches of a loader into packs of ``microbatches_per_step``.
 
-    Keeping a short trailing pack (``drop_last=False``) is only consistent across ranks when every rank sees the
-    same number of microbatches (e.g. the dataset was sharded with ``pad_to_equal_size_across_shards``).
+    It is the default ``MicrobatchPackStream``. A short trailing pack (``drop_last=False``) is consistent across
+    ranks only when every rank sees the same number of microbatches, e.g. when the dataset was sharded with
+    ``pad_to_equal_size_across_shards``.
 
     Its ``total_steps`` is derived from the loader's length, and it delegates its state to the loader
     (the checkpoint boundary).
     """
 
     def __init__(self, loader: DataLoaderProtocol, microbatches_per_step: int, drop_last: bool = True):
-        """Constructs a FixedCountMicrobatchPacker object.
+        """Constructs the ``FixedCountMicrobatchPacker`` object.
 
         Args:
             loader: The microbatch stream to group.
@@ -28,7 +29,7 @@ class FixedCountMicrobatchPacker(MicrobatchPackStream):
             ValueError: If ``microbatches_per_step`` is not positive.
         """
         if microbatches_per_step <= 0:
-            raise ValueError("microbatches_per_step must be positive")
+            raise ValueError(f"microbatches_per_step ({microbatches_per_step}) must be positive.")
 
         self._loader = loader
         self._microbatches_per_step = microbatches_per_step
@@ -52,10 +53,9 @@ class FixedCountMicrobatchPacker(MicrobatchPackStream):
 
     @property
     def total_steps(self) -> int | None:
-        """Returns the number of packs (steps) this packer yields.
+        """The number of packs (steps) this packer yields.
 
-        Returns:
-            The pack count, including a trailing short pack unless ``drop_last`` is set.
+        It includes a trailing short pack unless ``drop_last`` is set.
         """
         if self._drop_last:
             return len(self._loader) // self._microbatches_per_step

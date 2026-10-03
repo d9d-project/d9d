@@ -1,29 +1,26 @@
 # Custom Metrics
 
-The `d9d` framework allows you to implement custom metrics by adhering to the `Metric` interface.
+## About
+
+You can implement a custom metric by implementing the `Metric` interface. The `d9d.metric.component` package provides helpers for the distributed state.
 
 ## Design Guidelines
 
-Metric implementations usually follow this design:
+Metric implementations usually follow these rules:
 
-*   **GPU Residency**: Metrics accumulate data directly on the GPU tensors to avoid CPU-GPU synchronization.
-*   **Linearly Additive States**: Instead of storing unstable averages (e.g., "Current Accuracy"), store raw accumulation counts like "Total Correct" and "Total Samples". These are mathematically safe to sum via `all_reduce`. 
+*   **GPU residency**: Accumulate data in GPU tensors, so updates need no host sync.
+*   **Additive states**: Do not store averages such as "current accuracy". Store raw counts such as "total correct" and "total samples". Counts stay correct when summed with `all_reduce`.
 
-### Helper Components
+## Helper Components
 
-We provide the `d9d.metric.component` package to simplify implementation:
+`MetricAccumulator` keeps a local and a synchronized copy of a metric state tensor. It supports the `sum`, `max` and `min` reduction operations (`MetricReduceOp`). There is no average operation, because averages are not additive.
 
-*   **MetricAccumulator**: A helper object that handles the boilerplate of maintaining Local vs Synchronized versions of a metric state tensor. It supports standard reduction operations like Sum, Max, and Min.
+## Usage
 
-## Examples
-
-### MaxMetric
-
-Below is an example of a `MaxMetric` that tracks the maximum value seen across all ranks using the `MetricAccumulator` helper.
+This `MaxMetric` tracks the maximum value seen across all ranks with a `MetricAccumulator`.
 
 ```python
 import torch
-import torch.distributed as dist
 from typing import Any
 
 from d9d.metric import Metric
@@ -32,36 +29,37 @@ from d9d.core.dist_context import DistributedContext
 
 class MaxMetric(Metric[torch.Tensor]):
     def __init__(self):
-        # Initialize accumulator with -inf
         self._max_val = MetricAccumulator(
-            torch.tensor(float('-inf')), 
+            torch.tensor(float('-inf')),
             reduce_op=MetricReduceOp.max
         )
 
     def update(self, value: torch.Tensor):
-        # Update local max (No communication)
+        # Updates the local maximum, no communication.
         self._max_val.update(value)
 
     def sync(self, dist_context: DistributedContext):
-        # Perform all_reduce across the world
+        # Runs all_reduce across the default process group.
         self._max_val.sync()
 
     def compute(self) -> torch.Tensor:
-        # Return the synchronized value
+        # Returns the synchronized value.
         return self._max_val.value
 
     def reset(self):
         self._max_val.reset()
-        
+
     def to(self, device: str | torch.device | int):
         self._max_val.to(device)
 
-    # Stateful Protocol for Checkpointing
+    # Stateful protocol for checkpointing.
     def state_dict(self) -> dict[str, Any]:
         return {'max_val': self._max_val.state_dict()}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         self._max_val.load_state_dict(state_dict['max_val'])
 ```
+
+## API Reference
 
 ::: d9d.metric.component

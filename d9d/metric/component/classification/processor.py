@@ -5,19 +5,17 @@ import torch.nn.functional as F
 
 
 class ClassificationPredictionsProcessor(Protocol):
-    """Protocol for processing classification predictions and targets into a format suitable for evaluation."""
+    """Protocol for converting classification predictions and targets into binary tensors for evaluation."""
 
     def __call__(self, preds: torch.Tensor, targets: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Transforms raw predictions and targets into standardized tensors.
+        """Converts raw predictions and targets into binary tensors of the same shape.
 
         Args:
-            preds: The raw prediction outputs from the model. Expected shape depends
-                on the specific implementation.
-            targets: The ground truth targets. Expected shape depends on the
-                specific implementation.
+            preds: The raw model predictions. The expected shape depends on the implementation.
+            targets: The ground truth targets. The expected shape depends on the implementation.
 
         Returns:
-            A tuple containing the processed predictions and processed targets tensors.
+            The processed predictions and targets. Shape: ``(..., num_outputs)``.
         """
         ...
 
@@ -26,65 +24,59 @@ class TopKProcessor(ClassificationPredictionsProcessor):
     """Processes classification predictions to evaluate top-k accuracy."""
 
     def __init__(self, k: int) -> None:
-        """Constructs the TopKProcessor object.
+        """Constructs the ``TopKProcessor`` object.
 
         Args:
-            k: The number of highest probability predictions to consider for a hit.
+            k: The number of highest-scored classes that count as a hit.
         """
         self._k = k
 
     def __call__(self, preds: torch.Tensor, targets: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Checks if the true target is within the top-k predicted logits.
+        """Checks whether the true class is among the top-k predicted classes.
 
         Args:
-            preds: The raw prediction logits or probabilities of shape (..., C), where C is the number
-                of classes.
-            targets: The ground truth class indices of shape (...), matching the
-                leading dimensions of the predictions.
+            preds: The prediction logits or probabilities. Shape: ``(..., num_classes)``.
+            targets: The ground truth class indices. Shape: ``(...)``.
 
         Returns:
-            A tuple containing a boolean hit/miss tensor of shape (..., 1) and a dummy
-            target tensor of ones of matching shape (..., 1).
+            A hit (1) or miss (0) tensor and a target tensor of ones. Shape: ``(..., 1)``.
         """
-        # Get top-k indices over the last dimension: (..., k)
+        # Shape: (..., k).
         _, topk_indices = torch.topk(preds, self._k, dim=-1)
 
-        # Check if target is in top-k
-        # targets.unsqueeze(-1) turns (...) into (..., 1), enabling automatic broadcasting
         is_hit = (topk_indices == targets.unsqueeze(-1)).any(dim=-1, keepdim=True).long()
 
-        # dummy_target is always 1 (Hit) because we want to compare Prediction (Hit/Miss) vs Ideal (Hit)
+        # The ideal outcome is always a hit, so the target is all ones.
         dummy_target = torch.ones_like(is_hit)
 
         return is_hit, dummy_target
 
 
 class OneHotProcessor(ClassificationPredictionsProcessor):
-    """Processes predictions and targets by computing argmax and converting them into one-hot format."""
+    """Converts the argmax of predictions and the targets into one-hot tensors."""
 
     def __init__(self, num_classes: int) -> None:
-        """Constructs the OneHotProcessor object.
+        """Constructs the ``OneHotProcessor`` object.
 
         Args:
-            num_classes: The total number of unique classes for one-hot encoding.
+            num_classes: The number of classes.
         """
         self._num_classes = num_classes
 
     def __call__(self, preds: torch.Tensor, targets: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Converts categorical predictions and targets to one-hot encoded format.
+        """Converts predictions and targets to one-hot tensors.
 
         Args:
-            preds: The raw prediction logits or probabilities of shape (..., C), where C is the number
-                of classes.
-            targets: The ground truth class indices of shape (...), (..., 1), or already
-                one-hot encoded targets of shape (..., C).
+            preds: The prediction logits or probabilities. Shape: ``(..., num_classes)``.
+            targets: The ground truth class indices with shape ``(...)`` or ``(..., 1)``, or one-hot targets with
+                shape ``(..., num_classes)``.
 
         Returns:
-            A tuple containing one-hot encoded predictions and targets tensors, both of
-                shape (..., C).
+            The one-hot predictions and targets. Shape: ``(..., num_classes)``.
 
         Raises:
-            ValueError: If the targets tensor shape is incompatible with the predictions.
+            ValueError: If the last dimension of ``preds`` is not ``num_classes``, or if the shape of ``targets``
+                does not match ``preds``.
         """
         if preds.shape[-1] != self._num_classes:
             raise ValueError(
@@ -95,45 +87,45 @@ class OneHotProcessor(ClassificationPredictionsProcessor):
         preds_one_hot = F.one_hot(preds_indices, num_classes=self._num_classes).long()
 
         if targets.shape == preds.shape:
-            # Targets are already (..., C)
+            # Targets are already one-hot: (..., num_classes).
             targets_one_hot = targets.long()
         elif targets.shape == preds.shape[:-1]:
-            # Targets are (...) representing integer class labels
+            # Targets are class indices: (...).
             targets_one_hot = F.one_hot(targets.long(), num_classes=self._num_classes).long()
         elif targets.shape == (*preds.shape[:-1], 1):
-            # Targets are (..., 1) representing integer class labels with explicit trailing dim
+            # Targets are class indices with a trailing dimension: (..., 1).
             targets_one_hot = F.one_hot(targets.squeeze(-1).long(), num_classes=self._num_classes).float()
         else:
             raise ValueError(
-                f"Targets shape {targets.shape} is incompatible with predictions shape {preds.shape}."
-                f"Expected shape to be (...), (..., 1), or (..., C)."
+                f"Targets shape ({tuple(targets.shape)}) is incompatible with predictions shape "
+                f"({tuple(preds.shape)}). Targets must have shape (...), (..., 1) or (..., num_classes)."
             )
 
         return preds_one_hot, targets_one_hot
 
 
 class ThresholdProcessor(ClassificationPredictionsProcessor):
-    """Processes probabilistic predictions by applying a binary threshold."""
+    """Binarizes probability predictions with a threshold."""
 
     def __init__(self, threshold: float) -> None:
-        """Constructs the ThresholdProcessor object.
+        """Constructs the ``ThresholdProcessor`` object.
 
         Args:
-            threshold: The boundary value above which a prediction is considered positive.
+            threshold: Predictions strictly above this value are positive.
         """
         self._threshold = threshold
 
     def __call__(self, preds: torch.Tensor, targets: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
-        """Binarizes predictions based on the configured threshold.
+        """Binarizes predictions with the configured threshold.
 
         Args:
-            preds: The prediction probabilities of shape (..., C) or 1D shape (N,) containing
-                values, typically in the range [0, 1].
-            targets: The ground truth targets of shape (..., C) or 1D shape (N,).
+            preds: The predictions, typically probabilities in ``[0, 1]``. Shape: ``(..., num_classes)`` or
+                ``(num_samples,)``.
+            targets: The binary ground truth targets. Shape: ``(..., num_classes)`` or ``(num_samples,)``.
 
         Returns:
-            A tuple containing binarized predictions and float targets tensors, both
-            ensured to have at least 2 dimensions, yielding patterns like (..., C) or (N, 1).
+            The binary predictions and the targets as float tensors. 1D inputs get a trailing dimension.
+            Shape: ``(..., num_classes)`` or ``(num_samples, 1)``.
         """
         if preds.ndim == 1:
             preds = preds.unsqueeze(-1)

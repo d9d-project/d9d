@@ -6,8 +6,16 @@ import torch.distributed as dist
 from torch.distributed.checkpoint.stateful import Stateful
 
 
-# we explicitly do not add 'avg' op since it is not safe for metric accumulation
+# No "avg" op: averaging running values or per-rank averages gives wrong results when counts differ.
 class MetricReduceOp(StrEnum):
+    """Reduction operation of a ``MetricAccumulator``, used both for updates and for synchronization.
+
+    Attributes:
+        sum: Adds values.
+        max: Keeps the maximum value.
+        min: Keeps the minimum value.
+    """
+
     sum = "sum"
     max = "max"
     min = "min"
@@ -22,7 +30,7 @@ def _torch_reduce_op_for(op: MetricReduceOp) -> dist.ReduceOp.RedOpType:
         case MetricReduceOp.min:
             return dist.ReduceOp.MIN
         case _:
-            raise ValueError("Unknown metric reduce op")
+            raise ValueError(f"Unknown metric reduce op ({op}).")
 
 
 def _accumulate_inplace_(op: MetricReduceOp, accumulator: torch.Tensor, value: torch.Tensor | float | bool):
@@ -31,29 +39,32 @@ def _accumulate_inplace_(op: MetricReduceOp, accumulator: torch.Tensor, value: t
             accumulator.add_(value)
         case MetricReduceOp.max:
             if not isinstance(value, torch.Tensor):
-                raise ValueError("Non-tensor inputs are not supported for `max` reduce op")
+                raise ValueError(
+                    f"Value type ({type(value).__name__}) is not supported by the max reduce op. Pass a tensor."
+                )
             accumulator.copy_(torch.maximum(accumulator, value))
         case MetricReduceOp.min:
             if not isinstance(value, torch.Tensor):
-                raise ValueError("Non-tensor inputs are not supported for `min` reduce op")
+                raise ValueError(
+                    f"Value type ({type(value).__name__}) is not supported by the min reduce op. Pass a tensor."
+                )
             accumulator.copy_(torch.minimum(accumulator, value))
 
 
 class MetricAccumulator(Stateful):
-    """Helper class to track a distributed metric state.
+    """Tracks a distributed metric state.
 
-    This class manages two copies of the state: a 'local' copy that is updated
-    locally on every step, and a 'synchronized' copy that is populated during
-    the sync phase via distributed reduction (all-reduce).
+    It keeps two copies of the state: a local copy, updated on every step, and a synchronized copy, filled by an
+    all-reduce in ``sync()``.
     """
 
     def __init__(self, initial_value: torch.Tensor, reduce_op: MetricReduceOp = MetricReduceOp.sum):
-        """Constructs MetricAccumulator object.
+        """Constructs the ``MetricAccumulator`` object.
 
         Args:
-            initial_value: Tensor representing the starting value (e.g., 0 for sum, -inf for max).
-                This tensor determines the device and dtype of the accumulator.
-            reduce_op: The reduction operation to use during updates and synchronization.
+            initial_value: The starting value, e.g. 0 for sum or -inf for max. It sets the device and dtype of the
+                accumulator.
+            reduce_op: The reduction operation for updates and synchronization.
         """
         self._initial = initial_value.clone()
 
@@ -65,24 +76,24 @@ class MetricAccumulator(Stateful):
         self._is_synchronized = False
 
     def update(self, value: torch.Tensor | float | bool):
-        """Updates the local accumulator with a new value.
+        """Accumulates a value into the local state with the configured reduction operation.
 
-        This operation is performed in-place on the local tensor using the
-        configured reduction operation (e.g., add for Sum, max for Max).
-        It marks the accumulator as not synchronized.
+        After an update, ``value`` returns the local state until the next ``sync()``.
 
         Args:
-            value: The value to accumulate.
+            value: The value to accumulate. The ``max`` and ``min`` operations accept only tensors.
+
+        Raises:
+            ValueError: If ``value`` is not a tensor and the reduction operation is ``max`` or ``min``.
         """
         _accumulate_inplace_(self._reduce_op, self._local, value)
 
         self._is_synchronized = False
 
     def sync(self):
-        """Synchronizes the accumulator across the default distributed process group.
+        """Synchronizes the accumulator across the default process group.
 
-        This method acts as a blocking barrier. It copies the local state to a buffer
-        and performs an `all_reduce` collective operation.
+        Every rank must call it. The local state stays unchanged.
         """
         self._synchronized.copy_(self._local)
         dist.all_reduce(self._synchronized, op=_torch_reduce_op_for(self._reduce_op))
@@ -91,12 +102,7 @@ class MetricAccumulator(Stateful):
 
     @property
     def value(self) -> torch.Tensor:
-        """Returns the current accumulated value.
-
-        Returns:
-            The global synchronized value if `sync()` was called recently,
-            otherwise the local accumulated value.
-        """
+        """The synchronized value if ``sync()`` was called after the last update, otherwise the local value."""
         return self._synchronized if self._is_synchronized else self._local
 
     def reset(self):

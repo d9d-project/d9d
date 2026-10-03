@@ -38,11 +38,10 @@ class FBetaStatistic(ConfusionMatrixStatistic):
     """Computes the F-beta score from a confusion matrix."""
 
     def __init__(self, beta: float) -> None:
-        """Constructs the FBetaStatistic object.
+        """Constructs the ``FBetaStatistic`` object.
 
         Args:
-            beta: The beta parameter determining the weight of recall mathematically
-                relative to precision.
+            beta: The weight of recall relative to precision. ``beta=1`` gives the F1 score.
         """
         self._beta_sq = beta**2
 

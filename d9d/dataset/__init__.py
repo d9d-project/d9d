@@ -1,4 +1,4 @@
-"""This package provides utilities and torch.utils.data.Dataset implementations."""
+"""Dataset wrappers and data utilities for distributed training."""
 
 from .batch_iterator import (
     FixedCountMicrobatchPacker,

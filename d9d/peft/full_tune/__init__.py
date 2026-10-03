@@ -1,4 +1,4 @@
-"""Package for Full Fine-Tuning functionality within the PEFT framework."""
+"""Full fine-tuning within the PEFT framework."""
 
 from .config import FullTuneConfig
 from .method import FullTune

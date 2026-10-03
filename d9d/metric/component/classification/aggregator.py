@@ -24,35 +24,30 @@ class ClassificationAggregationMethod(StrEnum):
 
 
 class ConfusionMatrixAggregator:
-    """Aggregates a confusion matrix state into a single statistic tensor.
-
-    This class evaluates a given statistic across a multiclass confusion matrix
-    using a specified aggregation method.
-    """
+    """Computes a statistic from a confusion matrix and aggregates it across classes."""
 
     def __init__(self, method: ClassificationAggregationMethod, statistic: ConfusionMatrixStatistic) -> None:
-        """Constructs the ConfusionMatrixAggregator object.
+        """Constructs the ``ConfusionMatrixAggregator`` object.
 
         Args:
-            method: The methodology used to aggregate the matrices or statistics.
-            statistic: The protocol or callable responsible for computing the statistic
-                from the confusion matrix.
+            method: The aggregation method across classes.
+            statistic: The statistic to compute from the confusion matrix.
         """
         self._method = method
         self._statistic = statistic
 
     def __call__(self, matrix: ConfusionMatrix) -> torch.Tensor:
-        """Aggregates the given confusion matrix and computes the target statistic.
+        """Computes the statistic and aggregates it with the configured method.
 
         Args:
-            matrix: The accumulated confusion matrix state containing class counts. Shape of each its cell is (C,)
+            matrix: The accumulated confusion matrix. Each count has shape ``(num_outputs,)``.
 
         Returns:
-            The computed statistic tensor. Output shape depends on the aggregation method
-                (scalar for MICRO, MACRO, and WEIGHTED; 1D tensor for NONE).
+            The statistic. A scalar for ``MICRO``, ``MACRO`` and ``WEIGHTED``. Shape: ``(num_outputs,)`` for
+            ``NONE``.
 
         Raises:
-            ValueError: If an unknown aggregation method was specified.
+            ValueError: If the aggregation method is unknown.
         """
         match self._method:
             case ClassificationAggregationMethod.MICRO:
@@ -78,4 +73,4 @@ class ConfusionMatrixAggregator:
                 return self._statistic(matrix)
 
             case _:
-                raise ValueError(f"Unknown aggregation method: {self._method}")
+                raise ValueError(f"Unknown aggregation method ({self._method}).")

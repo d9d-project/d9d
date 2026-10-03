@@ -2,92 +2,83 @@
 
 ## About
 
-The `d9d.metric` package provides a unified interface for tracking, accumulating, and synchronizing statistics (such as Accuracy) across a distributed environment.
+The `d9d.metric` package provides one interface for tracking, accumulating and synchronizing statistics, such as accuracy, in distributed training.
 
-## Why and How
+## The Single-GPU Trap
 
-### The Single-GPU Trap
-
-Some practitioners coming from single-GPU training or standard data science backgrounds are used to workflows relying on good-old CPU-based libraries such as `scikit-learn`:
+Many practitioners come from single-GPU training or data science. They are used to CPU-based workflows with libraries such as `scikit-learn`:
 
 ```python
-# Typical single-node pattern
-loss_val = loss_fn(pred, target).item() # <--- CPU Sync Point 1
+# Typical single-node pattern.
+loss_val = loss_fn(pred, target).item()  # <--- Host sync point 1
 history.append(loss_val)
 # ... later ...
-avg = np.mean(history)     # <--- CPU Sync Point 2
+avg = np.mean(history)  # <--- Host sync point 2
 sklearn.metrics.f1_score(all_preds, all_targets)
 ```
 
-In a large-scale distributed environment, this approach causes critical failures:
+In large-scale distributed training, this approach fails:
 
-*   **Pipeline Stalls**: Calling `.item()` or `.cpu()` forces a synchronization that waits for the GPU to finish. This destroys the pipelining efficiency required for training large models.
-*   **Out-of-Memory Errors**: Accumulating prediction history for many steps in a Python list will rapidly exhaust RAM.
-*   **No Synchronization - Partial View**: Rank 0 only sees its own data shard. Logging loss from Rank 0 is misleading.
+*   **Pipeline stalls**: `.item()` and `.cpu()` make the host wait until the GPU finishes its queued work. Meanwhile the host cannot queue new work, so the GPU idles.
+*   **Out-of-memory errors**: A Python list of predictions from many steps quickly fills host RAM.
+*   **Partial view**: Rank 0 sees only its own data shard, so a loss logged from rank 0 alone is misleading.
 
-So, we have to do something with metric implementations to be performant and accurate.
+## The d9d Approach
 
-### The d9d Solution
+The `Metric` interface is:
 
-This package addresses issues described above by providing a `Metric` interface that is:
+*   **Distributed**: Each metric synchronizes its state across all ranks in its `sync` method.
+*   **Async-compatible**: A `Metric` implementation can stay simple and synchronous. The training loop drives it through the [`AsyncMetricCollector`](../internals/metric_collector.md), which runs synchronization and computation on a side CUDA stream. The main training loop continues meanwhile.
+*   **Stateful**: Metrics implement the `torch.distributed.checkpoint.stateful.Stateful` interface, so they are saved in checkpoints.
+*   **Small**: `Metric` is a lightweight interface with no hidden state accounting. Implement its methods and respect the lifecycle below.
 
-* **Distributed Aware**: Each metric knows how to synchronize its state across an ND-parallel environment via the `sync` method.
-* **Async Compatible**: While `Metric` implementations themselves can remain simple and synchronous, they are designed to be driven by the [`AsyncMetricCollector`](../internals/metric_collector.md). This wrapper offloads the synchronization and computation to a side-stream, allowing the main training loop to continue while metrics are being reduced.
-* **Stateful**: Metrics implement the `torch.distributed.checkpoint.stateful.Stateful` interface, allowing their state to be checkpointed seamlessly.
-* **Clear**: Unlike some other libraries, d9d's `Metric` is a lightweight interface. It has no hidden state accounting or complex contracts. Just implement the interface and ensure you don't break the lifecycle.
+## The Metric Lifecycle
 
-### The Metric Lifecycle
+A metric in d9d follows this lifecycle:
 
-A Metric in `d9d` follows a specific lifecycle:
+1.  **Update**: Runs every training step. The metric accumulates data locally on the GPU, e.g. with `.add_()`. No communication happens.
+2.  **Sync**: Runs at the logging interval. The metric aggregates data across all ranks, e.g. with `all_reduce`.
+3.  **Compute**: Computes the final value from the synchronized data, e.g. total loss divided by total samples.
+4.  **Reset**: Clears the state for the next logging window.
 
-1.  **Update**: Happens every train step. Data is aggregated locally on the GPU using methods like `.add_()`. No communication occurs here.
-2.  **Sync**: Happens at the logging interval. The metric aggregates data across the world (e.g. `all_reduce`). 
-3.  **Compute**: Calculates the final scalar (e.g., dividing total loss by total samples) using the synchronized data.
-4.  **Reset**: Clears the internal state for the next logging window.
+## Usage
 
-## Usage Examples
+### With the Trainer
 
-### Basic Usage
-
-Typically, you want to just instantiate and update metrics within your `TrainTask` object.
-
-See related examples in [Trainer](../loop/interfaces/index.md) documentation.
+Usually, you create and update metrics in your `TrainTask`. See the examples in the [Interfaces](../loop/interfaces/index.md) documentation.
 
 ### Manual Usage
 
-You may want to use d9d metrics manually, without using the Trainer object.
-
-When used directly, the `sync()` method is blocking by default. You may call it within `torch.cuda.stream(...)` 
-to overlap with computations.
+You can also use d9d metrics without the `Trainer`. Called directly, `sync()` blocks until all ranks finish the reduction. To overlap it with other work, call it within `torch.cuda.stream(...)`.
 
 ```python
-import torch
-from d9d.metric.impl import WeightedMeanMetric
-from d9d.core.dist_context import DistributedContext
+from d9d.metric.impl.aggregation import WeightedMeanMetric
 
-# 1. Initialize
+# 1. Create the metric.
 metric = WeightedMeanMetric()
 metric.to("cuda")
 
 dataloader = ...
 dist_ctx = ...
 
-# 2. Training Loop
+# 2. Training loop.
 for step, batch in enumerate(dataloader):
     # ... forward, backward ...
-    loss = ... 
-    num_tokens = ... 
-    
-    # Update local state (No communication, cheap)
+    loss = ...
+    num_tokens = ...
+
+    # Update the local state (no communication).
     metric.update(values=loss, weights=num_tokens)
 
-# 3. Synchronize & Compute
-# This will block until all ranks finish all_reduce
+# 3. Synchronize and compute.
+# Blocks until all ranks finish the all_reduce.
 metric.sync(dist_ctx)
-print(f"Global Average Loss: {metric.compute()}")
+print(f"Global average loss: {metric.compute()}")
 
-# 4. Reset for next epoch
+# 4. Reset for the next epoch.
 metric.reset()
 ```
+
+## API Reference
 
 ::: d9d.metric

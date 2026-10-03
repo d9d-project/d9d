@@ -7,17 +7,16 @@ from .config import FullTuneConfig
 
 
 class FullTune(PeftMethod[FullTuneConfig]):
-    """Implements Full Fine-Tuning as a 'PEFT' method.
+    """Implements full fine-tuning as a PEFT method.
 
-    Instead of injecting adapters, this method simply identifies existing parameters
-    that match the configuration pattern and marks them for training.
+    It injects no adapters. It marks all parameters of the matching modules as trainable.
     """
 
     def __init__(self, config: FullTuneConfig):
-        """Constructs a FullTune object.
+        """Constructs the ``FullTune`` object.
 
         Args:
-            config: Configuration defining the module name patterns to fine-tune.
+            config: Configuration with the module name pattern to fine-tune.
         """
         self._config = config
 
@@ -33,7 +32,8 @@ class FullTune(PeftMethod[FullTuneConfig]):
         return PeftInjectionResult(parameters_to_train=params_to_train, load_state_mappers=[])
 
     def merge(self, module: nn.Module):
-        pass  # do nothing here
+        # Full fine-tuning updates the original parameters, so there is nothing to merge.
+        pass
 
     @classmethod
     def from_config(cls, config: FullTuneConfig) -> Self:

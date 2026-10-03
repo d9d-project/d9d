@@ -24,7 +24,7 @@ def _padding_side_1d_to_config(side: PaddingSide1D, difference: int) -> tuple[in
         case PaddingSide1D.right:
             return 0, difference
         case _:
-            raise ValueError("Unknown padding side")
+            raise ValueError(f"Unknown padding side ({side}).")
 
 
 def pad_stack_1d(
@@ -33,28 +33,26 @@ def pad_stack_1d(
     padding_side: PaddingSide1D = PaddingSide1D.right,
     pad_to_multiple_of: int | None = None,
 ) -> torch.Tensor:
-    """Stacks 1D tensors into a batch, applying padding.
+    """Pads 1D tensors to the same length and stacks them into a batch.
 
-    Calculates the maximum length among the input tensors (optionally aligning to a multiple),
-    pads elements to match this length on the specified side, and stacks them.
+    All tensors are padded to the length of the longest one.
 
     Args:
-        items: A sequence of 1D tensors to be stacked.
+        items: The 1D tensors to stack.
         pad_value: The value used for padding.
-        padding_side: The side on which to apply padding (left or right).
-        pad_to_multiple_of: Optional integer. If provided, ensures the target length
-            is a multiple of this value.
+        padding_side: The side on which to pad.
+        pad_to_multiple_of: If set, the padded length is rounded up to a multiple of this value.
 
     Returns:
-        A single stacked tensor of shape (batch, max_length).
+        The stacked tensor. Shape: ``(batch, seq_len)``.
 
     Raises:
-        ValueError: If no items are provided or if `pad_to_multiple_of` is <= 0.
+        ValueError: If ``items`` is empty or ``pad_to_multiple_of`` is not positive.
     """
     if not items:
-        raise ValueError("Cannot stack 0 items")
+        raise ValueError("Cannot stack 0 items. Pass at least one tensor.")
     if pad_to_multiple_of is not None and pad_to_multiple_of <= 0:
-        raise ValueError("pad_to_multiple_of should be > 0")
+        raise ValueError(f"pad_to_multiple_of ({pad_to_multiple_of}) must be positive.")
 
     max_len = max(x.shape[0] for x in items)
 

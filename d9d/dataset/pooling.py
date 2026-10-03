@@ -7,9 +7,9 @@ class TokenPoolingType(StrEnum):
     """Enumeration of supported token pooling strategies.
 
     Attributes:
-        first: Selects the first token of the sequence (e.g., [CLS] token).
-        last: Selects the last non-padding token of the sequence (e.g., for Transformer Decoder).
-        all: Selects all non-padding tokens (e.g., for mean pooling).
+        first: Selects the first token of the sequence, e.g. the ``[CLS]`` token.
+        last: Selects the last non-padding token of the sequence, e.g. for decoder-only models.
+        all: Selects all non-padding tokens, e.g. for mean pooling.
     """
 
     first = "first"
@@ -20,19 +20,20 @@ class TokenPoolingType(StrEnum):
 def token_pooling_mask_from_attention_mask(
     attention_mask: torch.Tensor, pooling_type: TokenPoolingType
 ) -> torch.Tensor:
-    """Generates a binary mask for token pooling based on the specified strategy.
+    """Builds a binary mask of the tokens to pool for the given strategy.
+
+    ``last`` assumes right padding.
 
     Args:
-        attention_mask: A binary mask indicating valid tokens (1) and padding (0).
-            Expected shape is (batch_size, sequence_length).
-        pooling_type: The strategy to use for selecting tokens.
+        attention_mask: A binary mask of valid tokens (1) and padding (0). Shape: ``(batch, seq_len)``.
+        pooling_type: The strategy for selecting tokens.
 
     Returns:
-        A LongTensor of the same shape as input containing 1s at positions
-        to be included in pooling and 0s elsewhere.
+        A mask with 1 at the positions to pool and 0 elsewhere. ``first`` and ``last`` return a ``torch.long``
+        mask. ``all`` returns ``attention_mask`` itself. Shape: ``(batch, seq_len)``.
 
     Raises:
-        ValueError: If the provided pooling type is not supported.
+        ValueError: If ``pooling_type`` is not supported.
     """
     match pooling_type:
         case TokenPoolingType.first:
@@ -48,4 +49,4 @@ def token_pooling_mask_from_attention_mask(
         case TokenPoolingType.all:
             return attention_mask
         case _:
-            raise ValueError(f"Unknown pooling type: {pooling_type}")
+            raise ValueError(f"Unknown pooling type ({pooling_type}).")

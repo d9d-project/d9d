@@ -11,14 +11,14 @@ class SumMetric(Metric[torch.Tensor]):
     """Computes the sum of input values."""
 
     def __init__(self):
-        """Constructs a SumMetric object."""
+        """Constructs the ``SumMetric`` object."""
         self._accumulator = MetricAccumulator(torch.scalar_tensor(0, dtype=torch.float32))
 
     def update(self, value: torch.Tensor):
-        """Updates the metric state by adding the sum of the input value.
+        """Adds the sum of all elements of ``value`` to the metric.
 
         Args:
-            value: A tensor whose sum will be added to the accumulator.
+            value: The values to add.
         """
         self._accumulator.update(value.sum())
 

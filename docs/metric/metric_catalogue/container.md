@@ -1,39 +1,43 @@
 # Container Metrics
 
-Managing multiple metrics individually can lead to boilerplate code, especially when manually synchronizing, computing, and resetting states across distributed workers. The `d9d` framework provides container metrics to bundle and manage collections of metrics efficiently.
+## About
+
+Managing many metrics one by one means repeating the sync, compute and reset calls for each of them. Container metrics bundle several metrics and manage them together.
 
 ## Compose Metric
 
-The `ComposeMetric` wraps a mapping string keys to `Metric` instances into a single unifying interface. 
+`ComposeMetric` wraps a mapping from string keys to `Metric` instances into a single metric.
 
-By design, you cannot call `.update()` directly on a `ComposeMetric` since different metrics may require different underlying arguments. Instead, you access and update the children directly. However, collective lifecycle methods like `.sync()`, `.compute()`, `.reset()`, `.state_dict()`, and `.to()` automatically cascade to all underlying metrics.
+You cannot call `.update()` on a `ComposeMetric`, because its children can take different arguments. Update the children directly instead. The lifecycle methods `.sync()`, `.compute()`, `.reset()`, `.to()`, `.state_dict()` and `.load_state_dict()` apply to all children.
+
+## Usage
 
 ```python
 import torch
 from d9d.metric.impl.aggregation import SumMetric, WeightedMeanMetric
 from d9d.metric.impl.container import ComposeMetric
 
-# 1. Group multiple metrics together
+# 1. Group metrics together.
 metrics = ComposeMetric({
     "loss": WeightedMeanMetric(),
     "total_samples": SumMetric(),
 })
 
-# 2. Update children individually based on their specific signatures
+# 2. Update each child with its own arguments.
 metrics["loss"].update(torch.tensor(0.5), torch.tensor(32.0))
 metrics["total_samples"].update(torch.tensor(32.0))
 
-# 3. Lifecycle operations naturally propagate to all children via the container
+# 3. Lifecycle methods apply to all children.
 metrics.to("cuda")
 metrics.sync(dist_context)
 
-# 4. Compute returns a dictionary mapping metric names to their final aggregated results
+# 4. compute() returns a dictionary from metric name to result.
 results = metrics.compute()
 
-# 5. Reset all metrics for the next epoch/evaluation step
+# 5. Reset all metrics for the next epoch or evaluation.
 metrics.reset()
 ```
 
+## API Reference
+
 ::: d9d.metric.impl.container.ComposeMetric
-    options:
-      heading_level: 3

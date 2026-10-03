@@ -13,8 +13,8 @@ class PeftInjectionResult:
     """Encapsulates the result of injecting a PEFT method into a model.
 
     Attributes:
-        parameters_to_train: A list of parameters that should remain trainable.
-        load_state_mappers: A list of mappers required to load pre-trained weights into the modified structure.
+        parameters_to_train: The parameters that must stay trainable.
+        load_state_mappers: The mappers that load pre-trained weights into the modified structure.
     """
 
     parameters_to_train: list[nn.Parameter]
@@ -25,17 +25,17 @@ TConfig = TypeVar("TConfig", bound=BaseModel)
 
 
 class PeftMethod(abc.ABC, Generic[TConfig]):
-    """Abstract base class for all Parameter-Efficient Fine-Tuning methods."""
+    """Base class for all Parameter-Efficient Fine-Tuning methods."""
 
     @abc.abstractmethod
     def inject(self, module: nn.Module) -> PeftInjectionResult:
-        """Modifies the module in-place to apply the PEFT strategy.
+        """Modifies the module in place to apply the PEFT method.
 
         Args:
             module: The PyTorch module to modify.
 
         Returns:
-            Result object containing trainable parameters and structure mappers.
+            The trainable parameters and the mappers for loading weights into the new structure.
         """
         ...
 
@@ -51,12 +51,12 @@ class PeftMethod(abc.ABC, Generic[TConfig]):
     @classmethod
     @abc.abstractmethod
     def from_config(cls, config: TConfig) -> Self:
-        """Creates an instance of the method from a configuration object.
+        """Creates the method from a configuration object.
 
         Args:
             config: The configuration object.
 
         Returns:
-            An instance of the PeftMethod.
+            The method instance.
         """
         ...

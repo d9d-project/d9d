@@ -12,7 +12,7 @@ class ConfusionMatrixAccumulator(Stateful):
     """Accumulates confusion matrix statistics across batches and distributed workers."""
 
     def __init__(self, num_outputs: int):
-        """Constructs the ConfusionMatrixAccumulator object.
+        """Constructs the ``ConfusionMatrixAccumulator`` object.
 
         Args:
             num_outputs: The number of distinct classes to track.
@@ -25,39 +25,34 @@ class ConfusionMatrixAccumulator(Stateful):
 
     @property
     def state(self) -> ConfusionMatrix:
-        """Provides the current accumulated state.
-
-        Returns:
-            A single confusion matrix containing 1D tensors of counts for each
-            tracked output/class.
-        """
+        """The accumulated confusion matrix, with counts of shape ``(num_outputs,)``."""
         return ConfusionMatrix(tp=self._tp.value, fp=self._fp.value, tn=self._tn.value, fn=self._fn.value)
 
     def update(self, preds: torch.Tensor, targets: torch.Tensor):
         """Updates the accumulated statistics with a new batch of predictions and targets.
 
         Args:
-            preds: Pre-processed binary predictions tensor.
-            targets: Pre-processed binary targets tensor.
+            preds: Binary predictions, as returned by a ``ClassificationPredictionsProcessor``.
+                Shape: ``(..., num_outputs)``.
+            targets: Binary targets, as returned by a ``ClassificationPredictionsProcessor``.
+                Shape: ``(..., num_outputs)``.
 
         Raises:
-            ValueError: If predictions and targets have mismatched shapes, or if the
-                last dimension does not match the configured number of outputs.
+            ValueError: If ``preds`` and ``targets`` have different shapes, or if their last dimension does not
+                match ``num_outputs``.
         """
-        # preds/targets are pre-processed binary tensors
         if preds.shape != targets.shape:
-            raise ValueError(
-                f"preds and targets must have the same shape, got {tuple(preds.shape)} and {tuple(targets.shape)}."
-            )
+            raise ValueError(f"preds shape ({tuple(preds.shape)}) must match targets shape ({tuple(targets.shape)}).")
 
         if preds.shape[-1] != self._num_outputs:
-            raise ValueError(f"Expected {self._num_outputs} outputs, got {preds.shape[1]}")
+            raise ValueError(
+                f"The last dimension of preds ({preds.shape[-1]}) must equal num_outputs ({self._num_outputs})."
+            )
 
         preds = preds.long().flatten(0, -2)
         targets = targets.long().flatten(0, -2)
 
-        # calculation over batch dimension (dim 0)
-        # Result shape: (num_outputs,)
+        # Sum over all leading dimensions, flattened into dim 0; result shape: (num_outputs,).
         tp = (preds * targets).sum(dim=0)
         fp = (preds * (1 - targets)).sum(dim=0)
         fn = ((1 - preds) * targets).sum(dim=0)
@@ -69,7 +64,7 @@ class ConfusionMatrixAccumulator(Stateful):
         self._fn.update(fn)
 
     def sync(self):
-        """Synchronizes the accumulated metrics across all distributed workers."""
+        """Synchronizes the accumulated counts across the default process group."""
         self._tp.sync()
         self._fp.sync()
         self._tn.sync()
@@ -83,10 +78,10 @@ class ConfusionMatrixAccumulator(Stateful):
         self._fn.reset()
 
     def to(self, device: str | torch.device | int):
-        """Moves the underlying metric accumulators to the specified target device.
+        """Moves the internal accumulators to a device.
 
         Args:
-            device: The target device to move the internal tensors to.
+            device: The target device.
         """
         self._tp.to(device)
         self._fp.to(device)
@@ -94,10 +89,10 @@ class ConfusionMatrixAccumulator(Stateful):
         self._fn.to(device)
 
     def state_dict(self) -> dict[str, Any]:
-        """Retrieves the current state dictionary of the accumulator.
+        """Returns the state dictionary of the accumulator.
 
         Returns:
-            A dictionary containing the state bounds of all internal accumulators.
+            The states of all internal accumulators.
         """
         return {
             "tp": self._tp.state_dict(),
@@ -110,7 +105,7 @@ class ConfusionMatrixAccumulator(Stateful):
         """Restores the accumulator state from the given state dictionary.
 
         Args:
-            state_dict: The state dictionary to inject into the accumulator.
+            state_dict: The state dictionary to load.
         """
         self._tp.load_state_dict(state_dict["tp"])
         self._fp.load_state_dict(state_dict["fp"])

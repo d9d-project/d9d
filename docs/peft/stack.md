@@ -2,13 +2,11 @@
 
 ## About
 
-Complex fine-tuning often requires hybrid approaches.
+Fine-tuning can combine several methods. The `d9d.peft.all` package groups multiple PEFT configurations into a single `PeftStack`. The stack injects its methods in order and merges them in reverse order.
 
-The `d9d.peft.all` package facilitates this by grouping multiple PEFT configurations into a single `PeftStack`.
+## Usage
 
-## Usage Example
-
-Applying LoRA to attention layers while fully fine-tuning normalization layers.
+This example applies LoRA to attention layers and fully fine-tunes normalization layers.
 
 ```python
 import re
@@ -17,34 +15,35 @@ from d9d.peft.lora import LoRAConfig, LoRAParameters
 from d9d.peft.full_tune import FullTuneConfig
 from d9d.peft import inject_peft_and_freeze, merge_peft
 
-# 1. Define your Strategy
+# 1. Define the methods.
 config = PeftStackConfig(
     methods=[
-        # Method A: LoRA on attention projections
+        # LoRA on attention projections.
         LoRAConfig(
-            module_name_pattern=re.compile(r".*attention\..*_proj.*"),
+            module_name_pattern=re.compile(r".*self_attn\..*_proj"),
             params=LoRAParameters(r=8, alpha=16, dropout=0.05)
         ),
-        # Method B: Full Tune on LayerNorms
+        # Full fine-tuning of normalization layers.
         FullTuneConfig(
             module_name_pattern=re.compile(r".*norm.*")
         )
     ]
 )
 
-# 2. Create Factory
-# This automatically creates a PeftStack containing the sub-methods
+# 2. Build a PeftStack that contains both methods.
 method = peft_method_from_config(config)
 
-# 3. Inject
+# 3. Inject.
 mapper = inject_peft_and_freeze(method, model)
 
-# ... pass 'mapper' object to d9d's Trainer or manually load a model checkpoint ...
+# ... pass the mapper to d9d's Trainer or load a checkpoint with it ...
 
-# ... train a model ...
+# ... train the model ...
 
-# 4. Merge - for exporting a model
+# 4. Merge the adapters into the base weights before exporting the model.
 merge_peft(method, model)
 ```
+
+## API Reference
 
 ::: d9d.peft.all
