@@ -11,14 +11,14 @@ from .params import Qwen3MoELayerParameters
 
 
 class Qwen3MoELayer(nn.Module, ModuleLateInit):
-    """Implements a single Qwen3 Mixture-of-Experts (MoE) transformer layer.
+    """A single Qwen3 Mixture-of-Experts (MoE) transformer layer.
 
-    This layer consists of a Grouped Query Attention mechanism followed by an MoE
-    MLP block, with pre-RMSNorm applied before each sub-layer.
+    The layer applies Grouped Query Attention, then an MoE MLP block. Each sub-layer has a
+    pre-RMSNorm and a residual connection.
     """
 
     def __init__(self, params: Qwen3MoELayerParameters):
-        """Constructs a Qwen3MoELayer object.
+        """Constructs the ``Qwen3MoELayer`` object.
 
         Args:
             params: Configuration parameters for the layer.
@@ -49,14 +49,14 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
     def forward(
         self, hidden_states: torch.Tensor, position_embeddings: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
-        """Performs the forward pass of the MoE layer.
+        """Runs the forward pass of the layer.
 
         Args:
-            hidden_states: Input tensor of shape `(batch, seq_len, hidden_dim)`.
-            position_embeddings: Tuple containing RoPE precomputed embeddings (cos, sin).
+            hidden_states: Input hidden states. Shape: ``(batch, seq_len, hidden_size)``.
+            position_embeddings: Precomputed RoPE embeddings as a ``(cos, sin)`` tuple.
 
         Returns:
-            Output tensor after attention and MoE blocks, shape `(batch, seq_len, hidden_dim)`.
+            Output hidden states. Shape: ``(batch, seq_len, hidden_size)``.
         """
         residual = hidden_states
 
@@ -65,7 +65,7 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         hidden_states = self.self_attn(
             hidden_states=hidden_states,
             position_embeddings=position_embeddings,
-            attention_mask=None,  # no mask for moe decoder
+            attention_mask=None,
         )
         hidden_states = residual + hidden_states
 
@@ -78,7 +78,7 @@ class Qwen3MoELayer(nn.Module, ModuleLateInit):
         return hidden_states
 
     def reset_parameters(self):
-        """Resets module parameters."""
+        """Resets the module parameters."""
         self.self_attn.reset_parameters()
         self.mlp.reset_parameters()
         self.input_layernorm.reset_parameters()

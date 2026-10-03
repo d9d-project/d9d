@@ -9,11 +9,11 @@ from d9d.module.model.backbone import DecoderBackbone
 class CausalLMHeadConfig(BaseModel):
     """Configuration for a causal language modeling head.
 
-    The split-vocabulary layout and hidden size are derived from the backbone, so this
-    config carries no task-specific fields beyond its discriminator.
+    The head takes its hidden size and split-vocabulary layout from the backbone, so this config has
+    no fields besides its discriminator.
 
     Attributes:
-        kind: Discriminator field. Always "causal_lm".
+        kind: Discriminator field. Always ``"causal_lm"``.
     """
 
     kind: Literal["causal_lm"] = "causal_lm"
@@ -23,7 +23,7 @@ class ClassificationHeadConfig(BaseModel):
     """Configuration for a sequence/token classification head.
 
     Attributes:
-        kind: Discriminator field. Always "classification".
+        kind: Discriminator field. Always ``"classification"``.
         num_labels: The number of output classes.
         dropout: The dropout probability applied before the projection.
     """
@@ -37,8 +37,8 @@ class EmbeddingHeadConfig(BaseModel):
     """Configuration for a dense embedding head.
 
     Attributes:
-        kind: Discriminator field. Always "embedding".
-        embedding_dim: Dimensionality of the output embedding. None for no extra projection.
+        kind: Discriminator field. Always ``"embedding"``.
+        embedding_dim: Size of the output embedding. ``None`` for no extra projection.
         normalize: Whether to apply L2 normalization to the final embeddings.
     """
 
@@ -57,20 +57,19 @@ AnyHeadConfig = Annotated[
 def build_decoder_head(config: AnyHeadConfig, *, backbone: DecoderBackbone) -> TaskHead:
     """Builds a task head from its configuration and the decoder backbone it attaches to.
 
-    Backbone-shared dimensions (``hidden_size``, the LM split-vocab layout) are derived from the
-    backbone, so a config carries only task-specific fields. A bespoke head a user writes for their
-    own model is a :class:`TaskHead` instance passed directly to the decoder, bypassing this union
-    entirely.
+    The head takes ``hidden_size`` and the split-vocabulary layout from the backbone, so a config
+    holds only task-specific fields. A custom head does not go through this factory: pass its
+    ``TaskHead`` instance to the decoder directly.
 
     Args:
         config: Task head configuration selecting the head type and its task-specific fields.
-        backbone: The decoder backbone the head attaches to; provides shared dimensions.
+        backbone: The decoder backbone the head attaches to. It provides the shared dimensions.
 
     Returns:
         An instantiated task head.
 
     Raises:
-        ValueError: If an unknown head configuration type is provided.
+        ValueError: If the head configuration type is unknown.
     """
     match config:
         case CausalLMHeadConfig():
@@ -92,4 +91,4 @@ def build_decoder_head(config: AnyHeadConfig, *, backbone: DecoderBackbone) -> T
                 normalize=config.normalize,
             )
         case _:
-            raise ValueError(f"Unknown head config type: {type(config)}")
+            raise ValueError(f"Unknown head config type ({type(config)}).")

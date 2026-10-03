@@ -7,23 +7,15 @@ from d9d.module.parallelism.style import ShardMoESparseExpertsParallel, ToLocalP
 
 
 def parallelize_expert_parallel(module: MoELayer, mesh_experts: DeviceMesh, expert_shard_dim: str = "ep_shard"):
-    """Applies Expert Parallelism to a MoE layer.
+    """Applies expert parallelism to an MoE layer.
 
-    This function configures the provided Mixture of Experts layer for distributed
-    execution.
-
-    It partitions the sparse experts across the specified dimension
-    of the device mesh (Expert Parallelism) and replicates along other dims.
-
-    Simultaneously, it configures the router to be fully replicated across
-    the mesh.
-
-    If shared expert is enabled, it is also replicated across the mesh.
+    The sparse experts are sharded along ``expert_shard_dim`` and replicated along the other mesh
+    dimensions. The router and the shared expert (if any) are replicated across the whole mesh.
 
     Args:
-        module: The MoE layer instance to parallelize.
-        mesh_experts: The device mesh containing the expert parallel resources.
-        expert_shard_dim: The name of the mesh dimension where experts should be sharded.
+        module: The MoE layer to parallelize.
+        mesh_experts: The device mesh to distribute the layer over.
+        expert_shard_dim: The name of the mesh dimension to shard the experts along.
     """
     parallelize_module(module, mesh_experts, ShardMoESparseExpertsParallel(shard_dim_name=expert_shard_dim))
     parallelize_module(

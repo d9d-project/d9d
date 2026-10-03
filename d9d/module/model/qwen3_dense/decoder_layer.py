@@ -11,14 +11,14 @@ from .params import Qwen3DenseLayerParameters
 
 
 class Qwen3DenseLayer(nn.Module, ModuleLateInit):
-    """Implements a single Qwen3 Dense transformer layer.
+    """A single Qwen3 Dense transformer layer.
 
-    This layer consists of a Grouped Query Attention mechanism followed by a
-    SwiGLU MLP block, with pre-RMSNorm applied before each sub-layer.
+    The layer applies Grouped Query Attention, then a SwiGLU MLP block. Each sub-layer has a
+    pre-RMSNorm and a residual connection.
     """
 
     def __init__(self, params: Qwen3DenseLayerParameters):
-        """Constructs a Qwen3DenseLayer object.
+        """Constructs the ``Qwen3DenseLayer`` object.
 
         Args:
             params: Configuration parameters for the layer.
@@ -43,14 +43,14 @@ class Qwen3DenseLayer(nn.Module, ModuleLateInit):
     def forward(
         self, hidden_states: torch.Tensor, position_embeddings: tuple[torch.Tensor, torch.Tensor]
     ) -> torch.Tensor:
-        """Performs the forward pass of the dense layer.
+        """Runs the forward pass of the layer.
 
         Args:
-            hidden_states: Input tensor of shape `(batch, seq_len, hidden_dim)`.
-            position_embeddings: Tuple containing RoPE precomputed embeddings (cos, sin).
+            hidden_states: Input hidden states. Shape: ``(batch, seq_len, hidden_size)``.
+            position_embeddings: Precomputed RoPE embeddings as a ``(cos, sin)`` tuple.
 
         Returns:
-            Output tensor after attention and MLP blocks, shape `(batch, seq_len, hidden_dim)`.
+            Output hidden states. Shape: ``(batch, seq_len, hidden_size)``.
         """
         residual = hidden_states
 
@@ -72,7 +72,7 @@ class Qwen3DenseLayer(nn.Module, ModuleLateInit):
         return hidden_states
 
     def reset_parameters(self):
-        """Resets module parameters."""
+        """Resets the module parameters."""
         self.self_attn.reset_parameters()
         self.mlp.reset_parameters()
         self.input_layernorm.reset_parameters()

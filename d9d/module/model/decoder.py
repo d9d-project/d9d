@@ -39,7 +39,7 @@ THeadShared = TypeVar("THeadShared")
 THeadOutput = TypeVar("THeadOutput")
 
 SINGLE_HEAD_PREFIX = "head."
-"""FQN prefix of the task head in a single-head decoder, i.e. any :class:`DecoderWithHead`."""
+"""FQN prefix of the task head in a single-head decoder (any ``DecoderWithHead``)."""
 
 
 class DecoderWithHeads(
@@ -55,17 +55,16 @@ class DecoderWithHeads(
 ):
     """Composes one decoder backbone with a mapping of prebuilt named task heads.
 
-    For a model with a *single* head, reach for :class:`DecoderWithHead` instead: there is nothing
-    to key, and this class would make every caller name the only head there is.
+    For a model with a single head, use ``DecoderWithHead`` instead. With one head there is nothing
+    to key, and this class would make every caller name the only head.
 
-    The backbone (``self.model``) and the heads (``self.heads``) are public, so a provider
-    parallelizes and checkpoint-maps each independently. It does not build heads — that is the
-    :func:`build_decoder_head` factory's job — so the class stays a pure composition of prebuilt
-    modules and lets custom heads in on equal footing. Heads are attached only on the last pipeline
-    stage.
+    The backbone (``self.model``) and the heads (``self.heads``) are public, so a provider can
+    parallelize and checkpoint-map each of them separately. This class does not build heads: use
+    ``build_decoder_head`` for built-in heads, or pass custom heads in the same way. Heads are
+    attached only on the last pipeline stage.
 
-    The head IO type parameters carry the composed heads' contract: heads of one kind name that
-    kind's shared input and output, while heads of several kinds name their unions.
+    For heads of one kind, the head I/O type parameters are that kind's shared input and output.
+    For heads of several kinds, they are the unions of those types.
 
     Type parameters:
         TBackbone: The backbone type, kept precise so ``parallelize_*`` accepts ``self.model``.
@@ -79,7 +78,7 @@ class DecoderWithHeads(
         heads: Mapping[str, TaskHead[THeadShared, THeadOutput]],
         stage: PipelineStageInfo,
     ):
-        """Constructs the DecoderWithHeads object.
+        """Constructs the ``DecoderWithHeads`` object.
 
         Args:
             backbone: The decoder backbone, exposed as ``self.model`` (FQN ``model.*``).
@@ -102,10 +101,10 @@ class DecoderWithHeads(
         inputs: SequenceInput | SequenceTransfer[torch.Tensor],
         shared: SequenceHeadsShared[THeadShared],
     ) -> SequenceTransfer[torch.Tensor] | SequenceHeadsOutput[THeadOutput]:
-        """Executes the backbone and, on the last stage, every attached head.
+        """Runs the backbone and, on the last stage, every attached head.
 
-        ``shared.sequence`` flows to the backbone; each head receives its own entry of
-        ``shared.heads`` under the name it was composed with.
+        The backbone receives ``shared.sequence``. Each head receives the entry of ``shared.heads``
+        stored under its name.
 
         Args:
             inputs: ``SequenceInput`` on the first stage; the incoming ``SequenceTransfer`` otherwise.
@@ -123,7 +122,7 @@ class DecoderWithHeads(
         return {name: head(model_outputs.hidden_states, shared.heads[name]) for name, head in self.heads.items()}
 
     def reset_parameters(self) -> None:
-        """Resets module parameters, delegating to the backbone and every head."""
+        """Resets the parameters of the backbone and of every head."""
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:
@@ -135,11 +134,11 @@ class DecoderWithHeads(
     ) -> SequenceTransfer[TensorSpec]:
         """Describes the ``SequenceTransfer`` crossing the given boundary, as the backbone does.
 
-        Heads only run on the last stage, whose outgoing edge never transfers, so the transfer is
-        entirely the backbone's.
+        Heads only run on the last stage, which has no outgoing transfer, so the backbone alone
+        defines the transfer.
 
         Args:
-            pipeline_input: A representative ``SequenceInput`` microbatch; only shapes are read.
+            pipeline_input: A representative ``SequenceInput`` microbatch. Only its shapes are read.
             boundary: Which inter-stage edge to describe.
 
         Returns:
@@ -161,13 +160,13 @@ class DecoderWithHead(
 ):
     """Composes one decoder backbone with exactly one prebuilt task head.
 
-    The single-head counterpart of :class:`DecoderWithHeads`, and *not* a special case of it: with
-    one head there is nothing to key, so the head is reached as ``self.head`` (FQN ``head.*``), its
-    shared input arrives as a field, and the model's output is the head's own output rather than a
-    one-entry mapping. A task therefore reads ``ctx.pipeline_results.logps`` directly.
+    This is the single-head counterpart of ``DecoderWithHeads``, not a special case of it. With one
+    head there is nothing to key. The head is ``self.head`` (FQN ``head.*``), its shared input is a
+    field, and the model returns the head's output instead of a one-entry mapping. For example, a
+    causal LM task reads ``ctx.pipeline_results.logps`` directly.
 
-    The backbone (``self.model``) and the head (``self.head``) are public, so a provider
-    parallelizes and checkpoint-maps each independently. The head is attached only on the last
+    The backbone (``self.model``) and the head (``self.head``) are public, so a provider can
+    parallelize and checkpoint-map each of them separately. The head is attached only on the last
     pipeline stage.
 
     Type parameters:
@@ -178,7 +177,7 @@ class DecoderWithHead(
     """
 
     def __init__(self, backbone: TBackbone, head: THead, stage: PipelineStageInfo):
-        """Constructs the DecoderWithHead object.
+        """Constructs the ``DecoderWithHead`` object.
 
         Args:
             backbone: The decoder backbone, exposed as ``self.model`` (FQN ``model.*``).
@@ -199,7 +198,7 @@ class DecoderWithHead(
         inputs: SequenceInput | SequenceTransfer[torch.Tensor],
         shared: SequenceHeadShared[THeadShared],
     ) -> SequenceTransfer[torch.Tensor] | THeadOutput:
-        """Executes the backbone and, on the last stage, the attached head.
+        """Runs the backbone and, on the last stage, the attached head.
 
         Args:
             inputs: ``SequenceInput`` on the first stage; the incoming ``SequenceTransfer`` otherwise.
@@ -217,7 +216,7 @@ class DecoderWithHead(
         return self.head(model_outputs.hidden_states, shared.head)
 
     def reset_parameters(self) -> None:
-        """Resets module parameters, delegating to the backbone and the head."""
+        """Resets the parameters of the backbone and of the head."""
         self.model.reset_parameters()
 
         if self._stage.is_current_stage_last:
@@ -228,11 +227,11 @@ class DecoderWithHead(
     ) -> SequenceTransfer[TensorSpec]:
         """Describes the ``SequenceTransfer`` crossing the given boundary, as the backbone does.
 
-        The head only runs on the last stage, whose outgoing edge never transfers, so the transfer
-        is entirely the backbone's.
+        The head only runs on the last stage, which has no outgoing transfer, so the backbone alone
+        defines the transfer.
 
         Args:
-            pipeline_input: A representative ``SequenceInput`` microbatch; only shapes are read.
+            pipeline_input: A representative ``SequenceInput`` microbatch. Only its shapes are read.
             boundary: Which inter-stage edge to describe.
 
         Returns:
@@ -246,12 +245,12 @@ class DecoderForCausalLM(
 ):
     """A decoder backbone composed with a single causal language modeling head.
 
-    The shorthand for the most common case: it builds the head itself, so composing a model is one
-    call and its IO is fixed to that head's shared input and output.
+    It builds the head itself, so composing the model is one call. Its I/O types are fixed to that
+    head's shared input and output.
     """
 
     def __init__(self, backbone: TBackbone, stage: PipelineStageInfo):
-        """Constructs the DecoderForCausalLM object.
+        """Constructs the ``DecoderForCausalLM`` object.
 
         Args:
             backbone: The decoder backbone, exposed as ``self.model`` (FQN ``model.*``).
@@ -266,12 +265,12 @@ class DecoderForClassification(
 ):
     """A decoder backbone composed with a single classification head.
 
-    The shorthand for the most common case: it builds the head itself, so composing a model is one
-    call and its IO is fixed to that head's shared input and output.
+    It builds the head itself, so composing the model is one call. Its I/O types are fixed to that
+    head's shared input and output.
     """
 
     def __init__(self, backbone: TBackbone, config: ClassificationHeadConfig, stage: PipelineStageInfo):
-        """Constructs the DecoderForClassification object.
+        """Constructs the ``DecoderForClassification`` object.
 
         Args:
             backbone: The decoder backbone, exposed as ``self.model`` (FQN ``model.*``).
@@ -287,12 +286,12 @@ class DecoderForEmbedding(
 ):
     """A decoder backbone composed with a single embedding head.
 
-    The shorthand for the most common case: it builds the head itself, so composing a model is one
-    call and its IO is fixed to that head's shared input and output.
+    It builds the head itself, so composing the model is one call. Its I/O types are fixed to that
+    head's shared input and output.
     """
 
     def __init__(self, backbone: TBackbone, config: EmbeddingHeadConfig, stage: PipelineStageInfo):
-        """Constructs the DecoderForEmbedding object.
+        """Constructs the ``DecoderForEmbedding`` object.
 
         Args:
             backbone: The decoder backbone, exposed as ``self.model`` (FQN ``model.*``).

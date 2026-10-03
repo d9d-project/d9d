@@ -1,47 +1,45 @@
 # Model Design
 
-## Bring Your own Model
+## About
 
-d9d does **not** enforce you to use its model implementations. You are eager to use own custom 
-implementations of any model you want, optionally using high-performant d9d's building blocks.
+d9d does not require you to use its model implementations. You can bring your own model and optionally build it from d9d blocks. Your model must follow the principles on this page to work with the d9d training loop.
 
-Just make sure to follow the main design principles described below.
+## Principles
 
-## Main Principles
+d9d uses a "white-box" approach to modeling. Models are plain, readable PyTorch code without heavy abstraction layers.
 
-d9d opts for a "white-box" approach to modelling. We avoid heavy abstraction layers in favor of readable, standard PyTorch code.
+### No Layer Specs
 
-### No LayerSpecs
+Some distributed frameworks make you describe a model with metadata objects. The framework then injects wrapping logic, such as FSDP or activation checkpointing. This makes debugging difficult.
 
-Some distributed frameworks force users to define models via metadata specification objects to inject wrapping logic (like FSDP or Checkpointing) automatically. This makes debugging difficult.
-
-In d9d, you write standard `nn.Module` classes. Use `nn.Linear`, `nn.RMSNorm`, or d9d's optimized blocks directly. Distributed wrapping logic is handled transparently, maintaining the standard PyTorch look and feel.
+In d9d, you write standard `nn.Module` classes. You can use `nn.Linear`, `nn.RMSNorm` or d9d blocks directly. You apply distributed strategies to submodules after construction, so the model code stays standard PyTorch.
 
 ### Explicit Composition
 
-We avoid creating "Uber-Modules" - single, massive classes (e.g., `GenericTransformerBlock`) that handle every possible architectural variation (MoE, Dense, Post-Norm, Pre-Norm, Parallel Dense-Attention) via dozens of flags and parameters.
+d9d avoids "uber-modules": large classes such as a `GenericTransformerBlock` that cover every architecture variant through dozens of flags. Examples of such variants are MoE vs. dense, pre-norm vs. post-norm and parallel attention.
 
-Instead, d9d promotes explicit composition like **HuggingFace Transformers** does. This composition makes the call stack distinct and the logic for a specific architecture easy to trace.
+Instead, d9d composes each architecture explicitly, as **Hugging Face Transformers** does. The call stack of each model is distinct, so its logic is easy to trace.
 
 ### Pipelining-Aware Models
 
-Please see [Pipelining API](./pipeline_parallelism.md).
+See [Pipeline Parallelism](./pipeline_parallelism.md).
 
 ### Late Initialization
 
-Constructing a large model on a single GPU (or even CPU RAM) often leads to immediate Out-Of-Memory (OOM) errors. `d9d` solves this via the `ModuleLateInit` protocol.
+Building a large model on a single GPU, or even in CPU RAM, often runs out of memory. d9d avoids this with the `ModuleLateInit` protocol. Every model stage that you pass to the [Trainer](../loop/train.md) must implement it.
 
-It is safe to use modules implementing this protocol with d9d's native [Trainer](../loop/train.md) framework. 
+The Trainer initializes a model stage in this order:
 
-The Trainer will instantiate modules on the `meta` device (consuming no memory), lay out the distributed topology and sharding strategy. 
-
-Only then `reset_parameters()` is called to materialize model weights without allocating unnecessary things.
+1.  Construct the model on the `meta` device, which allocates no memory.
+2.  Apply the horizontal parallelism strategy.
+3.  Allocate empty storage for the local shards on the target device.
+4.  Call `reset_parameters()` to initialize the weights.
+5.  Load the source checkpoint, if one is configured.
 
 ## Reference Implementations
 
-For reference implementations, please see [Qwen3-MoE](./model_catalogue/qwen3_moe.md).
+See [Qwen3 MoE](./model_catalogue/qwen3_moe.md) for a reference implementation.
+
+## API Reference
 
 ::: d9d.module.base
-    options:
-        show_root_heading: true
-        show_root_full_path: true

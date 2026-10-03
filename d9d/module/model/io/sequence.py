@@ -11,10 +11,10 @@ THeadOutput = TypeVar("THeadOutput")
 
 @dataclasses.dataclass
 class SequenceInput:
-    """The inputs for a sequence transformer: the token ids fed to the first stage.
+    """The input of a sequence transformer: the token ids fed to the first stage.
 
     Attributes:
-        input_ids: Indices of input sequence tokens, shape ``[batch, seq]``.
+        input_ids: Indices of the input tokens. Shape: ``(batch, seq_len)``.
     """
 
     input_ids: torch.Tensor
@@ -25,9 +25,10 @@ class SequenceTransfer(Generic[TLeaf]):
     """The object moved between adjacent stages of a sequence transformer.
 
     Attributes:
-        hidden_states: The output of the last layer of the sending stage, shape ``[batch, seq, hidden]``.
-        hidden_states_snapshot: The accumulated aggregated hidden states carried across stages when
-            snapshotting is enabled, else ``None``.
+        hidden_states: The output of the last layer of the sending stage.
+            Shape: ``(batch, seq_len, hidden_size)``.
+        hidden_states_snapshot: The aggregated hidden states of the embeddings and of all layers so far, or
+            ``None`` if snapshotting is disabled. Shape: ``(num_layers, batch, hidden_size)``.
     """
 
     hidden_states: TLeaf
@@ -39,8 +40,10 @@ class SequenceShared:
     """The shared input the transformer backbone consumes on every stage.
 
     Attributes:
-        position_ids: Indices of positions of each token in the position embeddings.
-        hidden_states_agg_mask: Mask used to aggregate hidden states for snapshots, if enabled.
+        position_ids: The position of each token in the position embeddings.
+            Shape: ``(batch, seq_len)``.
+        hidden_states_agg_mask: Mask of the tokens to aggregate into hidden state snapshots, or ``None``
+            if snapshotting is disabled. Shape: ``(batch, seq_len)``.
     """
 
     position_ids: torch.Tensor
@@ -51,15 +54,15 @@ class SequenceShared:
 class SequenceHeadShared(Generic[THeadShared]):
     """The shared input a backbone composed with exactly one task head consumes on every stage.
 
-    The single-head counterpart of :class:`SequenceHeadsShared`: the head is reached by field, not
-    by name, and the model's output is that head's output unwrapped.
+    This is the single-head counterpart of ``SequenceHeadsShared``. The head input is a field, not a
+    named entry, and the model returns the head's output unwrapped.
 
     Type parameters:
         THeadShared: The shared input accepted by the composed head.
 
     Attributes:
         sequence: The backbone shared input.
-        head: The head's own shared input (read on the last stage).
+        head: The head's own shared input. Read on the last stage only.
     """
 
     sequence: SequenceShared
@@ -70,17 +73,16 @@ class SequenceHeadShared(Generic[THeadShared]):
 class SequenceHeadsShared(Generic[THeadShared]):
     """The shared input a backbone composed with named task heads consumes on every stage.
 
-    The parameter is the head shared input the composed heads accept: a single type for a model
-    with one kind of head (e.g. ``SequenceHeadsShared[SequenceCausalLMHeadShared]``), or their
-    union for a model composed of several kinds.
+    The type parameter is the shared input of the composed heads. It is a single type for heads of
+    one kind (e.g. ``SequenceHeadsShared[SequenceCausalLMHeadShared]``), or a union for heads of
+    several kinds.
 
     Type parameters:
         THeadShared: The shared input accepted by the composed heads.
 
     Attributes:
         sequence: The backbone shared input.
-        heads: Each head's own shared input, keyed by the names the heads were composed under
-            (read on the last stage).
+        heads: Each head's own shared input, keyed by head name. Read on the last stage only.
     """
 
     sequence: SequenceShared
@@ -91,8 +93,7 @@ SequenceHeadsOutput: TypeAlias = Mapping[str, THeadOutput]
 """
 The output of a backbone composed with named task heads: each head's output, keyed by head name.
 
-The key is the name the head was composed under, so two heads of the same type simply take
-different keys and cannot collide. The parameter is the output the composed heads produce: a single
-type for a model with one kind of head (e.g. ``SequenceHeadsOutput[SequenceCausalLMOutput]``), or
-their union for a model composed of several kinds.
+Two heads of the same type have different names, so their outputs cannot collide. The type
+parameter is the output of the composed heads. It is a single type for heads of one kind (e.g.
+``SequenceHeadsOutput[SequenceCausalLMOutput]``), or a union for heads of several kinds.
 """
