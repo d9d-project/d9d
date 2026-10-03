@@ -1,3 +1,5 @@
+"""Interface for providing a learning rate scheduler."""
+
 import abc
 import dataclasses
 import typing

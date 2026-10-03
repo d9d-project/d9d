@@ -1,3 +1,5 @@
+"""Events of the training loop."""
+
 import dataclasses
 
 from d9d.core.offload import SleepTag

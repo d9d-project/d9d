@@ -1,4 +1,4 @@
-"""Defines structural protocols and base classes for PyTorch modules used within the d9d framework."""
+"""Structural protocols and base classes for d9d modules."""
 
 from .late_init import ModuleLateInit
 

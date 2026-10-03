@@ -1,3 +1,5 @@
+"""Interface for building, parallelizing and exporting model stages."""
+
 from __future__ import annotations
 
 import abc

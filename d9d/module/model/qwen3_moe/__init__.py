@@ -1,3 +1,5 @@
+"""Qwen3 MoE model and its Hugging Face state mappers."""
+
 from .decoder_layer import Qwen3MoELayer
 from .huggingface import (
     Qwen3MoEExpertsFormat,

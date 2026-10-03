@@ -1,4 +1,4 @@
-"""Implements flexible piecewise learning rate schedules via a builder pattern."""
+"""Piecewise learning rate schedules composed with a builder."""
 
 from .builder import piecewise_schedule
 from .config import PiecewiseSchedulerConfig, piecewise_scheduler_from_config

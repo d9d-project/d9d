@@ -1,4 +1,4 @@
-"""This package provides core components of the state mapping system."""
+"""Core components of the model state mapping system."""
 
 from .abc import ModelStateMapper, StateGroup
 

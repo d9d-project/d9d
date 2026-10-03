@@ -1,4 +1,4 @@
-"""Pipeline Schedule Implementations."""
+"""Pipeline schedule implementations."""
 
 from .bfs import LoopedBFSPipelineProgramBuilder
 from .dualpipev import DualPipeVPipelineProgramBuilder

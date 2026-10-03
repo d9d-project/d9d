@@ -1,4 +1,4 @@
-"""Composition of multiple PEFT methods into a stack."""
+"""Stacking of several PEFT methods."""
 
 from .config import PeftStackConfig
 from .method import PeftStack, peft_method_from_config

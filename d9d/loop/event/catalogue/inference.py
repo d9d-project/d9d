@@ -1,3 +1,5 @@
+"""Events of the inference loop."""
+
 import dataclasses
 
 from d9d.loop.event import Event

@@ -1,8 +1,4 @@
-"""Pipeline Schedule Building Components.
-
-This package provides the core building blocks and compiler passes used to generate
-execution schedules for distributed pipelines.
-"""
+"""Building blocks and compiler passes that generate pipeline schedule programs."""
 
 from .base import PipelineProgramBuilder
 from .communications import add_communication_ops

@@ -1,4 +1,4 @@
-"""Utilities for learning rate scheduling."""
+"""Learning rate schedules."""
 
 from .visualizer import visualize_lr_scheduler
 

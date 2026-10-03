@@ -1,3 +1,5 @@
+"""Horizontal parallelism for the Qwen3 Dense model."""
+
 from d9d.core.dist_context import DENSE_DOMAIN, DistributedContext
 from d9d.module.model.qwen3_dense import Qwen3DenseModel
 from d9d.module.parallelism.api import parallelize_hsdp

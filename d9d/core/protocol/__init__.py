@@ -1,4 +1,4 @@
-"""Package providing protocol definitions for standard PyTorch objects."""
+"""Protocol definitions for standard PyTorch objects."""
 
 from .data import DataLoaderProtocol, MicrobatchPackStream
 from .training import LRSchedulerProtocol, OptimizerProtocol

@@ -1,3 +1,5 @@
+"""Pipeline schedule configurations and the factory that builds schedules from them."""
+
 from .config import (
     AnyPipelineScheduleConfig,
     PipelineSchedule1F1BConfig,

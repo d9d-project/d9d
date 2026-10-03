@@ -1,3 +1,5 @@
+"""Interfaces for training and inference tasks."""
+
 import abc
 import dataclasses
 import typing

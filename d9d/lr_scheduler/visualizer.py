@@ -1,3 +1,5 @@
+"""Plotting of learning rate schedules."""
+
 from collections.abc import Callable
 
 from torch import nn

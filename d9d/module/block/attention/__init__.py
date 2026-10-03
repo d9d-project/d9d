@@ -1,4 +1,4 @@
-"""Provides attention layer implementations."""
+"""Attention layers."""
 
 from .grouped_query import GroupedQueryAttention
 from .multi_head_latent import LowRankProjection, MultiHeadLatentAttention

@@ -1,3 +1,5 @@
+"""Optimizer provider built from a configuration."""
+
 import abc
 from abc import ABC
 from collections.abc import Iterable

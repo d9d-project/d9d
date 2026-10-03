@@ -1,3 +1,5 @@
+"""Normalization layers."""
+
 from .rms_norm import RMSNorm
 
 __all__ = [

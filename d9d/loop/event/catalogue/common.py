@@ -1,3 +1,5 @@
+"""Event contexts shared by the training and inference loops."""
+
 import dataclasses
 from typing import TYPE_CHECKING
 

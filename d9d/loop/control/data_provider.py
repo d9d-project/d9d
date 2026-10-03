@@ -1,3 +1,5 @@
+"""Interface for providing training and inference data."""
+
 import dataclasses
 import typing
 from typing import Protocol

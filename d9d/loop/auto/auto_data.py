@@ -1,3 +1,5 @@
+"""Default data provider built from a configuration."""
+
 from collections.abc import Callable
 
 from pydantic import BaseModel

@@ -1,4 +1,4 @@
-"""Provides building blocks for Mixture-of-Experts (MoE) architectures."""
+"""Building blocks for Mixture-of-Experts (MoE) layers."""
 
 from .grouped_experts import GroupedSwiGLU
 from .grouped_linear import GroupedLinear

@@ -1,3 +1,5 @@
+"""Scaled dot-product attention backends and their configurations."""
+
 from .config import (
     AnySdpaBackendConfig,
     EagerSdpaBackendConfig,

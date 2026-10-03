@@ -1,3 +1,5 @@
+"""Learning rate scheduler provider built from a configuration."""
+
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field
