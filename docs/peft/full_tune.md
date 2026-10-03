@@ -2,9 +2,7 @@
 
 ## About
 
-The `d9d.peft.full_tune` package brings standard fine-tuning into the PEFT workflow. It does not change the model architecture. It unfreezes all parameters of the modules whose names fully match a regular expression, e.g. normalization layers or a specific head.
-
-Full fine-tuning is most useful together with other PEFT methods through [Method Stacking](./stack.md). For example, you can apply LoRA to attention layers and fully fine-tune the normalization layers.
+The `d9d.peft.full_tune` package brings standard fine-tuning into the PEFT workflow. It does not change the model architecture. It unfreezes all parameters of the modules whose names fully match a regular expression, e.g. normalization layers or a specific head. Full fine-tuning is most useful together with other PEFT methods through [Method Stacking](./stack.md). For example, you can apply LoRA to attention layers and fully fine-tune the normalization layers.
 
 ## Usage
 

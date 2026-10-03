@@ -2,9 +2,7 @@
 
 ## About
 
-The `d9d.core.dist_context` package is the single source of truth for the distributed execution environment. Its `DistributedContext` class holds the topology, the rank mapping and the communication groups, so that every rank agrees on them. Use the context for all distributed questions, such as "Am I the main process?" or "Which rank is my pipeline peer?". Do not read raw `os.environ` variables or create ad-hoc process groups: this can lead to silent inconsistencies.
-
-`DistributedContext` requires CUDA GPUs. It sets the current CUDA device of each process to its local rank.
+The `d9d.core.dist_context` package is the single source of truth for the distributed execution environment. Its `DistributedContext` class holds the topology, the rank mapping and the communication groups, so that every rank agrees on them. Use the context for all distributed questions, such as "Am I the main process?" or "Which rank is my pipeline peer?". Do not read raw `os.environ` variables or create ad-hoc process groups: this can lead to silent inconsistencies. `DistributedContext` requires CUDA GPUs. It sets the current CUDA device of each process to its local rank.
 
 ## Comparison with Other Frameworks
 

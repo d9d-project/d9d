@@ -2,9 +2,7 @@
 
 ## About
 
-The `d9d.internals.grad_sync` package synchronizes gradients of `DTensor` parameters in distributed training.
-
-PyTorch `DistributedDataParallel` applies one communication strategy to the whole model. This package instead supports the mixed layouts of ND parallelism, which combines data, tensor, context and pipeline parallelism. It reads the `DTensor` placements of each parameter to find the mesh dimensions that need an all-reduce. Then it groups the parameters into communication buckets.
+The `d9d.internals.grad_sync` package synchronizes gradients of `DTensor` parameters in distributed training. PyTorch `DistributedDataParallel` applies one communication strategy to the whole model. This package instead supports the mixed layouts of ND parallelism, which combines data, tensor, context and pipeline parallelism. It reads the `DTensor` placements of each parameter to find the mesh dimensions that need an all-reduce. Then it groups the parameters into communication buckets.
 
 !!! warning "Internal API"
     If you use the standard d9d training loop, you do not need to call this package. d9d synchronizes the gradients itself. This page is for users who extend d9d.

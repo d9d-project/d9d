@@ -2,9 +2,7 @@
 
 ## About
 
-The `d9d.core.dist_ops` package wraps `torch.distributed` collective operations and allocates their output buffers for you. With plain PyTorch, you must pre-allocate the outputs yourself, for example a list of empty tensors for `all_gather`.
-
-The package also has operations for **variadic shapes**. They let ranks exchange tensors without knowing the shapes of the incoming tensors in advance.
+The `d9d.core.dist_ops` package wraps `torch.distributed` collective operations and allocates their output buffers for you. With plain PyTorch, you must pre-allocate the outputs yourself, for example a list of empty tensors for `all_gather`. The package also has operations for **variadic shapes**. They let ranks exchange tensors without knowing the shapes of the incoming tensors in advance.
 
 ## Usage
 

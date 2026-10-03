@@ -2,11 +2,11 @@
 
 ## About
 
-The `d9d.peft.lora` package implements [Low-Rank Adaptation](https://arxiv.org/abs/2106.09685). It wraps linear layers, both `nn.Linear` and d9d's [`GroupedLinear`](../models/modules/moe.md). The wrapper holds the original frozen layer (`base`) and two trainable low-rank layers (`lora_A` and `lora_B`).
+The `d9d.peft.lora` package implements [Low-Rank Adaptation](https://arxiv.org/abs/2106.09685). It wraps linear layers, both `nn.Linear` and d9d's [`GroupedLinear`](../models/modules/moe.md). The wrapper holds the original frozen layer (`base`) and two trainable low-rank layers (`lora_A` and `lora_B`). LoRA does not support `nn.Linear` layers with a bias.
+
+## State Mapping
 
 Because the original layer moves to the `base` submodule, its state keys change. LoRA returns a `ModelStateMapperRename` for each wrapped layer, so standard checkpoints still load.
-
-LoRA does not support `nn.Linear` layers with a bias.
 
 ## Usage
 

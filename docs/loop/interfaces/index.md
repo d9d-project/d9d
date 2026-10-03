@@ -2,9 +2,7 @@
 
 ## About
 
-The d9d loop does not depend on a specific model or dataset. You plug your logic into the loop by implementing **providers** (factories) and **tasks** (step logic).
-
-For common cases, such as standard optimizers, d9d provides **Auto** implementations. You configure them with Pydantic models, so you do not need to write a provider class.
+The d9d loop does not depend on a specific model or dataset. You plug your logic into the loop by implementing **providers** (factories) and **tasks** (step logic). For common cases, such as standard optimizers, d9d provides **Auto** implementations. You configure them with Pydantic models, so you do not need to write a provider class.
 
 ## Navigation
 

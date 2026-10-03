@@ -2,9 +2,7 @@
 
 ## About
 
-The `d9d.module.block.hidden_states_aggregator` package collects and reduces model hidden states during execution. Use it to keep hidden states for later use, such as reward modeling, custom distillation objectives or analysis. A reducing aggregator does not keep the full hidden states in memory.
-
-Create an aggregator with the `create_hidden_states_aggregator` factory.
+The `d9d.module.block.hidden_states_aggregator` package collects and reduces model hidden states during execution. Use it to keep hidden states for later use, such as reward modeling, custom distillation objectives or analysis. A reducing aggregator does not keep the full hidden states in memory. Create an aggregator with the `create_hidden_states_aggregator` factory.
 
 ## Snapshots
 

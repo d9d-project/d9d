@@ -4,8 +4,6 @@
 
 The `d9d.tracker` package gives one configuration-driven interface for logging metrics, hyperparameters and distributions during training. A common API hides the backend, such as [Aim](https://aimstack.io/) or the null tracker that logs nothing. Each backend has a `pydantic` configuration, so you can switch backends in the configuration without changing the training loop.
 
-The tracker is **stateful**: it implements the PyTorch `Stateful` protocol. When an interrupted job resumes from a checkpoint, the tracker reattaches to the existing run instead of starting a new one.
-
 !!! warning "Internal API"
     If you use the standard d9d training loop, you do not need to call this package. d9d sets up tracking based on its configuration. This page is for users who extend d9d.
 
@@ -17,6 +15,10 @@ The package splits tracking into two objects:
 2.  **The run**: `BaseTrackerRun`. It is a context-managed object, active only during the training loop. It provides `set_step`, `set_context`, `scalar` and `bins`.
 
 The `tracker_from_config` function creates a `BaseTracker` from its Pydantic configuration.
+
+## Resuming a Run
+
+The tracker is **stateful**: it implements the PyTorch `Stateful` protocol. When an interrupted job resumes from a checkpoint, the tracker reattaches to the existing run instead of starting a new one.
 
 ## Adding a New Tracker
 

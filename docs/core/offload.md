@@ -2,14 +2,14 @@
 
 ## About
 
-The `d9d.core.offload` package moves GPU-resident training state to host (CPU) memory and back. It is the base of the **sleep / wake** API of the `Trainer`. Sleep frees the GPUs for a colocated workload, for example a rollout engine that shares the GPUs in colocated reinforcement learning.
+The `d9d.core.offload` package moves GPU-resident training state to host (CPU) memory and back. It is the base of the **sleep / wake** API of the `Trainer`. Sleep frees the GPUs for a colocated workload, for example a rollout engine that shares the GPUs in colocated reinforcement learning. The user entry points `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` are documented on the [Training Loop](../loop/train.md) page. This page covers the primitives they are built on.
+
+## Building Blocks
 
 The package defines two things:
 
 1.  **The `Offloadable` protocol**: The contract for a subsystem that owns GPU memory and can release and restore it.
 2.  **The tensor primitives** `offload_tensor` and `onload_tensor`: they move the storage of one tensor to the host and back. The tensor object, and the `DTensor` wrapper, stay the same.
-
-The user entry points `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` are documented on the [Training Loop](../loop/train.md) page. This page covers the primitives they are built on.
 
 ## The Round-Trip Guarantee
 

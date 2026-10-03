@@ -2,9 +2,7 @@
 
 ## About
 
-The `d9d.module.block.moe` package implements sparse Mixture-of-Experts layers. `MoELayer` combines a router, a token dispatcher and the experts, with an optional shared expert.
-
-The layer requires the `d9d[moe]` extra. You must build and install [DeepEP](https://github.com/deepseek-ai/DeepEP) and [grouped-gemm](https://github.com/fanshiqing/grouped_gemm/) manually first.
+The `d9d.module.block.moe` package implements sparse Mixture-of-Experts layers. `MoELayer` combines a router, a token dispatcher and the experts, with an optional shared expert. The layer requires the `d9d[moe]` extra. You must build and install [DeepEP](https://github.com/deepseek-ai/DeepEP) and [grouped-gemm](https://github.com/fanshiqing/grouped_gemm/) manually first.
 
 ## Expert Parallelism
 
