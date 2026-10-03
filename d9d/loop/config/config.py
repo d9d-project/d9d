@@ -13,8 +13,8 @@ class JobScheduleConfig(BaseModel):
     """Configuration for the job's duration.
 
     Attributes:
-        total_steps: The total number of steps the job should run for. If None, the duration is derived
-            from the length of the batch iterator.
+        total_steps: The total number of steps to run. If ``None``, the length of the microbatch pack
+            stream sets the duration.
     """
 
     total_steps: int | None
@@ -25,8 +25,8 @@ class DataPrefetchConfig(BaseModel):
 
     Attributes:
         prefetch_factor: The number of packs copied to the device ahead of the current step. The copies run on
-            a dedicated CUDA stream and overlap with compute; each prefetched pack occupies device memory.
-            ``0`` disables prefetching: every pack is copied on the current stream when its step starts.
+            a separate CUDA stream and overlap with compute. Each prefetched pack occupies device memory.
+            ``0`` disables prefetching, so every pack is copied on the current stream when its step starts.
     """
 
     prefetch_factor: int = Field(ge=0)
@@ -36,8 +36,7 @@ class DeterminismConfig(BaseModel):
     """Configuration for reproducibility and random number generation.
 
     Attributes:
-        base_seed: The base integer seed used to initialize random number
-            generators (Python, NumPy, PyTorch) across all ranks.
+        base_seed: The base seed for the random number generators (Python, NumPy, PyTorch) on all ranks.
     """
 
     base_seed: int
@@ -47,7 +46,7 @@ class PipeliningConfig(BaseModel):
     """Configuration for pipeline parallelism orchestration.
 
     Attributes:
-        schedule: The specific scheduling strategy configuration used to manage pipeline execution.
+        schedule: The pipeline schedule configuration.
     """
 
     schedule: AnyPipelineScheduleConfig
@@ -57,7 +56,7 @@ class GarbageCollectionConfig(BaseModel):
     """Configuration for manual Python garbage collection control.
 
     Attributes:
-        period_steps: How frequently to manually trigger the Python garbage collector.
+        period_steps: How often to run the Python garbage collector.
     """
 
     period_steps: StepActionPeriod
@@ -67,10 +66,9 @@ class CheckpointingConfig(BaseModel):
     """Configuration for saving model snapshots.
 
     Attributes:
-        save_dir: The root directory where checkpoints will be stored.
-        period_steps: How frequently to save a checkpoint.
-        num_to_keep: The maximum number of recent checkpoints to retain. If None,
-            all checkpoints are kept.
+        save_dir: The root directory for checkpoints.
+        period_steps: How often to save a checkpoint.
+        num_to_keep: The maximum number of recent checkpoints to keep. If ``None``, all checkpoints are kept.
     """
 
     save_dir: Path
@@ -82,10 +80,10 @@ class ModelStageFactoryConfig(BaseModel):
     """Configuration for initializing model weights.
 
     Attributes:
-        source_checkpoint: Path to an initial checkpoint to load into the model
-            before training starts. If None, random initialization is used.
-        checkpoint_only_trainable_parameters: If True, only parameters with
-            requires_grad=True will be saved in checkpoints. Useful for PEFT/LoRA.
+        source_checkpoint: The path to a checkpoint to load into the model before the job starts. If ``None``,
+            the model is initialized randomly.
+        checkpoint_only_trainable_parameters: If ``True``, checkpoints store only parameters with
+            ``requires_grad=True``. Useful for PEFT, e.g. LoRA.
     """
 
     source_checkpoint: Path | None
@@ -96,9 +94,8 @@ class GradientClippingConfig(BaseModel):
     """Configuration for gradient norm clipping.
 
     Attributes:
-        max_norm: The maximum norm value for gradient clipping. If None,
-            no clipping is performed.
-        log_total_steps: Frequency at which to log the total gradient norm.
+        max_norm: The maximum gradient norm. If ``None``, gradients are not clipped.
+        log_total_steps: How often to log the total gradient norm.
     """
 
     max_norm: float | None
@@ -110,10 +107,10 @@ class ProfilingConfig(BaseModel):
 
     Attributes:
         enabled: Whether to enable the profiler.
-        traces_dir: Directory where trace files will be saved.
-        period_steps: Total length of a profiling cycle (wait + warmup + active).
-        warmup_steps: Number of steps to ignore before recording to allow for warming-up.
-        active_steps: Number of steps to actively record traces.
+        traces_dir: The directory for trace files.
+        period_steps: The total length of a profiling cycle (wait + warmup + active), in steps.
+        warmup_steps: The number of profiler warmup steps before recording.
+        active_steps: The number of steps to record.
         record_shapes: Whether to record the input shapes of operators.
         with_stack: Whether to record the Python call stacks of operators. They make up most of a trace.
     """
@@ -143,8 +140,8 @@ class JobLoggerConfig(BaseModel):
     """Configuration for experiment tracking and logging.
 
     Attributes:
-        period_steps: How frequently metrics are flushed to the logger.
-        tracker: Logic for the specific tracking backend (e.g., WandB, MLflow, stdout).
+        period_steps: How often metrics are logged.
+        tracker: The experiment tracker backend configuration, e.g. Aim.
     """
 
     period_steps: StepActionPeriod
@@ -155,8 +152,9 @@ class GradientManagerConfig(BaseModel):
     """Configuration for gradient synchronization.
 
     Attributes:
-        grad_dtype: The data type to use for storing the gradient. If None, follows the model's dtype.
-        bucket_size_mb: The size of gradient buckets in Megabytes for communication.
+        grad_dtype: The name of the ``torch`` dtype for gradients, e.g. ``"float32"``. If ``None``, gradients
+            use the parameter dtype.
+        bucket_size_mb: The maximum size of a gradient communication bucket, in MiB.
     """
 
     grad_dtype: str | None
@@ -167,8 +165,8 @@ class TimeoutConfig(BaseModel):
     """Configuration for distributed process group timeouts.
 
     Attributes:
-        init_timeout: Timeout in seconds for initializing the process group.
-        step_timeout: Timeout in seconds for individual step communications.
+        init_timeout: The timeout in seconds for the job setup and the first step.
+        step_timeout: The timeout in seconds for communication in later steps.
     """
 
     init_timeout: int = 10000
@@ -183,15 +181,14 @@ class TrainerConfig(BaseModel):
         schedule: Job duration settings.
         data_prefetch: Settings for copying data to the device ahead of time.
         logging: Experiment tracking settings.
-        pipelining: Pipeline Parallelism schedule and settings. If None,
-            pipeline parallelism is disabled.
+        pipelining: Pipeline parallelism schedule and settings.
         model_stage_factory: Model initialization and additional checkpointing logic.
         determinism: Random seed settings.
         gc: Garbage collection settings.
         checkpointing: Checkpoint saving settings.
         gradient_clipping: Gradient clipping settings.
-        profiling: Profiler settings.
-        gradient_manager: Gradient Synchronization Settings.
+        profiling: Profiler settings. If ``None``, profiling is disabled.
+        gradient_manager: Gradient synchronization settings.
         timeout: Distributed timeout settings.
     """
 
@@ -211,7 +208,7 @@ class TrainerConfig(BaseModel):
 
 
 class InferenceConfig(BaseModel):
-    """Top-level configuration object defining an inference/evaluation job.
+    """Top-level configuration object defining an inference or evaluation job.
 
     Attributes:
         schedule: Job duration settings.
@@ -220,7 +217,7 @@ class InferenceConfig(BaseModel):
         determinism: Random seed settings.
         gc: Garbage collection settings.
         checkpointing: Checkpointing settings.
-        profiling: Profiler settings.
+        profiling: Profiler settings. If ``None``, profiling is disabled.
         timeout: Distributed timeout settings.
     """
 

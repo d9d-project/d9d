@@ -25,14 +25,10 @@ class Event(Generic[TContext]):
 
 
 class EventBus:
-    """A centralized event bus for subscribing to and triggering typed events.
-
-    This class maintains a registry of event handlers and dispatches the
-    appropriate context to all registered callbacks when an event is triggered.
-    """
+    """Registers handlers for typed events and calls them when an event is triggered."""
 
     def __init__(self) -> None:
-        """Constructs an EventBus object."""
+        """Constructs the ``EventBus`` object."""
         self._handlers: dict[Event, list[Callable[[Any], None]]] = defaultdict(list)
 
     def subscribe(self, event: Event[TContext], handler: Callable[[TContext], None]) -> None:
@@ -68,9 +64,6 @@ class EventBus:
             event_pre: The event to trigger immediately before yielding.
             event_post: The event to trigger immediately after the block completes successfully.
             context: The context object passed to both events.
-
-        Yields:
-            None
         """
         self.trigger(event_pre, context)
         yield

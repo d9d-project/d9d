@@ -97,38 +97,35 @@ class RegisterModelEventsContext:
 class ModelProvider(abc.ABC, Generic[TModel]):
     """Abstract interface for defining the lifecycle of a distributed model.
 
-    This provider handles initialization, parallelization (sharding/replication/etc), and export preparation
-    for models within the d9d framework.
+    The provider initializes, parallelizes (shards, replicates, etc.) and prepares the model for export.
     """
 
     @abc.abstractmethod
     def initialize_model_stage(self, context: InitializeModelStageContext) -> InitializeModelStageResult[TModel]:
         """Initializes the model architecture for a specific pipeline stage.
 
-        This method is responsible for constructing the `nn.Module` for the requested stage.
+        It constructs the ``nn.Module`` for the requested stage.
 
-        Construction occurs within a meta-device context; therefore, weights
-        should not be loaded directly here. Instead, a `ModelStateMapper` must be returned
-        to define how weights from a checkpoint map to the newly created module parameters.
+        Construction runs on the meta device, so the method must not load weights. Instead, it returns a
+        ``ModelStateMapper`` that maps checkpoint weights to the parameters of the new module.
 
-        This allows for architecture modifications, such as injecting LoRA adapters,
-        provided that the returned mapper reflects the new structure.
+        The method can change the architecture, e.g. inject LoRA adapters, if the returned mapper
+        reflects the new structure.
 
         Args:
             context: Context for this operation.
 
         Returns:
-            Result of this operation.
+            The model stage and its state mapper.
         """
         ...
 
     @abc.abstractmethod
     def parallelize_model_stage(self, context: ParallelizeModelStageContext[TModel]):
-        """Converts the model parameters into distributed tensors (DTensors).
+        """Converts the model parameters into distributed tensors (``DTensor``).
 
-        Implementations should modify the model in-place. This involves converting
-        standard parameters into DTensors by replicating or sharding them according
-        to the desired parallelism strategies.
+        Implementations must modify the model in place. They replicate or shard each parameter
+        according to the chosen parallelism strategies.
 
         Args:
             context: Context for this operation.
@@ -140,22 +137,20 @@ class ModelProvider(abc.ABC, Generic[TModel]):
     ) -> PrepareExportModelStageResult:
         """Prepares the state mapper required for saving the model to disk.
 
-        This methods defines how the current in-memory model structure maps back to the
-        serialized checkpoint format.
+        The mapper defines how the in-memory model structure maps back to the checkpoint format.
 
         Args:
             context: Context for this operation.
 
         Returns:
-            Result of this operation.
+            The state mapper for export.
         """
 
     def register_events(self, context: RegisterModelEventsContext) -> None:
-        """Register model-specific event subscriptions.
+        """Registers model-specific event subscriptions.
 
         Args:
-            context: Context providing access to the distributed environment,
-                the built model modules, and the event bus.
+            context: Context with the distributed context and the event bus.
         """
 
     def dump_hparams(self) -> ScalarTree:

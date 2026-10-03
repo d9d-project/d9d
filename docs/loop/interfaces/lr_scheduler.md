@@ -1,42 +1,55 @@
 # Learning Rate Scheduler
 
+## About
+
+The loop creates one learning rate scheduler per optimizer through an `LRSchedulerProvider`. You can configure a standard schedule with `AutoLRSchedulerProvider`, or implement the `LRSchedulerProvider` protocol yourself.
+
 ## Auto Scheduler
 
-For standard PyTorch usage, `d9d` includes the `d9d.loop.auto` package. These providers ingest a Pydantic configuration object and manage the creation of standard schedulers.
+The `d9d.loop.auto` package builds schedulers from a Pydantic configuration. It supports [piecewise](../../lr_scheduler/piecewise.md) schedules (warmup, hold, decay). The `name` field selects the scheduler.
 
-Supports [Piecewise Linear](../lr_scheduler/piecewise.md) schedules (warmup, hold, decay).
+## Custom Scheduler
+
+For a custom scheduler, implement the `LRSchedulerProvider` protocol. It receives the optimizer and the total number of steps, and returns the scheduler.
+
+## Usage
+
+`AutoLRSchedulerConfig` is a discriminated union, so validate it with a Pydantic `TypeAdapter`:
 
 ```python
-from d9d.loop.auto import AutoLRSchedulerProvider, AutoLRSchedulerConfig
+from pydantic import TypeAdapter
+
+from d9d.loop.auto import AutoLRSchedulerConfig, AutoLRSchedulerProvider
 
 cfg = """
 {
-    "initial_multiplier": 0.0,
-    "phases": [
-        {
-            "mode": "steps",
-            "steps": 100,
-            "target_multiplier": 1.0,
-            "curve": { "type": "linear" }
-        },
-        {
-            "mode": "rest",
-            "target_multiplier": 0.1,
-            "curve": { "type": "cosine" }
-        }
-    ]
+    "name": "piecewise",
+    "scheduler": {
+        "initial_multiplier": 0.0,
+        "phases": [
+            {
+                "mode": "steps",
+                "steps": 100,
+                "target_multiplier": 1.0,
+                "curve": { "type": "linear" }
+            },
+            {
+                "mode": "rest",
+                "target_multiplier": 0.1,
+                "curve": { "type": "cosine" }
+            }
+        ]
+    }
 }
 """
 
-provider = AutoLRSchedulerProvider(
-    AutoLRSchedulerConfig.model_validate_json(cfg)
-)
+provider = AutoLRSchedulerProvider(TypeAdapter(AutoLRSchedulerConfig).validate_json(cfg))
 ```
 
+Inside a larger Pydantic config, declare a field of type `AutoLRSchedulerConfig` instead.
+
+## API Reference
+
 ::: d9d.loop.auto.auto_lr_scheduler
-
-## Interface
-
-If you need a custom learning rate scheduler, you implement the `LRSchedulerProvider` protocol.
 
 ::: d9d.loop.control.lr_scheduler_provider

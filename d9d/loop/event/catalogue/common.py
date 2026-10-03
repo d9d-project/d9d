@@ -15,7 +15,7 @@ class EventStepContext:
     """Context providing step information during iterative execution.
 
     Attributes:
-        schedule: Object responsible for tracking current step and total steps.
+        schedule: The schedule that tracks the current step and the total number of steps.
     """
 
     schedule: "JobSchedule"
@@ -23,7 +23,7 @@ class EventStepContext:
 
 @dataclasses.dataclass(kw_only=True)
 class EventConfigurationStartedContext:
-    """Context provided when the loop configuration process originates.
+    """Context provided when the loop configuration starts.
 
     Attributes:
         dist_context: The initialized distributed execution context.

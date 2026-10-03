@@ -11,7 +11,7 @@ class PiecewiseConfig(BaseModel):
     """Configuration for the piecewise learning rate scheduler.
 
     Attributes:
-        name: Discriminator tag, must be "piecewise".
+        name: Discriminator tag, must be ``"piecewise"``.
         scheduler: Detailed configuration for the piecewise schedule.
     """
 
@@ -21,13 +21,14 @@ class PiecewiseConfig(BaseModel):
 
 
 AutoLRSchedulerConfig = Annotated[PiecewiseConfig, Field(discriminator="name")]
+"""Discriminated union of the supported learning rate scheduler configurations."""
 
 
 class AutoLRSchedulerProvider(LRSchedulerProvider):
-    """LRSchedulerProvider that builds a learning rate scheduler based on a configuration object."""
+    """Builds a learning rate scheduler from a configuration object."""
 
     def __init__(self, config: AutoLRSchedulerConfig):
-        """Constructs the AutoLRSchedulerProvider object."""
+        """Constructs the ``AutoLRSchedulerProvider`` object."""
         self._config = config
 
     def __call__(self, context: InitializeLRSchedulerContext) -> LRSchedulerProtocol:
@@ -37,4 +38,4 @@ class AutoLRSchedulerProvider(LRSchedulerProvider):
                     self._config.scheduler, optimizer=context.optimizer, total_steps=context.total_steps
                 )
             case _:
-                raise ValueError(f"Unsupported LR scheduler type: {self._config}")
+                raise ValueError(f"Unsupported LR scheduler config ({self._config}).")

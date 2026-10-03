@@ -9,25 +9,34 @@ from .model_stage_factory import TrackedModules
 
 
 class ModelStageExporter:
+    """Exports the model stages held by this process as a ``.safetensors`` checkpoint."""
+
     def __init__(self, model_provider: ModelProvider, modules: TrackedModules, dist_context: DistributedContext):
+        """Constructs the ``ModelStageExporter`` object.
+
+        Args:
+            model_provider: The provider that maps each stage to its export state mapper.
+            modules: The model stages held by this process.
+            dist_context: The distributed context.
+        """
         self._model_provider = model_provider
         self._modules = modules
         self._dist_context = dist_context
 
     def export(self, save_dir: Path):
-        """Writes every stage this process holds to `save_dir`.
+        """Writes every stage this process holds to ``save_dir``.
 
         Args:
-            save_dir: directory to write the .safetensors shards and index into.
+            save_dir: The directory to write the ``.safetensors`` shards and the index to.
 
         Raises:
-            ValueError: the run has no parallelism yet holds more than one stage, which leaves
-                nothing to decide which of them writes the index.
+            ValueError: If the run has no parallelism but holds more than one stage. Nothing then decides
+                which stage writes the index.
         """
         alone = not self._dist_context.mesh_params.is_distributed
         stages = self._modules.modules
         if alone and len(stages) != 1:
-            raise ValueError(f"a run without parallelism holds one model stage, but this one holds {len(stages)}")
+            raise ValueError(f"The model stage count ({len(stages)}) must be 1 in a run without parallelism.")
 
         mappers = []
         for stage in stages:

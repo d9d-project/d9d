@@ -19,13 +19,13 @@ class GradientClipper:
         config: GradientClippingConfig,
         schedule: JobSchedule,
     ):
-        """Constructs the gradient clipper.
+        """Constructs the ``GradientClipper`` object.
 
         Args:
             dist_context: The distributed context.
-            tracked_modules: Container of model modules whose parameters need clipping.
-            config: Configuration defining max norm and logging frequency.
-            schedule: JobSchedule instance used to track the current training step.
+            tracked_modules: The model stages whose gradients are clipped.
+            config: The configuration that sets the maximum norm and the logging period.
+            schedule: The job schedule that tracks the current step.
         """
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
@@ -40,11 +40,7 @@ class GradientClipper:
 
     @contextmanager
     def install(self):
-        """Context manager that prepares and groups parameters for efficient norm calculation.
-
-        It calculates necessary metadata (such as segregating shared parameters) to ensure
-        correct global norm calculation across the pipeline parallel mesh.
-        """
+        """Groups the parameters for global gradient norm computation while the context is open."""
         self._parameter_groups = group_parameters_for_norm(self._all_parameters())
         yield
         self._parameter_groups = None
@@ -52,9 +48,7 @@ class GradientClipper:
     def clip_and_log(self, run: BaseTrackerRun):
         """Clips gradients to the configured maximum norm and logs the total L2 norm.
 
-        This method performs an in-place modification of parameter gradients if a
-        maximum norm is configured. It calculates the global gradient norm across
-        distributed ranks.
+        Gradients are modified in place if a maximum norm is configured. The norm is global across all ranks.
 
         Args:
             run: The tracker run instance used for logging the norm scalar.
@@ -68,7 +62,7 @@ class GradientClipper:
             return
 
         if self._parameter_groups is None:
-            raise ValueError("Parameter groups are not configured")
+            raise ValueError("clip_and_log() must be called inside the install() context.")
 
         if self._dist_context.mesh_params.is_distributed:
             pp_mesh = self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"]

@@ -32,14 +32,14 @@ class JobSchedule(Stateful):
     """Tracks the progress and resolves the duration of a job loop."""
 
     def __init__(self, config: JobScheduleConfig, stream: MicrobatchPackStream):
-        """Constructs a JobSchedule object.
+        """Constructs the ``JobSchedule`` object.
 
         Args:
             config: The schedule configuration carrying the optional explicit step budget.
             stream: The microbatch pack stream driving the loop, consulted for its ``total_steps``.
 
         Raises:
-            ValueError: If "total_steps" cannot be resolved from the config and the stream.
+            ValueError: If ``total_steps`` cannot be resolved from the config or the stream.
         """
         self._current_step = 0
         self._total_steps = _resolve_total_steps(config, stream)
@@ -69,8 +69,8 @@ class JobSchedule(Stateful):
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
         """Restores the schedule progress from a state dictionary.
 
-        Only the current step is restored; "total_steps" is always taken from the resolution at
-        construction time, so the configured budget may change across resumes.
+        Only the current step is restored. ``total_steps`` always comes from the constructor,
+        so the configured budget can change across resumes.
 
         Args:
             state_dict: The state dictionary to load from.
@@ -80,23 +80,18 @@ class JobSchedule(Stateful):
     def should_do_action(
         self, action: StepActionPeriod, enable_on_last_step_if_periodic: bool = False, is_post_step_action: bool = False
     ) -> bool:
-        """Determines whether a specific periodic action should be executed.
+        """Determines whether a periodic action runs at the current step.
 
         Args:
-            action: The configuration defining when the action should occur.
-                Can be a special action type or an integer representing the period.
-            enable_on_last_step_if_periodic: Whether the action should also be
-                forced on the very last step if the action is periodic.
-            is_post_step_action: Whether the check is being performed after the
-                step has logically incremented. Adjusts the step position to compute
-                the period accurately.
+            action: When the action runs: a period in steps or a special flag.
+            enable_on_last_step_if_periodic: Whether a periodic action also runs on the last step.
+            is_post_step_action: Whether the check runs after the step counter was incremented.
 
         Returns:
-            True if the action should be executed at the current point, False otherwise.
+            ``True`` if the action runs at the current step, otherwise ``False``.
 
         Raises:
-            ValueError: If the action period is less than or equal to zero, or
-                if the provided action configuration is completely invalid.
+            ValueError: If the action period is not positive or the action is invalid.
         """
         position_shift = 0 if is_post_step_action else 1
 

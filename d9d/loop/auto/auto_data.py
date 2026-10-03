@@ -31,9 +31,9 @@ class AutoDataConfig(BaseModel):
         microbatch_size: The number of samples in a single microbatch on a single rank.
         shard_indexing_mode: The dataset sharding strategy.
         shuffle: Whether to reshuffle the data every epoch.
-        drop_last: Whether to drop the trailing incomplete microbatch and pack (set False for evaluation).
+        drop_last: Whether to drop the trailing incomplete microbatch and pack. Set it to ``False`` for evaluation.
         num_workers: The number of subprocesses to use for data loading.
-        pin_memory: Whether to copy tensors into CUDA pinned memory before returning them.
+        pin_memory: Whether to copy the packs into pinned host memory before returning them.
         persistent_workers: Whether to keep worker processes alive between epochs.
         prefetch_factor: The number of batches each worker prefetches ahead.
         timeout: The timeout in seconds for collecting a batch from workers.
@@ -52,16 +52,16 @@ class AutoDataConfig(BaseModel):
 
 
 class AutoDataProvider(DataProvider):
-    """DataProvider that wires the default stack: shard the dataset, load microbatches, pack them per step.
+    """Builds the default data stack: shards the dataset, loads microbatches and packs them per step.
 
-    It shards the dataset across data-parallel ranks, wraps it in a stateful loader at the microbatch size,
-    derives the gradient-accumulation factor from the global batch size, groups the microbatches with a
-    ``FixedCountMicrobatchPacker`` and, if enabled, pins the packs with a ``PinMemoryMicrobatchPackStream``.
-    Users who need a non-default stack should write their own ``DataProvider``.
+    The dataset is sharded across data-parallel ranks and loaded by a stateful loader at the microbatch size.
+    The number of microbatches per step follows from the global batch size. A ``FixedCountMicrobatchPacker``
+    groups the microbatches, and a ``PinMemoryMicrobatchPackStream`` pins the packs if enabled.
+    For a different stack, write your own ``DataProvider``.
     """
 
     def __init__(self, dataset_factory: DatasetFactory, collator: CollateFn, config: AutoDataConfig):
-        """Constructs the AutoDataProvider object.
+        """Constructs the ``AutoDataProvider`` object.
 
         Args:
             dataset_factory: Builds the unsharded dataset given the distributed context.
@@ -84,7 +84,7 @@ class AutoDataProvider(DataProvider):
             collate_fn=self._collator,
             shuffle=self._config.shuffle,
             num_workers=self._config.num_workers,
-            # the loader's own pinning does not traverse dataclasses; packs are pinned by the stream below
+            # The loader's own pinning does not traverse dataclasses. The stream below pins the packs instead.
             pin_memory=False,
             persistent_workers=self._config.persistent_workers,
             prefetch_factor=self._config.prefetch_factor,

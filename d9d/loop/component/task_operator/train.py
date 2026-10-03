@@ -35,12 +35,12 @@ class LossComputer(typing.Generic[TPipelineOutput, TState]):
         gradient_manager: GradientManager,
         metrics: ComposeMetric,
     ):
-        """Constructs a new LossComputer.
+        """Constructs the ``LossComputer`` object.
 
         Args:
             state: Handler for the per-microbatch pipeline state.
             task: The user-defined training task containing loss computation logic.
-            schedule: Component tracking current step and progress.
+            schedule: The job schedule that tracks the current step.
             gradient_manager: Accumulator of loss/weight for gradient reduction.
             metrics: Metric collection updated per microbatch.
         """
@@ -95,7 +95,7 @@ class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPi
         job_schedule: JobSchedule,
         metrics: ComposeMetric,
     ):
-        """Constructs the TrainTaskOperator.
+        """Constructs the ``TrainTaskOperator`` object.
 
         Args:
             dist_context: The distributed context.
@@ -103,7 +103,7 @@ class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPi
             pipeline: Information about the pipeline schedule.
             pipeline_state: Handler for transient per-microbatch state during the step.
             gradient_manager: Gradient accumulator; told how many backward passes this step performs.
-            job_schedule: Component tracking current step and progress.
+            job_schedule: The job schedule that tracks the current step.
             metrics: Metric collection updated per microbatch.
         """
         self._dist_context = dist_context

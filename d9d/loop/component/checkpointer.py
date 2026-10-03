@@ -19,16 +19,15 @@ _SAVE_RE = re.compile(r"^save-(\d+)$")
 def _save_iter_predicate(x: Path) -> int:
     match = _SAVE_RE.fullmatch(x.stem)
     if match is None:
-        raise ValueError("Malformed checkpoint name")
+        raise ValueError(f"Malformed checkpoint name ({x.stem}). Expected save-<step>.")
     return int(match.group(1))
 
 
 class StateCheckpointer:
     """Manages the lifecycle of distributed training checkpoints.
 
-    This class handles saving and loading the training state (JobState object)
-    using PyTorch Distributed Checkpoint (DCP). It manages checkpoint versioning,
-    storage rotation (keeping only N latest), and synchronization across distributed ranks.
+    It saves and loads the job state with PyTorch Distributed Checkpoint (DCP). It names checkpoints
+    by step, keeps only the latest ones and synchronizes the ranks around each save and load.
     """
 
     def __init__(
@@ -39,14 +38,14 @@ class StateCheckpointer:
         gc: ManualGarbageCollector,
         run_name: str | None,
     ):
-        """Constructs the StateCheckpoint object.
+        """Constructs the ``StateCheckpointer`` object.
 
         Args:
             dist_context: The distributed context.
-            schedule: The job schedule tracking the current iteration/step.
-            config: Configuration object containing checkpointing parameters.
-            gc: Garbage collector for manual memory management during IO.
-            run_name: Optional specific run name to append to the save directory.
+            schedule: The job schedule that tracks the current step.
+            config: The checkpointing configuration.
+            gc: The garbage collector used to free memory around checkpoint I/O.
+            run_name: The run name to append to the save directory. ``None`` uses the save directory as is.
         """
         self._dist_context = dist_context
         self._schedule = schedule
@@ -111,13 +110,10 @@ class StateCheckpointer:
             self._dist_context.logger.info("Checkpoint successfully saved across the world")
 
     def checkpoint_if_needed(self, state: Stateful):
-        """Checks if a checkpoint is due based on the configuration and saves if necessary.
-
-        This checks the schedule to see if the current step matches the configured
-        saving period (or if it is the final step).
+        """Saves a checkpoint if the current step matches the configured period or is the last step.
 
         Args:
-            state: The Stateful object to save.
+            state: The ``Stateful`` object to save.
         """
         if self._schedule.should_do_action(
             self._config.period_steps, enable_on_last_step_if_periodic=True, is_post_step_action=True
@@ -150,11 +146,11 @@ class StateCheckpointer:
         self._dist_context.logger.info("Checkpoint successfully loaded across the world")
 
     def load_last_checkpoint(self, state: Stateful):
-        """Attempts to load the most recent checkpoint available in the save directory.
+        """Loads the latest checkpoint in the save directory.
 
-        If no checkpoint is found, the state remains unchanged (starting from scratch).
+        If no checkpoint is found, the state stays unchanged and the job starts from scratch.
 
         Args:
-            state: The stateful object to which loaded parameters will be applied.
+            state: The ``Stateful`` object to load the checkpoint into.
         """
         self._load(state)

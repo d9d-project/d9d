@@ -10,7 +10,7 @@ class DataParallelMicrobatchPackStream(MicrobatchPackStream):
     """Wraps a microbatch pack stream to namespace its checkpoint state per data-parallel rank."""
 
     def __init__(self, dist_context: DistributedContext, inner: MicrobatchPackStream):
-        """Constructs a DataParallelMicrobatchPackStream.
+        """Constructs the ``DataParallelMicrobatchPackStream`` object.
 
         Args:
             dist_context: The distributed context.

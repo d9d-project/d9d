@@ -37,7 +37,11 @@ class EventLRSchedulerReadyContext:
 
 @dataclasses.dataclass(kw_only=True)
 class EventTrainReadyContext:
-    """Context provided when training is fully ready to begin and the checkpoint is loaded."""
+    """Context provided when training is fully ready to begin and the checkpoint is loaded.
+
+    Attributes:
+        run: The active experiment tracker run.
+    """
 
     run: BaseTrackerRun
 
@@ -82,10 +86,10 @@ EVENT_TRAIN_READY = Event[EventTrainReadyContext](id="train.ready")
 """Triggered right before the main loop starts, after configuration is complete and checkpoints are loaded."""
 
 EVENT_TRAIN_STEP_PRE = Event[EventStepContext](id="train.step.pre")
-"""Triggered at the absolute beginning of a training step iteration."""
+"""Triggered at the start of a training step."""
 
 EVENT_TRAIN_STEP_POST = Event[EventStepContext](id="train.step.post")
-"""Triggered at the very end of a training step iteration, after all operations (excluding checkpointing)."""
+"""Triggered at the end of a training step, after all its work except checkpointing."""
 
 EVENT_TRAIN_FORWARD_BACKWARD_PRE = Event[EventStepContext](id="train.forward_backward.pre")
 """Triggered immediately before the sequence of forward and backward passes begins."""
@@ -94,7 +98,7 @@ EVENT_TRAIN_FORWARD_BACKWARD_POST = Event[EventStepContext](id="train.forward_ba
 """Triggered immediately after all forward and backward passes for the current step have finished."""
 
 EVENT_TRAIN_OPTIMIZER_STEP_PRE = Event[EventStepContext](id="train.optimizer_step.pre")
-"""Triggered immediately before the optimizer updates the model parameters (but after gradients are scaled/clipped)."""
+"""Triggered right before the optimizer updates the model parameters, after gradients are scaled and clipped."""
 
 EVENT_TRAIN_OPTIMIZER_STEP_POST = Event[EventStepContext](id="train.optimizer_step.post")
 """Triggered immediately after the optimizer has updated the model parameters but before gradients are zeroed."""

@@ -37,7 +37,7 @@ class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
         betas: Coefficients used for computing running averages of gradient and its square.
         eps: Term added to the denominator to improve numerical stability.
         weight_decay: Weight decay coefficient.
-        state_dtype: Data Type to use for the optimizer states.
+        state_dtype: The name of the ``torch`` dtype for the optimizer states, e.g. ``"bfloat16"``.
     """
 
     name: Literal["stochastic_adamw"] = "stochastic_adamw"
@@ -49,10 +49,10 @@ class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
     state_dtype: str
 
     def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """Builds StochasticAdamW with the configured parameters.
+        """Builds ``StochasticAdamW`` with the configured parameters.
 
         Returns:
-            The constructed StochasticAdamW optimizer.
+            The constructed ``StochasticAdamW`` optimizer.
         """
         return StochasticAdamW(
             params=params,
@@ -74,7 +74,7 @@ class AdamWOptimizerConfig(BaseAutoOptimizerConfig):
         eps: Term added to the denominator to improve numerical stability.
         weight_decay: Weight decay coefficient.
         amsgrad: Whether to use the AMSGrad variant.
-        maximize: Whether to maximize the params based on the objective (as opposed to minimizing).
+        maximize: Whether to maximize the objective instead of minimizing it.
     """
 
     name: Literal["adamw"] = "adamw"
@@ -115,7 +115,7 @@ class AdamOptimizerConfig(BaseAutoOptimizerConfig):
         weight_decay: Weight decay coefficient.
         decoupled_weight_decay: Whether to apply decoupled weight decay.
         amsgrad: Whether to use the AMSGrad variant.
-        maximize: Whether to maximize the params based on the objective.
+        maximize: Whether to maximize the objective instead of minimizing it.
     """
 
     name: Literal["adam"] = "adam"
@@ -157,7 +157,7 @@ class SGDOptimizerConfig(BaseAutoOptimizerConfig):
         dampening: Dampening for momentum.
         weight_decay: Weight decay (L2 penalty).
         nesterov: Enables Nesterov momentum.
-        maximize: Whether to maximize the params based on the objective.
+        maximize: Whether to maximize the objective instead of minimizing it.
     """
 
     name: Literal["sgd"] = "sgd"
@@ -191,13 +191,14 @@ AutoOptimizerConfig = Annotated[
     StochasticAdamWOptimizerConfig | AdamWOptimizerConfig | AdamOptimizerConfig | SGDOptimizerConfig,
     Field(discriminator="name"),
 ]
+"""Discriminated union of the supported optimizer configurations."""
 
 
 class AutoOptimizerProvider(OptimizerProvider):
-    """OptimizerProvider that builds a PyTorch optimizer based on a configuration object."""
+    """Builds a PyTorch optimizer from a configuration object."""
 
     def __init__(self, config: AutoOptimizerConfig):
-        """Constructs the provider with the given configuration."""
+        """Constructs the ``AutoOptimizerProvider`` object."""
         self._config = config
 
     def __call__(self, context: InitializeOptimizerStageContext) -> Optimizer:

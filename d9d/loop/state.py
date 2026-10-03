@@ -29,9 +29,8 @@ from d9d.metric.impl.container import ComposeMetric
 class JobState(Stateful):
     """Base container for the state of a distributed execution job.
 
-    This dataclass holds the common infrastructure components required for both
-    training and inference loops. It implements the Stateful protocol to support
-    checkpointing of its internal components.
+    It holds the components shared by the training and inference loops. It implements ``Stateful``,
+    so its components can be checkpointed.
 
     Attributes:
         dist_context: The distributed context.
@@ -74,8 +73,7 @@ class JobState(Stateful):
 class TrainJobState(JobState):
     """Container for the state of a training job.
 
-    Extends JobState to include components specific to training, such as
-    optimization, gradient management, and loss computation.
+    Extends ``JobState`` with training components, such as the optimizer and the gradient manager.
 
     Attributes:
         task: The specific training task logic definition.
@@ -87,6 +85,7 @@ class TrainJobState(JobState):
         lr_scheduler: The scheduler adjusting the learning rate.
         gradient_clipper: Component for clipping gradient norms.
         exporter: Component for exporting the final model artifacts.
+        event_bus: The event bus for this training job.
     """
 
     task: TrainTask
@@ -128,7 +127,7 @@ class InferenceJobState(JobState):
 
     Attributes:
         task: The specific inference task logic definition.
-        task_operator: Executor for running forward and backward passes.
+        task_operator: Executor for running forward passes.
         event_bus: The event bus for this inference job.
     """
 
