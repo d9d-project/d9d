@@ -137,17 +137,17 @@ def adamw_stochastic_bf16_(  # noqa: C901
     """
     # check shape equality
     if grads.shape != params.shape:
-        raise ValueError("Shape mismatch between grads and params.")
+        raise ValueError(f"grads shape {tuple(grads.shape)} must match params shape {tuple(params.shape)}.")
 
     if exp_avg.shape != params.shape:
-        raise ValueError("Shape mismatch between exp_avg state and params.")
+        raise ValueError(f"exp_avg shape {tuple(exp_avg.shape)} must match params shape {tuple(params.shape)}.")
 
     if exp_avg_sq.shape != params.shape:
-        raise ValueError("Shape mismatch between exp_avg_sq state and params.")
+        raise ValueError(f"exp_avg_sq shape {tuple(exp_avg_sq.shape)} must match params shape {tuple(params.shape)}.")
 
     # check params
     if params.dtype != torch.bfloat16:
-        raise ValueError("Params must be BFloat16 for this kernel.")
+        raise ValueError(f"params dtype ({params.dtype}) must be torch.bfloat16.")
 
     if not params.is_contiguous():
         raise ValueError("Params must be contiguous since it is an in-place kernel.")
@@ -164,7 +164,7 @@ def adamw_stochastic_bf16_(  # noqa: C901
         raise ValueError("Exp_avg_sq state must be contiguous since it is an in-place kernel.")
 
     if exp_avg.dtype != exp_avg_sq.dtype:
-        raise ValueError("States have different dtypes.")
+        raise ValueError(f"exp_avg dtype ({exp_avg.dtype}) and exp_avg_sq dtype ({exp_avg_sq.dtype}) must match.")
 
     n_elements = params.numel()
 

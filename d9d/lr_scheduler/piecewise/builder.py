@@ -66,7 +66,7 @@ class PiecewiseScheduleBuilder:
                 percentage implies a step count earlier than the current cursor.
         """
         if self._total_steps is None:
-            raise ValueError("You must define 'total_steps' in the constructor to use percentage-based methods.")
+            raise ValueError("Percentage-based phases require total_steps. Pass total_steps to piecewise_schedule().")
 
         if not 0.0 <= p <= 1.0:
             raise ValueError("Percentage should be in range of [0.0, 1.0]")
@@ -76,7 +76,8 @@ class PiecewiseScheduleBuilder:
 
         if duration < 0:
             raise ValueError(
-                f"Target percentage {p} (step {target_step_abs}) is behind current cursor (step {self._last_end_step})."
+                f"p ({p}) maps to step {target_step_abs}, which is before the end of the previous phase "
+                f"(step {self._last_end_step})."
             )
 
         return self.for_steps(duration, target_multiplier, curve)
@@ -107,7 +108,8 @@ class PiecewiseScheduleBuilder:
         """
         if self._total_steps is not None and self._last_end_step > self._total_steps:
             raise ValueError(
-                f"Schedule defined for {self._last_end_step} steps, but total_steps is {self._total_steps}."
+                f"The phases end at step {self._last_end_step}, after total_steps ({self._total_steps}). "
+                "Shorten the phases or increase total_steps."
             )
 
         engine = PiecewiseScheduleEngine(self._phases)

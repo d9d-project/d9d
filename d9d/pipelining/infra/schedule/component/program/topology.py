@@ -34,9 +34,7 @@ def build_stage_to_host_rank_topology(pp_size: int, num_stages: int, style: Sche
             return {stage_index: stage_index % pp_size for stage_index in range(num_stages)}
         case ScheduleStyle.v:
             if num_stages % pp_size != 0:
-                raise ValueError(
-                    f"num_stages {num_stages} must be evenly divisible by pp_size {pp_size} for V schedules"
-                )
+                raise ValueError(f"num_stages ({num_stages}) must be divisible by pp_size ({pp_size}) for V schedules.")
 
             result = {}
             rank_index = 0
@@ -50,7 +48,7 @@ def build_stage_to_host_rank_topology(pp_size: int, num_stages: int, style: Sche
                     rank_index -= 1
             return result
         case _:
-            raise ValueError()
+            raise ValueError(f"Unknown schedule style ({style}).")
 
 
 def invert_stage_to_host_rank_topology(stage_to_host: dict[int, int]) -> dict[int, list[int]]:

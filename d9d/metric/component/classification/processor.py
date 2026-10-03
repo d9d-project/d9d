@@ -88,7 +88,7 @@ class OneHotProcessor(ClassificationPredictionsProcessor):
         """
         if preds.shape[-1] != self._num_classes:
             raise ValueError(
-                f"Expected last dimension of preds to equal num_classes={self._num_classes}, got {preds.shape[-1]}"
+                f"The last dimension of preds ({preds.shape[-1]}) must equal num_classes ({self._num_classes})."
             )
 
         preds_indices = torch.argmax(preds, dim=-1)

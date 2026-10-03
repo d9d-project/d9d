@@ -311,7 +311,7 @@ class ConfusionMatrixMetricBuilder:
             raise ValueError("A problem type (binary, multiclass, multilabel) must be configured.")
 
         if self._statistic is None:
-            raise ValueError("A statistic calculation strategy must be configured.")
+            raise ValueError("A statistic must be configured. Call one of the with_*() methods before build().")
 
         if self._aggregation_method is None:
             raise ValueError("Aggregation method must be configured.")

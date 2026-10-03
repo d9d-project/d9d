@@ -64,7 +64,7 @@ def copy_fp32_to_bf16_stochastic_(
         raise ValueError("Since this is an in-place operation, target should be a contiguous tensor!")
 
     if source.shape != target.shape:
-        raise ValueError("Source and Target Tensors are of different shapes")
+        raise ValueError(f"source shape {tuple(source.shape)} must match target shape {tuple(target.shape)}.")
 
     if source.dtype != torch.float32:
         raise ValueError("Source must be Float32")

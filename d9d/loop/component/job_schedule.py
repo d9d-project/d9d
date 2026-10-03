@@ -23,8 +23,8 @@ def _resolve_total_steps(config: JobScheduleConfig, stream: MicrobatchPackStream
         return data_steps
 
     raise ValueError(
-        "Cannot resolve total_steps: the schedule config does not specify total_steps and "
-        "the data stream does not report its length. Please set `total_steps` in the schedule config."
+        "Cannot resolve total_steps: the schedule config does not set total_steps and "
+        "the data stream does not report its length. Set total_steps in the schedule config."
     )
 
 
@@ -109,11 +109,11 @@ class JobSchedule(Stateful):
                 return shifted_step == self._total_steps
             case int():
                 if action <= 0:
-                    raise ValueError()
+                    raise ValueError(f"Action period ({action}) must be positive.")
 
                 will_do_periodic = shifted_step % action == 0
                 will_do_last = enable_on_last_step_if_periodic and shifted_step == self._total_steps
 
                 return will_do_periodic or will_do_last
             case _:
-                raise ValueError("Invalid step configuration")
+                raise ValueError(f"Invalid step action ({action}). Use a positive int or a StepActionSpecial value.")

@@ -65,7 +65,7 @@ class ShardedDataset(Dataset[_T_co], Stateful):
             ValueError: If the dataset does not implement __len__.
         """
         if not isinstance(dataset, Sized):
-            raise ValueError("Dataset should implement __len__ method")
+            raise ValueError(f"Dataset ({type(dataset).__name__}) must implement __len__ to be sharded.")
 
         self._dataset = dataset
 

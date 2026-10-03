@@ -46,7 +46,9 @@ class ConfusionMatrixAccumulator(Stateful):
         """
         # preds/targets are pre-processed binary tensors
         if preds.shape != targets.shape:
-            raise ValueError(f"preds and targets must have same shape, got {preds.shape} and {targets.shape}")
+            raise ValueError(
+                f"preds and targets must have the same shape, got {tuple(preds.shape)} and {tuple(targets.shape)}."
+            )
 
         if preds.shape[-1] != self._num_outputs:
             raise ValueError(f"Expected {self._num_outputs} outputs, got {preds.shape[1]}")

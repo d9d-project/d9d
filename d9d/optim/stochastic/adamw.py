@@ -76,15 +76,15 @@ class StochasticAdamW(Optimizer):
             ValueError: If any of the provided hyperparameters are invalid.
         """
         if lr <= 0:
-            raise ValueError(f"Invalid learning rate: {lr}")
+            raise ValueError(f"lr ({lr}) must be positive.")
         if eps <= 0:
-            raise ValueError(f"Invalid epsilon value: {eps}")
+            raise ValueError(f"eps ({eps}) must be positive.")
         if not 0.0 <= betas[0] < 1.0:
-            raise ValueError(f"Invalid beta parameter at index 0: {betas[0]}")
+            raise ValueError(f"betas[0] ({betas[0]}) must be in [0.0, 1.0).")
         if not 0.0 <= betas[1] < 1.0:
-            raise ValueError(f"Invalid beta parameter at index 1: {betas[1]}")
+            raise ValueError(f"betas[1] ({betas[1]}) must be in [0.0, 1.0).")
         if weight_decay < 0:
-            raise ValueError(f"Invalid weight_decay value: {weight_decay}")
+            raise ValueError(f"weight_decay ({weight_decay}) must be non-negative.")
 
         if generator is None:
             generator = torch.Generator(device="cpu")
@@ -116,7 +116,7 @@ class StochasticAdamW(Optimizer):
     @torch.no_grad()
     def step(self, closure: None = None) -> None:  # type: ignore[override]
         if closure is not None:
-            raise ValueError("Closure is not supported")
+            raise ValueError("StochasticAdamW does not support closures. Call step() without a closure.")
 
         for group in self.param_groups:
             lr = group["lr"]
@@ -131,7 +131,7 @@ class StochasticAdamW(Optimizer):
 
                 grad = p.grad
                 if grad.is_sparse:
-                    raise RuntimeError("StochasticAdamW does not support sparse gradients")
+                    raise RuntimeError("StochasticAdamW does not support sparse gradients.")
 
                 state = self.state[p]
 
