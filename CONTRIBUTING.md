@@ -147,6 +147,16 @@ PR descriptions.
     *   Use one term for one concept, and use it everywhere.
     *   Do not stack more than three nouns.
     *   Keep a paragraph about one topic, with at most six sentences. Put the main point first.
+*   **Write "can" for what is allowed and "must" for what is required.**
+*   **Mark stopgaps.** If a design is a stopgap forced by a current limit, say so in one sentence and name the limit.
+    In a DEP, list the deferred work explicitly.
+*   **Spell common terms one way.** Write "microbatch", "bf16" and "fp32". Write MiB and GiB for sizes in powers of two.
+
+### Names
+
+*   **Name a new entity after what it is.** Follow the PyTorch or Hugging Face name for the same idea. Do not reuse a
+    word that already means something else in d9d.
+*   **Make a name exactly as broad as what it covers.** This also applies to DEP and PR titles.
 
 ### Comments
 
@@ -155,6 +165,10 @@ PR descriptions.
     explanation to a class docstring or a module constant just to have a place for it.
 *   **Justify code that looks removable.** Some code exists because of an external limitation, such as a kernel
     requirement or a PyTorch quirk. Say so briefly and name the source, so nobody deletes the code as redundant.
+*   **Give every suppression a reason.** Name the code and end with ` - <reason>`, e.g.
+    `# noqa: BLE001 - re-raised in the consuming thread`. Lazy imports of optional dependencies (`PLC0415`) need no
+    reason.
+*   **Write a TODO as `# TODO(owner): ...`,** once per item, with a link to its issue.
 
 ### Docstrings
 
@@ -167,6 +181,22 @@ We follow the [Google Python style](https://google.github.io/styleguide/pyguide.
 *   **No type annotations in docstrings:** Types are already declared in the signature and checked by `ty`. Do not repeat them in the docstring.
 *   **Document `__init__`:** Write a docstring even for `__init__`, but keep it short and to the point, e.g. `"""Constructs the ``Trainer`` object."""`.
 *   **Public API coverage:** Always write docstrings for everything considered public API.
+*   **Write the summary line in the third person.** It fits on one line and ends with a period, e.g. "Computes the
+    loss.". An `__init__` summary starts with "Constructs". A `Raises:` entry starts with "If".
+*   **Put identifiers and literals in double backticks,** e.g. ``` ``GroupedLinear`` ``` and ``` ``None`` ```. Do not
+    use quotes or Sphinx roles such as `:class:`.
+*   **Write tensor shapes one way.** End the description with ```Shape: ``(batch, seq_len, hidden_size)``.```. Use
+    parentheses and snake_case dimension names. Use the same name for the same dimension everywhere.
+*   **Document fields under `Attributes:`** in data classes, configs and enums. Other classes document their
+    arguments in the `__init__` docstring.
+*   **Let overrides inherit the contract.** An override may omit its docstring. Document it only if its behaviour
+    differs from the base contract.
+*   **Write a property docstring as a noun phrase,** e.g. "The current step.", without a `Returns:` section.
+
+### Error Messages
+
+*   **Write a full sentence.** Name the offending value as `name ({value})`. If the caller can fix the problem, say
+    how. Never raise an exception without a message.
 
 ### Documentation Pages
 
