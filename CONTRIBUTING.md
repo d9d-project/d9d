@@ -130,16 +130,94 @@ We have two tiers of tests:
 
 **Requirement:** All PRs must pass `make test`. If you add a feature, you must add corresponding tests.
 
-## Documentation
+## Writing
+
+These rules apply to everything we write: code comments, docstrings, documentation pages, commit messages and
+PR descriptions.
+
+### General Rules
+
+*   **Write as little as the reader needs.** When in doubt, cut.
+*   **Put each explanation where the reader looks for it.** Explain a line of code next to that line. Explain how to
+    use a feature in the documentation. Explain why a change was made in the PR description.
+*   **Use simple English.**
+    *   Keep sentences short: at most 20 words in procedures and 25 words in descriptions.
+    *   Write one idea per sentence. In procedures, write one instruction per numbered step, in the imperative.
+    *   Use the active voice and simple tenses.
+    *   Use one term for one concept, and use it everywhere.
+    *   Do not stack more than three nouns.
+    *   Keep a paragraph about one topic, with at most six sentences. Put the main point first.
+*   **Write "can" for what is allowed and "must" for what is required.**
+*   **Mark stopgaps.** If a design is a stopgap forced by a current limit, say so in one sentence and name the limit.
+    In a DEP, list the deferred work explicitly.
+*   **Spell common terms one way.** Write "microbatch", "bf16" and "fp32". Write MiB and GiB for sizes in powers of two.
+
+### Names
+
+*   **Name a new entity after what it is.** Follow the PyTorch or Hugging Face name for the same idea. Do not reuse a
+    word that already means something else in d9d.
+*   **Make a name exactly as broad as what it covers.** This also applies to DEP and PR titles.
+
+### Comments
+
+*   **Explain *why*, next to the code.** Put a short comment right above the line it explains. Comment a non-obvious
+    condition, a workaround or a choice that looks wrong. Do not restate what the code does. Do not move the
+    explanation to a class docstring or a module constant just to have a place for it.
+*   **Justify code that looks removable.** Some code exists because of an external limitation, such as a kernel
+    requirement or a PyTorch quirk. Say so briefly and name the source, so nobody deletes the code as redundant.
+*   **Give every suppression a reason.** Name the code and end with ` - <reason>`, e.g.
+    `# noqa: BLE001 - re-raised in the consuming thread`. Lazy imports of optional dependencies (`PLC0415`) need no
+    reason.
+*   **Write a TODO as `# TODO(owner): ...`,** once per item, with a link to its issue.
 
 ### Docstrings
 
 We follow the [Google Python style](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings) for docstrings.
 
 *   **Style:** Use Google-style docstrings (`Args:`, `Returns:`, `Raises:`, etc.).
+*   **Describe the contract, not the implementation.** Say what the object does, its arguments, return values and
+    errors. Implementation choices go into comments. Leave out context the caller does not need and claims the code
+    does not guarantee.
 *   **No type annotations in docstrings:** Types are already declared in the signature and checked by `ty`. Do not repeat them in the docstring.
 *   **Document `__init__`:** Write a docstring even for `__init__`, but keep it short and to the point, e.g. `"""Constructs the ``Trainer`` object."""`.
 *   **Public API coverage:** Always write docstrings for everything considered public API.
+*   **Write the summary line in the third person.** It fits on one line and ends with a period, e.g. "Computes the
+    loss.". An `__init__` summary starts with "Constructs". A `Raises:` entry starts with "If".
+*   **Put identifiers and literals in double backticks,** e.g. ``` ``GroupedLinear`` ``` and ``` ``None`` ```. Do not
+    use quotes or Sphinx roles such as `:class:`.
+*   **Write tensor shapes one way.** End the description with ```Shape: ``(batch, seq_len, hidden_size)``.```. Use
+    parentheses and snake_case dimension names. Use the same name for the same dimension everywhere.
+*   **Document fields under `Attributes:`** in data classes, configs and enums. Other classes document their
+    arguments in the `__init__` docstring.
+*   **Let overrides inherit the contract.** An override may omit its docstring. Document it only if its behaviour
+    differs from the base contract.
+*   **Write a property docstring as a noun phrase,** e.g. "The current step.", without a `Returns:` section.
+
+### Error Messages
+
+*   **Write a full sentence.** Name the offending value as `name ({value})`. If the caller can fix the problem, say
+    how. Never raise an exception without a message.
+
+### Documentation Pages
+
+*   **Say what a feature does and how to use it.** Leave internals (host syncs, alignment, fallback paths) to code
+    comments.
+*   **Follow the page structure.** Start with `## About`: what the feature is, in one paragraph. Add topic sections.
+    Add `## Usage` with a short example for anything users call directly. End with `## API Reference` and the
+    `:::` blocks.
+*   **Keep each section about one topic.**
+*   **Write short, real examples.** Use real names from the API. Show configs and environment variables in the form
+    users type them.
+*   **State facts, not adjectives.** Do not write "efficient", "highly optimized", "powerful" or "seamless". Say what
+    makes it fast (a fused kernel, no host sync), or show a benchmark with the hardware and dtype in the heading.
+*   **State the limits users must know.** Name the required hardware, dtypes and extras (`d9d[...]`), and what the
+    feature does not support.
+*   **Do not repeat the API reference.** Arguments and return values come from the docstrings. Use prose for concepts
+    and choices.
+*   **Link the sources.** Link the paper for a method and the repository for an external library.
+*   **Update the documentation in the same PR.** If a change affects what users see or do, update the pages with it.
+
+## Documentation
 
 ### Documentation Site
 

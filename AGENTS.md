@@ -11,7 +11,8 @@ Most conventions are already documented. Always read relevant files (especially 
   - Development setup.
   - The `Makefile` workflow.
   - Design Principles. Treat these as hard rules when writing or changing code.
-  - Linting (`ruff`), type checking (`ty`), testing tiers, and docstring style.
+  - Linting (`ruff`), type checking (`ty`) and testing tiers.
+  - Writing rules for comments, docstrings, documentation pages and PR descriptions.
   - The DEP process for major changes.
   - Conventional Commits format and the PR checklist.
 - @deps/0001-dep-process.md - when and how to write a D9D Enhancement Proposal.
