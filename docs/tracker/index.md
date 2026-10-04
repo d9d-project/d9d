@@ -10,11 +10,11 @@ The `d9d.tracker` package sends the loss, the metrics and the hyperparameters of
 
 Writes each scalar as one line to the Python logger of d9d, next to the other messages of d9d. It needs no extra and no options. It does not log hyperparameters.
 
-```json
-"logging": {
-  "period_steps": 10,
-  "tracker": {"provider": "log"}
-}
+```yaml
+logging:
+  period_steps: 10
+  tracker:
+    provider: log
 ```
 
 A log line looks like this:
@@ -27,11 +27,12 @@ A log line looks like this:
 
 Logs to an [Aim](https://aimstack.io/) repository. It needs the `d9d[aim]` extra and the path or URL of the repository in `repo`. By default, it also records the CPU, GPU and memory usage and the terminal output.
 
-```json
-"logging": {
-  "period_steps": 10,
-  "tracker": {"provider": "aim", "repo": "runs/aim"}
-}
+```yaml
+logging:
+  period_steps: 10
+  tracker:
+    provider: aim
+    repo: runs/aim
 ```
 
 To see the runs, start the Aim UI on the same repository:
@@ -44,11 +45,11 @@ aim up --repo runs/aim
 
 Logs nothing.
 
-```json
-"logging": {
-  "period_steps": 10,
-  "tracker": {"provider": "null"}
-}
+```yaml
+logging:
+  period_steps: 10
+  tracker:
+    provider: "null"  # Quoted, because YAML reads a bare null as None.
 ```
 
 ## What the Loop Logs
