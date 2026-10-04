@@ -17,7 +17,7 @@ nav = [
         "getting_started/installation.md",
     ] },
     { "Table of Contents" = "toc.md" },
-    { "Troubleshooting" = "troubleshooting.md" },
+    { "Troubleshooting" = "guides/troubleshooting.md" },
     { "Core" = [
         "core/dist_context.md",
         "core/dist_ops.md",

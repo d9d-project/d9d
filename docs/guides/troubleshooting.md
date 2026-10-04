@@ -2,7 +2,7 @@
 
 ## About
 
-This page lists common problems with d9d jobs, their causes and their fixes. If your problem is not here, ask in [Discord](https://discord.gg/sNRjDbxVrg) or open a [GitHub issue](https://github.com/d9d-project/d9d/issues).
+This page shows how to read the logs of a d9d job, the first step for any problem. If your problem is not here, ask in [Discord](https://discord.gg/sNRjDbxVrg) or open a [GitHub issue](https://github.com/d9d-project/d9d/issues).
 
 ## Reading the Logs
 
@@ -11,7 +11,7 @@ d9d logs to standard output on every rank. Each line starts with `[d9d]` and the
 `torchrun` can write the output of each rank to its own file. `--log-dir` sets the directory, and `--tee 3` also keeps the output in the console. `--local-ranks-filter 0` prints only local rank 0 to the console:
 
 ```bash
-torchrun --nproc-per-node 8 --log-dir logs --tee 3 --local-ranks-filter 0 train.py
+torchrun --nproc-per-node 8 --log-dir logs --tee 3 --local-ranks-filter 0 train.py config.yaml
 ```
 
 When one rank fails, the other ranks often fail later with a timeout or a communication error. Find the rank that failed first and read its log.

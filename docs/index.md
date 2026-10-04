@@ -42,7 +42,7 @@ Install it with your package manager:
 
 Start with the [Table of Contents](./toc.md). You can read it from top to bottom.
 
-If a job hangs or fails, see [Troubleshooting](./troubleshooting.md).
+If a job hangs or fails, see [Troubleshooting](./guides/troubleshooting.md).
 
 d9d is in alpha, so public APIs can change between minor releases. Read the [changelog](https://github.com/d9d-project/d9d/blob/main/CHANGELOG.md) before you upgrade.
 
