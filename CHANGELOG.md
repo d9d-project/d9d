@@ -2,6 +2,22 @@
 
 <!-- version list -->
 
+## v0.22.0 (2026-10-04)
+
+### Documentation
+
+- Add writing rules for the whole project
+  ([`5f11a9e`](https://github.com/d9d-project/d9d/commit/5f11a9e435b51215fcc740ec9eb045b39596e857))
+
+- Fix code samples and outdated facts, add troubleshooting
+  ([`d19b8ed`](https://github.com/d9d-project/d9d/commit/d19b8ed9ca54fbce38c8fb3cefd60f950a2e312b))
+
+### Features
+
+- **tracker**: Add a tracker that writes scalars to the Python logger
+  ([`ef6f13a`](https://github.com/d9d-project/d9d/commit/ef6f13a085ce3d8f43cd9e104d6b2581e05bdc9d))
+
+
 ## v0.21.2 (2026-10-02)
 
 ### Bug Fixes
