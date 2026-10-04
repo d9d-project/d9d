@@ -6,7 +6,6 @@ from pydantic import ValidationError
 _REQUIRED = {
     "run": {"name": "test"},
     "logging": {"period_steps": 10, "tracker": {"provider": "null"}},
-    "model_stage_factory": {"source_checkpoint": None, "checkpoint_only_trainable_parameters": False},
     "determinism": {"base_seed": 42},
     "gc": {"period_steps": 100},
     "checkpointing": {"save_dir": "checkpoints", "period_steps": 100},
@@ -21,6 +20,8 @@ def test_fills_defaults_for_optional_sections():
     assert config.schedule.total_steps is None
     assert config.data_prefetch.prefetch_factor == 1
     assert config.pipelining.schedule == PipelineScheduleGPipeConfig()
+    assert config.model_stage_factory.source_checkpoint is None
+    assert not config.model_stage_factory.checkpoint_only_trainable_parameters
     assert config.checkpointing.num_to_keep is None
     assert config.profiling is None
     assert config.gradient_manager.grad_dtype is None

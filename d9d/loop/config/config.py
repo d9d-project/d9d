@@ -100,8 +100,8 @@ class ModelStageFactoryConfig(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    source_checkpoint: Path | None
-    checkpoint_only_trainable_parameters: bool
+    source_checkpoint: Path | None = None
+    checkpoint_only_trainable_parameters: bool = False
 
 
 class GradientClippingConfig(BaseModel):
@@ -219,7 +219,7 @@ class TrainerConfig(BaseModel):
     data_prefetch: DataPrefetchConfig = Field(default_factory=DataPrefetchConfig)
     logging: JobLoggerConfig
     pipelining: PipeliningConfig = Field(default_factory=PipeliningConfig)
-    model_stage_factory: ModelStageFactoryConfig
+    model_stage_factory: ModelStageFactoryConfig = Field(default_factory=ModelStageFactoryConfig)
     determinism: DeterminismConfig
     gc: GarbageCollectionConfig
     checkpointing: CheckpointingConfig
@@ -247,7 +247,7 @@ class InferenceConfig(BaseModel):
 
     schedule: JobScheduleConfig = Field(default_factory=JobScheduleConfig)
     data_prefetch: DataPrefetchConfig = Field(default_factory=DataPrefetchConfig)
-    model_stage_factory: ModelStageFactoryConfig
+    model_stage_factory: ModelStageFactoryConfig = Field(default_factory=ModelStageFactoryConfig)
     determinism: DeterminismConfig
     gc: GarbageCollectionConfig
     checkpointing: CheckpointingConfig
