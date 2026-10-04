@@ -4,6 +4,11 @@ icon: lucide/table-of-contents
 
 # Table of Contents
 
+## 🏁 Getting Started
+Your first job.
+
+*   **[Installation](./getting_started/installation.md)**: Install d9d from PyPI or from a checkout, and the optional extras.
+
 ## 🌐 Distributed Core
 The foundational primitives managing the cluster.
 

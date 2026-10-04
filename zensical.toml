@@ -13,6 +13,9 @@ extra_javascript = [
 
 nav = [
     { "Home" = "index.md" },
+    { "Getting Started" = [
+        "getting_started/installation.md",
+    ] },
     { "Table of Contents" = "toc.md" },
     { "Troubleshooting" = "troubleshooting.md" },
     { "Core" = [
