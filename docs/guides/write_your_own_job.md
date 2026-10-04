@@ -2,7 +2,7 @@
 
 ## About
 
-This page turns the [Quickstart](../getting_started/quickstart.md) script into a job for your own model and data. Copy `train.py` and `config.yaml` from `example/quickstart` into your project and replace their parts in the order below. Before each run, delete `runs/` or change `trainer.run.name`. Otherwise, the job resumes the finished run and does nothing.
+This page turns the [Quickstart](../getting_started/quickstart.md) script into a job for your own model and data. Copy `train.py` and `config.yaml` from `example/quickstart` into your project and replace their parts in the order below. Before each run, delete `runs/` or change `trainer.run.name`. Otherwise, the job tries to resume the finished Quickstart run with your new code.
 
 ## Replace the Data
 
