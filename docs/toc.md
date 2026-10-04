@@ -51,14 +51,18 @@ Parameter-Efficient Fine-Tuning framework.
 *   **Methods**: [LoRA](./peft/lora.md), [Full Fine-Tuning](./peft/full_tune.md), and [Method Stacking](./peft/stack.md).
 
 ## 📈 Optimization and Metrics
-Metrics, experiment tracking, learning rate schedules and optimizers.
+Metrics, learning rate schedules and optimizers.
 
 *   **[Metrics Overview](./metric/overview.md)**: Distributed-aware statistic accumulation.
 *   **[Metric Catalogue](./metric/metric_catalogue/index.md)**: Ready-to-use metric implementations.
 *   **[Custom Metrics](./metric/custom.md)**: Implementing custom metrics.
-*   **[Experiment Tracking](./internals/tracker_integration.md)**: Integration with logging backends (Aim).
 *   **[Piecewise Scheduler](./lr_scheduler/piecewise.md)**: Composable LR schedules and [Schedule Visualization](./lr_scheduler/visualization.md).
 *   **[Stochastic Optimizers](./optimizer/stochastic.md)**: Low-precision training using stochastic rounding.
+
+## 📊 Experiment Tracking
+Where the loss and the metrics go.
+
+*   **[Experiment Tracking](./tracker/index.md)**: Choosing a tracker (the log, Aim), what the loop logs and adding a new tracker.
 
 ## ⚙️ Internals
 Deep dive into the engine room.

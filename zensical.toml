@@ -81,6 +81,9 @@ nav = [
         ] },
         "metric/custom.md",
     ] },
+    { "Experiment Tracking" = [
+        "tracker/index.md",
+    ] },
     { "Optimizers" = [
         "optimizer/stochastic.md",
     ] },
@@ -95,7 +98,6 @@ nav = [
         "internals/metric_collector.md",
         "internals/pipelining.md",
         "internals/profiling.md",
-        "internals/tracker_integration.md",
     ] },
 ]
 

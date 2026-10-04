@@ -68,7 +68,7 @@ Before the loop starts:
     *   If no checkpoint exists, the job starts from the first step.
 3.  **Context Entry**: The trainer enters several context managers:
     *   **UI**: Shows a progress bar.
-    *   **Logging**: Starts a new run in the experiment tracker and logs the run hyperparameters. [More info](../internals/tracker_integration.md).
+    *   **Logging**: Starts a new run in the experiment tracker and logs the run hyperparameters. [More info](../tracker/index.md).
     *   **Garbage Collector**: Disables automatic Python garbage collection.
     *   **Profiler**: Starts the `torch.profiler` hooks. [More info](../internals/profiling.md).
     *   **Gradient Manager**: Installs the backward hooks that all-reduce gradients.
