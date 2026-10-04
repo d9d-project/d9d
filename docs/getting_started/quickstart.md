@@ -2,7 +2,7 @@
 
 ## About
 
-This page trains a small model on one GPU in a few seconds. The job has the same parts as every d9d job: a model, a model provider, a task, a data provider and a configuration. The code is in [`example/quickstart`](https://github.com/d9d-project/d9d/tree/main/example/quickstart).
+This page trains a small model on one GPU in a few seconds. The job has the same parts as every d9d job: a model, a model provider, a task, a data provider and a configuration. The code is in [`example/guide/quickstart`](https://github.com/d9d-project/d9d/tree/main/example/guide/quickstart).
 
 ## Run the Example
 
@@ -11,7 +11,7 @@ Install d9d (see [Installation](./installation.md)) and PyYAML, which reads the 
 ```bash
 pip install d9d pyyaml
 git clone https://github.com/d9d-project/d9d.git
-cd d9d/example/quickstart
+cd d9d/example/guide/quickstart
 python train.py config.yaml
 ```
 
@@ -40,7 +40,7 @@ If you start the job again, it loads `save-256` and logs `Training is already co
 ## The Code
 
 ```python
---8<-- "example/quickstart/train.py"
+--8<-- "example/guide/quickstart/train.py"
 ```
 
 The script has these parts:
@@ -56,7 +56,7 @@ The script has these parts:
 ## The Configuration
 
 ```yaml
---8<-- "example/quickstart/config.yaml"
+--8<-- "example/guide/quickstart/config.yaml"
 ```
 
 The job makes one pass over the 65,536 samples: 256 steps of 256 samples.
