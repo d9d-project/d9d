@@ -84,7 +84,7 @@ They are not enforced by tooling, but PRs that violate them may be asked to chan
 * **Separate configuration from behavior.** Config objects describe; classes behave. Don't merge them into one dataclass that needs `__post_init__` magic.
 * **Polymorphism for configurable objects via discriminated unions.** When a configurable object has selectable behavior, model the choices as a Pydantic discriminated union and resolve them in a `build_*()` factory with an exhaustive `match (case _: raise)`.
 
-### Linting & Formatting
+### Linting and Formatting
 We use [Ruff](https://docs.astral.sh/ruff/) for both linting and formatting.
 Configuration is strict (see `pyproject.toml` for the authoritative list of enabled rules).
 
@@ -95,7 +95,7 @@ conforming code without memorizing rule codes.
 *   Double quotes, 4-space indentation, 120-char line length.
 *   Imports are auto-sorted (`I`). Run `make lint` to fix ordering.
 
-#### Typing & annotations
+#### Typing and Annotations
 *   **Annotate everything public** (`ANN`): function args and return types. `None` returns may be omitted.
 *   `typing.Any` is allowed (`ANN401` is off) but should be a last resort.
 *   Prefer modern syntax (`UP`, `FA`): `X | Y` over `Optional`/`Union`, builtin generics (`list[int]`),
@@ -110,7 +110,7 @@ conforming code without memorizing rule codes.
 *   Every package needs `__init__.py` (`INP`); `/example/` is exempt.
 *   `__init__.py` files expose the package's public surface via an explicit `__all__` re-export list.
 
-#### Tests
+#### Test Code
 *   Use idiomatic `pytest` (`PT`): `pytest.raises`, fixtures, parametrization.
 *   Tests relax several rules: `assert` is allowed, no docstrings/annotations required, private
     access and non-top-level imports are fine.
@@ -205,13 +205,49 @@ We follow the [Google Python style](https://google.github.io/styleguide/pyguide.
     how. Never raise an exception without a message.
 *   **Write calls with parentheses,** e.g. "Call configure_buffers() first."
 
-### Documentation Pages
+## Documentation
+
+### Page Types
+
+Every page has one type. The type decides the structure of the page. The `nav` table in `zensical.toml` decides where
+the reader finds it.
+
+| Type           | The page is built around             | Examples                                                          |
+|:---------------|:-------------------------------------|:------------------------------------------------------------------|
+| **Example**    | One script from `example/`           | Quickstart, Fine-Tune a Hugging Face Model                        |
+| **Guide**      | One task without a script of its own | Installation, Write Your Own Job, Running Jobs, Troubleshooting   |
+| **Concept**    | One idea that spans several features | How d9d Works, Choosing Parallelism, d9d and Other Frameworks     |
+| **Feature**    | One feature or subsystem             | Training Loop, Model State Mapper, LoRA, Gradient Synchronization |
+| **Navigation** | Links to other pages                 | The landing page, Table of Contents, Modules                      |
+
+Every page starts with `## About`, one paragraph, except the landing page and the Table of Contents. The rest depends
+on the type:
+
+*   **Example**: About says what the job does. `## Run the Example` comes next, with the commands and their output.
+    Then the page explains the parts of the script and includes the full script with `--8<--`.
+*   **Guide**: About says which task the page solves. Then comes one section per step or per variant of the task.
+    Explain only what the reader needs for the step.
+*   **Concept**: About says which question the page answers. The page reads like a lecture: top to bottom, away from
+    the keyboard, and each section builds on the previous ones. It links to the feature pages for details and has no
+    `## Usage` and no `## API Reference`.
+*   **Feature**: About says what the feature is. Then come sections on how it works and on its limits, `## Usage` with
+    a short example for anything users call directly, and `## API Reference` with the `:::` blocks. Ideas that span
+    several features belong on a concept page. The pages under Internals are feature pages for readers who extend
+    d9d.
+*   **Navigation**: The Table of Contents and the section indexes give each page one line: a link and a description.
+    Every page in `nav` appears in the Table of Contents. `README.md` repeats the landing page `docs/index.md`, so
+    change both together.
+
+### Writing Pages
+
+Pages follow the [Writing](#writing) rules above, plus these:
 
 *   **Say what a feature does and how to use it.** Leave internals (host syncs, alignment, fallback paths) to code
-    comments.
-*   **Follow the page structure.** Start with `## About`: what the feature is, in one paragraph. Add topic sections.
-    Add `## Usage` with a short example for anything users call directly. End with `## API Reference` and the
-    `:::` blocks.
+    comments. The pages under Internals are the exception: they explain the mechanisms to readers who extend d9d.
+*   **Follow the structure of the page type** (see [Page Types](#page-types)).
+*   **Show code that runs.** Example pages include their script from `example/` with
+    `--8<-- "example/<name>/<file>"`, so the page always shows the code that runs. Run the script before you change
+    the page.
 *   **Keep each section about one topic.**
 *   **Write one paragraph per line.** Do not wrap lines by hand. Use soft wrapping in your editor.
 *   **Indent list items by four characters.** Write `*   ` for bullets and `1.  ` for numbered items, so nested
@@ -230,9 +266,7 @@ We follow the [Google Python style](https://google.github.io/styleguide/pyguide.
 *   **Link the sources.** Link the paper for a method and the repository for an external library.
 *   **Update the documentation in the same PR.** If a change affects what users see or do, update the pages with it.
 
-## Documentation
-
-### Documentation Site
+### Site and Navigation
 
 The site is built with **Zensical**.
 
@@ -240,7 +274,7 @@ The site is built with **Zensical**.
 *   **Building:** Run `make mkdocs` to preview changes locally.
 *   **Registering pages (`zensical.toml`):** The site navigation is **not** auto-generated from the `docs/` directory - it is defined explicitly in the `nav` table of `zensical.toml`. Whenever you add, remove, rename, or move a page under `docs/`, you must update `nav` accordingly. New top-level subsystems should also be added to the appropriate section (and mirrored in `docs/toc.md`).
 
-## Commit Messages & PRs
+## Commit Messages and PRs
 
 We use [Semantic Release](https://python-semantic-release.readthedocs.io/en/latest/) to automate versioning and changelogs. **Your commit messages must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.**
 
