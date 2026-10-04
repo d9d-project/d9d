@@ -1,7 +1,7 @@
+import dataclasses
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TypedDict
 
 import torch
 import yaml
@@ -45,6 +45,32 @@ class ProjectConfig(BaseModel):
     export_to: Path
 
 
+# One sample of the dataset.
+@dataclasses.dataclass
+class RegressionSample:
+    x: torch.Tensor
+    y: torch.Tensor
+
+
+# One microbatch, as collate() builds it.
+@dataclasses.dataclass
+class RegressionBatch:
+    x: torch.Tensor
+    y: torch.Tensor
+
+
+# What the model receives.
+@dataclasses.dataclass
+class RegressionInput:
+    x: torch.Tensor
+
+
+# What compute_loss() needs but the model does not receive.
+@dataclasses.dataclass
+class RegressionState:
+    y: torch.Tensor
+
+
 # A synthetic regression task: the targets are a fixed random linear function of the inputs plus noise.
 class RegressionDataset(Dataset):
     def __init__(self, num_samples: int, num_features: int):
@@ -53,15 +79,15 @@ class RegressionDataset(Dataset):
         true_weight = torch.randn(num_features, 1, generator=generator)
         self._y = self._x @ true_weight + 0.1 * torch.randn(num_samples, 1, generator=generator)
 
-    def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
-        return {"x": self._x[index], "y": self._y[index]}
+    def __getitem__(self, index: int) -> RegressionSample:
+        return RegressionSample(x=self._x[index], y=self._y[index])
 
     def __len__(self) -> int:
         return len(self._x)
 
     @staticmethod
-    def collate(samples: Sequence[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
-        return {"x": torch.stack([s["x"] for s in samples]), "y": torch.stack([s["y"] for s in samples])}
+    def collate(samples: Sequence[RegressionSample]) -> RegressionBatch:
+        return RegressionBatch(x=torch.stack([s.x for s in samples]), y=torch.stack([s.y for s in samples]))
 
 
 # A plain PyTorch model. d9d needs two things from it: reset_parameters() for initialization on the
@@ -72,8 +98,8 @@ class MLP(nn.Module):
         self.up = nn.Linear(num_features, hidden_size)
         self.down = nn.Linear(hidden_size, 1)
 
-    def forward(self, inputs: dict[str, torch.Tensor], shared: dict[str, torch.Tensor]) -> torch.Tensor:
-        return self.down(torch.relu(self.up(inputs["x"])))
+    def forward(self, inputs: RegressionInput, shared: None) -> torch.Tensor:
+        return self.down(torch.relu(self.up(inputs.x)))
 
     def reset_parameters(self):
         self.up.reset_parameters()
@@ -94,19 +120,17 @@ class MLPProvider(ModelProvider[MLP]):
         return PrepareExportModelStageResult(state_mapper=identity_mapper_from_module(context.model))
 
 
-class RegressionState(TypedDict):
-    y: torch.Tensor
-
-
-class RegressionTask(TrainTask[dict[str, torch.Tensor], dict[str, torch.Tensor], dict, torch.Tensor, RegressionState]):
+class RegressionTask(TrainTask[RegressionBatch, RegressionInput, None, torch.Tensor, RegressionState]):
     def build_forward_inputs(
-        self, ctx: BuildForwardInputsContext[dict[str, torch.Tensor]]
-    ) -> BuildForwardInputsResult[dict[str, torch.Tensor], dict, RegressionState]:
+        self, ctx: BuildForwardInputsContext[RegressionBatch]
+    ) -> BuildForwardInputsResult[RegressionInput, None, RegressionState]:
         # The model gets the inputs. The targets wait in the state until compute_loss().
-        return BuildForwardInputsResult(input={"x": ctx.batch["x"]}, shared={}, state=RegressionState(y=ctx.batch["y"]))
+        return BuildForwardInputsResult(
+            input=RegressionInput(x=ctx.batch.x), shared=None, state=RegressionState(y=ctx.batch.y)
+        )
 
     def compute_loss(self, ctx: ComputeLossContext[torch.Tensor, RegressionState]) -> ComputeLossResult:
-        loss = nn.functional.mse_loss(ctx.pipeline_results, ctx.state["y"])
+        loss = nn.functional.mse_loss(ctx.pipeline_results, ctx.state.y)
         return ComputeLossResult(loss=loss, loss_weight=None)
 
 

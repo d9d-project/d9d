@@ -46,6 +46,7 @@ If you start the job again, it loads `save-256` and logs `Training is already co
 The script has these parts:
 
 *   **`ProjectConfig`**: One Pydantic model for the whole YAML file. Pydantic validates the file before the job starts. See [Configuration](../loop/config.md).
+*   **`RegressionSample`, `RegressionBatch`, `RegressionInput` and `RegressionState`**: Dataclasses for one sample of the dataset, the microbatch that `collate()` builds, what the model receives and what `compute_loss()` needs besides the model output.
 *   **`RegressionDataset`**: A standard PyTorch `Dataset`. `AutoDataProvider` shards it across data-parallel ranks, batches it with the `collator` and groups the microbatches into steps. See [Data Loading](../loop/interfaces/data.md).
 *   **`MLP`**: A standard `nn.Module`. It implements `reset_parameters()`, because d9d builds the model on the `meta` device and initializes it on the GPU. Its `forward()` takes `inputs` and `shared`, like every [pipeline stage](../models/pipeline_parallelism.md). See [Model Design](../models/model_design.md).
 *   **`MLPProvider`**: Builds the model, distributes it and returns the [state mappers](../model_states/mapper.md) for loading and export. `parallelize_hsdp()` shards the model along `dp_cp_shard` and replicates it along the other dimensions of the mesh slice. A job on one GPU does not call `parallelize_model_stage()`. See [Horizontal Parallelism](../models/horizontal_parallelism.md) and [Model Definition](../loop/interfaces/model.md).
