@@ -18,6 +18,8 @@ config = TrainerConfig.model_validate_json(Path("trainer.json").read_text(encodi
 
 Periodic actions, such as `checkpointing.period_steps`, take a `StepActionPeriod`. It is a step interval (e.g. `100`), `"last_step"` or `"disable"`.
 
+You can leave out the fields and sections that have defaults. An unknown key fails the validation, so a misspelled key stops the job before it starts. The `trainer` section of the [Quickstart config](../getting_started/quickstart.md#the-configuration) holds only the required fields.
+
 ## API Reference
 
 ### Main Config

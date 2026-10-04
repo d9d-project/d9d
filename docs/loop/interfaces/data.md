@@ -22,6 +22,8 @@ You can use the shipped `AutoDataProvider` for the common case, or write your ow
 *   The `collator` collates a list of samples into one microbatch.
 
 ```python
+import dataclasses
+
 import datasets
 import torch
 
@@ -36,11 +38,18 @@ def build_dataset(dist_context):
         return datasets.load_dataset("my/dataset", split="train")
 
 
-def collate(samples: list[dict]) -> dict[str, torch.Tensor]:
-    return {
-        "input_ids": torch.stack([s["input_ids"] for s in samples]),
-        "labels": torch.stack([s["labels"] for s in samples]),
-    }
+@dataclasses.dataclass
+class Batch:
+    input_ids: torch.Tensor
+    labels: torch.Tensor
+
+
+# The rows of a Hugging Face dataset are dicts.
+def collate(samples: list[dict]) -> Batch:
+    return Batch(
+        input_ids=torch.stack([s["input_ids"] for s in samples]),
+        labels=torch.stack([s["labels"] for s in samples]),
+    )
 
 
 provider = AutoDataProvider(
@@ -80,6 +89,7 @@ Wrap the packer in a `PinMemoryMicrobatchPackStream` to pin the packs, so the lo
 Unlike with `AutoDataProvider`, you own the data-parallel sharding. Shard the dataset yourself before you build the loader, e.g. with `shard_dataset_data_parallel`. See the [Dataset Utilities](../../dataset/index.md) documentation.
 
 ```python
+import dataclasses
 from collections.abc import Sequence
 from typing import Any
 
@@ -103,6 +113,12 @@ from d9d.dataset import (
 from d9d.loop.control import DataProvider, InitializeDataProviderContext
 
 
+@dataclasses.dataclass
+class ProjectBatch:
+    input_ids: torch.Tensor
+    labels: torch.Tensor
+
+
 class ProjectDataset(Dataset, DatasetImplementingSortKeyProtocol):
     def __init__(self, dataset: datasets.Dataset, tokenizer: Tokenizer):
         self._dataset = dataset
@@ -116,8 +132,8 @@ class ProjectDataset(Dataset, DatasetImplementingSortKeyProtocol):
         return {...}
 
     @classmethod
-    def collate(cls, batch: Sequence[dict[str, torch.Tensor]]) -> dict[str, torch.Tensor]:
-        return {...}
+    def collate(cls, batch: Sequence[TensorTree]) -> ProjectBatch:
+        return ProjectBatch(...)
 
     def __len__(self) -> int:
         return len(self._dataset)
