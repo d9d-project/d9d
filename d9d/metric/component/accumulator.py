@@ -117,6 +117,7 @@ class MetricAccumulator(Stateful):
         Args:
             device: Target device.
         """
+        self._initial = self._initial.to(device)
         self._local = self._local.to(device)
         self._synchronized = self._synchronized.to(device)
 
