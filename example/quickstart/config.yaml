@@ -1,0 +1,49 @@
+# The parallelism degrees. All of them default to 1, so the job runs on one GPU.
+mesh: {}
+
+data:
+  global_batch_size: 256  # Samples per step.
+  microbatch_size: 64  # Samples per forward and backward pass.
+  num_workers: 2
+  shuffle: true
+
+trainer:
+  run:
+    name: quickstart  # Also the name of the checkpoint directory.
+  # schedule.total_steps is not set, so the job makes one pass over the data.
+  logging:
+    period_steps: 10  # How often the task metrics are logged. The loss is logged every step.
+    tracker:
+      provider: log  # Writes the logged values to the log.
+  determinism:
+    base_seed: 42
+  gc:
+    period_steps: 100
+  checkpointing:
+    save_dir: runs/checkpoints
+    period_steps: 100
+    num_to_keep: 2
+  gradient_clipping:
+    max_norm: 1.0
+
+optimizer:
+  name: adamw
+  lr: 0.01
+
+# A linear warm-up over the first 10% of the steps, then a cosine decay to 10% of the peak.
+lr_scheduler:
+  name: piecewise
+  scheduler:
+    initial_multiplier: 0.0
+    phases:
+      - mode: percentage
+        percentage: 0.1
+        target_multiplier: 1.0
+        curve:
+          type: linear
+      - mode: rest
+        target_multiplier: 0.1
+        curve:
+          type: cosine
+
+export_to: runs/export
