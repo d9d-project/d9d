@@ -30,9 +30,9 @@ def _flatten_pytree_for_metrics(tree: PyTree[float]) -> dict[str, float]:
 
 
 class JobLogger(Stateful):
-    """Logger that sends the loss and the metrics of a job to the experiment tracker.
+    """Logger that sends the loss, the gradient norm and the metrics of a job to the experiment tracker.
 
-    The loss is logged every step. Metrics are aggregated across ranks and logged periodically.
+    The loss and the gradient norm are logged every step. Metrics are aggregated across ranks and logged periodically.
     """
 
     def __init__(
@@ -97,17 +97,21 @@ class JobLogger(Stateful):
 
         self._metric_collector.schedule_collection(self._dist_context)
 
-    def log(self, run: BaseTrackerRun, loss_value: torch.Tensor):
-        """Logs the current loss and, on logging steps, the metric results.
+    def log(self, run: BaseTrackerRun, loss: torch.Tensor, grad_norm: torch.Tensor):
+        """Logs the loss and the gradient norm of the current step and, on logging steps, the metric results.
 
         The metric results are the ones started by ``trigger_sync``.
 
         Args:
             run: The active tracker run.
-            loss_value: The scalar loss of the current step.
+            loss: The global loss of the current step, as a scalar tensor.
+            grad_norm: The global gradient norm of the current step, as a scalar tensor.
         """
         with record_function("Logging"):
-            run.scalar("loss", loss_value.item())
+            # One copy to the host for both values.
+            loss_value, grad_norm_value = torch.stack([loss.float(), grad_norm.float()]).tolist()
+            run.scalar("loss", loss_value)
+            run.scalar("l2_grad_norm_total", grad_norm_value)
 
             if not self._schedule.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
                 return

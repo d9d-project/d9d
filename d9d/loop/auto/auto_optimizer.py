@@ -6,7 +6,7 @@ from collections.abc import Iterable
 from typing import Annotated, Literal
 
 import torch
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from torch import nn
 from torch.optim import SGD, Adam, AdamW, Optimizer
 
@@ -16,6 +16,8 @@ from d9d.optim.stochastic import StochasticAdamW
 
 class BaseAutoOptimizerConfig(BaseModel, ABC):
     """Abstract base class for optimizer configurations."""
+
+    model_config = ConfigDict(extra="forbid")
 
     @abc.abstractmethod
     def build(self, params: Iterable[nn.Parameter]) -> Optimizer:

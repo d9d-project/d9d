@@ -78,13 +78,7 @@
       "period_steps": 1000,
       "num_to_keep": 3
     },
-    "profiling": {
-      "enabled": false,
-      "traces_dir": "../../example_data/traces",
-      "period_steps": 10,
-      "warmup_steps": 5,
-      "active_steps": 1
-    },
+    "profiling": null,
     "timeout": {
       "init_timeout": 10000,
       "step_timeout": 100

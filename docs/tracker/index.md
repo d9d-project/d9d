@@ -55,9 +55,9 @@ Logs nothing.
 
 | Name | When | Value |
 |:-----|:-----|:------|
-| `loss` | Every step | The loss of the step, averaged over all microbatches and ranks. |
-| The names of the task metrics | Every `logging.period_steps` steps and on the last step | The metrics that the task creates in `create_metrics()`. A nested name joins its keys with `/`. See [Metrics Overview](../metric/overview.md). |
-| `l2_grad_norm_total` | Every `gradient_clipping.log_total_steps` steps | The total gradient norm before clipping. |
+| `loss` | Every step | The loss of the step, averaged over its microbatches and ranks, weighted by `loss_weight`. |
+| `l2_grad_norm_total` | Every step | The total gradient norm of the step, before clipping. |
+| The names of the task metrics | Every `logging.period_steps` steps and on the last step | The metrics that the task creates in `create_metrics()`, accumulated over the steps since the previous logging step. A nested name joins its keys with `/`. See [Metrics Overview](../metric/overview.md). |
 
 Each value has the step number and the context `stage=train`.
 

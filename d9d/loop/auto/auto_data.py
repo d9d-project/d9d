@@ -2,7 +2,7 @@
 
 from collections.abc import Callable
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from torch.utils.data import Dataset
 from torchdata.stateful_dataloader import StatefulDataLoader
 
@@ -40,6 +40,8 @@ class AutoDataConfig(BaseModel):
         prefetch_factor: The number of batches each worker prefetches ahead.
         timeout: The timeout in seconds for collecting a batch from workers.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     global_batch_size: int
     microbatch_size: int

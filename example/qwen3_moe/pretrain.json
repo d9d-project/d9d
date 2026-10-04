@@ -99,16 +99,9 @@
       "num_to_keep": 3
     },
     "gradient_clipping": {
-      "max_norm": 5.0,
-      "log_total_steps": 5
+      "max_norm": 5.0
     },
-    "profiling": {
-      "enabled": false,
-      "traces_dir": "../../example_data/traces",
-      "period_steps": 10,
-      "warmup_steps": 5,
-      "active_steps": 1
-    },
+    "profiling": null,
     "gradient_manager": {
       "grad_dtype": "float32",
       "bucket_size_mb": 32

@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class Qwen3MoELayerParameters(BaseModel):
@@ -14,6 +14,8 @@ class Qwen3MoELayerParameters(BaseModel):
         rms_norm_eps: Epsilon of the RMSNorm layers.
         head_dim: Size of a single attention head.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     hidden_size: int
     intermediate_size: int
@@ -42,6 +44,8 @@ class Qwen3MoEParameters(BaseModel):
             modules on the last stage after the main layers, such as the final norm and the LM head.
             Pipeline layer distribution uses it.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     layer: Qwen3MoELayerParameters
 

@@ -2,7 +2,7 @@ import dataclasses
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class EagerSdpaBackendConfig(BaseModel):
@@ -13,6 +13,8 @@ class EagerSdpaBackendConfig(BaseModel):
     Attributes:
         kind: Discriminator field. Always ``"eager"``.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     kind: Literal["eager"] = "eager"
 
@@ -26,6 +28,8 @@ class FlashAttention4SdpaBackendConfig(BaseModel):
         kind: Discriminator field. Always ``"flash_attention_4"``.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     kind: Literal["flash_attention_4"] = "flash_attention_4"
 
 
@@ -37,6 +41,8 @@ class FlashAttention2SdpaBackendConfig(BaseModel):
     Attributes:
         kind: Discriminator field. Always ``"flash_attention_2"``.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     kind: Literal["flash_attention_2"] = "flash_attention_2"
 
@@ -67,6 +73,8 @@ class TorchSdpaBackendConfig(BaseModel):
         backends: PyTorch SDPA kernels to enable. PyTorch picks one of the enabled kernels that supports the
             inputs. If ``None``, PyTorch uses its default kernel selection.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     kind: Literal["torch"] = "torch"
     backends: list[TorchSdpaBackendType] | None = None

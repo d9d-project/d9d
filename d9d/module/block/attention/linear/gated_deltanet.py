@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from fla.modules.conv import causal_conv1d
 from fla.ops.gated_delta_rule import chunk_gated_delta_rule
 from fla.ops.kda.gate import fused_kda_gate
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from torch import nn
 
 from d9d.kernel.swiglu import silu_mul
@@ -178,6 +178,8 @@ class MambaDecayGateParameters(BaseModel):
         dt_init_floor: Floor for ``dt`` clamping during initialization.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["mamba"] = "mamba"
     normalizer: float
     dt_min: float
@@ -192,6 +194,8 @@ class LogSigmoidDecayGateParameters(BaseModel):
         type: Discriminator field. Always ``"logsigmoid"``.
         normalizer: Temperature that divides the log-sigmoid output.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     type: Literal["logsigmoid"] = "logsigmoid"
     normalizer: float

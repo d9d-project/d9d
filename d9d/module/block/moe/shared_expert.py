@@ -1,5 +1,5 @@
 import torch
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from torch import nn
 
 from d9d.module.base import ModuleLateInit
@@ -13,6 +13,8 @@ class SharedExpertParameters(BaseModel):
         intermediate_size: Intermediate size of the SwiGLU FFN.
         enable_gate: Whether to scale the output with a learned sigmoid gate.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     intermediate_size: int
     enable_gate: bool

@@ -5,7 +5,6 @@ from pydantic import ValidationError
 
 def _config(period_steps, warmup_steps, active_steps):
     return ProfilingConfig(
-        enabled=True,
         traces_dir="traces",
         period_steps=period_steps,
         warmup_steps=warmup_steps,

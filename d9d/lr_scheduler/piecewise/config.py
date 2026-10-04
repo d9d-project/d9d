@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, PositiveInt
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 from torch.optim import Optimizer
 
 from d9d.core.protocol import LRSchedulerProtocol
@@ -16,6 +16,8 @@ class CurveLinearConfig(BaseModel):
         type: Discriminator field. Always ``"linear"``.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["linear"] = "linear"
 
 
@@ -25,6 +27,8 @@ class CurveCosineConfig(BaseModel):
     Attributes:
         type: Discriminator field. Always ``"cosine"``.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     type: Literal["cosine"] = "cosine"
 
@@ -36,6 +40,8 @@ class CurveExponentialConfig(BaseModel):
         type: Discriminator field. Always ``"exponential"``.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["exponential"] = "exponential"
 
 
@@ -46,6 +52,8 @@ class CurvePolyConfig(BaseModel):
         type: Discriminator field. Always ``"poly"``.
         power: Exponent of the polynomial.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     type: Literal["poly"] = "poly"
     power: float = 2.0
@@ -86,6 +94,8 @@ class StepPhaseConfig(BaseModel):
         curve: Interpolation curve configuration.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     mode: Literal["steps"] = "steps"
 
     steps: PositiveInt
@@ -103,6 +113,8 @@ class PercentagePhaseConfig(BaseModel):
         curve: Interpolation curve configuration.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     mode: Literal["percentage"] = "percentage"
 
     percentage: float = Field(..., ge=0.0, le=1.0)
@@ -118,6 +130,8 @@ class RestPhaseConfig(BaseModel):
         target_multiplier: Multiplier at the end of training.
         curve: Interpolation curve configuration.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     mode: Literal["rest"] = "rest"
 
@@ -135,6 +149,8 @@ class PiecewiseSchedulerConfig(BaseModel):
         initial_multiplier: Learning rate multiplier at step 0.
         phases: Phase configurations, in order.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     initial_multiplier: float
     phases: list[PhaseConfig]

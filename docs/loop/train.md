@@ -100,7 +100,6 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
 5.  **Gradient Clipping**
     *   The `GradientClipper` computes the global L2 norm of all gradients.
     *   If `max_norm` is set, the gradients are clipped in place.
-    *   The total norm is logged.
     *   [More info](../internals/grad_norm.md).
 
 6.  **Optimization**
@@ -110,7 +109,7 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
     *   **Schedule**: The LR scheduler updates the learning rate for the *next* step.
 
 7.  **Logging & Maintenance**
-    *   **Log**: The loss and, on logging steps, the metrics are written to the tracker.
+    *   **Log**: `JobLogger` writes the loss and the gradient norm of the step and, on logging steps, the metrics to the tracker.
     *   **Zero Grad**: The `GradientManager` clears the gradients for the next step.
     *   **GC**: `ManualGarbageCollector` runs if the current step matches the GC period.
     *   **Event-Based Logic**: Triggers the `EVENT_TRAIN_STEP_POST` event.

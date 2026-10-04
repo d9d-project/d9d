@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class PipelineScheduleInferenceConfig(BaseModel):
@@ -11,6 +11,8 @@ class PipelineScheduleInferenceConfig(BaseModel):
     Attributes:
         schedule: Discriminator field. Always ``"inference"``.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     schedule: Literal["inference"] = "inference"
 
@@ -25,6 +27,8 @@ class PipelineScheduleGPipeConfig(BaseModel):
         schedule: Discriminator field. Always ``"gpipe"``.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     schedule: Literal["gpipe"] = "gpipe"
 
 
@@ -38,6 +42,8 @@ class PipelineScheduleLoopedBFSConfig(BaseModel):
         schedule: Discriminator field. Always ``"looped_bfs"``.
         num_stages_per_rank: The number of stages hosted on each rank.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     schedule: Literal["looped_bfs"] = "looped_bfs"
 
@@ -56,6 +62,8 @@ class PipelineSchedule1F1BConfig(BaseModel):
         zero_bubble: Whether to use the Interleaved Zero Bubble (ZB1P) variant.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     schedule: Literal["1f1b"] = "1f1b"
 
     num_stages_per_rank: int
@@ -72,6 +80,8 @@ class PipelineScheduleZeroBubbleVConfig(BaseModel):
         schedule: Discriminator field. Always ``"zero_bubble_v"``.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     schedule: Literal["zero_bubble_v"] = "zero_bubble_v"
 
 
@@ -85,6 +95,8 @@ class PipelineScheduleDualPipeVConfig(BaseModel):
     Attributes:
         schedule: Discriminator field. Always ``"dual_pipe_v"``.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     schedule: Literal["dual_pipe_v"] = "dual_pipe_v"
 

@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from d9d.peft.full_tune.config import FullTuneConfig
 from d9d.peft.lora.config import LoRAConfig
@@ -13,6 +13,8 @@ class PeftStackConfig(BaseModel):
         kind: Discriminator field. Always ``"stack"``.
         methods: The PEFT configurations (e.g. LoRA, full tune) to apply in order.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     kind: Literal["stack"] = "stack"
 
