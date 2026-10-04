@@ -2,10 +2,31 @@
 
 ## About
 
-The `d9d.tracker` package gives one configuration-driven interface for logging metrics, hyperparameters and distributions during training. A common API hides the backend, such as [Aim](https://aimstack.io/) or the null tracker that logs nothing. Each backend has a `pydantic` configuration, so you can switch backends in the configuration without changing the training loop.
+The `d9d.tracker` package gives one configuration-driven interface for logging metrics, hyperparameters and distributions during training. A common API hides the backend, such as [Aim](https://aimstack.io/), the Python logger or the null tracker that logs nothing. Each backend has a `pydantic` configuration, so you can switch backends in the configuration without changing the training loop.
 
 !!! warning "Internal API"
     If you use the standard d9d training loop, you do not need to call this package. d9d sets up tracking based on its configuration. This page is for users who extend d9d.
+
+## Built-in Trackers
+
+The `logging.tracker` section of the job configuration selects the tracker by its `provider` field. Only the main process logs.
+
+*   **`log`**: Writes each scalar as one line to the Python logger of d9d, next to the other messages of d9d. The loop logs the loss every step and the metrics every `logging.period_ste`ps` steps. It needs no extra.
+*   **`aim`**: Logs to [Aim](https://aimstack.io/). It needs the `d9d[aim]` extra.
+*   **`null`**: Logs nothing.
+
+```json
+"logging": {
+  "period_steps": 10,
+  "tracker": {"provider": "log"}
+}
+```
+
+A log line looks like this. A step that logs metrics writes one more line for each metric.
+
+```text
+[d9d] [local] 2026-10-04 01:08:11,755 - INFO - step 1 (stage=train): loss=15.0928
+```
 
 ## Trackers and Runs
 

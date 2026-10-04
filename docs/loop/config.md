@@ -54,6 +54,10 @@ Periodic actions, such as `checkpointing.period_steps`, take a `StepActionPeriod
     options:
       heading_level: 4
 
+::: d9d.tracker.provider.log.LogTrackerConfig
+    options:
+      heading_level: 4
+
 ::: d9d.tracker.provider.null.NullTrackerConfig
     options:
       heading_level: 4

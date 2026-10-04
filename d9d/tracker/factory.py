@@ -5,9 +5,10 @@ from pydantic import Field
 
 from .base import BaseTracker
 from .provider.aim.config import AimConfig
+from .provider.log import LogTracker, LogTrackerConfig
 from .provider.null import NullTracker, NullTrackerConfig
 
-AnyTrackerConfig = Annotated[AimConfig | NullTrackerConfig, Field(discriminator="provider")]
+AnyTrackerConfig = Annotated[AimConfig | LogTrackerConfig | NullTrackerConfig, Field(discriminator="provider")]
 """Union of all tracker configurations, discriminated by the ``provider`` field."""
 
 
@@ -18,6 +19,7 @@ class _TrackerImportFailed:
 
 
 _MAP: dict[type[AnyTrackerConfig], type[BaseTracker] | _TrackerImportFailed] = {
+    LogTrackerConfig: LogTracker,
     NullTrackerConfig: NullTracker,
 }
 
