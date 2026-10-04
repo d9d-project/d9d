@@ -4,39 +4,9 @@
 
 The `d9d.core.dist_context` package is the single source of truth for the distributed execution environment. Its `DistributedContext` class holds the topology, the rank mapping and the communication groups, so that every rank agrees on them. Use the context for all distributed questions, such as "Am I the main process?" or "Which rank is my pipeline peer?". Do not read raw `os.environ` variables or create ad-hoc process groups: this can lead to silent inconsistencies. `DistributedContext` requires CUDA GPUs. It sets the current CUDA device of each process to its local rank.
 
-## Comparison with Other Frameworks
+## An Explicit Object
 
-Distributed training frameworks solve topology management in different ways.
-
-### Megatron-LM (`parallel_state`)
-
-Megatron-LM manages topology in a module called `mpu` (Model Parallel Unit) or `core.parallel_state`.
-
-It relies on global variables and manual rank arithmetic. To find a peer rank, developers often write modulo operations, such as `rank % tp_size`. This is flexible, but error-prone and brittle.
-
-### Hugging Face Accelerate (`PartialState`)
-
-Accelerate describes the environment with a class called `PartialState`.
-
-Its helper methods are useful, and d9d has similar ones: `wait_world()` (like `wait_for_everyone()`), `is_main_process` and `is_local_main_process`.
-
-`PartialState` targets flat data parallelism (DDP and FSDP). It does not support multidimensional parallelism natively.
-
-`PartialState` is a singleton: every instantiation returns the same global state. This hides the flow of dependencies. It can also initialize process groups and the distributed environment in unexpected places.
-
-### TorchTitan (`ParallelDims`)
-
-TorchTitan is the framework closest to d9d in spirit: both build on the native PyTorch `DeviceMesh`.
-
-However, `ParallelDims` in TorchTitan is a mesh factory, not a controller of the distributed environment.
-
-### d9d (`DistributedContext`)
-
-In d9d, `DistributedContext` is the explicit controller of the whole distributed environment.
-
-*   `DistributedContext` is a plain object. You create it and pass it explicitly to the components that need it. Process groups are initialized exactly when and where you intend.
-*   It replaces manual rank arithmetic with the native PyTorch `DeviceMesh`.
-*   It is an active runtime controller, not only a mesh factory. It also manages timeouts, rank-aware logging and synchronization between ranks.
+`DistributedContext` is a plain object. You build it once from `DeviceMeshParameters`, which also creates the process groups, and pass it to every component that needs it. Besides the device meshes, it holds a logger that prefixes each line with the mesh coordinates of the rank. It also sets the timeout of all process groups and synchronizes ranks. [d9d and Other Frameworks](../concepts/comparison.md#global-state) compares this with the global state of other frameworks.
 
 ## DeviceMesh Domains
 
