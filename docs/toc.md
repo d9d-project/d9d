@@ -9,6 +9,12 @@ Your first job.
 
 *   **[Installation](./getting_started/installation.md)**: Install d9d from PyPI or from a checkout, and the optional extras.
 
+## 💡 Concepts
+The ideas behind d9d.
+
+*   **[How d9d Works](./concepts/how_d9d_works.md)**: The parts of a job, the model build, parameter placements, packs and pipeline programs, the training loop, checkpoints and events.
+*   **[d9d and Other Frameworks](./concepts/comparison.md)**: How the design of d9d compares with Megatron-Core, torchtitan, DeepSpeed, Accelerate and others, and when to choose each.
+
 ## 🌐 Distributed Core
 The foundational primitives managing the cluster.
 

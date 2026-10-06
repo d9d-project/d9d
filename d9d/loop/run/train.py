@@ -301,6 +301,7 @@ class Trainer:
             run.set_context({"stage": "train"})
             self._state.event_bus.trigger(EVENT_TRAIN_READY, EventTrainReadyContext(run=run))
 
+            # docs/concepts/how_d9d_works.md shows a trimmed copy of this loop. Update it when the loop changes.
             while self._state.schedule.current_step < self._state.schedule.total_steps:
                 run.set_step(self._state.schedule.current_step)
                 self._state.event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
