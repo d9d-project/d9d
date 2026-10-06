@@ -6,7 +6,7 @@ The `d9d.core.dist_context` package is the single source of truth for the distri
 
 ## An Explicit Object
 
-`DistributedContext` is a plain object. You build it once from `DeviceMeshParameters`, which also creates the process groups, and pass it to every component that needs it. Besides the device meshes, it holds a logger that prefixes each line with the mesh coordinates of the rank. It also sets the timeout of all process groups and synchronizes ranks. [d9d and Other Frameworks](../concepts/comparison.md#global-state) compares this with the global state of other frameworks.
+`DistributedContext` is a plain object. You build it once from `DeviceMeshParameters`, which also creates the process groups, and pass it to every component that needs it. Besides the device meshes, it holds a logger that prefixes each line with the mesh coordinates of the rank. It also sets the timeout of all process groups and synchronizes ranks. [d9d and Other Frameworks](../concepts/comparison.md#what-a-component-can-see) compares this with the global state of other frameworks.
 
 ## DeviceMesh Domains
 
