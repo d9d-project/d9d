@@ -73,5 +73,5 @@ The job makes one pass over the 65,536 samples: 256 steps of 256 samples.
 ## Next Steps
 
 *   **Your own job**: [Write Your Own Job](../guides/write_your_own_job.md) shows what to replace in this script, and [How d9d Works](../concepts/how_d9d_works.md) explains how the parts of a job fit together.
-*   **More GPUs**: [Running Jobs](../guides/running.md) shows how to launch the same script on several GPUs, and [Choosing Parallelism](../concepts/parallelism.md) compares the strategies.
+*   **More GPUs**: [Running Jobs](../guides/running.md) shows how to launch the same script on several GPUs, and [Choosing Parallelism](../concepts/parallelism.md) points to the strategies.
 *   **A real model**: [Fine-Tune a Hugging Face Model](../guides/finetune_huggingface.md) loads Qwen3 from a Hugging Face checkpoint, trains it and exports it back.
