@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from d9d.core.protocol import LRSchedulerProtocol
 from d9d.loop.control import InitializeLRSchedulerContext, LRSchedulerProvider
@@ -16,6 +16,8 @@ class PiecewiseConfig(BaseModel):
         name: Discriminator field. Always ``"piecewise"``.
         scheduler: Detailed configuration for the piecewise schedule.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     name: Literal["piecewise"] = "piecewise"
 

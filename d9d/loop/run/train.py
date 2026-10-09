@@ -172,7 +172,6 @@ class TrainingConfigurator:
             dist_context=dist_context,
             tracked_modules=modules,
             config=self._parameters.gradient_clipping,
-            schedule=schedule,
         )
 
         optimizer, scheduler = OptimizerFactory(
@@ -302,6 +301,7 @@ class Trainer:
             run.set_context({"stage": "train"})
             self._state.event_bus.trigger(EVENT_TRAIN_READY, EventTrainReadyContext(run=run))
 
+            # docs/concepts/how_d9d_works.md shows a trimmed copy of this loop. Update it when the loop changes.
             while self._state.schedule.current_step < self._state.schedule.total_steps:
                 run.set_step(self._state.schedule.current_step)
                 self._state.event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
@@ -327,7 +327,7 @@ class Trainer:
                 self._state.gradient_manager.sync_and_scale()
 
                 # The norm must cover the synced gradients, so clip only after the sync.
-                self._state.gradient_clipper.clip_and_log(run)
+                grad_norm = self._state.gradient_clipper.clip()
 
                 # The optimizer does not sync gradients: they are already replicated.
                 with self._state.event_bus.bounded(
@@ -337,7 +337,9 @@ class Trainer:
 
                 self._state.lr_scheduler.step()
 
-                self._state.logger.log(run, loss_value=self._state.gradient_manager.compute_global_loss())
+                self._state.logger.log(
+                    run, loss=self._state.gradient_manager.compute_global_loss(), grad_norm=grad_norm
+                )
 
                 self._state.gradient_manager.zero_grad()
 

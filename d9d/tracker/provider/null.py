@@ -3,7 +3,7 @@ from contextlib import contextmanager
 from typing import Any, Literal, Self
 
 import torch
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig
 
@@ -14,6 +14,8 @@ class NullTrackerConfig(BaseModel):
     Attributes:
         provider: Discriminator field. Always ``"null"``.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     provider: Literal["null"] = "null"
 

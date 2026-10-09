@@ -1,0 +1,84 @@
+mesh: {}
+
+# --8<-- [start:model]
+model:
+  layer:
+    hidden_size: 1024
+    intermediate_size: 3072
+    num_attention_heads: 16
+    num_key_value_heads: 8
+    rms_norm_eps: 1.0e-06
+    head_dim: 128
+  num_hidden_layers: 28
+  rope_base: 1000000
+  max_position_ids: 40960
+  split_vocab_size:
+    regular: 151936
+  split_vocab_order:
+    - regular
+# --8<-- [end:model]
+
+lora: null
+
+data:
+  dataset: Salesforce/wikitext
+  dataset_config: wikitext-2-raw-v1
+  split: train
+  text_column: text
+  tokenizer: models/Qwen3-0.6B/tokenizer.json
+  max_length: 512
+
+auto_data:
+  global_batch_size: 16
+  microbatch_size: 4
+  num_workers: 2
+  shuffle: true
+
+trainer:
+  run:
+    name: finetune-qwen3
+  schedule:
+    total_steps: 100
+  logging:
+    period_steps: 10
+    tracker:
+      provider: log
+  model_stage_factory:
+    source_checkpoint: models/Qwen3-0.6B
+  determinism:
+    base_seed: 42
+  gc:
+    period_steps: 50
+  checkpointing:
+    save_dir: runs/checkpoints
+    period_steps: last_step
+    num_to_keep: 1
+  gradient_clipping:
+    max_norm: 1.0
+  gradient_manager:
+    grad_dtype: float32
+  timeout:
+    init_timeout: 1800
+    step_timeout: 300
+
+optimizer:
+  name: stochastic_adamw
+  lr: 1.0e-05
+  state_dtype: float32
+
+lr_scheduler:
+  name: piecewise
+  scheduler:
+    initial_multiplier: 0.0
+    phases:
+      - mode: percentage
+        percentage: 0.1
+        target_multiplier: 1.0
+        curve:
+          type: linear
+      - mode: rest
+        target_multiplier: 0.1
+        curve:
+          type: cosine
+
+export_to: runs/export

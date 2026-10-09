@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class AimConfig(BaseModel):
@@ -13,6 +13,8 @@ class AimConfig(BaseModel):
         capture_terminal_logs: Whether to capture stdout and stderr.
         system_tracking_interval: The interval of system monitoring in seconds.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     provider: Literal["aim"] = "aim"
 

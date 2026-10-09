@@ -25,7 +25,7 @@ class JobProfiler:
             schedule: The schedule that tracks the current step of the loop.
         """
         self._config = config
-        if config is None or not config.enabled:
+        if config is None:
             self._profiler = None
         else:
             self._profiler = Profiler(

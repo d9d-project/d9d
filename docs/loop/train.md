@@ -63,12 +63,12 @@ It returns a `Trainer` that holds a prepared `TrainJobState`.
 Before the loop starts:
 
 1.  **Global Synchronization**: The trainer waits for all ranks (a barrier).
-2.  **State Loading**: The `StateCheckpointer` looks for the latest checkpoint in `checkpointing.save_dir`/`run.name`.
+2.  **State Loading**: The `StateCheckpointer` looks for the latest checkpoint in `checkpointing.save_dir`/`run.name` (see [Checkpointing](./checkpointing.md)).
     *   If a checkpoint exists, it loads it into all `Stateful` objects of the job state.
     *   If no checkpoint exists, the job starts from the first step.
 3.  **Context Entry**: The trainer enters several context managers:
     *   **UI**: Shows a progress bar.
-    *   **Logging**: Starts a new run in the experiment tracker and logs the run hyperparameters. [More info](../internals/tracker_integration.md).
+    *   **Logging**: Starts a new run in the experiment tracker and logs the run hyperparameters. [More info](../tracker/index.md).
     *   **Garbage Collector**: Disables automatic Python garbage collection.
     *   **Profiler**: Starts the `torch.profiler` hooks. [More info](../internals/profiling.md).
     *   **Gradient Manager**: Installs the backward hooks that all-reduce gradients.
@@ -100,7 +100,6 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
 5.  **Gradient Clipping**
     *   The `GradientClipper` computes the global L2 norm of all gradients.
     *   If `max_norm` is set, the gradients are clipped in place.
-    *   The total norm is logged.
     *   [More info](../internals/grad_norm.md).
 
 6.  **Optimization**
@@ -110,14 +109,14 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
     *   **Schedule**: The LR scheduler updates the learning rate for the *next* step.
 
 7.  **Logging & Maintenance**
-    *   **Log**: The loss and, on logging steps, the metrics are written to the tracker.
+    *   **Log**: `JobLogger` writes the loss and the gradient norm of the step and, on logging steps, the metrics to the tracker.
     *   **Zero Grad**: The `GradientManager` clears the gradients for the next step.
     *   **GC**: `ManualGarbageCollector` runs if the current step matches the GC period.
     *   **Event-Based Logic**: Triggers the `EVENT_TRAIN_STEP_POST` event.
     *   **Advance**: The `JobSchedule` increments the step counter.
 
 8.  **Checkpointing**
-    *   If the step matches `checkpointing.period_steps` or is the last step, the trainer saves a checkpoint. This is a global barrier.
+    *   If the step matches `checkpointing.period_steps` or is the last step, the trainer saves a checkpoint. This is a global barrier. See [Checkpointing](./checkpointing.md).
 
 ### 3. Finalization
 

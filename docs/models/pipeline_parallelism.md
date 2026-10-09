@@ -169,12 +169,12 @@ The schedule composes its program once per microbatch count and reuses it. It re
 
 Pipelining is available in the [`Trainer`](../loop/train.md) framework. Set the schedule in the `pipelining` section of the `Trainer` config:
 
-```json
-{
-  "pipelining": {
-    "schedule": {"schedule": "1f1b", "num_stages_per_rank": 2, "zero_bubble": true}
-  }
-}
+```yaml
+pipelining:
+  schedule:
+    schedule: 1f1b
+    num_stages_per_rank: 2
+    zero_bubble: true
 ```
 
 The `Trainer` builds the schedule and distributes the layers.

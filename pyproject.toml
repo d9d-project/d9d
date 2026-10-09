@@ -93,6 +93,7 @@ docs = [
 ]
 examples = [
     "datasets>=4.5.0,<5.0.0",
+    "pyyaml>=6.0.0,<7.0.0",
 ]
 
 

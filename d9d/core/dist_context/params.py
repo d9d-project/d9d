@@ -19,7 +19,7 @@ class DeviceMeshParameters(BaseModel):
         expert_parallel: Degree of expert parallelism (EP) for MoE layers.
     """
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     pipeline_parallel: int = 1
 

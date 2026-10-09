@@ -4,6 +4,7 @@
 /dist/
 /logs/
 .mypy_cache/
-/example_data/
 /.cache/
 /.venv/
+/example/*/*/runs/
+/example/*/*/models/

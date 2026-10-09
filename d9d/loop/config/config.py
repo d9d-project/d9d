@@ -1,9 +1,9 @@
 from pathlib import Path
 from typing import Self
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from d9d.pipelining.factory import AnyPipelineScheduleConfig
+from d9d.pipelining.factory import AnyPipelineScheduleConfig, PipelineScheduleGPipeConfig
 from d9d.tracker import AnyTrackerConfig, RunConfig
 
 from .types import StepActionPeriod
@@ -17,7 +17,9 @@ class JobScheduleConfig(BaseModel):
             stream sets the duration.
     """
 
-    total_steps: int | None
+    model_config = ConfigDict(extra="forbid")
+
+    total_steps: int | None = None
 
 
 class DataPrefetchConfig(BaseModel):
@@ -29,7 +31,9 @@ class DataPrefetchConfig(BaseModel):
             ``0`` disables prefetching, so every pack is copied on the current stream when its step starts.
     """
 
-    prefetch_factor: int = Field(ge=0)
+    model_config = ConfigDict(extra="forbid")
+
+    prefetch_factor: int = Field(default=1, ge=0)
 
 
 class DeterminismConfig(BaseModel):
@@ -38,6 +42,8 @@ class DeterminismConfig(BaseModel):
     Attributes:
         base_seed: The base seed for the random number generators (Python, NumPy, PyTorch) on all ranks.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     base_seed: int
 
@@ -49,7 +55,9 @@ class PipeliningConfig(BaseModel):
         schedule: The pipeline schedule configuration.
     """
 
-    schedule: AnyPipelineScheduleConfig
+    model_config = ConfigDict(extra="forbid")
+
+    schedule: AnyPipelineScheduleConfig = Field(default_factory=PipelineScheduleGPipeConfig)
 
 
 class GarbageCollectionConfig(BaseModel):
@@ -58,6 +66,8 @@ class GarbageCollectionConfig(BaseModel):
     Attributes:
         period_steps: How often to run the Python garbage collector.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     period_steps: StepActionPeriod
 
@@ -71,9 +81,11 @@ class CheckpointingConfig(BaseModel):
         num_to_keep: The maximum number of recent checkpoints to keep. If ``None``, all checkpoints are kept.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     save_dir: Path
     period_steps: StepActionPeriod
-    num_to_keep: int | None
+    num_to_keep: int | None = None
 
 
 class ModelStageFactoryConfig(BaseModel):
@@ -86,8 +98,10 @@ class ModelStageFactoryConfig(BaseModel):
             ``requires_grad=True``. Useful for PEFT, e.g. LoRA.
     """
 
-    source_checkpoint: Path | None
-    checkpoint_only_trainable_parameters: bool
+    model_config = ConfigDict(extra="forbid")
+
+    source_checkpoint: Path | None = None
+    checkpoint_only_trainable_parameters: bool = False
 
 
 class GradientClippingConfig(BaseModel):
@@ -95,18 +109,17 @@ class GradientClippingConfig(BaseModel):
 
     Attributes:
         max_norm: The maximum gradient norm. If ``None``, gradients are not clipped.
-        log_total_steps: How often to log the total gradient norm.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     max_norm: float | None
-    log_total_steps: StepActionPeriod
 
 
 class ProfilingConfig(BaseModel):
     """Configuration for the PyTorch Profiler.
 
     Attributes:
-        enabled: Whether to enable the profiler.
         traces_dir: The directory for trace files.
         period_steps: The total length of a profiling cycle (wait + warmup + active), in steps.
         warmup_steps: The number of profiler warmup steps before recording.
@@ -115,7 +128,7 @@ class ProfilingConfig(BaseModel):
         with_stack: Whether to record the Python call stacks of operators. They make up most of a trace.
     """
 
-    enabled: bool
+    model_config = ConfigDict(extra="forbid")
 
     traces_dir: Path
 
@@ -140,9 +153,12 @@ class JobLoggerConfig(BaseModel):
     """Configuration for experiment tracking and logging.
 
     Attributes:
-        period_steps: How often metrics are logged.
+        period_steps: How often the metrics are logged. The metrics are accumulated over the steps between two
+            logging steps. The loss and the total gradient norm are logged every step.
         tracker: The experiment tracker backend configuration, e.g. Aim.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     period_steps: StepActionPeriod
     tracker: AnyTrackerConfig
@@ -157,8 +173,10 @@ class GradientManagerConfig(BaseModel):
         bucket_size_mb: The maximum size of a gradient communication bucket, in MiB.
     """
 
-    grad_dtype: str | None
-    bucket_size_mb: int
+    model_config = ConfigDict(extra="forbid")
+
+    grad_dtype: str | None = None
+    bucket_size_mb: int = 32
 
 
 class TimeoutConfig(BaseModel):
@@ -168,6 +186,8 @@ class TimeoutConfig(BaseModel):
         init_timeout: The timeout in seconds for the job setup and the first step.
         step_timeout: The timeout in seconds for communication in later steps.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     init_timeout: int = 10000
     step_timeout: int = 100
@@ -192,19 +212,21 @@ class TrainerConfig(BaseModel):
         timeout: Distributed timeout settings.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     run: RunConfig
-    schedule: JobScheduleConfig
-    data_prefetch: DataPrefetchConfig
+    schedule: JobScheduleConfig = Field(default_factory=JobScheduleConfig)
+    data_prefetch: DataPrefetchConfig = Field(default_factory=DataPrefetchConfig)
     logging: JobLoggerConfig
-    pipelining: PipeliningConfig
-    model_stage_factory: ModelStageFactoryConfig
+    pipelining: PipeliningConfig = Field(default_factory=PipeliningConfig)
+    model_stage_factory: ModelStageFactoryConfig = Field(default_factory=ModelStageFactoryConfig)
     determinism: DeterminismConfig
     gc: GarbageCollectionConfig
     checkpointing: CheckpointingConfig
     gradient_clipping: GradientClippingConfig
-    profiling: ProfilingConfig | None
-    gradient_manager: GradientManagerConfig
-    timeout: TimeoutConfig
+    profiling: ProfilingConfig | None = None
+    gradient_manager: GradientManagerConfig = Field(default_factory=GradientManagerConfig)
+    timeout: TimeoutConfig = Field(default_factory=TimeoutConfig)
 
 
 class InferenceConfig(BaseModel):
@@ -221,11 +243,13 @@ class InferenceConfig(BaseModel):
         timeout: Distributed timeout settings.
     """
 
-    schedule: JobScheduleConfig
-    data_prefetch: DataPrefetchConfig
-    model_stage_factory: ModelStageFactoryConfig
+    model_config = ConfigDict(extra="forbid")
+
+    schedule: JobScheduleConfig = Field(default_factory=JobScheduleConfig)
+    data_prefetch: DataPrefetchConfig = Field(default_factory=DataPrefetchConfig)
+    model_stage_factory: ModelStageFactoryConfig = Field(default_factory=ModelStageFactoryConfig)
     determinism: DeterminismConfig
     gc: GarbageCollectionConfig
     checkpointing: CheckpointingConfig
-    profiling: ProfilingConfig | None
-    timeout: TimeoutConfig
+    profiling: ProfilingConfig | None = None
+    timeout: TimeoutConfig = Field(default_factory=TimeoutConfig)

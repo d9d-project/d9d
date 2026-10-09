@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from typing import Any, Literal, Self
 
 import torch
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig
 
@@ -15,6 +15,8 @@ class LogTrackerConfig(BaseModel):
     Attributes:
         provider: Discriminator field. Always ``"log"``.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     provider: Literal["log"] = "log"
 

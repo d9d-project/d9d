@@ -1,0 +1,44 @@
+mesh: {}
+
+model:
+  layer:
+    hidden_size: 1024
+    intermediate_size: 3072
+    num_attention_heads: 16
+    num_key_value_heads: 8
+    rms_norm_eps: 1.0e-06
+    head_dim: 128
+  num_hidden_layers: 28
+  rope_base: 1000000
+  max_position_ids: 40960
+  split_vocab_size:
+    regular: 151936
+  split_vocab_order:
+    - regular
+
+data:
+  dataset: Salesforce/wikitext
+  dataset_config: wikitext-2-raw-v1
+  split: validation
+  text_column: text
+  tokenizer: models/Qwen3-0.6B/tokenizer.json
+  max_length: 512
+
+auto_data:
+  global_batch_size: 16
+  microbatch_size: 16
+  num_workers: 2
+  shuffle: false
+  drop_last: false
+
+inference:
+  determinism:
+    base_seed: 42
+  gc:
+    period_steps: 50
+  checkpointing:
+    save_dir: runs/evaluate
+    period_steps: disable
+  timeout:
+    init_timeout: 1800
+    step_timeout: 300

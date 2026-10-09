@@ -1,6 +1,6 @@
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead, TaskHead
 from d9d.module.model.backbone import DecoderBackbone
@@ -16,6 +16,8 @@ class CausalLMHeadConfig(BaseModel):
         kind: Discriminator field. Always ``"causal_lm"``.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     kind: Literal["causal_lm"] = "causal_lm"
 
 
@@ -27,6 +29,8 @@ class ClassificationHeadConfig(BaseModel):
         num_labels: The number of output classes.
         dropout: The dropout probability applied before the projection.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     kind: Literal["classification"] = "classification"
     num_labels: int
@@ -41,6 +45,8 @@ class EmbeddingHeadConfig(BaseModel):
         embedding_dim: Size of the output embedding. ``None`` for no extra projection.
         normalize: Whether to apply L2 normalization to the final embeddings.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     kind: Literal["embedding"] = "embedding"
     embedding_dim: int | None = None

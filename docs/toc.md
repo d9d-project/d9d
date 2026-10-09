@@ -4,6 +4,27 @@ icon: lucide/table-of-contents
 
 # Table of Contents
 
+## 🏁 Getting Started
+Your first job.
+
+*   **[Installation](./getting_started/installation.md)**: Install d9d from PyPI or from a checkout, and the optional extras.
+*   **[Quickstart](./getting_started/quickstart.md)**: Train a small model on one GPU and learn the parts of a d9d job.
+
+## 💡 Concepts
+The ideas behind d9d.
+
+*   **[How d9d Works](./concepts/how_d9d_works.md)**: The parts of a job, the model build, parameter placements, packs and pipeline programs, the training loop, checkpoints and events.
+*   **[Choosing Parallelism](./concepts/parallelism.md)**: Where to learn the parallelism strategies and how to apply them in d9d.
+*   **[d9d and Other Frameworks](./concepts/comparison.md)**: How the design of d9d compares with Megatron-Core, torchtitan, DeepSpeed, Accelerate and others, and when to choose each.
+
+## 🍳 Guides
+Solutions for concrete tasks.
+
+*   **[Write Your Own Job](./guides/write_your_own_job.md)**: Turn the Quickstart script into a job for your own model, data and loss.
+*   **[Running Jobs](./guides/running.md)**: Launch on one GPU, several GPUs or several nodes. Checkpoints, resuming and export.
+*   **[Fine-Tune a Hugging Face Model](./guides/finetune_huggingface.md)**: Load Qwen3 from a Hugging Face checkpoint, fine-tune all weights or LoRA adapters and export it back.
+*   **[Troubleshooting](./guides/troubleshooting.md)**: Reading the logs of a multi-rank job.
+
 ## 🌐 Distributed Core
 The foundational primitives managing the cluster.
 
@@ -19,6 +40,7 @@ How to configure and run jobs.
 
 *   **[Training Loop](./loop/train.md)**: The lifecycle of the `Trainer`, dependency injection, and execution flow.
 *   **[Inference Loop](./loop/inference.md)**: The lifecycle of distributed `Inference` and forward-only execution.
+*   **[Checkpointing](./loop/checkpointing.md)**: What a checkpoint holds, when the job saves, how it resumes and where it must be stored.
 *   **[Configuration](./loop/config.md)**: Pydantic schemas for configuring jobs, scheduling, and logging.
 *   **[Interfaces](./loop/interfaces/index.md)**: How to inject your custom Model, Data, and Step logic (Train & Infer).
 
@@ -51,14 +73,18 @@ Parameter-Efficient Fine-Tuning framework.
 *   **Methods**: [LoRA](./peft/lora.md), [Full Fine-Tuning](./peft/full_tune.md), and [Method Stacking](./peft/stack.md).
 
 ## 📈 Optimization and Metrics
-Metrics, experiment tracking, learning rate schedules and optimizers.
+Metrics, learning rate schedules and optimizers.
 
 *   **[Metrics Overview](./metric/overview.md)**: Distributed-aware statistic accumulation.
 *   **[Metric Catalogue](./metric/metric_catalogue/index.md)**: Ready-to-use metric implementations.
 *   **[Custom Metrics](./metric/custom.md)**: Implementing custom metrics.
-*   **[Experiment Tracking](./internals/tracker_integration.md)**: Integration with logging backends (Aim).
 *   **[Piecewise Scheduler](./lr_scheduler/piecewise.md)**: Composable LR schedules and [Schedule Visualization](./lr_scheduler/visualization.md).
 *   **[Stochastic Optimizers](./optimizer/stochastic.md)**: Low-precision training using stochastic rounding.
+
+## 📊 Experiment Tracking
+Where the loss and the metrics go.
+
+*   **[Experiment Tracking](./tracker/index.md)**: Choosing a tracker (the log, Aim), what the loop logs and adding a new tracker.
 
 ## ⚙️ Internals
 Deep dive into the engine room.

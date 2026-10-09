@@ -51,20 +51,21 @@ The raw `batch` is available only in `build_forward_inputs(...)`. The **state** 
 `build_forward_inputs` returns the state. `compute_loss`, `process_outputs` and `update_metrics` read it back, fully typed.
 
 ```python
-class MyState(TypedDict):
+@dataclasses.dataclass
+class MyState:
     target: torch.Tensor
     num_targets: torch.Tensor
 
 # In build_forward_inputs:
-target = ctx.batch["target"]
+target = ctx.batch.target
 state = MyState(target=target, num_targets=(target != LM_IGNORE_INDEX).sum())
 return BuildForwardInputsResult(input=..., shared=..., state=state)
 
 # Later, in compute_loss (ctx.state is typed as MyState):
-loss = loss_fn(ctx.pipeline_results, ctx.state["target"])
+loss = loss_fn(ctx.pipeline_results, ctx.state.target)
 
 # And in update_metrics:
-ctx.metrics["num_targets"].update(ctx.state["num_targets"])
+ctx.metrics["num_targets"].update(ctx.state.num_targets)
 ```
 
 Tensors stored in the state are detached from the autograd graph, so the cached state never keeps the graph alive.
@@ -83,7 +84,7 @@ The task I/O uses the same PyTree roles as the model pipeline (see [Pipeline Par
 ## Usage
 
 ```python
-from typing import TypedDict
+import dataclasses
 
 import torch
 
@@ -100,13 +101,21 @@ from d9d.module.block.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, S
 from d9d.module.model.io import SequenceHeadShared, SequenceInput, SequenceShared
 
 
-class SFTState(TypedDict):  # It can also be a dataclass
+@dataclasses.dataclass
+class SFTBatch:
+    input_ids: torch.Tensor
+    position_ids: torch.Tensor
+    labels: torch.Tensor
+
+
+@dataclasses.dataclass
+class SFTState:
     labels: torch.Tensor
 
 
 class SFTTask(
     TrainTask[
-        dict[str, torch.Tensor],
+        SFTBatch,
         SequenceInput,
         SequenceHeadShared[SequenceCausalLMHeadShared],
         SequenceCausalLMOutput,
@@ -117,17 +126,17 @@ class SFTTask(
         self._dist_ctx = dist_ctx
 
     def build_forward_inputs(
-        self, ctx: BuildForwardInputsContext
+        self, ctx: BuildForwardInputsContext[SFTBatch]
     ) -> BuildForwardInputsResult[SequenceInput, SequenceHeadShared[SequenceCausalLMHeadShared], SFTState]:
         # ctx.batch contains the output of the collator.
         # The SharedInput routes position IDs to the backbone and labels to the head.
         return BuildForwardInputsResult(
-            input=SequenceInput(input_ids=ctx.batch["input_ids"]),
+            input=SequenceInput(input_ids=ctx.batch.input_ids),
             shared=SequenceHeadShared(
-                sequence=SequenceShared(position_ids=ctx.batch["position_ids"]),
-                head=SequenceCausalLMHeadShared(labels=ctx.batch["labels"]),
+                sequence=SequenceShared(position_ids=ctx.batch.position_ids),
+                head=SequenceCausalLMHeadShared(labels=ctx.batch.labels),
             ),
-            state=SFTState(labels=ctx.batch["labels"]),
+            state=SFTState(labels=ctx.batch.labels),
         )
 
     def dump_hparams(self) -> ScalarTree:
@@ -137,7 +146,7 @@ class SFTTask(
         logps = ctx.pipeline_results.logps
 
         # Count the valid tokens (labels that are not padding). The loss of a variable-length batch needs it.
-        num_loss_tokens = (ctx.state["labels"] != LM_IGNORE_INDEX).sum()
+        num_loss_tokens = (ctx.state.labels != LM_IGNORE_INDEX).sum()
 
         # Average loss per valid token.
         total_loss = logps.sum() / num_loss_tokens

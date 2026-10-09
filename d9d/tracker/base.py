@@ -4,7 +4,7 @@ from contextlib import contextmanager
 from typing import Any, Generic, Self, TypeVar
 
 import torch
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from torch.distributed.checkpoint.stateful import Stateful
 
 
@@ -66,8 +66,10 @@ class RunConfig(BaseModel):
         hparams: The hyperparameters to log at the start of the run.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str
-    description: str | None
+    description: str | None = None
     hparams: dict[str, Any] = Field(default_factory=dict)
 
 
