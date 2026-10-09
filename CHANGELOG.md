@@ -2,6 +2,20 @@
 
 <!-- version list -->
 
+## v0.23.0 (2026-10-09)
+
+### Bug Fixes
+
+- **pipelining**: Require the pipelining protocol only for multi-stage pipelines
+  ([#76](https://github.com/d9d-project/d9d/pull/76),
+  [`873b481`](https://github.com/d9d-project/d9d/commit/873b48122300e3ecc550576222edb9b121db765f))
+
+### Features
+
+- **loop**: Add config defaults and restructure the documentation
+  ([`d5b8706`](https://github.com/d9d-project/d9d/commit/d5b8706ccb4b6d9337cb7a8e2e065ac488268c1e))
+
+
 ## v0.22.0 (2026-10-04)
 
 ### Documentation
