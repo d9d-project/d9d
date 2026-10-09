@@ -1,6 +1,6 @@
 [project]
 site_name = "d9d"
-site_description = "d9d is a distributed training framework built on top of modern PyTorch. It aims to be hackable, modular, and efficient, designed to scale from single-GPU debugging to massive clusters running 6D-Parallelism."
+site_description = "d9d is a composable framework for distributed training in PyTorch. You write the model in plain PyTorch, and d9d runs it on one GPU or on a multi-node cluster."
 repo_url = "https://github.com/d9d-project/d9d"
 copyright = """
 Copyright &copy; 2026 The d9d Project
@@ -15,20 +15,31 @@ nav = [
     { "Home" = "index.md" },
     { "Getting Started" = [
         "getting_started/installation.md",
+        "getting_started/quickstart.md",
+    ] },
+    { "Concepts" = [
+        "concepts/how_d9d_works.md",
+        "concepts/parallelism.md",
+        "concepts/comparison.md",
+    ] },
+    { "Guides" = [
+        "guides/write_your_own_job.md",
+        "guides/running.md",
+        "guides/finetune_huggingface.md",
+        "guides/troubleshooting.md",
     ] },
     { "Table of Contents" = "toc.md" },
-    { "Troubleshooting" = "guides/troubleshooting.md" },
     { "Core" = [
         "core/dist_context.md",
         "core/dist_ops.md",
         "core/pytree.md",
         "core/types.md",
         "core/offload.md",
-        "core/autograd_extensions.md"
     ] },
     { "Training and Inference" = [
         "loop/train.md",
         "loop/inference.md",
+        "loop/checkpointing.md",
         "loop/config.md",
         { "Interfaces" = [
             "loop/interfaces/index.md",
@@ -94,7 +105,8 @@ nav = [
         "lr_scheduler/piecewise.md",
         "lr_scheduler/visualization.md",
     ] },
-    { "Internal APIs" = [
+    { "Internals" = [
+        "core/autograd_extensions.md",
         "internals/determinism.md",
         "internals/grad_norm.md",
         "internals/grad_sync.md",
@@ -166,6 +178,11 @@ anchor_linenums = true
 
 [project.markdown_extensions.pymdownx.superfences]
 custom_fences = [{ name = "mermaid", class = "mermaid", format = "pymdownx.superfences.fence_code_format" }]
+
+# Includes example files into the pages, so the docs show the code that runs.
+[project.markdown_extensions.pymdownx.snippets]
+base_path = ["."]
+check_paths = true
 
 [project.markdown_extensions.pymdownx.tabbed]
 alternate_style = true
