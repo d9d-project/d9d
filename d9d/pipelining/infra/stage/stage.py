@@ -47,7 +47,17 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
             module: The module that runs this stage.
             group: The pipeline-parallel process group.
             stage_to_host_topology: Mapping from stage index to the pipeline-parallel rank that hosts it.
+
+        Raises:
+            TypeError: If the pipeline has more than one stage and the module does not implement
+                ``ModuleSupportsPipelining``.
         """
+        if info.num_stages > 1 and not isinstance(module, ModuleSupportsPipelining):
+            raise TypeError(
+                f"The stage module ({type(module).__name__}) must implement the ModuleSupportsPipelining protocol, "
+                "because the pipeline has more than one stage. Implement stage_transfer_spec()."
+            )
+
         self._info = info
         self._module = module
         self._group = group
@@ -76,13 +86,15 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
     def _make_receiver(
         self,
         inputs: tuple[TPipelineInput, ...],
-        module: ModuleSupportsPipelining,
         from_stage: int | None,
         boundary: StageBoundary,
         requires_grad: bool,
     ) -> StageReceiver[TStageTransfer] | None:
         if from_stage is None:
             return None
+
+        # __init__ has already checked the protocol.
+        module = cast(ModuleSupportsPipelining, self._module)
 
         return StageReceiver(
             peer_global_rank=self._peer_global_rank(from_stage),
@@ -106,22 +118,12 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         Args:
             has_backward: Whether the stage must prepare for a backward pass.
             pipeline_inputs_per_microbatch: A ``PipelineInput`` for each microbatch.
-
-        Raises:
-            TypeError: If the module does not support pipelining.
         """
         prev_stage_idx = None if self._info.is_current_stage_first else self._info.current_stage - 1
         next_stage_idx = None if self._info.is_current_stage_last else self._info.current_stage + 1
 
-        module = self._module
-        if not isinstance(module, ModuleSupportsPipelining):
-            raise TypeError(
-                f"The stage module ({type(module).__name__}) must implement the ModuleSupportsPipelining protocol."
-            )
-
         self._forward_receiver = self._make_receiver(
             pipeline_inputs_per_microbatch,
-            module,
             from_stage=prev_stage_idx,
             boundary=StageBoundary.incoming,
             requires_grad=has_backward,
@@ -131,12 +133,11 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         if has_backward:
             self._backward_comp = BackwardComputeHandler(
                 stage_index=self._info.current_stage,
-                module=module,
+                module=self._module,
                 has_input_peer=not self._info.is_current_stage_first,
             )
             self._backward_receiver = self._make_receiver(
                 pipeline_inputs_per_microbatch,
-                module,
                 from_stage=next_stage_idx,
                 boundary=StageBoundary.outgoing,
                 requires_grad=False,
