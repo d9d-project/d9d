@@ -31,12 +31,15 @@ from d9d.loop.control import (
 from d9d.loop.run import TrainingConfigurator
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
 from d9d.module.parallelism.api import parallelize_hsdp
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from torch import nn
 from torch.utils.data import Dataset
 
 
 class ProjectConfig(BaseModel):
+    # Rejects unknown keys, so a misspelled key in config.yaml fails at load.
+    model_config = ConfigDict(extra="forbid")
+
     mesh: DeviceMeshParameters
     data: AutoDataConfig
     trainer: TrainerConfig
