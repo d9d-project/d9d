@@ -212,21 +212,20 @@ We follow the [Google Python style](https://google.github.io/styleguide/pyguide.
 Every page has one type. The type decides the structure of the page. The `nav` table in `zensical.toml` decides where
 the reader finds it.
 
-| Type           | The page is built around             | Examples                                                          |
-|:---------------|:-------------------------------------|:------------------------------------------------------------------|
-| **Example**    | One script from `example/`           | Quickstart, Fine-Tune a Hugging Face Model                        |
-| **Guide**      | One task without a script of its own | Installation, Write Your Own Job, Running Jobs, Troubleshooting   |
-| **Concept**    | One idea that spans several features | How d9d Works, Choosing Parallelism, d9d and Other Frameworks     |
-| **Feature**    | One feature or subsystem             | Training Loop, Model State Mapper, LoRA, Gradient Synchronization |
-| **Navigation** | Links to other pages                 | The landing page, Table of Contents, Modules                      |
+| Type           | The page is built around             | Examples                                                               |
+|:---------------|:-------------------------------------|:-----------------------------------------------------------------------|
+| **Guide**      | One task, step by step               | Quickstart, Installation, Running Jobs, Fine-Tune a Hugging Face Model |
+| **Concept**    | One idea that spans several features | How d9d Works, Choosing Parallelism, d9d and Other Frameworks          |
+| **Feature**    | One feature or subsystem             | Training Loop, Checkpointing, Model State Mapper, LoRA                 |
+| **Navigation** | Links to other pages                 | The landing page, Table of Contents, Modules                           |
 
 Every page starts with `## About`, one paragraph, except the landing page and the Table of Contents. The rest depends
 on the type:
 
-*   **Example**: About says what the job does. `## Run the Example` comes next, with the commands and their output.
-    Then the page explains the parts of the script and includes the full script with `--8<--`.
 *   **Guide**: About says which task the page solves. Then comes one section per step or per variant of the task.
-    Explain only what the reader needs for the step.
+    Explain only what the reader needs for the step. A guide with a script keeps it in `example/guide/<name>`. Its
+    `## Run the Example` comes after About, with the commands and their output, and the page includes the full
+    script with `--8<--`.
 *   **Concept**: About says which question the page answers. The page reads like a lecture: top to bottom, away from
     the keyboard, and each section builds on the previous ones. It links to the feature pages for details and has no
     `## Usage` and no `## API Reference`.
@@ -245,9 +244,8 @@ Pages follow the [Writing](#writing) rules above, plus these:
 *   **Say what a feature does and how to use it.** Leave internals (host syncs, alignment, fallback paths) to code
     comments. The pages under Internals are the exception: they explain the mechanisms to readers who extend d9d.
 *   **Follow the structure of the page type** (see [Page Types](#page-types)).
-*   **Show code that runs.** Example pages include their script from `example/` with
-    `--8<-- "example/<name>/<file>"`, so the page always shows the code that runs. Run the script before you change
-    the page.
+*   **Show code that runs.** Guides include their script with `--8<-- "example/guide/<name>/<file>"`, so the page
+    always shows the code that runs. Run the script before you change the page.
 *   **Keep each section about one topic.**
 *   **Write one paragraph per line.** Do not wrap lines by hand. Use soft wrapping in your editor.
 *   **Indent list items by four characters.** Write `*   ` for bullets and `1.  ` for numbered items, so nested
@@ -265,6 +263,15 @@ Pages follow the [Writing](#writing) rules above, plus these:
     and choices.
 *   **Link the sources.** Link the paper for a method and the repository for an external library.
 *   **Update the documentation in the same PR.** If a change affects what users see or do, update the pages with it.
+
+### Examples and Recipes
+
+`example/` holds two kinds of scripts:
+
+*   **Guides** (`example/guide/<name>`): The scripts of the guide pages. Keep them short, because the page explains
+    them.
+*   **Recipes** (`example/recipe/<name>`): Complete scripts for one use case, e.g. a classifier or a multi-head model,
+    to copy code from. A recipe starts with a comment that says what it shows and how to run it. It runs as is.
 
 ### Site and Navigation
 
