@@ -58,7 +58,7 @@ class SplitLanguageModellingHead(TaskHead[SequenceCausalLMHeadShared, SequenceCa
         losses = linear_cross_entropy(
             hidden_states, lm_head_weight, shared.labels, ignore_index=LM_IGNORE_INDEX, reduction="none"
         )
-        return SequenceCausalLMOutput(logps=losses)
+        return SequenceCausalLMOutput(nll=losses)
 
     def reset_parameters(self):
         """Resets module parameters."""

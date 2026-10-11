@@ -41,7 +41,7 @@ hidden_states = torch.randn(2, 16, 2048, device="cuda", dtype=torch.bfloat16)
 labels = torch.randint(0, 151944, (2, 16), device="cuda")
 
 output = head(hidden_states, SequenceCausalLMHeadShared(labels=labels))
-loss = output.logps[labels != LM_IGNORE_INDEX].mean()
+loss = output.nll[labels != LM_IGNORE_INDEX].mean()
 ```
 
 ## API Reference

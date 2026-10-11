@@ -190,7 +190,7 @@ class CausalLMTask(
     def compute_loss(self, ctx: ComputeLossContext[SequenceCausalLMOutput, CausalLMState]) -> ComputeLossResult:
         # The head returns the per-token cross-entropy loss. Padding positions hold zeros.
         num_tokens = ctx.state.num_tokens
-        loss = ctx.pipeline_results.logps.sum() / num_tokens
+        loss = ctx.pipeline_results.nll.sum() / num_tokens
 
         # Weighting each microbatch by its token count gives the mean loss per token across microbatches and ranks.
         return ComputeLossResult(loss=loss, loss_weight=num_tokens.float())

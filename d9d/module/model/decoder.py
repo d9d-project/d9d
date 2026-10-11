@@ -163,7 +163,7 @@ class DecoderWithHead(
     This is the single-head counterpart of ``DecoderWithHeads``, not a special case of it. With one
     head there is nothing to key. The head is ``self.head`` (FQN ``head.*``), its shared input is a
     field, and the model returns the head's output instead of a one-entry mapping. For example, a
-    causal LM task reads ``ctx.pipeline_results.logps`` directly.
+    causal LM task reads ``ctx.pipeline_results.nll`` directly.
 
     The backbone (``self.model``) and the head (``self.head``) are public, so a provider can
     parallelize and checkpoint-map each of them separately. The head is attached only on the last

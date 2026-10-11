@@ -31,10 +31,10 @@ class SequenceCausalLMOutput:
     """The output of a causal language modeling head.
 
     Attributes:
-        logps: Per-token cross-entropy loss (negative log-probabilities). Shape: ``(batch, seq_len)``.
+        nll: Per-token cross-entropy loss, the negative log-likelihood of each label. Shape: ``(batch, seq_len)``.
     """
 
-    logps: torch.Tensor
+    nll: torch.Tensor
 
 
 @dataclasses.dataclass

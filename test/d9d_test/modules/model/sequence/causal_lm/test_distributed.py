@@ -55,13 +55,13 @@ def test_consistent_to_itself_dist(
             head=SequenceCausalLMHeadShared(labels=batch_global.labels),
         ),
     )
-    loss_global = outputs_global.logps[batch_global.labels != -100].sum() / loss_delimiter
+    loss_global = outputs_global.nll[batch_global.labels != -100].sum() / loss_delimiter
     loss_global.backward()
 
     # Create Local Model and PP Schedule
     def _callback(outputs: SequenceCausalLMOutput, microbatch_idx: int) -> torch.Tensor:
         labels_mb = microbatch_slice(batch_dist.labels, microbatch_idx=microbatch_idx, n_microbatches=_N_MICROBATCHES)
-        loss_value = outputs.logps[labels_mb != -100].sum() / loss_delimiter
+        loss_value = outputs.nll[labels_mb != -100].sum() / loss_delimiter
         dist_loss_accum.append(loss_value.detach())
         return loss_value
 
