@@ -184,7 +184,7 @@ class TrainingConfigurator:
         event_bus.trigger(EVENT_TRAIN_OPTIMIZER_READY, EventOptimizerReadyContext(optimizer=optimizer))
         event_bus.trigger(EVENT_TRAIN_LR_SCHEDULER_READY, EventLRSchedulerReadyContext(lr_scheduler=scheduler))
 
-        gc = ManualGarbageCollector(dist_ctx=dist_context, config=self._parameters.gc, schedule=schedule)
+        gc = ManualGarbageCollector(dist_context=dist_context, config=self._parameters.gc, schedule=schedule)
 
         checkpointer = StateCheckpointer(
             dist_context=dist_context,
