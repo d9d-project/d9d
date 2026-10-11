@@ -1,7 +1,6 @@
 from contextlib import contextmanager
 
 import torch
-from torch.distributed.tensor import DTensor
 from torch.profiler import record_function
 
 from d9d.core.dist_context import DistributedContext
@@ -43,7 +42,6 @@ class GradientManager(Offloadable):
             [list(module.parameters()) for module in self._tracked_modules.modules],
             bucket_size_mb=self._config.bucket_size_mb,
         )
-        self._grads_to_scale: list[torch.Tensor] | None = None
 
         self._installed = False
         self._offloaded = False
@@ -58,44 +56,18 @@ class GradientManager(Offloadable):
                 if param.requires_grad:
                     param.grad_dtype = getattr(torch, self._config.grad_dtype)
 
-    def _bind_grads_to_scale(self):
-        grads_to_scale: list[torch.Tensor] = []
-
-        for mod in self._tracked_modules.modules:
-            for param in mod.parameters():
-                if param.grad is None:
-                    continue
-                grad = param.grad.to_local() if isinstance(param.grad, DTensor) else param.grad
-                grads_to_scale.append(grad)
-
-        self._grads_to_scale = grads_to_scale
-
-    def _unbind_grads_to_scale(self):
-        self._grads_to_scale = None
-
-    def _scale_grads(self):
-        if self._grads_to_scale is None:
-            raise ValueError("Gradients are not bound. Call sync_and_scale() inside the install() context.")
-
-        scale_factor = 1.0 / self._loss.accumulated_weight
-        if len(self._grads_to_scale) > 0:
-            torch._foreach_mul_(self._grads_to_scale, scale_factor)
-
     def _bind(self):
         self._setup_grad_dtype()
         self._grad_sync.bind()
-        self._bind_grads_to_scale()
 
     def _unbind(self):
-        self._unbind_grads_to_scale()
         self._grad_sync.unbind()
 
     @contextmanager
     def install(self):
         """Activates gradient handling while the context is open.
 
-        It sets the gradient dtype, installs the backward hooks that synchronize gradients
-        and binds the gradients for later scaling.
+        It sets the gradient dtype and installs the backward hooks that synchronize gradients.
         """
         self._bind()
         self._installed = True
@@ -139,7 +111,7 @@ class GradientManager(Offloadable):
 
             if self._dist_context.mesh_params.is_distributed:
                 self._loss.sync(self._dist_context)
-            self._scale_grads()
+            self._grad_sync.scale_grads(1.0 / self._loss.accumulated_weight)
 
     def compute_global_loss(self) -> torch.Tensor:
         """Calculates the final weighted mean loss.

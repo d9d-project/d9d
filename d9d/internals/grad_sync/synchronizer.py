@@ -90,81 +90,74 @@ def _group_params_for_buckets(
     return regrouped_params
 
 
-def _make_bucket(
-    group_marker: _ParameterGroupMarker,
-    parameters: list[nn.Parameter],
-    communicate_stream: torch.cuda.Stream,
-) -> AbstractGradientBucket:
-    """Creates a local bucket or a sync bucket, depending on the reduce mesh.
+def _split_by_size(
+    params: list[nn.Parameter], grad_dtype: torch.dtype, bucket_size_mb: int
+) -> list[list[nn.Parameter]]:
+    """Splits parameters into consecutive chunks whose local gradients fit into ``bucket_size_mb``.
+
+    A parameter larger than the limit gets a chunk of its own.
+
+    Args:
+        params: The ``DTensor`` parameters to split.
+        grad_dtype: The dtype of the gradients.
+        bucket_size_mb: The maximum size of one chunk in MiB.
 
     Returns:
-        The created bucket.
-
-    Raises:
-        ValueError: If the gradient dtype is ``None`` for a sync bucket.
+        The chunks of parameters, in the original order.
     """
-    if group_marker.reduce_mesh is None:
-        return LocalGradientBucket(parameters)
-    else:
-        if group_marker.grad_dtype is None:
-            raise ValueError("Gradient dtype cannot be None for parameters that need gradient synchronization.")
-
-        return SyncGradientBucket(
-            parameters=parameters,
-            device=group_marker.device,
-            grad_dtype=group_marker.grad_dtype,
-            reduce_mesh=group_marker.reduce_mesh,
-            communicate_stream=communicate_stream,
-        )
+    max_bytes = bucket_size_mb * 1024 * 1024
+    chunks: list[list[nn.Parameter]] = []
+    chunk_bytes = 0
+    for param in params:
+        param_bytes = cast(DTensor, param.data).to_local().numel() * grad_dtype.itemsize
+        if not chunks or chunk_bytes + param_bytes > max_bytes:
+            chunks.append([])
+            chunk_bytes = 0
+        chunks[-1].append(param)
+        chunk_bytes += param_bytes
+    return chunks
 
 
-def _fill_buckets(
-    param_groups: dict[_ParameterGroupMarker, list[nn.Parameter]],
+def _make_buckets(
+    group_marker: _ParameterGroupMarker,
+    params: list[nn.Parameter],
     bucket_size_mb: int,
     communicate_stream: torch.cuda.Stream,
 ) -> list[AbstractGradientBucket]:
-    """Splits grouped parameters into buckets of limited size.
+    """Creates the buckets of one parameter group.
+
+    A group without a reduce mesh becomes one local bucket. Other groups are split into sync buckets of limited size.
 
     Args:
-        param_groups: Parameters grouped by synchronization requirements.
-        bucket_size_mb: The maximum size of one bucket in MiB.
+        group_marker: The synchronization requirements of the group.
+        params: The parameters of the group.
+        bucket_size_mb: The maximum size of one sync bucket in MiB.
         communicate_stream: The CUDA stream for asynchronous gradient communication.
 
     Returns:
-        The gradient buckets.
+        The buckets of the group.
+
+    Raises:
+        ValueError: If the gradient dtype is ``None`` for parameters that need gradient synchronization.
     """
-    buckets = []
+    reduce_mesh = group_marker.reduce_mesh
+    if reduce_mesh is None:
+        return [LocalGradientBucket(params)]
 
-    bucket_size = bucket_size_mb * 1024 * 1024
+    grad_dtype = group_marker.grad_dtype
+    if grad_dtype is None:
+        raise ValueError("Gradient dtype cannot be None for parameters that need gradient synchronization.")
 
-    for param_group_marker, param_group in param_groups.items():
-        current_bucket_size = 0
-        unfinished_bucket: list[nn.Parameter] = []
-        for param in param_group:
-            param_bytes = param.numel() * param.element_size()
-            if current_bucket_size + param_bytes >= bucket_size and unfinished_bucket:
-                buckets.append(
-                    _make_bucket(
-                        group_marker=param_group_marker,
-                        parameters=unfinished_bucket,
-                        communicate_stream=communicate_stream,
-                    )
-                )
-                unfinished_bucket = []
-                current_bucket_size = 0
-
-            unfinished_bucket.append(param)
-            current_bucket_size += param_bytes
-
-        if unfinished_bucket:
-            buckets.append(
-                _make_bucket(
-                    group_marker=param_group_marker,
-                    parameters=unfinished_bucket,
-                    communicate_stream=communicate_stream,
-                )
-            )
-    return buckets
+    return [
+        SyncGradientBucket(
+            parameters=chunk,
+            device=group_marker.device,
+            grad_dtype=grad_dtype,
+            reduce_mesh=reduce_mesh,
+            communicate_stream=communicate_stream,
+        )
+        for chunk in _split_by_size(params, grad_dtype=grad_dtype, bucket_size_mb=bucket_size_mb)
+    ]
 
 
 class GradientSynchronizer:
@@ -196,11 +189,13 @@ class GradientSynchronizer:
         """
         stream = torch.cuda.Stream()
         self._communicate_stream = stream
-        self._buckets = _fill_buckets(
-            _group_params_for_buckets(self._param_groups),
-            bucket_size_mb=self._bucket_size_mb,
-            communicate_stream=stream,
-        )
+        self._buckets = [
+            bucket
+            for group_marker, params in _group_params_for_buckets(self._param_groups).items()
+            for bucket in _make_buckets(
+                group_marker, params, bucket_size_mb=self._bucket_size_mb, communicate_stream=stream
+            )
+        ]
 
         for bucket in self._buckets:
             bucket.bind()
@@ -232,6 +227,23 @@ class GradientSynchronizer:
 
         for bucket in self._buckets:
             bucket.mark_sync()
+
+    @torch.no_grad()
+    def scale_grads(self, factor: torch.Tensor):
+        """Multiplies the gradients of all managed parameters in place.
+
+        Args:
+            factor: The scalar to multiply the gradients by.
+
+        Raises:
+            ValueError: If the synchronizer is not bound.
+        """
+        if self._communicate_stream is None:
+            raise ValueError("The synchronizer is not bound. Call bind() first.")
+
+        grads = [grad for bucket in self._buckets for grad in bucket.grad_local_tensors()]
+        if len(grads) > 0:
+            torch._foreach_mul_(grads, factor)
 
     def zero_grad(self):
         """Resets gradients and accumulation counters for all managed parameters."""
