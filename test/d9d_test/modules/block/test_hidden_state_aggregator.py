@@ -97,7 +97,7 @@ def test_mean_aggregator_lifecycle(batch_size, seq_len, hidden_dim, num_adds, sn
         assert torch.allclose(accumulated_result[i], expected_mean)
 
     res_cleared = aggregator.pack_with_snapshot(snapshot)
-    assert res_cleared is None
+    assert res_cleared is snapshot
 
 
 @pytest.mark.local

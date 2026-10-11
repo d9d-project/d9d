@@ -23,6 +23,8 @@ Reduces the hidden states as soon as it receives them. It needs an aggregation m
 
 This reduces memory use when you collect states over many iterations.
 
+If the aggregator collected nothing, `pack_with_snapshot` returns the snapshot unchanged.
+
 ## Usage
 
 ```python
