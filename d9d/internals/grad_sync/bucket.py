@@ -38,6 +38,15 @@ class AbstractGradientBucket(abc.ABC):
         """Marks this bucket as synchronized."""
 
     @abc.abstractmethod
+    def grad_local_tensors(self) -> list[Tensor]:
+        """Returns the local tensors of the current gradients of the bucket, as ``DTensor.to_local()`` does.
+
+        Returns:
+            The local gradient tensors. They share memory with the gradients, so in-place changes to them change
+            the gradients.
+        """
+
+    @abc.abstractmethod
     def set_required_accumulations(self, require_accumulations: int):
         """Sets how many accumulations must happen before this bucket reduces gradients.
 
@@ -74,6 +83,13 @@ class LocalGradientBucket(AbstractGradientBucket):
 
     def mark_sync(self):
         """Does nothing."""
+
+    def grad_local_tensors(self) -> list[Tensor]:
+        return [
+            param.grad.to_local() if isinstance(param.grad, DTensor) else param.grad
+            for param in self._params
+            if param.grad is not None
+        ]
 
     def set_required_accumulations(self, require_accumulations: int):
         """Does nothing: local buckets never reduce."""
@@ -277,6 +293,21 @@ class SyncGradientBucket(AbstractGradientBucket):
             )
 
         self._ready_to_sync = False
+
+    def grad_local_tensors(self) -> list[Tensor]:
+        """Returns the flat buffer that holds the local tensors of all gradients of the bucket.
+
+        Returns:
+            A list with the flat buffer. The local tensors of the parameter gradients are views into it.
+
+        Raises:
+            ValueError: If the buffer is not allocated.
+        """
+        buffer = self._buffer
+        if buffer is None:
+            raise ValueError("The gradient buffer is not allocated. Call bind() first.")
+
+        return [buffer]
 
     def set_required_accumulations(self, require_accumulations: int):
         self._accum_counter.set_required_accumulations(require_accumulations)
