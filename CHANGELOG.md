@@ -2,6 +2,29 @@
 
 <!-- version list -->
 
+## v0.23.1 (2026-10-11)
+
+### Bug Fixes
+
+- **grad_sync**: Scale all gradients by the loss weight and size buckets by the local shard
+  ([#77](https://github.com/d9d-project/d9d/pull/77),
+  [`c304691`](https://github.com/d9d-project/d9d/commit/c30469178d764a820df2d8348326373e0d9b004d))
+
+- **grad_sync**: Size buckets by the local gradient shard in the gradient dtype
+  ([#77](https://github.com/d9d-project/d9d/pull/77),
+  [`c304691`](https://github.com/d9d-project/d9d/commit/c30469178d764a820df2d8348326373e0d9b004d))
+
+- **loop**: Scale gradients created after install() by the total loss weight
+  ([#77](https://github.com/d9d-project/d9d/pull/77),
+  [`c304691`](https://github.com/d9d-project/d9d/commit/c30469178d764a820df2d8348326373e0d9b004d))
+
+### Documentation
+
+- **grad_sync**: Say that the bucket size counts the local gradient shard
+  ([#77](https://github.com/d9d-project/d9d/pull/77),
+  [`c304691`](https://github.com/d9d-project/d9d/commit/c30469178d764a820df2d8348326373e0d9b004d))
+
+
 ## v0.23.0 (2026-10-09)
 
 ### Bug Fixes
