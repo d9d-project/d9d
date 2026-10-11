@@ -63,6 +63,12 @@ def test_set_directions_overwrite():
         assert not ctx.check_direction(GradDirection.inputs)
         assert ctx.check_direction(GradDirection.weight)
 
+    # Step 3: An exception inside the block still restores both directions.
+    with pytest.raises(RuntimeError, match="backward failed"), ctx.with_directions(GradDirection.inputs):
+        raise RuntimeError("backward failed")
+    assert ctx.check_direction(GradDirection.inputs)
+    assert ctx.check_direction(GradDirection.weight)
+
 
 class ControlledMatmul(Function):
     execution_log: ClassVar[list[str]] = []

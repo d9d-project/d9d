@@ -52,15 +52,17 @@ class GlobalGradContext:
     def with_directions(self, *directions: GradDirection):
         """Enables only the given gradient directions inside the context.
 
-        The previous directions are restored when the context exits.
+        The previous directions are restored when the context exits, even if the block raises an exception.
 
         Args:
             *directions: The gradient directions to enable.
         """
         prev_directions = self._enabled_directions
         self._enabled_directions = set(directions)
-        yield
-        self._enabled_directions = prev_directions
+        try:
+            yield
+        finally:
+            self._enabled_directions = prev_directions
 
 
 GLOBAL_GRAD_CONTEXT = GlobalGradContext()
