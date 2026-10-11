@@ -91,17 +91,21 @@ def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype):
             (param.to_local() * rank).sum().backward()
 
         sync.wait()
+        sync.scale_grads(torch.tensor(0.5, device="cuda"))
 
         world_size = sync_mesh.size()
-        # Expected Grad = 2Sum(0..W-1) = 2 * (W - 1) * W / 2 = (W - 1) * W
+        # Expected Grad = 2Sum(0..W-1) * 0.5 = (W - 1) * W / 2
         for param, spec in zip(params, tensor_specs, strict=True):
             if spec["will_sync"]:
                 expect_grad = torch.full(
-                    param.to_local().shape, fill_value=world_size * (world_size - 1), dtype=grad_dtype, device="cuda"
+                    param.to_local().shape,
+                    fill_value=world_size * (world_size - 1) / 2,
+                    dtype=grad_dtype,
+                    device="cuda",
                 )
                 assert torch.allclose(param.grad.to_local(), expect_grad)
             else:
-                expect_grad = torch.full(param.to_local().shape, fill_value=rank * 2, dtype=grad_dtype, device="cuda")
+                expect_grad = torch.full(param.to_local().shape, fill_value=rank, dtype=grad_dtype, device="cuda")
                 assert torch.allclose(param.grad.to_local(), expect_grad)
 
         # STAGE 3: zero grad and after that repeat
@@ -126,28 +130,33 @@ def test_e2e_local():
     sync.bind()
     sync.set_required_accumulations(2)
 
-    # Iteration 1
-    loss = sum(p.sum() for p in params)
-    loss.backward()
+    # The second step checks the gradients created after zero_grad().
+    for _ in range(2):
+        # Iteration 1
+        loss = sum(p.sum() for p in params)
+        loss.backward()
 
-    for p in params:
-        assert p.grad is not None
-        assert torch.is_tensor(p.grad)
+        for p in params:
+            assert p.grad is not None
+            assert torch.is_tensor(p.grad)
 
-    # Wait should be a no-op for local buckets
-    sync.wait()
+        # Wait should be a no-op for local buckets
+        sync.wait()
 
-    # Iteration 2 (Accumulation)
-    loss = sum(p.sum() for p in params)
-    loss.backward()
+        # Iteration 2 (Accumulation)
+        loss = sum(p.sum() for p in params)
+        loss.backward()
 
-    # Gradients should be accumulated (x2)
-    sync.wait()
+        # Gradients should be accumulated (x2) and then halved
+        sync.wait()
+        sync.scale_grads(torch.tensor(0.5))
+        for p in params:
+            assert torch.equal(p.grad, torch.ones_like(p))
 
-    # 4. Zero Grad
-    sync.zero_grad()
-    for p in params:
-        assert p.grad is None
+        # 4. Zero Grad
+        sync.zero_grad()
+        for p in params:
+            assert p.grad is None
 
     # 5. Cleanup
     sync.unbind()
