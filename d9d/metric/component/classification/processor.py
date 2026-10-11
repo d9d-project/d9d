@@ -72,7 +72,7 @@ class OneHotProcessor(ClassificationPredictionsProcessor):
                 shape ``(..., num_classes)``.
 
         Returns:
-            The one-hot predictions and targets. Shape: ``(..., num_classes)``.
+            The one-hot predictions and targets as long tensors. Shape: ``(..., num_classes)``.
 
         Raises:
             ValueError: If the last dimension of ``preds`` is not ``num_classes``, or if the shape of ``targets``
@@ -94,7 +94,7 @@ class OneHotProcessor(ClassificationPredictionsProcessor):
             targets_one_hot = F.one_hot(targets.long(), num_classes=self._num_classes).long()
         elif targets.shape == (*preds.shape[:-1], 1):
             # Targets are class indices with a trailing dimension: (..., 1).
-            targets_one_hot = F.one_hot(targets.squeeze(-1).long(), num_classes=self._num_classes).float()
+            targets_one_hot = F.one_hot(targets.squeeze(-1).long(), num_classes=self._num_classes).long()
         else:
             raise ValueError(
                 f"Targets shape ({tuple(targets.shape)}) is incompatible with predictions shape "
