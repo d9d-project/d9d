@@ -31,7 +31,7 @@ You build the `Inference` engine with the `InferenceConfigurator`. It combines t
 
 6.  **Model Materialization**:
     *   The `ModelStageFactory` builds the model, as in [training](./train.md#the-configuration-lifecycle).
-    *   You can reuse the `ModelProvider` from training.
+    *   You can reuse the `ModelProvider` from training. An inference-only provider can skip `prepare_export_model_stage()`.
     *   The pipeline schedule is always `PipelineScheduleInferenceConfig`. `InferenceConfig` has no pipelining settings.
     *   Triggers the `EVENT_INFERENCE_MODEL_STAGES_READY` event.
 

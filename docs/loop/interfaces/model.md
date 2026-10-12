@@ -26,7 +26,9 @@ For d9d models, you can use the default strategies. For example, apply `parallel
 
 For a custom model, see the [horizontal parallelism](../../models/horizontal_parallelism.md) docs and the reference implementations.
 
-### Implement `prepare_export_model_stage(...)`
+### Implement `prepare_export_model_stage(...)` for Export
+
+You must implement this method if the job calls `Trainer.export()`. Other jobs can skip it. Without it, `export()` raises a `NotImplementedError`.
 
 This method returns a [state mapper](../../model_states/mapper.md) for the final export. It converts the in-memory model state to the state saved on disk.
 
