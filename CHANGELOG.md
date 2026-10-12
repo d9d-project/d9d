@@ -2,6 +2,47 @@
 
 <!-- version list -->
 
+## v0.23.2 (2026-10-12)
+
+### Bug Fixes
+
+- **autograd**: Restore the gradient directions when the block raises
+  ([#88](https://github.com/d9d-project/d9d/pull/88),
+  [`39502b1`](https://github.com/d9d-project/d9d/commit/39502b14320bd8b83500cea4b2cfd77de7d46212))
+
+- **head**: Rename SequenceCausalLMOutput.logps to cross_entropy
+  ([#90](https://github.com/d9d-project/d9d/pull/90),
+  [`e44f5b7`](https://github.com/d9d-project/d9d/commit/e44f5b7ebeb59cdbabe891c38b7e1651fa9e91f5))
+
+- **head**: Rename SequenceCausalLMOutput.logps to nll
+  ([#90](https://github.com/d9d-project/d9d/pull/90),
+  [`e44f5b7`](https://github.com/d9d-project/d9d/commit/e44f5b7ebeb59cdbabe891c38b7e1651fa9e91f5))
+
+- **head**: Rename the nll field to cross_entropy
+  ([#90](https://github.com/d9d-project/d9d/pull/90),
+  [`e44f5b7`](https://github.com/d9d-project/d9d/commit/e44f5b7ebeb59cdbabe891c38b7e1651fa9e91f5))
+
+- **loop**: Make prepare_export_model_stage() optional for jobs that never export
+  ([#96](https://github.com/d9d-project/d9d/pull/96),
+  [`7199c96`](https://github.com/d9d-project/d9d/commit/7199c969b90c5050f2e14f412b19e5837f48ee7d))
+
+- **metric**: Return long targets from OneHotProcessor for (..., 1) targets
+  ([#89](https://github.com/d9d-project/d9d/pull/89),
+  [`e686310`](https://github.com/d9d-project/d9d/commit/e686310c4b1a54a2a65330f65e901d4ba44a6f55))
+
+- **module**: Keep the snapshot when the mean aggregator collected nothing
+  ([#92](https://github.com/d9d-project/d9d/pull/92),
+  [`1aeff12`](https://github.com/d9d-project/d9d/commit/1aeff12f86996ad7c099648a12567b109069e073))
+
+- **packaging**: Add the py.typed marker ([#87](https://github.com/d9d-project/d9d/pull/87),
+  [`54e03fc`](https://github.com/d9d-project/d9d/commit/54e03fc2ec181b65e2dc67364c7f022259f87114))
+
+### Performance Improvements
+
+- **metric**: Compute AUROC without a host sync ([#97](https://github.com/d9d-project/d9d/pull/97),
+  [`b06427f`](https://github.com/d9d-project/d9d/commit/b06427f87563f3bf056a4f9e5133828702bb6cde))
+
+
 ## v0.23.1 (2026-10-11)
 
 ### Bug Fixes
