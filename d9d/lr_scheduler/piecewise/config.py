@@ -72,6 +72,9 @@ def curve_from_config(config: AnyCurveConfig) -> CurveBase:
 
     Returns:
         The curve.
+
+    Raises:
+        ValueError: If the curve configuration type is unknown.
     """
     match config:
         case CurveLinearConfig():
@@ -82,6 +85,8 @@ def curve_from_config(config: AnyCurveConfig) -> CurveBase:
             return CurveExponential()
         case CurveCosineConfig():
             return CurveCosine()
+        case _:
+            raise ValueError(f"Unknown curve config type ({type(config)}).")
 
 
 class StepPhaseConfig(BaseModel):
@@ -171,7 +176,8 @@ def piecewise_scheduler_from_config(
         The learning rate scheduler.
 
     Raises:
-        ValueError: If the phases do not fit ``total_steps``, as described in ``PiecewiseScheduleBuilder``.
+        ValueError: If the phases do not fit ``total_steps``, as described in ``PiecewiseScheduleBuilder``, or if
+            the type of a phase or curve configuration is unknown.
     """
     builder = piecewise_schedule(config.initial_multiplier, total_steps)
 
@@ -184,5 +190,7 @@ def piecewise_scheduler_from_config(
                 builder.until_percentage(phase.percentage, phase.target_multiplier, curve)
             case RestPhaseConfig():
                 builder.fill_rest(phase.target_multiplier, curve)
+            case _:
+                raise ValueError(f"Unknown phase config type ({type(phase)}).")
 
     return builder.build(optimizer)

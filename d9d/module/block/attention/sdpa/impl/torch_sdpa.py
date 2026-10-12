@@ -19,6 +19,8 @@ def _backend_type_to_torch(backend: TorchSdpaBackendType) -> SDPBackend:
             return SDPBackend.EFFICIENT_ATTENTION
         case TorchSdpaBackendType.CUDNN_ATTENTION:
             return SDPBackend.CUDNN_ATTENTION
+        case _:
+            raise ValueError(f"Unknown torch SDPA backend type ({backend}).")
 
 
 class TorchSdpa(nn.Module, SdpaBackend):
