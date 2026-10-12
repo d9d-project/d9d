@@ -23,21 +23,16 @@ def _compute_histogram_auroc(pos_hist: torch.Tensor, neg_hist: torch.Tensor) -> 
     total_pos = pos_hist.sum()
     total_neg = neg_hist.sum()
 
-    # AUROC is undefined if one class is absent.
-    if total_pos <= 0 or total_neg <= 0:
-        return pos_hist.new_tensor(0.5)
-
     cum_pos = pos_hist.cumsum(dim=0)
     acc_pos = total_pos - cum_pos
 
     area = ((0.5 * neg_hist * pos_hist) + (neg_hist * acc_pos)).sum()
-    denominator = total_pos * total_neg
 
-    raw_auroc = area / denominator
-
-    # The early return above already handles a missing class; this guard also returns 0.5 instead of inf/nan.
+    # AUROC is undefined if one class is absent. The check stays on the device, because a Python `if` on a
+    # tensor waits for the GPU. The denominator of 1 only keeps the unused branch free of NaN.
     is_valid = (total_pos > 0) & (total_neg > 0)
-    return torch.where(is_valid, raw_auroc, pos_hist.new_tensor(0.5))
+    denominator = torch.where(is_valid, total_pos * total_neg, 1.0)
+    return torch.where(is_valid, area / denominator, 0.5)
 
 
 class BinaryAUROCMetric(Metric[torch.Tensor]):
