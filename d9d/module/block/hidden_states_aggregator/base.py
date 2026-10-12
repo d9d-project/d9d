@@ -25,5 +25,5 @@ class BaseHiddenStatesAggregator(abc.ABC):
             snapshot: Previously aggregated states to prepend to the current collection, or ``None``.
 
         Returns:
-            The snapshot followed by the newly aggregated states, or ``None`` if no states were collected.
+            The snapshot followed by the newly aggregated states, or only the snapshot if no states were collected.
         """
