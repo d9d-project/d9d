@@ -355,6 +355,8 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
                     f"({microbatch_index}): the previous backward pass was a full backward, or the weight backward "
                     "already ran."
                 )
+            case _:
+                raise ValueError(f"Unknown pending weight backward type ({type(pending)}).")
 
         state.pending_weight = None
         self._release_if_complete(microbatch_index)

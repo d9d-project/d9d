@@ -49,6 +49,8 @@ def _accumulate_inplace_(op: MetricReduceOp, accumulator: torch.Tensor, value: t
                     f"Value type ({type(value).__name__}) is not supported by the min reduce op. Pass a tensor."
                 )
             accumulator.copy_(torch.minimum(accumulator, value))
+        case _:
+            raise ValueError(f"Unknown metric reduce op ({op}).")
 
 
 class MetricAccumulator(Stateful):
