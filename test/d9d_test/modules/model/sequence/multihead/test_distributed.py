@@ -66,7 +66,7 @@ def test_multihead_consistent_to_itself_dist(
         lm_labels: torch.Tensor,
         cls_labels: torch.Tensor,
     ):
-        lm_loss = outputs[HEAD_NAME_LM].logps[lm_labels != -100].sum() / lm_delimiter
+        lm_loss = outputs[HEAD_NAME_LM].cross_entropy[lm_labels != -100].sum() / lm_delimiter
         cls_loss = F.cross_entropy(outputs[HEAD_NAME_CLS].scores, cls_labels, reduction="sum") / total_cls
         return lm_loss + cls_loss
 

@@ -53,15 +53,15 @@ def test_two_heads_share_one_backbone(model_type: ModelCatalogue, model_factory_
     # Each head's output is keyed by the name it was composed under.
     assert set(outputs) == {HEAD_NAME_LM, HEAD_NAME_CLS}
 
-    logps = outputs[HEAD_NAME_LM].logps
+    cross_entropy = outputs[HEAD_NAME_LM].cross_entropy
     scores = outputs[HEAD_NAME_CLS].scores
 
-    assert logps.shape == batch.sequence.input_ids.shape
+    assert cross_entropy.shape == batch.sequence.input_ids.shape
     assert scores.shape == (batch_size, NUM_LABELS_MULTIHEAD)
     assert scores.dtype == torch.float32
 
     # The task combines per-head tensors; the model holds no loss policy.
-    lm_loss = logps[batch.lm_labels != -100].mean()
+    lm_loss = cross_entropy[batch.lm_labels != -100].mean()
     cls_loss = F.cross_entropy(scores, batch.cls_labels)
     (lm_loss + cls_loss).backward()
 

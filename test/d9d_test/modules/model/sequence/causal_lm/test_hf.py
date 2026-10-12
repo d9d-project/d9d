@@ -54,7 +54,7 @@ def test_consistent_to_hf(model_type: ModelCatalogue, model_factory_d9d):
             head=SequenceCausalLMHeadShared(labels=labels_shift),
         ),
     )
-    loss_d9d = outputs_d9d.logps[labels_shift != -100].mean()
+    loss_d9d = outputs_d9d.cross_entropy[labels_shift != -100].mean()
     loss_d9d.backward()
 
     assert_close(loss_d9d, outputs_hf.loss, atol=1e-4, rtol=0.001)
