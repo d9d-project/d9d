@@ -49,9 +49,11 @@ class AimRun(BaseTrackerRun):
         else:
             track_context = {**self._context, **context}
 
+        # Tensor.numpy() needs a CPU tensor without grad, and NumPy has no bf16.
+        samples = values.detach().cpu().float().numpy()
         self._run.track(
             name=name,
-            value=Distribution(hist=values.numpy(), bin_range=(0, values.shape[0])),
+            value=Distribution(samples=samples),
             context=track_context,
             step=self._step,
         )

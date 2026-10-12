@@ -1,6 +1,7 @@
 import sys
 from unittest.mock import MagicMock, patch
 
+import numpy as np
 import pytest
 import torch
 from d9d.tracker import RunConfig, tracker_from_config
@@ -93,13 +94,17 @@ def test_aim_run_logging(mock_aim_run, mock_aim_dist):
         )
 
         # Bins/Histograms
-        tensor_vals = torch.tensor([1.0, 2.0, 3.0])
+        tensor_vals = torch.tensor([1.0, 2.0, 2.0, 3.0], dtype=torch.bfloat16)
         run.bins("logits", tensor_vals)
 
-        # Verify tensor -> numpy conversion
-        assert mock_aim_dist.called
-        kwargs = mock_aim_dist.call_args[1]
-        assert (kwargs["hist"] == tensor_vals.numpy()).all()
+        # Aim must bin the values itself instead of reading them as bin counts.
+        mock_aim_dist.assert_called_once()
+        assert mock_aim_dist.call_args.args == ()
+        assert mock_aim_dist.call_args.kwargs.keys() == {"samples"}
+        np.testing.assert_array_equal(mock_aim_dist.call_args.kwargs["samples"], [1.0, 2.0, 2.0, 3.0])
+        mock_instance.track.assert_called_with(
+            name="logits", value=mock_aim_dist.return_value, context={"phase": "train"}, step=100
+        )
 
 
 @pytest.mark.local
