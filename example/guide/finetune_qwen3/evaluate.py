@@ -19,8 +19,7 @@ from d9d.loop.control import (
 from d9d.loop.run import InferenceConfigurator
 from d9d.module.block.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
 from d9d.module.model.io import SequenceHeadShared, SequenceInput, SequenceShared
-from d9d.module.model.qwen3_dense import Qwen3DenseParameters
-from finetune import DataConfig, Qwen3Provider, TextBatch, TextDataset, build_dataset
+from finetune import DataConfig, Qwen3Provider, TextBatch, TextDataset, build_dataset, read_model_parameters
 from pydantic import BaseModel, ConfigDict
 
 
@@ -28,7 +27,7 @@ class EvaluationConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mesh: DeviceMeshParameters
-    model: Qwen3DenseParameters
+    model: Path
     data: DataConfig
     auto_data: AutoDataConfig
     inference: InferenceConfig
@@ -96,7 +95,8 @@ def main():
         mesh=config.mesh,
         parameters=config.inference,
         task_provider=lambda ctx: PerplexityTask(ctx.dist_context),
-        model_provider=Qwen3Provider(config.model, lora=None),
+        # The architecture comes from the original model: an export keeps it, but has no config.json.
+        model_provider=Qwen3Provider(read_model_parameters(config.model), lora=None),
         data_provider=AutoDataProvider(
             dataset_factory=lambda dist_context: build_dataset(config.data, dist_context),
             collator=TextDataset.collate,

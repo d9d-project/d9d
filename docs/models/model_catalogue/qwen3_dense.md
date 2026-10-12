@@ -10,13 +10,25 @@ The package provides state mappers that convert Hugging Face checkpoints to the 
 
 There is one mapper pair for the bare backbone and one for each head type (causal LM, classification and embedding). An embedding model cannot be exported to Hugging Face if its embedding head has a projection.
 
+`parameters_from_huggingface_qwen3_dense` builds the `Qwen3DenseParameters` from the `config.json` of a Hugging Face model. It accepts the layouts of Transformers 4 and Transformers 5. It raises an error if the config enables a feature that the model does not support, e.g. sliding window attention, RoPE scaling or attention bias.
+
 ## Usage
 
 ```python
+import json
+from pathlib import Path
+
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
 from d9d.module.model import DecoderForCausalLM
-from d9d.module.model.qwen3_dense import Qwen3DenseModel, mapper_from_huggingface_qwen3_dense_for_causal_lm
+from d9d.module.model.qwen3_dense import (
+    Qwen3DenseModel,
+    mapper_from_huggingface_qwen3_dense_for_causal_lm,
+    parameters_from_huggingface_qwen3_dense,
+)
 from d9d.module.parallelism.model import parallelize_causal_lm_head, parallelize_qwen3_dense_model
+
+hf_config = json.loads(Path("models/Qwen3-0.6B/config.json").read_text())
+params = parameters_from_huggingface_qwen3_dense(hf_config, vocab_split_name="regular")
 
 # In ModelProvider.initialize_model_stage.
 backbone = Qwen3DenseModel(

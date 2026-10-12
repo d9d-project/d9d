@@ -1,21 +1,7 @@
 mesh: {}
 
 # --8<-- [start:model]
-model:
-  layer:
-    hidden_size: 1024
-    intermediate_size: 3072
-    num_attention_heads: 16
-    num_key_value_heads: 8
-    rms_norm_eps: 1.0e-06
-    head_dim: 128
-  num_hidden_layers: 28
-  rope_base: 1000000
-  max_position_ids: 40960
-  split_vocab_size:
-    regular: 151936
-  split_vocab_order:
-    - regular
+model: models/Qwen3-0.6B
 # --8<-- [end:model]
 
 lora: null
