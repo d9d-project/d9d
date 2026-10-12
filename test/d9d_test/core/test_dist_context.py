@@ -96,6 +96,24 @@ def test_local_context_initialization():
         ctx.mesh_for(REGULAR_DOMAIN)
 
 
+@pytest.mark.local
+@pytest.mark.parametrize(
+    ("params", "world_size"),
+    [
+        (DeviceMeshParameters(), "8"),
+        (DeviceMeshParameters(data_parallel_shard=4), None),
+    ],
+)
+def test_context_rejects_mesh_not_matching_world_size(monkeypatch, params, world_size):
+    if world_size is None:
+        monkeypatch.delenv("WORLD_SIZE", raising=False)
+    else:
+        monkeypatch.setenv("WORLD_SIZE", world_size)
+
+    with pytest.raises(ValueError, match="WORLD_SIZE"):
+        params.build()
+
+
 @pytest.mark.distributed
 def test_mesh_topology_complex(dist_ctx_factory):
     ctx = dist_ctx_factory(
