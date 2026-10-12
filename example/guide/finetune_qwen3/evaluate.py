@@ -69,7 +69,7 @@ class PerplexityTask(
 
     def process_outputs(self, ctx: ProcessOutputsContext[SequenceCausalLMOutput, PerplexityState]):
         # The head returns the per-token cross-entropy loss. Padding positions hold zeros.
-        self._loss_sum += ctx.pipeline_results.nll.sum()
+        self._loss_sum += ctx.pipeline_results.cross_entropy.sum()
         self._num_tokens += ctx.state.num_tokens
 
     def finalize(self, ctx: FinalizeContext) -> None:

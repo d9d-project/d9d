@@ -143,13 +143,13 @@ class SFTTask(
         return super().dump_hparams()
 
     def compute_loss(self, ctx: ComputeLossContext[SequenceCausalLMOutput, SFTState]) -> ComputeLossResult:
-        nll = ctx.pipeline_results.nll
+        cross_entropy = ctx.pipeline_results.cross_entropy
 
         # Count the valid tokens (labels that are not padding). The loss of a variable-length batch needs it.
         num_loss_tokens = (ctx.state.labels != LM_IGNORE_INDEX).sum()
 
         # Average loss per valid token.
-        total_loss = nll.sum() / num_loss_tokens
+        total_loss = cross_entropy.sum() / num_loss_tokens
 
         return ComputeLossResult(
             loss=total_loss,
