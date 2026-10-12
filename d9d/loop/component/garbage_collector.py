@@ -19,15 +19,15 @@ class ManualGarbageCollector(AbstractContextManager):
     latency spikes during steps. Collections then run only at configured intervals or when forced.
     """
 
-    def __init__(self, dist_ctx: DistributedContext, config: GarbageCollectionConfig, schedule: JobSchedule):
+    def __init__(self, dist_context: DistributedContext, config: GarbageCollectionConfig, schedule: JobSchedule):
         """Constructs the ``ManualGarbageCollector`` object.
 
         Args:
-            dist_ctx: The distributed context.
+            dist_context: The distributed context.
             config: The configuration that sets how often garbage collection runs.
             schedule: The job schedule that tracks the current step.
         """
-        self._dist_ctx = dist_ctx
+        self._dist_context = dist_context
         self._config = config
         self._schedule = schedule
 
@@ -69,4 +69,6 @@ class ManualGarbageCollector(AbstractContextManager):
             begin = time.monotonic()
             gc.collect(generation)
             end = time.monotonic()
-            self._dist_ctx.logger.info(f"Garbage collection for generation {generation} took {end - begin:.2f} seconds")
+            self._dist_context.logger.info(
+                f"Garbage collection for generation {generation} took {end - begin:.2f} seconds"
+            )

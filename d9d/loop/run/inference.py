@@ -135,7 +135,7 @@ class InferenceConfigurator:
             dist_context=dist_context, task=task, pipeline=pipeline_schedule, pipeline_state=pipeline_state_handler
         )
 
-        gc = ManualGarbageCollector(dist_ctx=dist_context, config=self._parameters.gc, schedule=schedule)
+        gc = ManualGarbageCollector(dist_context=dist_context, config=self._parameters.gc, schedule=schedule)
 
         checkpointer = StateCheckpointer(
             dist_context=dist_context, schedule=schedule, config=self._parameters.checkpointing, gc=gc, run_name=None
