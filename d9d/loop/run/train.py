@@ -411,6 +411,9 @@ class Trainer:
         Args:
             export_to: The directory to save the model files to.
             load_checkpoint: If ``True``, loads the latest checkpoint into the model before exporting.
+
+        Raises:
+            NotImplementedError: If the model provider does not implement ``prepare_export_model_stage()``.
         """
         if load_checkpoint:
             self._state.checkpointer.load_last_checkpoint(self._state)

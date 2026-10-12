@@ -133,20 +133,27 @@ class ModelProvider(abc.ABC, Generic[TModel]):
             context: Context for this operation.
         """
 
-    @abc.abstractmethod
     def prepare_export_model_stage(
         self, context: PrepareExportModelStageContext[TModel]
     ) -> PrepareExportModelStageResult:
         """Prepares the state mapper required for saving the model to disk.
 
-        The mapper defines how the in-memory model structure maps back to the checkpoint format.
+        The mapper defines how the in-memory model structure maps back to the checkpoint format. A provider
+        must implement this method if its job calls ``Trainer.export()``.
 
         Args:
             context: Context for this operation.
 
         Returns:
             The state mapper for export.
+
+        Raises:
+            NotImplementedError: If the provider does not implement this method.
         """
+        raise NotImplementedError(
+            f"The model provider ({type(self).__name__}) does not implement prepare_export_model_stage(). "
+            "Implement it to export the model."
+        )
 
     def register_events(self, context: RegisterModelEventsContext) -> None:
         """Registers model-specific event subscriptions.
