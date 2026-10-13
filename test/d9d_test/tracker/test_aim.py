@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
-from d9d.tracker import RunConfig, tracker_from_config
+from d9d.tracker import Histogram, RunConfig, Scalar, TrackerPoint, tracker_from_config
 from d9d.tracker.provider.aim.config import AimConfig
 from d9d.tracker.provider.aim.tracker import AimTracker
 
@@ -33,7 +33,7 @@ def test_aim_tracker_lifecycle(mock_aim_run):
 
     run_props = RunConfig(name="test_run", description="test_desc", hparams={"lr": 0.01})
 
-    with tracker.open(run_props) as run:
+    with tracker.open(run_props):
         # Check initialization
         mock_cls.assert_called_with(
             run_hash=None,
@@ -47,9 +47,6 @@ def test_aim_tracker_lifecycle(mock_aim_run):
         assert mock_instance.name == "test_run"
         assert mock_instance.description == "test_desc"
         mock_instance.__setitem__.assert_called_with("hparams", {"lr": 0.01})
-
-        # Validation of internal wrapper state
-        assert run._step == 0
 
     mock_instance.close.assert_called_once()
     assert tracker.state_dict() == {"restart_hash": "mocked_hash_123"}
@@ -80,21 +77,15 @@ def test_aim_run_logging(mock_aim_run, mock_aim_dist):
     tracker = AimTracker(AimConfig(repo="."))
 
     with tracker.open(RunConfig(name="test", description=None)) as run:
-        run.set_step(100)
-
-        # Context Merging
-        run.set_context({"phase": "train"})
-        run.scalar("accuracy", 0.9)
-        mock_instance.track.assert_called_with(name="accuracy", value=0.9, context={"phase": "train"}, step=100)
-        # Ephemeral context
-        run.scalar("f1", 0.8, context={"type": "micro"})
-        mock_instance.track.assert_called_with(
-            name="f1", value=0.8, context={"phase": "train", "type": "micro"}, step=100
+        run.write(
+            TrackerPoint(name="accuracy", step=100, context={"phase": "train"}),
+            Scalar(value=torch.tensor(0.9, dtype=torch.float64)),
         )
+        mock_instance.track.assert_called_with(name="accuracy", value=0.9, context={"phase": "train"}, step=100)
 
         # Bins/Histograms
         tensor_vals = torch.tensor([1.0, 2.0, 3.0])
-        run.bins("logits", tensor_vals)
+        run.write(TrackerPoint(name="logits", step=100, context={"phase": "train"}), Histogram(counts=tensor_vals))
 
         # Verify tensor -> numpy conversion
         assert mock_aim_dist.called

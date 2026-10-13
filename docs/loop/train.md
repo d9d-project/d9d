@@ -74,7 +74,7 @@ Before the loop starts:
     *   **Gradient Manager**: Installs the backward hooks that all-reduce gradients.
     *   **Gradient Clipper**: Groups the parameters for global gradient norm computation.
     *   **Metric Collector**: Binds the async metric collector to the device.
-4.  **Ready Hook Trigger**: Triggers the `EVENT_TRAIN_READY` event.
+4.  **Ready Hook Trigger**: Triggers the `EVENT_TRAIN_READY` event. Its context holds the `TrackerWriter`, so event handlers can log their own values. [More info](../tracker/index.md#logging-your-own-values).
 
 ### 2. The Step Loop
 
@@ -109,7 +109,7 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
     *   **Schedule**: The LR scheduler updates the learning rate for the *next* step.
 
 7.  **Logging & Maintenance**
-    *   **Log**: `JobLogger` writes the loss and the gradient norm of the step and, on logging steps, the metrics to the tracker.
+    *   **Log**: `JobLogger` logs the loss and the gradient norm of the step and, on logging steps, the metrics. The values reach the tracker after the GPU has computed them, so the step does not wait for the GPU.
     *   **Zero Grad**: The `GradientManager` clears the gradients for the next step.
     *   **GC**: `ManualGarbageCollector` runs if the current step matches the GC period.
     *   **Event-Based Logic**: Triggers the `EVENT_TRAIN_STEP_POST` event.

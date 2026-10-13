@@ -2,10 +2,10 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any, Self, TypedDict, cast
 
-import torch
 from aim import Distribution, Run
 
-from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig
+from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig, TrackerPoint
+from d9d.tracker.value import Histogram, Scalar, TrackerValue
 
 from .config import AimConfig
 
@@ -26,35 +26,19 @@ class AimRun(BaseTrackerRun):
             run: The Aim run to log to.
         """
         self._run = run
-        self._step = 0
-        self._context: dict[str, str] = {}
 
-    def set_step(self, step: int):
-        self._step = step
+    def write(self, point: TrackerPoint, value: TrackerValue):
+        match value:
+            case Scalar():
+                track_value = float(value.value)
+            case Histogram():
+                # NumPy has no bf16.
+                counts = value.counts.float().numpy()
+                track_value = Distribution(hist=counts, bin_range=(0, counts.shape[0]))
+            case _:
+                raise ValueError(f"Tracker value type ({type(value).__name__}) is not supported by Aim.")
 
-    def set_context(self, context: dict[str, str]):
-        self._context = context
-
-    def scalar(self, name: str, value: float, context: dict[str, str] | None = None):
-        if context is None:
-            track_context = self._context
-        else:
-            track_context = {**self._context, **context}
-
-        self._run.track(name=name, value=value, context=track_context, step=self._step)
-
-    def bins(self, name: str, values: torch.Tensor, context: dict[str, str] | None = None):
-        if context is None:
-            track_context = self._context
-        else:
-            track_context = {**self._context, **context}
-
-        self._run.track(
-            name=name,
-            value=Distribution(hist=values.numpy(), bin_range=(0, values.shape[0])),
-            context=track_context,
-            step=self._step,
-        )
+        self._run.track(name=point.name, value=track_value, context=point.context, step=point.step)
 
 
 class AimTracker(BaseTracker[AimConfig]):

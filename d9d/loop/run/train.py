@@ -290,7 +290,7 @@ class Trainer:
                 disable=not self._state.dist_context.is_local_main_process,
                 initial=self._state.schedule.current_step,
             ) as bar,
-            self._state.logger.new_run() as run,
+            self._state.logger.new_run(context={"stage": "train"}) as writer,
             self._state.garbage_collector as gc,
             self._state.profiler.open() as profiler,
             self._state.gradient_manager.install(),
@@ -298,12 +298,10 @@ class Trainer:
             self._state.logger.install(),
             contextlib.closing(iter(self._state.microbatch_pack_stream)) as packs,
         ):
-            run.set_context({"stage": "train"})
-            self._state.event_bus.trigger(EVENT_TRAIN_READY, EventTrainReadyContext(run=run))
+            self._state.event_bus.trigger(EVENT_TRAIN_READY, EventTrainReadyContext(writer=writer))
 
             # docs/concepts/how_d9d_works.md shows a trimmed copy of this loop. Update it when the loop changes.
             while self._state.schedule.current_step < self._state.schedule.total_steps:
-                run.set_step(self._state.schedule.current_step)
                 self._state.event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
 
                 device_pack = next(packs, None)
@@ -337,9 +335,7 @@ class Trainer:
 
                 self._state.lr_scheduler.step()
 
-                self._state.logger.log(
-                    run, loss=self._state.gradient_manager.compute_global_loss(), grad_norm=grad_norm
-                )
+                self._state.logger.log(loss=self._state.gradient_manager.compute_global_loss(), grad_norm=grad_norm)
 
                 self._state.gradient_manager.zero_grad()
 

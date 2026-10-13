@@ -62,7 +62,76 @@ logging:
 
 Each value has the step number and the context `stage=train`.
 
+Logging does not make the step wait for the GPU. A value waits in pinned host memory until the GPU has computed it, and reaches the tracker at a later logging call. The values can lag `logging.max_pending_steps` steps (2 by default) behind the current step. If they lag more, logging waits for the GPU to finish the oldest step. This also limits how far the host runs ahead of the GPU. Before a checkpoint and at the end of training, the loop writes all waiting values to the tracker. If training raises, the loop writes only the values that the GPU has already computed.
+
 At the start of a run, the tracker also gets the hyperparameters: `trainer.run.hparams` from the configuration and the results of `dump_hparams()` of the task and of the model provider. Override `dump_hparams()` to log the settings of your own code, e.g. the size of the model.
+
+## Logging Your Own Values
+
+The context of `EVENT_TRAIN_READY` holds the `TrackerWriter` of the run. Keep it in your [event handler](../loop/interfaces/events.md) and log with `log()` and a value of one of the types in `TrackerValue` (see the [API Reference](#api-reference)). The tensors of a value can be on the GPU. Each value gets the step that is current at the call and the context `stage=train`. Only the main process writes to the tracker, so the tracker shows the values of rank 0.
+
+This task logs a histogram of each weight matrix every 100 steps:
+
+```python
+import torch
+from torch.distributed.tensor import DTensor
+
+from d9d.loop.component import TrackerWriter
+from d9d.loop.control import RegisterTaskEventsContext, TrainTask
+from d9d.loop.event import subscribe, subscribe_annotated
+from d9d.loop.event.catalogue.common import EventModelStagesReadyContext, EventStepContext
+from d9d.loop.event.catalogue.train import (
+    EVENT_TRAIN_MODEL_STAGES_READY,
+    EVENT_TRAIN_READY,
+    EVENT_TRAIN_STEP_POST,
+    EventTrainReadyContext,
+)
+from d9d.tracker import Histogram
+
+PERIOD_STEPS = 100
+
+
+class WeightHistogramTask(TrainTask):
+    def __init__(self):
+        self._writer: TrackerWriter | None = None
+        self._weights: list[tuple[str, torch.Tensor]] = []
+
+    def register_events(self, context: RegisterTaskEventsContext) -> None:
+        subscribe_annotated(context.event_bus, self)
+
+    @subscribe(EVENT_TRAIN_MODEL_STAGES_READY)
+    def _on_model_ready(self, ctx: EventModelStagesReadyContext) -> None:
+        self._weights = [
+            (name, param) for stage in ctx.modules for name, param in stage.named_parameters() if param.ndim == 2
+        ]
+
+    @subscribe(EVENT_TRAIN_READY)
+    def _on_ready(self, ctx: EventTrainReadyContext) -> None:
+        self._writer = ctx.writer
+
+    @subscribe(EVENT_TRAIN_STEP_POST)
+    def _on_step_post(self, ctx: EventStepContext) -> None:
+        if ctx.schedule.current_step % PERIOD_STEPS != 0:
+            return
+        # EVENT_TRAIN_READY comes before the first step.
+        assert self._writer is not None
+        for name, weight in self._weights:
+            # With FSDP, the histogram covers the shard of this rank.
+            local = weight.to_local() if isinstance(weight, DTensor) else weight
+            # A fixed range keeps histc on the GPU. The automatic range (min=max=0) waits for the GPU to find it.
+            counts = torch.histc(local.detach().float(), bins=50, min=-0.1, max=0.1)
+            self._writer.log(f"weights/{name}", Histogram(counts=counts))
+
+    def build_forward_inputs(self, ctx):
+        ...  # Task logic
+
+    def compute_loss(self, ctx):
+        ...  # Task logic
+```
+
+The histograms go to the writer and not to a [metric](../metric/overview.md). A histogram is a snapshot of the weights at one step, while a metric accumulates a value over `logging.period_steps` and synchronizes it across ranks. Only the main process writes, so with FSDP the tracker shows the shards of rank 0, and with pipeline parallelism the stage of rank 0.
+
+A call reads a tensor on the current CUDA stream. You can change the tensor in place after the call, on the same stream, without changing the logged value. The writer works only while the run is open, until `train()` returns. Later calls raise an error.
 
 ## Adding a New Tracker
 
@@ -86,21 +155,24 @@ class WandbConfig(BaseModel):
 
 ### The Run
 
-Implement `BaseTrackerRun`. It maps `set_step()`, `set_context()`, `scalar()` and `bins()` to the calls of your backend SDK.
+Implement `BaseTrackerRun`. Its `write()` gets a `TrackerPoint` with the name, the step and the context, and a value of one of the types in `TrackerValue`. The tensors of the value are already on the CPU. End the `match` with `case _:` that raises a `ValueError`, so that a value type that your tracker does not handle yet, e.g. after an update of d9d, fails loudly. A tracker that writes only some types on purpose, such as the log tracker, can skip the others with `case _: pass`.
 
 ```python
-from d9d.tracker import BaseTrackerRun
+from d9d.tracker import BaseTrackerRun, Histogram, Scalar, TrackerPoint, TrackerValue
 
 
 class WandbRun(BaseTrackerRun):
     def __init__(self, run_obj):
         self._run = run_obj
-        self._step = 0
 
-    def set_step(self, step: int):
-        self._step = step
-
-    # ... Implement set_context(), scalar() and bins() to call self._run.log() ...
+    def write(self, point: TrackerPoint, value: TrackerValue):
+        match value:
+            case Scalar():
+                self._run.log({point.name: float(value.value)}, step=point.step)
+            case Histogram():
+                ...  # Call self._run.log() with a wandb.Histogram built from value.counts.
+            case _:
+                raise ValueError(f"Tracker value type ({type(value).__name__}) is not supported by W&B.")
 ```
 
 ### The Tracker
@@ -161,3 +233,5 @@ except ImportError as e:
 ## API Reference
 
 ::: d9d.tracker
+
+::: d9d.loop.component.TrackerWriter

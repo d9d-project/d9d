@@ -52,14 +52,16 @@ class AsyncMetricCollector:
         with torch.cuda.stream(self._stream), record_function("Async Metric Sync & Compute"):
             if dist_context.mesh_params.is_distributed:
                 self._metric.sync(dist_context)
-            self._compute_buffer = self._metric.compute()
+            # compute() can return the metric state itself, which collect_results() resets.
+            self._compute_buffer = pytree.tree_map(lambda x: x.clone(), self._metric.compute())
 
-    def collect_results(self) -> PyTree[float | int | bool]:
-        """Waits for the asynchronous computation, returns its results and resets the metric.
+    def collect_results(self) -> PyTree[torch.Tensor]:
+        """Returns the results of the asynchronous computation and resets the metric.
+
+        The current CUDA stream waits for the computation, the host does not.
 
         Returns:
-            A PyTree with the structure of the metric output and Python scalars (``float``, ``int`` or ``bool``)
-            as leaves.
+            A PyTree with the structure of the metric output and tensors on the device of the metric as leaves.
 
         Raises:
             RuntimeError: If the collector is not bound, or if ``schedule_collection`` was not called before.
@@ -73,10 +75,6 @@ class AsyncMetricCollector:
         torch.cuda.current_stream().wait_stream(self._stream)
         results = self._compute_buffer
         self._compute_buffer = None
-
-        # Sync to CPU.
-        results = pytree.tree_map(lambda x: x.cpu(), results)
-        results = pytree.tree_map(lambda x: x.item(), results)
 
         # Safe: the current stream already waited for the side stream that read the metric state.
         self._metric.reset()

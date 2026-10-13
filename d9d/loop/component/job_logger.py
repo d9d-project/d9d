@@ -13,13 +13,14 @@ from d9d.internals.metric_collector import AsyncMetricCollector
 from d9d.internals.state import load_state_dict_main_process, state_dict_main_process
 from d9d.loop.config import JobLoggerConfig
 from d9d.metric.impl.container import ComposeMetric
-from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig, tracker_from_config
+from d9d.tracker import BaseTracker, RunConfig, Scalar, tracker_from_config
 from d9d.tracker.provider.null import NullTrackerConfig
 
 from .job_schedule import JobSchedule
+from .tracker_writer import PendingTrackerWrites, TrackerWriter
 
 
-def _flatten_pytree_for_metrics(tree: PyTree[float]) -> dict[str, float]:
+def _flatten_pytree_for_metrics(tree: PyTree[torch.Tensor]) -> dict[str, torch.Tensor]:
     flat_dict = {}
 
     for path_tuple, value in pytree.tree_leaves_with_path(tree):
@@ -33,6 +34,7 @@ class JobLogger(Stateful):
     """Logger that sends the loss, the gradient norm and the metrics of a job to the experiment tracker.
 
     The loss and the gradient norm are logged every step. Metrics are aggregated across ranks and logged periodically.
+    The values go to the tracker once the GPU has computed them, so logging does not wait for the GPU.
     """
 
     def __init__(
@@ -63,6 +65,8 @@ class JobLogger(Stateful):
 
         self._tracker = self._build_tracker()
         self._metric_collector = AsyncMetricCollector(metrics)
+        self._pending: PendingTrackerWrites | None = None
+        self._writer: TrackerWriter | None = None
 
     def _build_tracker(self) -> BaseTracker:
         if self._dist_context.is_main_process:
@@ -71,14 +75,25 @@ class JobLogger(Stateful):
             return tracker_from_config(NullTrackerConfig())
 
     @contextmanager
-    def new_run(self) -> Generator[BaseTrackerRun, None, None]:
+    def new_run(self, context: dict[str, str]) -> Generator[TrackerWriter, None, None]:
         """Opens a new experiment run.
 
+        All values logged in the run are written to the tracker when the block exits. If the block raises, only the
+        values that the GPU has already computed are written.
+
+        Args:
+            context: The tags attached to every value of the run, e.g. ``{"stage": "train"}``.
+
         Yields:
-            The active tracker run interface.
+            The writer that logs values to the run at the current step.
         """
-        with self._tracker.open(self._run_config) as run:
-            yield run
+        with (
+            self._tracker.open(self._run_config) as run,
+            PendingTrackerWrites(run, max_pending_steps=self._config.max_pending_steps) as pending,
+        ):
+            self._pending = pending
+            self._writer = TrackerWriter(pending, schedule=self._schedule, context=context)
+            yield self._writer
 
     @contextmanager
     def install(self):
@@ -97,21 +112,24 @@ class JobLogger(Stateful):
 
         self._metric_collector.schedule_collection(self._dist_context)
 
-    def log(self, run: BaseTrackerRun, loss: torch.Tensor, grad_norm: torch.Tensor):
+    def log(self, loss: torch.Tensor, grad_norm: torch.Tensor):
         """Logs the loss and the gradient norm of the current step and, on logging steps, the metric results.
 
         The metric results are the ones started by ``trigger_sync``.
 
         Args:
-            run: The active tracker run.
             loss: The global loss of the current step, as a scalar tensor.
             grad_norm: The global gradient norm of the current step, as a scalar tensor.
+
+        Raises:
+            RuntimeError: If no run is open.
         """
+        if self._writer is None:
+            raise RuntimeError("No tracker run is open. Call log() inside new_run().")
+
         with record_function("Logging"):
-            # One copy to the host for both values.
-            loss_value, grad_norm_value = torch.stack([loss.float(), grad_norm.float()]).tolist()
-            run.scalar("loss", loss_value)
-            run.scalar("l2_grad_norm_total", grad_norm_value)
+            self._writer.log("loss", Scalar(value=loss))
+            self._writer.log("l2_grad_norm_total", Scalar(value=grad_norm))
 
             if not self._schedule.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
                 return
@@ -120,9 +138,12 @@ class JobLogger(Stateful):
             results_flat = _flatten_pytree_for_metrics(results_tree)
 
             for name, value in results_flat.items():
-                run.scalar(name, value)
+                self._writer.log(name, Scalar(value=value))
 
     def state_dict(self) -> dict[str, Any]:
+        # A checkpoint marks the steps that are done, so the tracker must have every value logged before it.
+        if self._pending is not None:
+            self._pending.flush()
         return {
             "tracker": state_dict_main_process(self._dist_context, self._tracker),
         }

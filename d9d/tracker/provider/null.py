@@ -2,10 +2,10 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any, Literal, Self
 
-import torch
 from pydantic import BaseModel, ConfigDict
 
-from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig
+from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig, TrackerPoint
+from d9d.tracker.value import TrackerValue
 
 
 class NullTrackerConfig(BaseModel):
@@ -26,16 +26,7 @@ class NullRun(BaseTrackerRun):
     Use it in tests or when tracking is disabled.
     """
 
-    def set_step(self, step: int):
-        pass
-
-    def set_context(self, context: dict[str, str]):
-        pass
-
-    def scalar(self, name: str, value: float, context: dict[str, str] | None = None):
-        pass
-
-    def bins(self, name: str, values: torch.Tensor, context: dict[str, str] | None = None):
+    def write(self, point: TrackerPoint, value: TrackerValue):
         pass
 
 

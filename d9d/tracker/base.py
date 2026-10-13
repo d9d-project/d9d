@@ -1,58 +1,47 @@
 import abc
+import dataclasses
 from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Any, Generic, Self, TypeVar
 
-import torch
 from pydantic import BaseModel, ConfigDict, Field
 from torch.distributed.checkpoint.stateful import Stateful
 
+from .value import TrackerValue
+
+
+@dataclasses.dataclass(frozen=True, kw_only=True)
+class TrackerPoint:
+    """Point of a tracked series that a value is written to.
+
+    Attributes:
+        name: The name of the series, e.g. ``"loss"``.
+        step: The step the value belongs to.
+        context: The tags of the value, e.g. ``{"stage": "train"}``.
+    """
+
+    name: str
+    step: int
+    context: dict[str, str]
+
 
 class BaseTrackerRun(abc.ABC):
-    """Abstract base class for an active tracking session (run).
+    """Abstract base class for an active tracking session (run) of a tracker backend.
 
-    A run logs metrics during training or inference.
+    A run writes values to the backend. It keeps no step or context: every call carries them in a ``TrackerPoint``.
+    Training code does not call it directly, but logs through a ``TrackerWriter``.
     """
 
     @abc.abstractmethod
-    def set_step(self, step: int):
-        """Sets the global step for subsequent logs.
+    def write(self, point: TrackerPoint, value: TrackerValue):
+        """Writes a value.
+
+        A run raises a ``ValueError`` for a value type that it does not handle. A run that writes only some types on
+        purpose can skip the others instead. Calls come in the order the values were logged.
 
         Args:
-            step: The current step, e.g. the iteration number.
-        """
-        ...
-
-    @abc.abstractmethod
-    def set_context(self, context: dict[str, str]):
-        """Sets the context for subsequent logs.
-
-        The context values (tags) are attached to every logged metric until the next call.
-
-        Args:
-            context: A dict of tag names and values.
-        """
-        ...
-
-    @abc.abstractmethod
-    def scalar(self, name: str, value: float, context: dict[str, str] | None = None):
-        """Logs a scalar value.
-
-        Args:
-            name: The name of the metric.
-            value: The scalar value to log.
-            context: An optional context for this event only. It is merged with the run context.
-        """
-        ...
-
-    @abc.abstractmethod
-    def bins(self, name: str, values: torch.Tensor, context: dict[str, str] | None = None):
-        """Logs a distribution (histogram) of values.
-
-        Args:
-            name: The name of the metric.
-            values: The population of values to bin.
-            context: An optional context for this event only. It is merged with the run context.
+            point: The series, step and tags of the value.
+            value: The value. Its tensors are on the CPU, in the dtype they were logged with.
         """
         ...
 
