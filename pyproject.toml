@@ -33,9 +33,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-aim = [
+tracker-aim = [
     "aim>=3.0.0,<4.0.0",  # Aim tracker integration
     "setuptools>=70.0.0",  # Unset dependency for Aim
+]
+tracker-wandb = [
+    "wandb>=0.25.0",  # W&B tracker integration
+]
+tracker-tensorboard = [
+    "tensorboard>=2.20.0",  # TensorBoard tracker integration
+]
+tracker-mlflow = [
+    "mlflow-skinny>=3.0.0",  # MLflow tracker integration
 ]
 visualization = [
     "plotly>=6.0.0",  # For visualizing LR schedulers
