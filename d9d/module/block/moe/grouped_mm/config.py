@@ -21,7 +21,7 @@ class QuackGroupedMmBackendConfig(BaseModel):
     """Configuration for the QuACK (CuTe-DSL) variable-length GEMM backend.
 
     Reads the expert offsets on the device, so it does not need the per-expert counts on the host. Kernels are
-    JIT-compiled on first use.
+    JIT-compiled on first use. Requires the ``d9d[backend-grouped-mm-quack]`` extra.
 
     Attributes:
         kind: Discriminator field. Always ``"quack"``.
@@ -33,7 +33,8 @@ class QuackGroupedMmBackendConfig(BaseModel):
 class GroupedGemmBackendConfig(BaseModel):
     """Configuration for the ``grouped_gemm`` library backend.
 
-    Needs the per-expert counts on the host; getting them from the device synchronizes with it.
+    Needs the per-expert counts on the host; getting them from the device synchronizes with it. Requires the
+    ``d9d[backend-grouped-mm-grouped-gemm]`` extra.
 
     Attributes:
         kind: Discriminator field. Always ``"grouped_gemm"``.

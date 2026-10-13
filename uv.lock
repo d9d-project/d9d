@@ -1060,6 +1060,15 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+backend-expert-parallel-deepep = [
+    { name = "deep-ep" },
+]
+backend-grouped-mm-grouped-gemm = [
+    { name = "nv-grouped-gemm" },
+]
+backend-grouped-mm-quack = [
+    { name = "quack-kernels" },
+]
 backend-sdpa-flash-attention-2 = [
     { name = "flash-attn" },
 ]
@@ -1071,10 +1080,6 @@ cce = [
 ]
 linear-attention = [
     { name = "fla-core" },
-]
-moe = [
-    { name = "deep-ep" },
-    { name = "nv-grouped-gemm" },
 ]
 tracker-aim = [
     { name = "aim" },
@@ -1123,15 +1128,16 @@ test = [
 requires-dist = [
     { name = "aim", marker = "extra == 'tracker-aim'", specifier = ">=3.0.0,<4.0.0" },
     { name = "cut-cross-entropy", marker = "extra == 'cce'", git = "https://github.com/apple/ml-cross-entropy?rev=b7a02791b234e187b524fb1dba6a812d521b203a" },
-    { name = "deep-ep", marker = "extra == 'moe'", git = "https://github.com/deepseek-ai/DeepEP?rev=9af0e0d0e74f3577af1979c9b9e1ac2cad0104ee" },
+    { name = "deep-ep", marker = "extra == 'backend-expert-parallel-deepep'", git = "https://github.com/deepseek-ai/DeepEP?rev=9af0e0d0e74f3577af1979c9b9e1ac2cad0104ee" },
     { name = "fla-core", marker = "extra == 'linear-attention'", specifier = ">=0.4.2" },
     { name = "flash-attn", marker = "extra == 'backend-sdpa-flash-attention-2'", git = "https://github.com/Dao-AILab/flash-attention?rev=edb5c76ee329b18ed95d1f7ea9aa522a1331ab7d" },
     { name = "flash-attn-4", marker = "extra == 'backend-sdpa-flash-attention-4'", specifier = ">=4.0.0b32" },
     { name = "mlflow-skinny", marker = "extra == 'tracker-mlflow'", specifier = ">=3.0.0" },
-    { name = "nv-grouped-gemm", marker = "extra == 'moe'", specifier = ">=1.1.4" },
+    { name = "nv-grouped-gemm", marker = "extra == 'backend-grouped-mm-grouped-gemm'", specifier = ">=1.1.4" },
     { name = "optree", specifier = ">=0.19.0" },
     { name = "plotly", marker = "extra == 'visualization'", specifier = ">=6.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
+    { name = "quack-kernels", marker = "extra == 'backend-grouped-mm-quack'", specifier = ">=0.6.5" },
     { name = "safetensors", specifier = ">=0.7.0" },
     { name = "setuptools", marker = "extra == 'tracker-aim'", specifier = ">=70.0.0" },
     { name = "tensorboard", marker = "extra == 'tracker-tensorboard'", specifier = ">=2.20.0" },
@@ -1141,7 +1147,7 @@ requires-dist = [
     { name = "triton", specifier = ">=3.6.0" },
     { name = "wandb", marker = "extra == 'tracker-wandb'", specifier = ">=0.25.0" },
 ]
-provides-extras = ["tracker-aim", "tracker-wandb", "tracker-tensorboard", "tracker-mlflow", "visualization", "moe", "cce", "linear-attention", "backend-sdpa-flash-attention-2", "backend-sdpa-flash-attention-4"]
+provides-extras = ["tracker-aim", "tracker-wandb", "tracker-tensorboard", "tracker-mlflow", "visualization", "cce", "linear-attention", "backend-sdpa-flash-attention-2", "backend-sdpa-flash-attention-4", "backend-grouped-mm-quack", "backend-grouped-mm-grouped-gemm", "backend-expert-parallel-deepep"]
 
 [package.metadata.requires-dev]
 dev = [

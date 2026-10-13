@@ -152,7 +152,7 @@ class DeepEpCombine(torch.autograd.Function):
 class DeepEpCommunicationHandler(ExpertCommunicationHandler):
     """MoE communication handler for expert-parallel ranks, based on the DeepEP library.
 
-    Requires the ``d9d[moe]`` extra.
+    Requires the ``d9d[backend-expert-parallel-deepep]`` extra.
     """
 
     def __init__(self, num_experts: int):
