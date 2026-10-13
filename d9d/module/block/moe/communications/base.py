@@ -2,6 +2,8 @@ import abc
 
 import torch
 
+from d9d.module.block.moe.grouped_mm import ExpertTokenGroups
+
 
 class ExpertCommunicationHandler(abc.ABC):
     """Abstract base class for Mixture-of-Experts communication strategies."""
@@ -9,7 +11,7 @@ class ExpertCommunicationHandler(abc.ABC):
     @abc.abstractmethod
     def dispatch(
         self, hidden_states: torch.Tensor, topk_ids: torch.Tensor, topk_weights: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, ExpertTokenGroups]:
         """Routes local hidden states to their target experts, which can be on other ranks.
 
         Tokens assigned to several experts are replicated. The received tokens are sorted by expert index,
@@ -25,7 +27,7 @@ class ExpertCommunicationHandler(abc.ABC):
 
             *   Sorted hidden states received by this rank. Shape: ``(num_received_tokens, hidden_size)``.
             *   Routing weights in the same order. Shape: ``(num_received_tokens,)``.
-            *   CPU tensor with the number of tokens each local expert received. Shape: ``(num_local_experts,)``.
+            *   How the received tokens are split between the local experts.
         """
         ...
 

@@ -7,6 +7,7 @@ from torch.autograd.function import FunctionCtx
 from d9d.kernel.moe.indices_to_multihot import fused_indices_to_multihot
 from d9d.kernel.moe.permute_with_probs import moe_permute_with_probs, moe_unpermute_mask
 from d9d.module.block.moe.communications import ExpertCommunicationHandler
+from d9d.module.block.moe.grouped_mm import ExpertTokenGroups
 
 _buffer: Buffer | None = None
 
@@ -192,7 +193,7 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
 
     def dispatch(
         self, hidden_states: torch.Tensor, topk_ids: torch.Tensor, topk_weights: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    ) -> tuple[torch.Tensor, torch.Tensor, ExpertTokenGroups]:
         (hidden_states, topk_ids, topk_weights, tokens_per_expert, handle) = DeepEpDispatch.apply(
             hidden_states, topk_ids, topk_weights, self._num_experts
         )
@@ -208,7 +209,13 @@ class DeepEpCommunicationHandler(ExpertCommunicationHandler):
         self._handle = handle
         self._unpermute_mapping = reverse_permute_map
 
-        return hidden_states, routing_probs, tokens_per_expert
+        # The tokens are permuted by the routing map, so it gives the counts of the experts on the device. DeepEP
+        # reports the same counts on the host, so nothing is copied between the host and the device.
+        return (
+            hidden_states,
+            routing_probs,
+            ExpertTokenGroups(routing_map.sum(dim=0), host_counts=tokens_per_expert),
+        )
 
     def combine(self, hidden_states: torch.Tensor) -> torch.Tensor:
         if self._handle is None:

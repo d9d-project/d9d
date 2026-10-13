@@ -2,8 +2,14 @@ import torch
 from torch import nn
 
 from d9d.module.block.moe import GroupedLinear
+from d9d.module.block.moe.grouped_mm import ExpertTokenGroups
 
 from .config import LoRAParameters
+
+
+def _linear_like(base: nn.Linear, in_features: int, out_features: int) -> nn.Linear:
+    # Same device and dtype as the base layer, like GroupedLinear.with_features() for grouped layers.
+    return nn.Linear(in_features, out_features, bias=False, device=base.weight.device, dtype=base.weight.dtype)
 
 
 class LoRALinear(nn.Module):
@@ -26,23 +32,15 @@ class LoRALinear(nn.Module):
         Raises:
             ValueError: If ``base_layer`` has a bias.
         """
-        super().__init__()
-        self.lora_A = nn.Linear(
-            base_layer.in_features, params.r, bias=False, device=base_layer.weight.device, dtype=base_layer.weight.dtype
-        )
-        self.lora_B = nn.Linear(
-            params.r,
-            base_layer.out_features,
-            bias=False,
-            device=base_layer.weight.device,
-            dtype=base_layer.weight.dtype,
-        )
-        self.base = base_layer
-
         if base_layer.bias is not None:
             raise ValueError(
                 "LoRA does not support linear layers with a bias. Apply it only to layers with bias=False."
             )
+
+        super().__init__()
+        self.lora_A = _linear_like(base_layer, base_layer.in_features, params.r)
+        self.lora_B = _linear_like(base_layer, params.r, base_layer.out_features)
+        self.base = base_layer
 
         self.dropout: nn.Dropout = nn.Dropout(params.dropout)
 
@@ -101,20 +99,8 @@ class LoRAGroupedLinear(nn.Module):
             params: LoRA hyperparameters.
         """
         super().__init__()
-        self.lora_A = GroupedLinear(
-            base_layer.n_groups,
-            base_layer.in_features,
-            params.r,
-            device=base_layer.weight.device,
-            dtype=base_layer.weight.dtype,
-        )
-        self.lora_B = GroupedLinear(
-            base_layer.n_groups,
-            params.r,
-            base_layer.out_features,
-            device=base_layer.weight.device,
-            dtype=base_layer.weight.dtype,
-        )
+        self.lora_A = base_layer.with_features(base_layer.in_features, params.r)
+        self.lora_B = base_layer.with_features(params.r, base_layer.out_features)
         self.base = base_layer
 
         self.dropout = nn.Dropout(params.dropout)
@@ -123,13 +109,13 @@ class LoRAGroupedLinear(nn.Module):
 
         self.reset_parameters()
 
-    def forward(self, x: torch.Tensor, x_groups: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, x_groups: ExpertTokenGroups) -> torch.Tensor:
         """Computes the base output plus the scaled LoRA update for grouped inputs.
 
         Args:
             x: Input tokens of all groups, with the tokens of each group stored together.
                 Shape: ``(num_tokens, in_features)``.
-            x_groups: CPU tensor with the number of tokens in each group. Shape: ``(n_groups,)``.
+            x_groups: How the tokens are split between groups.
 
         Returns:
             The sum of the base and LoRA outputs. Shape: ``(num_tokens, out_features)``.

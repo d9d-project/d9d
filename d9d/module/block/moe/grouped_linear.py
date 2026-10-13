@@ -4,16 +4,22 @@ import torch
 from torch import nn
 from torch.distributed.tensor import DTensor
 
-from d9d.core.autograd import GradDirection
-from d9d.kernel.gmm import gmm
 from d9d.module.base import ModuleLateInit
+
+from .grouped_mm import (
+    AnyGroupedMmBackendConfig,
+    ExpertTokenGroups,
+    GroupedMmBackend,
+    GroupedMmParameters,
+    build_grouped_mm_backend,
+)
 
 
 class GroupedLinear(nn.Module, ModuleLateInit):
     """Linear layer with a separate transformation for each group of tokens, computed with grouped GEMM.
 
     Each group (expert) has its own weight and processes a variable number of tokens. This is the compute core
-    of the Mixture-of-Experts layer. Requires the ``d9d[moe]`` extra.
+    of the Mixture-of-Experts layer.
     """
 
     def __init__(
@@ -23,6 +29,7 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         out_features: int,
         device: torch.device | str | None = None,
         dtype: torch.dtype | None = None,
+        grouped_mm_backend: AnyGroupedMmBackendConfig | None = None,
     ):
         """Constructs the ``GroupedLinear`` object.
 
@@ -32,6 +39,7 @@ class GroupedLinear(nn.Module, ModuleLateInit):
             out_features: Size of each output sample.
             device: Target device.
             dtype: Target data type.
+            grouped_mm_backend: Grouped GEMM backend. If ``None``, the backend is auto-detected.
         """
         super().__init__()
         self.weight = nn.Parameter(torch.empty(n_groups, in_features, out_features, device=device, dtype=dtype))
@@ -40,16 +48,43 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         self.in_features = in_features
         self.out_features = out_features
 
+        self._grouped_mm_backend = grouped_mm_backend
+        self.kernel: GroupedMmBackend = build_grouped_mm_backend(
+            GroupedMmParameters(in_features=in_features, out_features=out_features), grouped_mm_backend
+        )
+
         self.reset_parameters()
 
-    def forward(self, x: torch.Tensor, x_groups: torch.Tensor) -> torch.Tensor:
+    def with_features(self, in_features: int, out_features: int) -> "GroupedLinear":
+        """Creates a new ``GroupedLinear`` like this one, but with other feature sizes.
+
+        The new layer has the same number of groups, grouped GEMM backend configuration, device and dtype, and
+        freshly initialized weights. Layers attached to this one, such as LoRA adapters, use it to run on the same
+        backend without knowing which one it is.
+
+        Args:
+            in_features: Input hidden size of the new layer.
+            out_features: Output hidden size of the new layer.
+
+        Returns:
+            The new layer.
+        """
+        return GroupedLinear(
+            self.n_groups,
+            in_features,
+            out_features,
+            grouped_mm_backend=self._grouped_mm_backend,
+            device=self.weight.device,
+            dtype=self.weight.dtype,
+        )
+
+    def forward(self, x: torch.Tensor, x_groups: ExpertTokenGroups) -> torch.Tensor:
         """Performs the grouped matrix multiplication.
 
         Args:
             x: Input tokens of all groups, with the tokens of each group stored together.
                 Shape: ``(num_tokens, in_features)``.
-            x_groups: CPU tensor with the number of tokens in each group. Must sum to ``num_tokens``.
-                Shape: ``(n_groups,)``.
+            x_groups: How the tokens are split between groups.
 
         Returns:
             The output tensor. Shape: ``(num_tokens, out_features)``.
@@ -59,7 +94,7 @@ class GroupedLinear(nn.Module, ModuleLateInit):
         if isinstance(weight, DTensor):
             weight = weight.to_local()
 
-        return gmm(x, weight, x_groups, a_grad_direction=GradDirection.inputs, b_grad_direction=GradDirection.weight)
+        return self.kernel(x, weight, x_groups)
 
     def reset_parameters(self):
         """Initializes the weights from ``U(-1 / sqrt(in_features), 1 / sqrt(in_features))``."""
