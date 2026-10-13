@@ -84,7 +84,7 @@ Metrics, learning rate schedules and optimizers.
 ## 📊 Experiment Tracking
 Where the loss and the metrics go.
 
-*   **[Experiment Tracking](./tracker/index.md)**: Choosing a tracker (the log, Aim), what the loop logs and adding a new tracker.
+*   **[Experiment Tracking](./tracker/index.md)**: Choosing a tracker (the log, W&B, TensorBoard, MLflow, Aim), what the loop logs and adding a new tracker.
 
 ## ⚙️ Internals
 Deep dive into the engine room.

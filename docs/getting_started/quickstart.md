@@ -66,7 +66,7 @@ The job makes one pass over the 65,536 samples: 256 steps of 256 samples.
 *   **`run.name`**: The name of the run and of its checkpoint directory.
 *   **`schedule.total_steps`**: The number of steps. Without it, the job makes one pass over the data.
 *   **`checkpointing`**: Where and how often the job saves checkpoints.
-*   **`logging.tracker`**: Where the logged values go. `log` writes them to the log, `aim` sends them to Aim and needs `d9d[aim]`, and `null` drops them. See [Experiment Tracking](../tracker/index.md).
+*   **`logging.tracker`**: Where the logged values go. `log` writes them to the log, and `null` drops them. Other providers send them to W&B, TensorBoard, MLflow or Aim and need an extra. See [Experiment Tracking](../tracker/index.md).
 
 [Configuration](../loop/config.md) describes every field and its default.
 
