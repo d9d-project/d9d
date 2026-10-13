@@ -18,6 +18,7 @@ from .optimizer_factory import OptimizerFactory
 from .pipeline_state import PipelineStateHandler
 from .task_operator import InferenceTaskOperator, TrainTaskOperator
 from .timeout_manager import TimeoutManager
+from .tracker_writer import TrackerWriter
 from .train_sleeper import TrainSleeper
 
 __all__ = [
@@ -39,6 +40,7 @@ __all__ = [
     "StateCheckpointer",
     "TimeoutManager",
     "TrackedModules",
+    "TrackerWriter",
     "TrainSleeper",
     "TrainTaskOperator",
     "build_device_pack_stream",

@@ -25,8 +25,7 @@ def test_lifecycle_local(dist_ctx_factory):
 
     result = collector.collect_results()
 
-    assert isinstance(result, float)
-    assert result == 20.0
+    assert result.item() == 20.0
 
     assert metric.reset_called
 
@@ -52,7 +51,7 @@ def test_lifecycle_distributed(dist_ctx_factory):
     result = collector.collect_results()
 
     # Logic: (10 + 1 (sync add)) * 2 = 22
-    assert result == 22.0
+    assert result.item() == 22.0
     assert metric.reset_called
 
     collector.unbind()
@@ -98,11 +97,8 @@ def test_pytree_support(dist_ctx_factory):
     collector.schedule_collection(dist_ctx)
     results = collector.collect_results()
 
-    assert results["a"] == 1.0
-    assert isinstance(results["a"], float)
-
-    assert isinstance(results["b"][0], float)
-    assert isinstance(results["b"][1], float)
-    assert results["b"] == [2.0, 3.0]
+    # "a" is the metric state itself, which reset() clears, so the results must not alias it.
+    assert results["a"].item() == 1.0
+    assert [value.item() for value in results["b"]] == [2.0, 3.0]
 
     collector.unbind()

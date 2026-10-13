@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.tracker import BaseTrackerRun, RunConfig, tracker_from_config
+from d9d.tracker import BaseTrackerRun, Histogram, RunConfig, Scalar, TrackerPoint, tracker_from_config
 from d9d.tracker.provider.null import NullTracker, NullTrackerConfig
 
 
@@ -14,10 +14,8 @@ def test_null_tracker_lifecycle():
     run_config = RunConfig(name="test", description="desc")
     with tracker.open(run_config) as run:
         assert isinstance(run, BaseTrackerRun)
-        run.set_step(10)
-        run.set_context({"a": "b"})
-        run.scalar("loss", 0.5)
-        run.bins("hist", torch.randn(10))
+        run.write(TrackerPoint(name="loss", step=10, context={"a": "b"}), Scalar(value=torch.tensor(0.5)))
+        run.write(TrackerPoint(name="hist", step=10, context={"a": "b"}), Histogram(counts=torch.randn(10)))
 
 
 @pytest.mark.local

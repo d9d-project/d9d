@@ -156,12 +156,16 @@ class JobLoggerConfig(BaseModel):
         period_steps: How often the metrics are logged. The metrics are accumulated over the steps between two
             logging steps. The loss and the total gradient norm are logged every step.
         tracker: The experiment tracker backend configuration, e.g. Aim.
+        max_pending_steps: How many steps the logged values can lag behind the current step, waiting for the GPU
+            to compute them. When they lag more, logging waits for the GPU, which also limits how far the host runs
+            ahead of the GPU.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     period_steps: StepActionPeriod
     tracker: AnyTrackerConfig
+    max_pending_steps: int = Field(default=2, gt=0)
 
 
 class GradientManagerConfig(BaseModel):

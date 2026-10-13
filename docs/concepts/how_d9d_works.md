@@ -172,7 +172,7 @@ For a per-token loss, `compute_loss()` returns the mean loss of its microbatch a
 
 ## The Training Loop
 
-The training loop only sets the order of the calls. `TrainingConfigurator` built every object in it and gave each one its collaborators, such as the `DistributedContext` or the model stages. `train()` first loads the latest training checkpoint, if one exists. Then it runs the step loop below. The excerpt leaves out the progress bar, the profiler, tracker bookkeeping, garbage collection, timeout updates and the end-of-data check:
+The training loop only sets the order of the calls. `TrainingConfigurator` built every object in it and gave each one its collaborators, such as the `DistributedContext` or the model stages. `train()` first loads the latest training checkpoint, if one exists. Then it runs the step loop below. The excerpt leaves out the progress bar, the profiler, garbage collection, timeout updates and the end-of-data check:
 
 ```python
 while schedule.current_step < schedule.total_steps:
@@ -190,7 +190,7 @@ while schedule.current_step < schedule.total_steps:
         optimizer.step()
 
     lr_scheduler.step()
-    logger.log(run, loss=gradient_manager.compute_global_loss(), grad_norm=grad_norm)
+    logger.log(loss=gradient_manager.compute_global_loss(), grad_norm=grad_norm)
     gradient_manager.zero_grad()
 
     event_bus.trigger(EVENT_TRAIN_STEP_POST, step_ctx)
