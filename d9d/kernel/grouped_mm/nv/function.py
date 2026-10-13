@@ -7,7 +7,7 @@ from torch.autograd import Function
 from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 
 
-class GroupedGemm(Function):
+class GroupedGemmFunction(Function):
     """Autograd function for grouped GEMM (general matrix multiplication) with explicit gradient control."""
 
     @staticmethod
@@ -48,7 +48,7 @@ class GroupedGemm(Function):
         return a_grad, b_grad, None, None, None, None
 
 
-def gmm(
+def grouped_mm(
     a: torch.Tensor,
     b: torch.Tensor,
     batch_sizes: torch.Tensor,
@@ -73,4 +73,4 @@ def gmm(
     Returns:
         The result. Shape: ``(num_tokens, out_features)``.
     """
-    return GroupedGemm.apply(a, b, batch_sizes, a_grad_direction, b_grad_direction, trans_b)
+    return GroupedGemmFunction.apply(a, b, batch_sizes, a_grad_direction, b_grad_direction, trans_b)
