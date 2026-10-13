@@ -1,5 +1,3 @@
-from collections.abc import Generator
-from contextlib import contextmanager
 from typing import Annotated
 
 from pydantic import Field
@@ -19,17 +17,6 @@ AnyTrackerConfig = Annotated[
 """Union of all tracker configurations, discriminated by the ``provider`` field."""
 
 
-@contextmanager
-def _extra_import(provider: str) -> Generator[None, None, None]:
-    # Each SDK takes seconds to import, so a provider imports it only when a job selects it.
-    try:
-        yield
-    except ImportError as e:
-        raise ImportError(
-            f"Tracker provider ({provider}) cannot be loaded. Install the d9d[tracker-{provider}] extra."
-        ) from e
-
-
 def tracker_from_config(config: AnyTrackerConfig) -> BaseTracker:
     """Creates the tracker that the ``provider`` field of the configuration selects.
 
@@ -43,26 +30,32 @@ def tracker_from_config(config: AnyTrackerConfig) -> BaseTracker:
         ImportError: If the optional dependency of the provider is not installed.
         ValueError: If the configuration type is unknown.
     """
-    match config:
-        case LogTrackerConfig():
-            return LogTracker.from_config(config)
-        case NullTrackerConfig():
-            return NullTracker.from_config(config)
-        case AimConfig():
-            with _extra_import(config.provider):
+    # Each SDK takes seconds to import, so a provider imports it only when a job selects it.
+    try:
+        match config:
+            case LogTrackerConfig():
+                return LogTracker.from_config(config)
+            case NullTrackerConfig():
+                return NullTracker.from_config(config)
+            case AimConfig():
                 from .provider.aim.tracker import AimTracker  # noqa: PLC0415
-            return AimTracker.from_config(config)
-        case WandbConfig():
-            with _extra_import(config.provider):
+
+                return AimTracker.from_config(config)
+            case WandbConfig():
                 from .provider.wandb.tracker import WandbTracker  # noqa: PLC0415
-            return WandbTracker.from_config(config)
-        case TensorBoardConfig():
-            with _extra_import(config.provider):
+
+                return WandbTracker.from_config(config)
+            case TensorBoardConfig():
                 from .provider.tensorboard.tracker import TensorBoardTracker  # noqa: PLC0415
-            return TensorBoardTracker.from_config(config)
-        case MLflowConfig():
-            with _extra_import(config.provider):
+
+                return TensorBoardTracker.from_config(config)
+            case MLflowConfig():
                 from .provider.mlflow.tracker import MLflowTracker  # noqa: PLC0415
-            return MLflowTracker.from_config(config)
-        case _:
-            raise ValueError(f"Tracker configuration type ({type(config).__name__}) is not supported.")
+
+                return MLflowTracker.from_config(config)
+            case _:
+                raise ValueError(f"Tracker configuration type ({type(config).__name__}) is not supported.")
+    except ImportError as e:
+        raise ImportError(
+            f"Tracker provider ({config.provider}) cannot be loaded. Install the d9d[tracker-{config.provider}] extra."
+        ) from e
