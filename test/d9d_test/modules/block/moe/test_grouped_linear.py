@@ -2,6 +2,7 @@ import pytest
 import torch
 from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 from d9d.module.block.moe import GroupedLinear
+from d9d.module.block.moe.grouped_mm import ExpertTokenGroups
 
 
 @pytest.mark.local
@@ -26,7 +27,8 @@ def test_grouped_linear_grad_directions(direction, expect_input_grad, expect_wei
         n_groups * batch_size_per_group, in_features, device="cuda", dtype=torch.bfloat16, requires_grad=True
     )
 
-    x_groups = torch.tensor([batch_size_per_group] * n_groups, device="cpu", dtype=torch.long)
+    counts = torch.tensor([batch_size_per_group] * n_groups, dtype=torch.long)
+    x_groups = ExpertTokenGroups(counts.cuda(), host_counts=counts)
 
     out = model(x, x_groups)
     loss = out.sum()
@@ -51,3 +53,23 @@ def test_grouped_linear_grad_directions(direction, expect_input_grad, expect_wei
         assert torch.norm(model.weight.grad) > 0
     else:
         assert model.weight.grad is None
+
+
+@pytest.mark.local
+def test_with_features_keeps_backend_device_and_dtype():
+    from d9d.module.block.moe.grouped_mm import EagerGroupedMmBackendConfig
+    from d9d.module.block.moe.grouped_mm.impl.eager import EagerGroupedMm
+
+    # an explicit backend that auto-detection would not pick on this machine
+    base = GroupedLinear(
+        4, 64, 32, grouped_mm_backend=EagerGroupedMmBackendConfig(), device="cuda", dtype=torch.bfloat16
+    )
+
+    derived = base.with_features(64, 8)
+
+    assert isinstance(derived.kernel, EagerGroupedMm)
+    assert derived.n_groups == 4
+    assert (derived.in_features, derived.out_features) == (64, 8)
+    assert derived.weight.shape == (4, 64, 8)
+    assert derived.weight.device == base.weight.device
+    assert derived.weight.dtype == torch.bfloat16
