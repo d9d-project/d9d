@@ -32,9 +32,10 @@ Before starting work on a major feature, we highly recommend jumping into our [D
     # All extras at once, or pick specific ones with `--extra <name>`
     uv sync --all-extras
     ```
-    Some extras (`moe`, `backend-sdpa-flash-attention-2`) contain CUDA extensions without usable prebuilt wheels,
-    so uv builds them from source against the locked `torch` (pinned revisions live in `[tool.uv.sources]` of
-    `pyproject.toml`). This requires the CUDA 13 toolkit installed at `/usr/local/cuda`, and the first build takes a while.
+    Some extras (`backend-grouped-mm-grouped-gemm`, `backend-expert-parallel-deepep`, `backend-sdpa-flash-attention-2`)
+    contain CUDA extensions without usable prebuilt wheels, so uv builds them from source against the locked `torch`
+    (pinned revisions live in `[tool.uv.sources]` of `pyproject.toml`). This requires the CUDA 13 toolkit installed at
+    `/usr/local/cuda`, and the first build takes a while.
 
     `uv sync` removes packages that were not requested, so pass the same `--extra`/`--all-extras` flags on every
     subsequent sync. `uv run` (used by the `Makefile`) does not remove them.

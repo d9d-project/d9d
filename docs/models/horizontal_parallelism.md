@@ -37,6 +37,7 @@ During the forward pass, the module sees its parameters as plain local `torch.Te
 
 1.  It shards the experts (the `GroupedLinear` weights) along the `ep_shard` mesh dimension, so each GPU holds a subset of experts. Along `ep_replicate`, the experts are replicated.
 2.  It replicates the router and the shared expert, if any, across the whole mesh.
+3.  It switches the token dispatcher of the layer to [DeepEP](https://github.com/deepseek-ai/DeepEP). This requires the `d9d[backend-expert-parallel-deepep]` extra.
 
 ### Fully Sharded Data Parallel (FSDP)
 

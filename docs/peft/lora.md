@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.peft.lora` package implements [Low-Rank Adaptation](https://arxiv.org/abs/2106.09685). It wraps linear layers, both `nn.Linear` and d9d's [`GroupedLinear`](../models/modules/moe.md). The wrapper holds the original frozen layer (`base`) and two trainable low-rank layers (`lora_A` and `lora_B`). LoRA does not support `nn.Linear` layers with a bias.
+The `d9d.peft.lora` package implements [Low-Rank Adaptation](https://arxiv.org/abs/2106.09685). It wraps linear layers, both `nn.Linear` and d9d's [`GroupedLinear`](../models/modules/moe.md). The wrapper holds the original frozen layer (`base`) and two trainable low-rank layers (`lora_A` and `lora_B`). The low-rank layers of a `GroupedLinear` use the same [grouped GEMM backend](../models/modules/moe.md#grouped-gemm-backends) as the base layer. LoRA does not support `nn.Linear` layers with a bias.
 
 ## State Mapping
 
