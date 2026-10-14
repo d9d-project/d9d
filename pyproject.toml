@@ -49,10 +49,6 @@ tracker-mlflow = [
 visualization = [
     "plotly>=6.0.0",  # For visualizing LR schedulers
 ]
-moe = [
-    "deep-ep>=1.2.1",  # For MoE, https://github.com/deepseek-ai/DeepEP
-    "nv-grouped-gemm>=1.1.4",  # For MoE, https://github.com/fanshiqing/grouped_gemm/
-]
 cce = [
     "cut-cross-entropy>=25.9.3",  # For efficient CE, https://github.com/apple/ml-cross-entropy
 ]
@@ -64,6 +60,15 @@ backend-sdpa-flash-attention-2 = [
 ]
 backend-sdpa-flash-attention-4 = [
     "flash-attn-4>=4.0.0b32",  # SDPA Backend, https://github.com/Dao-AILab/flash-attention
+]
+backend-grouped-mm-quack = [
+    "quack-kernels>=0.6.5",  # Grouped GEMM Backend, https://github.com/Dao-AILab/quack
+]
+backend-grouped-mm-grouped-gemm = [
+    "nv-grouped-gemm>=1.1.4",  # Grouped GEMM Backend, https://github.com/fanshiqing/grouped_gemm/
+]
+backend-expert-parallel-deepep = [
+    "deep-ep>=1.2.1",  # Expert Parallel Backend, https://github.com/deepseek-ai/DeepEP
 ]
 
 [project.urls]

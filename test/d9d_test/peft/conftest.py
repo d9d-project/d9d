@@ -3,6 +3,7 @@ import re
 import pytest
 import torch
 from d9d.module.block.moe import GroupedLinear
+from d9d.module.block.moe.grouped_mm import ExpertTokenGroups
 from d9d.peft.all import PeftStackConfig
 from d9d.peft.full_tune import FullTuneConfig
 from d9d.peft.lora import LoRAConfig, LoRAParameters
@@ -19,8 +20,9 @@ class SimpleBlock(nn.Module):
         )
 
     def forward(self, x):
-        groups = torch.zeros(4, dtype=torch.long, device="cpu")
-        groups[0] = x.shape[0]
+        counts = torch.zeros(4, dtype=torch.long, device="cpu")
+        counts[0] = x.shape[0]
+        groups = ExpertTokenGroups(counts.to(x.device), host_counts=counts)
 
         x = self.proj(x) + self.untouched(x)
         x = self.experts(x, groups)

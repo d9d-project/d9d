@@ -43,7 +43,7 @@ Top-level packages of the library.
 - `optim/` - optimizers, including `stochastic` (stochastic-rounding low-precision).
 - `lr_scheduler/` - learning-rate schedules, including `piecewise` (composable schedules).
 - `tracker/` - experiment tracking integrations (`provider`, e.g. Aim).
-- `kernel/` - custom kernels: `cce`, `gmm`, `moe`, `normalization`, `stochastic`, `swiglu`, `general`.
+- `kernel/` - custom kernels: `cce`, `grouped_mm`, `moe`, `normalization`, `stochastic`, `swiglu`, `general`.
 - `internals/` - engine internals: `grad_sync`, `grad_norm`, `metric_collector`, `determinism`, `profiling`, `state`.
 
 ## Working agreements for agents

@@ -45,3 +45,18 @@ def test_linear_math():
     # expected: 1.2 * 10 = 12.0
     assert torch.allclose(y_merged, torch.full_like(y_merged, 12.0))
     assert torch.allclose(base.weight, torch.full_like(base.weight, 1.2))
+
+
+@pytest.mark.local
+def test_grouped_lora_uses_backend_of_base_layer():
+    from d9d.module.block.moe import GroupedLinear
+    from d9d.module.block.moe.grouped_mm import EagerGroupedMmBackendConfig
+    from d9d.module.block.moe.grouped_mm.impl.eager import EagerGroupedMm
+    from d9d.peft.lora import LoRAGroupedLinear
+
+    # An explicit backend that auto-detection would not pick on this machine.
+    base = GroupedLinear(4, 64, 32, grouped_mm_backend=EagerGroupedMmBackendConfig())
+    lora = LoRAGroupedLinear(base, LoRAParameters(r=8, alpha=16, dropout=0.0))
+
+    assert isinstance(lora.lora_A.kernel, EagerGroupedMm)
+    assert isinstance(lora.lora_B.kernel, EagerGroupedMm)

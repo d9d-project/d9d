@@ -9,6 +9,7 @@ from .communications import (
     NoCommunicationHandler,
 )
 from .grouped_experts import GroupedSwiGLU
+from .grouped_mm import AnyGroupedMmBackendConfig
 from .router import RoutingResult, TopKRouter
 from .shared_expert import SharedExpertParameters, SharedSwiGLU
 
@@ -31,6 +32,7 @@ class MoELayer(nn.Module, ModuleLateInit):
         top_k: int,
         router_renormalize_probabilities: bool,
         shared_expert: SharedExpertParameters | None = None,
+        grouped_mm_backend: AnyGroupedMmBackendConfig | None = None,
     ):
         """Constructs the ``MoELayer`` object.
 
@@ -42,6 +44,7 @@ class MoELayer(nn.Module, ModuleLateInit):
             router_renormalize_probabilities: If ``True``, the router renormalizes the probabilities of the
                 selected experts to sum to 1.
             shared_expert: Optional configuration for a shared expert.
+            grouped_mm_backend: Grouped GEMM backend for the experts. If ``None``, the backend is auto-detected.
         """
         super().__init__()
         self.router = TopKRouter(
@@ -51,7 +54,10 @@ class MoELayer(nn.Module, ModuleLateInit):
             renormalize_probabilities=router_renormalize_probabilities,
         )
         self.grouped_experts = GroupedSwiGLU(
-            hidden_dim=hidden_dim, intermediate_dim=intermediate_dim_grouped, num_experts=num_grouped_experts
+            hidden_dim=hidden_dim,
+            intermediate_dim=intermediate_dim_grouped,
+            num_experts=num_grouped_experts,
+            grouped_mm_backend=grouped_mm_backend,
         )
         self._communicator: ExpertCommunicationHandler = NoCommunicationHandler(num_grouped_experts)
 
@@ -112,10 +118,10 @@ class MoELayer(nn.Module, ModuleLateInit):
         expert_indices = routing_result.selected_expert_indices
         expert_scores = routing_result.selected_probabilities
         self._update_tokens_per_expert(expert_indices)
-        hidden_states, expert_scores, expert_count = self._communicator.dispatch(
+        hidden_states, expert_scores, expert_groups = self._communicator.dispatch(
             hidden_states, expert_indices, expert_scores
         )
-        hidden_states = self.grouped_experts(hidden_states, expert_scores, expert_count)
+        hidden_states = self.grouped_experts(hidden_states, expert_scores, expert_groups)
         hidden_states = self._communicator.combine(hidden_states)
 
         if shared_expert_result is not None:

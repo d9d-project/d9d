@@ -1,5 +1,3 @@
-from typing import cast
-
 import torch
 from torch import Size
 
@@ -9,6 +7,7 @@ from d9d.kernel.moe import (
     moe_unpermute_mask,
 )
 from d9d.module.block.moe.communications import ExpertCommunicationHandler
+from d9d.module.block.moe.grouped_mm import ExpertTokenGroups
 
 
 class NoCommunicationHandler(ExpertCommunicationHandler):
@@ -30,21 +29,20 @@ class NoCommunicationHandler(ExpertCommunicationHandler):
 
     def dispatch(
         self, hidden_states: torch.Tensor, topk_ids: torch.Tensor, topk_weights: torch.Tensor
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        with torch.no_grad():
-            tokens_per_expert = torch.bincount(topk_ids.flatten(), minlength=self._num_experts).cpu()
-
+    ) -> tuple[torch.Tensor, torch.Tensor, ExpertTokenGroups]:
         routing_map, routing_probs = fused_indices_to_multihot(topk_ids, topk_weights, self._num_experts)
 
         self._hidden_shape_before_permute = hidden_states.shape
 
+        # Every token goes to exactly top-k experts, so the permuted row count is known without the counts.
         hidden_states, routing_probs, reverse_permute_map = moe_permute_with_probs(
-            hidden_states, routing_probs, routing_map, num_out_tokens=cast(int, tokens_per_expert.sum().item())
+            hidden_states, routing_probs, routing_map, num_out_tokens=topk_ids.numel()
         )
 
         self._unpermute_mapping = reverse_permute_map
 
-        return hidden_states, routing_probs, tokens_per_expert
+        # The tokens are permuted by the routing map, so it gives the counts of the experts on the device.
+        return hidden_states, routing_probs, ExpertTokenGroups(routing_map.sum(dim=0))
 
     def combine(self, hidden_states: torch.Tensor) -> torch.Tensor:
         if self._unpermute_mapping is None:
