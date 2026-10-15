@@ -2,6 +2,44 @@
 
 <!-- version list -->
 
+## v0.24.0 (2026-10-15)
+
+### Documentation
+
+- **moe**: Document the grouped GEMM backends and the new extras
+  ([#100](https://github.com/d9d-project/d9d/pull/100),
+  [`f65570e`](https://github.com/d9d-project/d9d/commit/f65570e13b924a106f25bb886936542189de811d))
+
+### Features
+
+- **kernel**: Add torch and quack grouped GEMM kernels
+  ([#100](https://github.com/d9d-project/d9d/pull/100),
+  [`f65570e`](https://github.com/d9d-project/d9d/commit/f65570e13b924a106f25bb886936542189de811d))
+
+- **loop**: Log to the tracker without waiting for the GPU
+  ([#99](https://github.com/d9d-project/d9d/pull/99),
+  [`9cbf486`](https://github.com/d9d-project/d9d/commit/9cbf48613fcfb52d021de3d3f4c7a774962f925b))
+
+- **moe**: Add grouped GEMM backend selection ([#100](https://github.com/d9d-project/d9d/pull/100),
+  [`f65570e`](https://github.com/d9d-project/d9d/commit/f65570e13b924a106f25bb886936542189de811d))
+
+- **moe**: Add grouped GEMM backends for the experts
+  ([#100](https://github.com/d9d-project/d9d/pull/100),
+  [`f65570e`](https://github.com/d9d-project/d9d/commit/f65570e13b924a106f25bb886936542189de811d))
+
+- **moe**: Run the experts through the grouped GEMM backends
+  ([#100](https://github.com/d9d-project/d9d/pull/100),
+  [`f65570e`](https://github.com/d9d-project/d9d/commit/f65570e13b924a106f25bb886936542189de811d))
+
+- **moe**: Split the moe extra into grouped GEMM and expert parallel backend extras
+  ([#100](https://github.com/d9d-project/d9d/pull/100),
+  [`f65570e`](https://github.com/d9d-project/d9d/commit/f65570e13b924a106f25bb886936542189de811d))
+
+- **tracker**: Add W&B, TensorBoard and MLflow trackers
+  ([#101](https://github.com/d9d-project/d9d/pull/101),
+  [`237d140`](https://github.com/d9d-project/d9d/commit/237d140e672cb7ce82e087e026a1382a04ce010f))
+
+
 ## v0.23.2 (2026-10-12)
 
 ### Bug Fixes
