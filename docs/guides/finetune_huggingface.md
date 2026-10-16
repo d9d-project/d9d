@@ -5,7 +5,7 @@
 This guide loads [Qwen3-0.6B](https://huggingface.co/Qwen/Qwen3-0.6B) from its Hugging Face checkpoint, fine-tunes it on [WikiText-2](https://huggingface.co/datasets/Salesforce/wikitext) and exports it back in the Hugging Face format. A second config trains LoRA adapters instead of all weights. Another script measures the perplexity of a model with the inference loop. The code is in [`example/guide/finetune_qwen3`](https://github.com/d9d-project/d9d/tree/main/example/guide/finetune_qwen3).
 
 !!! warning "Hugging Face integration will change"
-    d9d will integrate with Hugging Face more closely ([#69](https://github.com/d9d-project/d9d/issues/69)), so this guide will change. Today, you copy the model parameters from `config.json` by hand and copy the config and the tokenizer files after export.
+    d9d will integrate with Hugging Face more closely ([#69](https://github.com/d9d-project/d9d/issues/69)), so this guide will change. Today, you copy the config and the tokenizer files after export.
 
 ## Run the Example
 
@@ -22,23 +22,21 @@ The job trains for 100 steps on one GPU. It saves a checkpoint to `runs/checkpoi
 
 ## Model Parameters
 
-The `model` section of the config holds the `Qwen3DenseParameters`. Copy them from the `config.json` file of the Hugging Face model:
-
-| Hugging Face `config.json` | d9d `model` |
-|:---------------------------|:------------|
-| `hidden_size`, `intermediate_size`, `num_attention_heads`, `num_key_value_heads`, `head_dim`, `rms_norm_eps` | `layer.<same name>` |
-| `num_hidden_layers` | `num_hidden_layers` |
-| `rope_theta` | `rope_base` |
-| `max_position_embeddings` | `max_position_ids` |
-| `vocab_size` | `split_vocab_size.regular`, with `split_vocab_order` set to `["regular"]` |
-
-For Qwen3-0.6B, the section is:
+The `model` field of the config points to the downloaded model directory:
 
 ```yaml
 --8<-- "example/guide/finetune_qwen3/config.yaml:model"
 ```
 
-The Hugging Face mappers support only one vocabulary split.
+The script reads `config.json` from this directory and builds the `Qwen3DenseParameters` with `parameters_from_huggingface_qwen3_dense`:
+
+```python
+--8<-- "example/guide/finetune_qwen3/finetune.py:parameters"
+```
+
+The function accepts a `config.json` written by Transformers 4 or Transformers 5. It raises an error if the config enables a feature that the d9d model does not support, e.g. sliding window attention or RoPE scaling.
+
+The Hugging Face mappers support only one vocabulary split, so the whole vocabulary goes to the split named `regular`.
 
 ## Loading the Hugging Face Model
 
@@ -130,7 +128,7 @@ The [provider](#loading-the-hugging-face-model) changes in three places:
 
 ## Evaluate the Model
 
-`evaluate.py` computes the perplexity on the validation split with the [inference loop](../loop/inference.md). It takes the model state to evaluate as its second argument. It loads it through the same Hugging Face mapper, so it reads the original model and the exports alike:
+`evaluate.py` computes the perplexity on the validation split with the [inference loop](../loop/inference.md). It takes the model state to evaluate as its second argument. It loads it through the same Hugging Face mapper, so it reads the original model and the exports alike. It reads the architecture from the original model in the `model` field, because an export has no `config.json`:
 
 ```bash
 python evaluate.py evaluate.yaml models/Qwen3-0.6B

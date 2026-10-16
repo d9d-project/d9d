@@ -1,4 +1,5 @@
 import dataclasses
+import json
 import sys
 from collections.abc import Sequence
 from pathlib import Path
@@ -41,6 +42,7 @@ from d9d.module.model.qwen3_dense import (
     Qwen3DenseParameters,
     mapper_from_huggingface_qwen3_dense_for_causal_lm,
     mapper_to_huggingface_qwen3_dense_for_causal_lm,
+    parameters_from_huggingface_qwen3_dense,
 )
 from d9d.module.parallelism.model import parallelize_causal_lm_head, parallelize_qwen3_dense_model
 from d9d.peft import inject_peft_and_freeze, merge_peft
@@ -65,7 +67,7 @@ class ProjectConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     mesh: DeviceMeshParameters
-    model: Qwen3DenseParameters
+    model: Path
     lora: LoRAConfig | None
     data: DataConfig
     auto_data: AutoDataConfig
@@ -114,6 +116,16 @@ def build_dataset(config: DataConfig, dist_context: DistributedContext) -> Datas
         data = datasets.load_dataset(config.dataset, config.dataset_config, split=config.split)
     texts = [text for text in data[config.text_column] if text.strip()]
     return TextDataset(texts, Tokenizer.from_file(str(config.tokenizer)), config.max_length)
+
+
+# --8<-- [start:parameters]
+def read_model_parameters(model_dir: Path) -> Qwen3DenseParameters:
+    # The architecture comes from the config.json of the Hugging Face model.
+    config = json.loads((model_dir / "config.json").read_text(encoding="utf-8"))
+    return parameters_from_huggingface_qwen3_dense(config, vocab_split_name="regular")
+
+
+# --8<-- [end:parameters]
 
 
 # --8<-- [start:provider]
@@ -206,7 +218,7 @@ def main():
         mesh=config.mesh,
         parameters=config.trainer,
         task_provider=lambda ctx: CausalLMTask(),
-        model_provider=Qwen3Provider(config.model, config.lora),
+        model_provider=Qwen3Provider(read_model_parameters(config.model), config.lora),
         data_provider=AutoDataProvider(
             dataset_factory=lambda dist_context: build_dataset(config.data, dist_context),
             collator=TextDataset.collate,

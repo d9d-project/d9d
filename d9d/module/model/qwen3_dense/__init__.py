@@ -1,4 +1,4 @@
-"""Qwen3 Dense model and its Hugging Face state mappers."""
+"""Qwen3 Dense model, its Hugging Face state mappers and its Hugging Face config import."""
 
 from .decoder_layer import Qwen3DenseLayer
 from .huggingface import (
@@ -10,6 +10,7 @@ from .huggingface import (
     mapper_to_huggingface_qwen3_dense_for_causal_lm,
     mapper_to_huggingface_qwen3_dense_for_classification,
     mapper_to_huggingface_qwen3_dense_for_embedding,
+    parameters_from_huggingface_qwen3_dense,
 )
 from .model import Qwen3DenseModel
 from .params import (
@@ -30,4 +31,5 @@ __all__ = [
     "mapper_to_huggingface_qwen3_dense_for_causal_lm",
     "mapper_to_huggingface_qwen3_dense_for_classification",
     "mapper_to_huggingface_qwen3_dense_for_embedding",
+    "parameters_from_huggingface_qwen3_dense",
 ]
