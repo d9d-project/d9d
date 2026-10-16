@@ -14,7 +14,7 @@ python train.py config.yaml
 
 ## Several GPUs
 
-Launch one process per GPU with [`torchrun`](https://docs.pytorch.org/docs/stable/elastic/run.html). The number of processes must equal the product of the parallelism degrees in `mesh`. Degrees that only regroup ranks that other degrees already count, such as `expert_parallel`, do not add to the product (see [Distributed Context](../core/dist_context.md)).
+Launch one process per GPU with [`torchrun`](https://docs.pytorch.org/docs/stable/elastic/run.html). The number of processes must equal the product of the parallelism degrees in `mesh`. Degrees that only regroup ranks that other degrees already count, such as `expert_parallel`, do not add to the product (see [Distributed Context](../core/dist_context.md)). If the numbers differ, the job fails at start with an error that names both.
 
 For example, this `mesh` replicates the model on 2 GPUs:
 

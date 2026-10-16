@@ -69,6 +69,21 @@ class DeviceMeshParameters(BaseModel):
         return self.expert_parallel > 1
 
     @property
+    def world_size(self) -> int:
+        """The number of processes the mesh spans.
+
+        ``expert_parallel`` does not add to it, because it regroups the ranks that the other degrees count.
+        """
+        return (
+            self.pipeline_parallel
+            * self.data_parallel_replicate
+            * self.data_parallel_shard
+            * self.context_parallel_replicate
+            * self.context_parallel_shard
+            * self.tensor_parallel
+        )
+
+    @property
     def is_distributed(self) -> bool:
         """Whether any form of parallelism is enabled."""
         return (
@@ -107,5 +122,8 @@ class DeviceMeshParameters(BaseModel):
 
         Returns:
             A new ``DistributedContext`` with the built device meshes.
+
+        Raises:
+            ValueError: If ``world_size`` differs from the number of processes in the job.
         """
         return DistributedContext(self, log_level)

@@ -44,7 +44,18 @@ class DistributedContext:
         Args:
             params: The parallelism degrees to build the device meshes from.
             log_level: The log level of the ``d9d`` logger.
+
+        Raises:
+            ValueError: If ``params.world_size`` differs from the number of processes in the job.
         """
+        # WORLD_SIZE is unset when the job runs as a plain Python process.
+        world_size = int(os.environ.get("WORLD_SIZE", "1"))
+        if params.world_size != world_size:
+            raise ValueError(
+                f"Mesh world_size ({params.world_size}) does not match WORLD_SIZE ({world_size}). "
+                "Change the degrees in the mesh config or the number of processes (torchrun --nproc-per-node)."
+            )
+
         self._params = params
 
         if params.is_distributed:
