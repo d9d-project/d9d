@@ -66,3 +66,34 @@ def test_parallelize_replicate(dist_ctx_factory, mesh_dims):
 
     assert torch.allclose(model.w.param.grad.to_local(), expected_grad_w_local)
     assert torch.allclose(model.b.param.grad.to_local(), expected_grad_b_local)
+
+
+class _FailingModule(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.w = NestedModule(2.0)
+
+    def forward(self, x, fail: bool):
+        y = x * self.w()
+        if fail:
+            raise RuntimeError("Forward failed.")
+        return y
+
+
+@pytest.mark.distributed
+def test_parallelize_replicate_restores_classes_after_exception(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=4, context_parallel_replicate=2))
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+
+    model = _FailingModule().cuda()
+    parallelize_replicate(model, mesh)
+    classes = {name: type(submod) for name, submod in model.named_modules()}
+    x = torch.tensor(float(dist.get_rank()), device="cuda")
+
+    with pytest.raises(RuntimeError, match="Forward failed"):
+        model(x, fail=True)
+    assert {name: type(submod) for name, submod in model.named_modules()} == classes
+    assert isinstance(model.w.param, DTensor)
+
+    model(x, fail=False).backward()
+    torch.testing.assert_close(model.w.param.grad.to_local(), x)

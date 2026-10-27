@@ -1,4 +1,5 @@
 import abc
+from collections.abc import Callable
 from typing import cast
 
 import torch
@@ -154,6 +155,7 @@ class SyncGradientBucket(AbstractGradientBucket):
         grad_dtype: torch.dtype,
         reduce_mesh: DeviceMesh,
         communicate_stream: torch.cuda.Stream,
+        on_ready: Callable[[], None],
     ):
         """Constructs the ``SyncGradientBucket`` object.
 
@@ -163,6 +165,8 @@ class SyncGradientBucket(AbstractGradientBucket):
             grad_dtype: The dtype of the gradients.
             reduce_mesh: The device mesh to reduce the gradients over.
             communicate_stream: The CUDA stream to run the asynchronous communication on.
+            on_ready: Called when all parameters reach the required accumulation count. The callee decides when
+                to call ``start_reduction()``.
 
         Raises:
             ValueError: If any parameter does not hold ``DTensor`` data.
@@ -181,7 +185,9 @@ class SyncGradientBucket(AbstractGradientBucket):
         self._hooks: list[RemovableHandle] | None = None
 
         self._communicate_stream = communicate_stream
+        self._on_ready = on_ready
         self._ready_to_sync = False
+        self._write_events: dict[torch.cuda.Stream, torch.cuda.Event] = {}
 
     def _bind_buffer(self):
         """Allocates the flat buffer and makes the parameter gradients views into it."""
@@ -203,16 +209,20 @@ class SyncGradientBucket(AbstractGradientBucket):
 
     @torch.no_grad()
     def _post_accumulation_hook(self, param: nn.Parameter):
-        """Counts an accumulation of ``param`` and starts the asynchronous all-reduce once the bucket is ready.
+        """Counts an accumulation of ``param`` and reports the bucket as ready once all parameters are counted.
 
         Args:
             param: The parameter whose gradient was accumulated.
 
         Raises:
-            ValueError: If the previous reduction of the bucket was not waited for, or if the buffer is not
-                allocated.
+            ValueError: If the previous reduction of the bucket was not waited for.
         """
         self._accum_counter.update(param)
+
+        # The gradient write is only enqueued when the hook runs. FSDP writes on the stream of its root, so one
+        # bucket can get writes from several streams. The latest event of a stream covers its earlier writes.
+        stream = torch.cuda.current_stream()
+        self._write_events[stream] = stream.record_event()
 
         if not self._accum_counter.is_ready():
             return
@@ -223,13 +233,33 @@ class SyncGradientBucket(AbstractGradientBucket):
                 "Call wait() on the synchronizer after each reduction."
             )
 
+        self._on_ready()
+
+    def is_ready_to_reduce(self) -> bool:
+        """Checks whether all parameters reached the required accumulation count.
+
+        Returns:
+            ``True`` if ``start_reduction()`` can be called.
+        """
+        return self._accum_counter.is_ready()
+
+    @torch.no_grad()
+    def start_reduction(self):
+        """Starts the asynchronous all-reduce of the gradient buffer on the communication stream.
+
+        Raises:
+            ValueError: If the buffer is not allocated.
+        """
         buffer = self._buffer
         if buffer is None:
             raise ValueError("The gradient buffer is not allocated. Call bind() first.")
 
         with record_function("Gradient Sync"):
-            # The reduction must see the gradients that the backward pass wrote on the current stream.
-            self._communicate_stream.wait_stream(torch.cuda.current_stream())
+            # The reduction must see the gradient writes of all streams, not only of the stream that made the bucket
+            # ready.
+            for event in self._write_events.values():
+                self._communicate_stream.wait_event(event)
+            self._write_events.clear()
             # A side stream overlaps the reduction with the rest of the backward pass; the all-reduces share the
             # buffer, so they run one after another on that stream.
             with torch.cuda.stream(self._communicate_stream):
@@ -253,6 +283,7 @@ class SyncGradientBucket(AbstractGradientBucket):
     def _unbind_buffer(self):
         """Frees the buffer and clears the parameter gradients."""
         self._buffer = None
+        self._write_events.clear()
 
         for param in self._params:
             param.grad = None
@@ -285,6 +316,7 @@ class SyncGradientBucket(AbstractGradientBucket):
 
         buffer.zero_()
         self._accum_counter.reset()
+        self._write_events.clear()
 
     def mark_sync(self):
         if not self._ready_to_sync:

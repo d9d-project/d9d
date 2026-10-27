@@ -93,3 +93,37 @@ def test_parallelize_hsdp(dist_ctx_factory):
 
     assert torch.allclose(model.w.param.grad.to_local(), exp_local_w)
     assert torch.allclose(model.b.param.grad.to_local(), exp_local_b)
+
+
+def _module_classes(model: nn.Module) -> dict[str, type]:
+    return {name: type(submod) for name, submod in model.named_modules()}
+
+
+@pytest.mark.distributed
+def test_parallelize_hsdp_keeps_fsdp_classes(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_shard=4, data_parallel_replicate=2))
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate", "dp_cp_shard"]
+
+    param_size = 16
+    model = SimpleLinear(param_size).cuda()
+    parallelize_hsdp(model, mesh, shard_dim="dp_cp_shard")
+    classes = _module_classes(model)
+
+    x = torch.arange(param_size, device="cuda", dtype=torch.float) + dist.get_rank()
+    first_step_grads = None
+    # The second step checks that the first step left the module in its parallelized state.
+    for _ in range(2):
+        model.zero_grad(set_to_none=True)
+        y = model(x)
+        assert _module_classes(model) == classes
+        assert isinstance(model, FSDPModule)
+
+        y.backward()
+        assert _module_classes(model) == classes
+        model.reshard()
+
+        grads = [param.grad.to_local().clone() for param in model.parameters()]
+        if first_step_grads is None:
+            first_step_grads = grads
+        for grad, first_grad in zip(grads, first_step_grads, strict=True):
+            torch.testing.assert_close(grad, first_grad, rtol=0, atol=0)
