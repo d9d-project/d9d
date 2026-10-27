@@ -15,8 +15,7 @@ from d9d_test.modules.helper import (
     microbatch_slice,
     sync_grads_manually,
 )
-from d9d_test.modules.model.meshes import MESHES_FOR_MODEL_TESTS
-from d9d_test.modules.model.sequence.catalogue import ModelCatalogue, parallelize_decoder
+from d9d_test.modules.model.sequence.catalogue import D9D_MODEL_MESHES, ModelCatalogue, parallelize_decoder
 from d9d_test.modules.model.sequence.classification.batch import build_classification_batch, shard_classification_batch
 from d9d_test.modules.model.sequence.classification.catalogue import D9D_MODEL_FACTORIES_CLS
 
@@ -25,17 +24,19 @@ _N_MICROBATCHES = 2
 
 @pytest.mark.distributed
 @pytest.mark.parametrize(
-    ("model_type", "model_factory_d9d"),
+    ("mesh", "model_type", "model_factory_d9d"),
     [
         pytest.param(
+            mesh,
             model_type,
             model_factory,
+            id=f"{model_type}-{mesh_name}-factory{factory_index}",
         )
         for model_type, factories in D9D_MODEL_FACTORIES_CLS.items()
-        for model_factory in factories
+        for mesh_name, mesh in D9D_MODEL_MESHES[model_type].items()
+        for factory_index, model_factory in enumerate(factories)
     ],
 )
-@pytest.mark.parametrize("mesh", MESHES_FOR_MODEL_TESTS)
 def test_consistent_to_itself_dist(
     mesh: DeviceMeshParameters, model_type: ModelCatalogue, model_factory_d9d, dist_ctx_factory
 ):

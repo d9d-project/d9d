@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from enum import StrEnum, auto
 
-from d9d.core.dist_context import DistributedContext
+from d9d.core.dist_context import DeviceMeshParameters, DistributedContext
 from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
 from d9d.module.model import DecoderBackbone, DecoderWithHead, DecoderWithHeads
@@ -27,11 +27,18 @@ from d9d.pipelining.api import PipelineStageInfo
 from transformers import PretrainedConfig, PreTrainedModel, Qwen3Config, Qwen3MoeConfig
 
 from d9d_test.modules.helper import torch_seed
+from d9d_test.modules.model.meshes import DENSE_MODEL_MESHES, MOE_MODEL_MESHES
 
 
 class ModelCatalogue(StrEnum):
     QWEN3_MOE = auto()
     QWEN3_DENSE = auto()
+
+
+D9D_MODEL_MESHES: dict[ModelCatalogue, dict[str, DeviceMeshParameters]] = {
+    ModelCatalogue.QWEN3_DENSE: DENSE_MODEL_MESHES,
+    ModelCatalogue.QWEN3_MOE: MOE_MODEL_MESHES,
+}
 
 
 _HIDDEN_SIZE = 512
