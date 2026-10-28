@@ -70,8 +70,11 @@ class LocalGradientBucket(AbstractGradientBucket):
     def bind(self):
         """Does nothing: local gradients need no buffer."""
 
+    @torch.no_grad()
     def unbind(self):
-        """Does nothing."""
+        """Sets the gradients of the parameters to ``None``."""
+        for param in self._params:
+            param.grad = None
 
     def wait(self):
         """Does nothing: local buckets do not communicate."""

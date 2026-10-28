@@ -57,6 +57,28 @@ def test_failed_wait_keeps_buckets_unchanged(dist_ctx_factory):
 
 
 @pytest.mark.distributed
+def test_unused_parameter_raises_on_wait(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+
+    used = _make_replicated_param(mesh)
+    unused = _make_replicated_param(mesh)
+    sync = GradientSynchronizer(param_groups=[[used, unused]], bucket_size_mb=1)
+    sync.bind()
+
+    try:
+        sync.set_required_accumulations(1)
+        # ``unused`` gets no gradient, so its bucket never reaches the required accumulation count.
+        _backward(used, 1.0)
+
+        with pytest.raises(ValueError, match="must get one in each backward pass"):
+            sync.wait()
+    finally:
+        torch.cuda.synchronize()
+        sync.unbind()
+
+
+@pytest.mark.distributed
 @pytest.mark.parametrize("wait_before_extra_backward", [False, True], ids=["before_wait", "after_wait"])
 def test_extra_accumulation_raises(dist_ctx_factory, wait_before_extra_backward):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))

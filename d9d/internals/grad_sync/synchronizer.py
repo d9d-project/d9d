@@ -250,6 +250,11 @@ class GradientSynchronizer:
 
     def unbind(self):
         """Destroys the buckets, frees their buffers and removes the hooks."""
+        # After an error in the backward pass, reductions can still run on the buffers. The buffers were allocated
+        # on the current stream, so the allocator could reuse their memory before the reductions finish.
+        if self._communicate_stream is not None:
+            torch.cuda.current_stream().wait_stream(self._communicate_stream)
+
         for bucket in self._buckets:
             bucket.unbind()
 
@@ -286,7 +291,8 @@ class GradientSynchronizer:
             raise ValueError(
                 f"The gradients are not ready to sync: bucket ({self._next_reduction}) of "
                 f"({len(self._sync_buckets)}) did not reach the required accumulation count. "
-                "Run all backward passes of the step before wait()."
+                "Run all backward passes of the step before wait(). Every parameter that requires a gradient must get "
+                "one in each backward pass."
             )
 
         torch.cuda.current_stream().wait_stream(stream)

@@ -38,6 +38,7 @@ Training often accumulates gradients over several microbatches before an optimiz
 
 *   **Owned gradients**: After `bind()`, each gradient of a parameter that needs a reduction is a view into the buffer of its bucket. Do not set gradients to `None`, e.g. with `optimizer.zero_grad()`. Call `zero_grad()` of the synchronizer instead. A backward pass into a replaced gradient raises an error.
 *   **Exact accumulation count**: Each parameter must get exactly `require_accumulations` gradients per step. An extra backward pass raises an error. A missing one makes `wait()` raise an error.
+*   **No unused parameters**: Every parameter that requires a gradient must get one in each backward pass. Otherwise its bucket never starts the reduction and `wait()` raises an error. If only some ranks skip the parameter, the other ranks wait in the `all_reduce` until the collective timeout.
 *   **No shared parameters**: A parameter can appear only once in the parameter groups. Tied weights in two parameter groups raise an error in `bind()`.
 
 ## API Reference
