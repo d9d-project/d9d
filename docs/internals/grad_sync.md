@@ -34,6 +34,12 @@ Training often accumulates gradients over several microbatches before an optimiz
 
 4.  **Synchronization**: When the asynchronous reduction completes, the flat buffer holds the globally summed gradient. The gradients have the same `Replicate` placement as their parameters. So the optimizer can use them without any further synchronization.
 
+## Limits
+
+*   **Owned gradients**: After `bind()`, each gradient of a parameter that needs a reduction is a view into the buffer of its bucket. Do not set gradients to `None`, e.g. with `optimizer.zero_grad()`. Call `zero_grad()` of the synchronizer instead. A backward pass into a replaced gradient raises an error.
+*   **Exact accumulation count**: Each parameter must get exactly `require_accumulations` gradients per step. An extra backward pass raises an error. A missing one makes `wait()` raise an error.
+*   **No shared parameters**: A parameter can appear only once in the parameter groups. Tied weights in two parameter groups raise an error in `bind()`.
+
 ## API Reference
 
 ::: d9d.internals.grad_sync

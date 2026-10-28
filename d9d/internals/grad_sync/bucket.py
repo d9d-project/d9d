@@ -125,8 +125,17 @@ class AccumulationCounter:
 
         Args:
             param: The parameter that finished a backward step.
+
+        Raises:
+            ValueError: If the parameter is accumulated more times than required.
         """
-        self._param_to_sync_count[param] += 1
+        count = self._param_to_sync_count[param] + 1
+        if self._require_accumulations is not None and count > self._require_accumulations:
+            raise ValueError(
+                f"A parameter is accumulated more times ({count}) than required ({self._require_accumulations}). "
+                "Set the accumulation count to the number of backward passes and call zero_grad() after each step."
+            )
+        self._param_to_sync_count[param] = count
 
     def is_ready(self) -> bool:
         """Checks whether all parameters reached the required number of accumulations.
@@ -182,6 +191,7 @@ class SyncGradientBucket(AbstractGradientBucket):
         self._reduce_groups: list[dist.ProcessGroup] = reduce_mesh.get_all_groups()[::-1]
 
         self._buffer: Tensor | None = None
+        self._grad_data_ptrs: dict[nn.Parameter, int] = {}
         self._hooks: list[RemovableHandle] | None = None
 
         self._communicate_stream = communicate_stream
@@ -209,6 +219,7 @@ class SyncGradientBucket(AbstractGradientBucket):
             local_grad = self._buffer[offset : offset + local_param.numel()].view(local_param.shape)
 
             param.grad = dist_grad_from_local(data, local_grad)
+            self._grad_data_ptrs[param] = local_grad.data_ptr()
 
             offset += local_param.numel()
 
@@ -220,8 +231,18 @@ class SyncGradientBucket(AbstractGradientBucket):
             param: The parameter whose gradient was accumulated.
 
         Raises:
-            ValueError: If the previous reduction of the bucket was not waited for.
+            ValueError: If the gradient is no longer a view into the buffer, or if the previous reduction of the
+                bucket was not waited for.
         """
+        # Code outside the synchronizer can replace the gradient, e.g. optimizer.zero_grad(set_to_none=True). Then
+        # autograd writes into a new tensor and the reduction of the buffer misses it.
+        grad = param.grad
+        if not isinstance(grad, DTensor) or grad.to_local().data_ptr() != self._grad_data_ptrs[param]:
+            raise ValueError(
+                "The gradient of a parameter is no longer a view into its bucket buffer. "
+                "Do not set gradients to None outside the synchronizer: call zero_grad() of the synchronizer."
+            )
+
         self._accum_counter.update(param)
 
         # The gradient write is only enqueued when the hook runs. FSDP writes on the stream of its root, so one
@@ -288,6 +309,7 @@ class SyncGradientBucket(AbstractGradientBucket):
     def _unbind_buffer(self):
         """Frees the buffer and clears the parameter gradients."""
         self._buffer = None
+        self._grad_data_ptrs.clear()
         self._write_events.clear()
 
         for param in self._params:
