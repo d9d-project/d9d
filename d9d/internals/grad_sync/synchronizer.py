@@ -1,5 +1,6 @@
 import dataclasses
 from collections import defaultdict
+from collections.abc import Callable
 from typing import cast
 
 import torch
@@ -123,6 +124,7 @@ def _make_buckets(
     params: list[nn.Parameter],
     bucket_size_mb: int,
     communicate_stream: torch.cuda.Stream,
+    on_ready: Callable[[], None],
 ) -> list[AbstractGradientBucket]:
     """Creates the buckets of one parameter group.
 
@@ -133,6 +135,7 @@ def _make_buckets(
         params: The parameters of the group.
         bucket_size_mb: The maximum size of one sync bucket in MiB.
         communicate_stream: The CUDA stream for asynchronous gradient communication.
+        on_ready: Called when a sync bucket reaches the required accumulation count.
 
     Returns:
         The buckets of the group.
@@ -155,6 +158,7 @@ def _make_buckets(
             grad_dtype=grad_dtype,
             reduce_mesh=reduce_mesh,
             communicate_stream=communicate_stream,
+            on_ready=on_ready,
         )
         for chunk in _split_by_size(params, grad_dtype=grad_dtype, bucket_size_mb=bucket_size_mb)
     ]
@@ -181,6 +185,8 @@ class GradientSynchronizer:
         self._communicate_stream: torch.cuda.Stream | None = None
         self._can_sync: bool
         self._buckets: list[AbstractGradientBucket] = []
+        self._sync_buckets: list[SyncGradientBucket] = []
+        self._next_reduction = 0
 
     def bind(self):
         """Builds the buckets, allocates their gradient buffers and registers the backward hooks.
@@ -193,9 +199,26 @@ class GradientSynchronizer:
             bucket
             for group_marker, params in _group_params_for_buckets(self._param_groups).items()
             for bucket in _make_buckets(
-                group_marker, params, bucket_size_mb=self._bucket_size_mb, communicate_stream=stream
+                group_marker,
+                params,
+                bucket_size_mb=self._bucket_size_mb,
+                communicate_stream=stream,
+                on_ready=self._start_ready_reductions,
             )
         ]
+        # Every rank starts the reductions in this order. In the expected backward order, a ready bucket rarely waits
+        # for the buckets before it, also when it shares the order with buckets of other reduce meshes.
+        backward_position = {
+            param: position
+            for position, param in enumerate(
+                param for param_group in self._param_groups[::-1] for param in param_group[::-1]
+            )
+        }
+        self._sync_buckets = sorted(
+            (bucket for bucket in self._buckets if isinstance(bucket, SyncGradientBucket)),
+            key=lambda bucket: backward_position[bucket.parameters[0]],
+        )
+        self._next_reduction = 0
 
         for bucket in self._buckets:
             bucket.bind()
@@ -211,7 +234,22 @@ class GradientSynchronizer:
             bucket.unbind()
 
         self._buckets = []
+        self._sync_buckets = []
         self._communicate_stream = None
+
+    def _start_ready_reductions(self):
+        """Starts the reductions of ready buckets in bucket order.
+
+        A ready bucket waits until all buckets before it are ready.
+        """
+        # Collectives are matched by call order, not by buffer. The backward pass can make buckets ready in a
+        # different order on each rank, so every rank must start them in the same bucket order.
+        while (
+            self._next_reduction < len(self._sync_buckets)
+            and self._sync_buckets[self._next_reduction].is_ready_to_reduce()
+        ):
+            self._sync_buckets[self._next_reduction].start_reduction()
+            self._next_reduction += 1
 
     def wait(self):
         """Makes the current stream wait for all asynchronous reductions and marks the buckets as synchronized.
@@ -249,6 +287,7 @@ class GradientSynchronizer:
         """Resets gradients and accumulation counters for all managed parameters."""
         for bucket in self._buckets:
             bucket.zero_grad()
+        self._next_reduction = 0
 
     def set_required_accumulations(self, require_accumulations: int):
         """Sets the accumulation count of the current step for all buckets.

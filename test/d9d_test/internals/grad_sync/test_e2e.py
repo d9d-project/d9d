@@ -22,7 +22,27 @@ def _make_dtensor_param(
     return param
 
 
+def _make_param_groups(params: list[nn.Parameter], layout: str) -> list[list[nn.Parameter]]:
+    match layout:
+        case "one_group":
+            return [params]
+        case "group_per_param":
+            # One bucket per parameter, so the order of the backward passes changes the order of the buckets.
+            return [[param] for param in params]
+        case _:
+            raise ValueError(f"Unknown layout ({layout}).")
+
+
+def _backward_order(params: list[nn.Parameter], rank: int, rank_dependent: bool) -> list[nn.Parameter]:
+    # Odd ranks run the backward passes in reverse, like a model whose graph depends on the data.
+    if rank_dependent and rank % 2 == 1:
+        return params[::-1]
+    return params
+
+
 @pytest.mark.distributed
+@pytest.mark.parametrize("rank_dependent_order", [False, True], ids=["same_order", "rank_dependent_order"])
+@pytest.mark.parametrize("param_groups_layout", ["one_group", "group_per_param"])
 @pytest.mark.parametrize(
     "tensor_specs",
     [
@@ -44,7 +64,7 @@ def _make_dtensor_param(
     ("param_dtype", "grad_dtype"),
     [(torch.float32, torch.float32), (torch.bfloat16, torch.float32), (torch.bfloat16, torch.bfloat16)],
 )
-def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype):
+def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype, param_groups_layout, rank_dependent_order):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
     sync_mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
     params = [
@@ -58,7 +78,7 @@ def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype):
         )
         for spec in tensor_specs
     ]
-    sync = GradientSynchronizer(param_groups=[params], bucket_size_mb=2)
+    sync = GradientSynchronizer(param_groups=_make_param_groups(params, param_groups_layout), bucket_size_mb=2)
 
     sync.bind()
     sync.set_required_accumulations(2)
@@ -73,9 +93,10 @@ def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype):
                 assert param.grad is None
 
         rank = sync_mesh.get_local_rank()
+        backward_order = _backward_order(params, rank, rank_dependent_order)
 
         # STAGE 1: grad = rank
-        for param in params:
+        for param in backward_order:
             (param.to_local() * rank).sum().backward()
 
         # it is 1 accumulation out of 2
@@ -87,7 +108,7 @@ def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype):
             assert torch.allclose(param.grad.to_local(), expect_grad)
 
         # STAGE 2: grad = 2rank and sync
-        for param in params:
+        for param in backward_order:
             (param.to_local() * rank).sum().backward()
 
         sync.wait()
