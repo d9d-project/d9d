@@ -1,5 +1,6 @@
 import dataclasses
 from collections import defaultdict
+from collections.abc import Callable
 from typing import cast
 
 import torch
@@ -67,14 +68,26 @@ def _group_params_for_buckets(
 
     Returns:
         A dict that maps group markers to their parameters.
+
+    Raises:
+        ValueError: If a parameter appears more than once in the parameter groups.
     """
     regrouped_params = defaultdict(list)
+    seen_params: set[nn.Parameter] = set()
     for param_group_i, param_group in enumerate(param_groups):
         # The backward pass produces gradients roughly in reverse parameter order, so reversed buckets
         # fill up and start their reduction earlier.
         for param in param_group[::-1]:
             if not param.requires_grad:
                 continue
+
+            # A parameter in two buckets gets two gradient views, but autograd writes into only one of them.
+            if param in seen_params:
+                raise ValueError(
+                    f"A parameter (shape {tuple(param.shape)}) appears more than once in the parameter groups. "
+                    "Shared parameters are not supported by gradient synchronization."
+                )
+            seen_params.add(param)
 
             if isinstance(param.data, DTensor):
                 reduce_mesh = _find_reduce_mesh(param.data)
@@ -123,6 +136,7 @@ def _make_buckets(
     params: list[nn.Parameter],
     bucket_size_mb: int,
     communicate_stream: torch.cuda.Stream,
+    on_ready: Callable[[], None],
 ) -> list[AbstractGradientBucket]:
     """Creates the buckets of one parameter group.
 
@@ -133,6 +147,7 @@ def _make_buckets(
         params: The parameters of the group.
         bucket_size_mb: The maximum size of one sync bucket in MiB.
         communicate_stream: The CUDA stream for asynchronous gradient communication.
+        on_ready: Called when a sync bucket reaches the required accumulation count.
 
     Returns:
         The buckets of the group.
@@ -155,6 +170,7 @@ def _make_buckets(
             grad_dtype=grad_dtype,
             reduce_mesh=reduce_mesh,
             communicate_stream=communicate_stream,
+            on_ready=on_ready,
         )
         for chunk in _split_by_size(params, grad_dtype=grad_dtype, bucket_size_mb=bucket_size_mb)
     ]
@@ -181,21 +197,48 @@ class GradientSynchronizer:
         self._communicate_stream: torch.cuda.Stream | None = None
         self._can_sync: bool
         self._buckets: list[AbstractGradientBucket] = []
+        self._sync_buckets: list[SyncGradientBucket] = []
+        self._next_reduction = 0
 
     def bind(self):
         """Builds the buckets, allocates their gradient buffers and registers the backward hooks.
 
         It must be called before the backward pass.
+
+        Raises:
+            ValueError: If the synchronizer is already bound, or if a parameter appears more than once in the
+                parameter groups.
         """
+        if self._communicate_stream is not None:
+            raise ValueError("The synchronizer is already bound. Call unbind() first.")
+
         stream = torch.cuda.Stream()
-        self._communicate_stream = stream
         self._buckets = [
             bucket
             for group_marker, params in _group_params_for_buckets(self._param_groups).items()
             for bucket in _make_buckets(
-                group_marker, params, bucket_size_mb=self._bucket_size_mb, communicate_stream=stream
+                group_marker,
+                params,
+                bucket_size_mb=self._bucket_size_mb,
+                communicate_stream=stream,
+                on_ready=self._start_ready_reductions,
             )
         ]
+        # Every rank starts the reductions in this order. In the expected backward order, a ready bucket rarely waits
+        # for the buckets before it, also when it shares the order with buckets of other reduce meshes.
+        backward_position = {
+            param: position
+            for position, param in enumerate(
+                param for param_group in self._param_groups[::-1] for param in param_group[::-1]
+            )
+        }
+        self._sync_buckets = sorted(
+            (bucket for bucket in self._buckets if isinstance(bucket, SyncGradientBucket)),
+            key=lambda bucket: backward_position[bucket.parameters[0]],
+        )
+        self._next_reduction = 0
+        # Set only after the buckets are built, so a failed build does not leave the synchronizer bound.
+        self._communicate_stream = stream
 
         for bucket in self._buckets:
             bucket.bind()
@@ -207,21 +250,50 @@ class GradientSynchronizer:
 
     def unbind(self):
         """Destroys the buckets, frees their buffers and removes the hooks."""
+        # After an error in the backward pass, reductions can still run on the buffers. The buffers were allocated
+        # on the current stream, so the allocator could reuse their memory before the reductions finish.
+        if self._communicate_stream is not None:
+            torch.cuda.current_stream().wait_stream(self._communicate_stream)
+
         for bucket in self._buckets:
             bucket.unbind()
 
         self._buckets = []
+        self._sync_buckets = []
         self._communicate_stream = None
+
+    def _start_ready_reductions(self):
+        """Starts the reductions of ready buckets in bucket order.
+
+        A ready bucket waits until all buckets before it are ready.
+        """
+        # Collectives are matched by call order, not by buffer. The backward pass can make buckets ready in a
+        # different order on each rank, so every rank must start them in the same bucket order.
+        while (
+            self._next_reduction < len(self._sync_buckets)
+            and self._sync_buckets[self._next_reduction].is_ready_to_reduce()
+        ):
+            self._sync_buckets[self._next_reduction].start_reduction()
+            self._next_reduction += 1
 
     def wait(self):
         """Makes the current stream wait for all asynchronous reductions and marks the buckets as synchronized.
 
         Raises:
-            ValueError: If the synchronizer is not bound.
+            ValueError: If the synchronizer is not bound, or if some bucket has not started its reduction.
         """
         stream = self._communicate_stream
         if stream is None:
             raise ValueError("The synchronizer is not bound. Call bind() first.")
+
+        # Check all buckets before marking any of them, so a failed wait() leaves the buckets unchanged.
+        if self._next_reduction < len(self._sync_buckets):
+            raise ValueError(
+                f"The gradients are not ready to sync: bucket ({self._next_reduction}) of "
+                f"({len(self._sync_buckets)}) did not reach the required accumulation count. "
+                "Run all backward passes of the step before wait(). Every parameter that requires a gradient must get "
+                "one in each backward pass."
+            )
 
         torch.cuda.current_stream().wait_stream(stream)
 
@@ -249,6 +321,7 @@ class GradientSynchronizer:
         """Resets gradients and accumulation counters for all managed parameters."""
         for bucket in self._buckets:
             bucket.zero_grad()
+        self._next_reduction = 0
 
     def set_required_accumulations(self, require_accumulations: int):
         """Sets the accumulation count of the current step for all buckets.
@@ -258,7 +331,12 @@ class GradientSynchronizer:
 
         Args:
             require_accumulations: The number of accumulations required before the gradients are reduced.
+
+        Raises:
+            ValueError: If ``require_accumulations`` is less than 1.
         """
+        if require_accumulations < 1:
+            raise ValueError(f"The accumulation count ({require_accumulations}) must be at least 1.")
         self._require_accumulations = require_accumulations
         for bucket in self._buckets:
             bucket.set_required_accumulations(require_accumulations)

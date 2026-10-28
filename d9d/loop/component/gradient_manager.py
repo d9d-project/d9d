@@ -71,9 +71,11 @@ class GradientManager(Offloadable):
         """
         self._bind()
         self._installed = True
-        yield
-        self._installed = False
-        self._unbind()
+        try:
+            yield
+        finally:
+            self._installed = False
+            self._unbind()
 
     def set_required_accumulations(self, require_accumulations: int):
         """Sets how many backward passes are accumulated before gradients are reduced this step.
