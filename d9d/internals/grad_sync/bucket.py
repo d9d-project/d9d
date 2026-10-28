@@ -187,6 +187,7 @@ class SyncGradientBucket(AbstractGradientBucket):
         self._communicate_stream = communicate_stream
         self._on_ready = on_ready
         self._ready_to_sync = False
+        self._write_events: dict[torch.cuda.Stream, torch.cuda.Event] = {}
 
     @property
     def parameters(self) -> list[nn.Parameter]:
@@ -223,6 +224,11 @@ class SyncGradientBucket(AbstractGradientBucket):
         """
         self._accum_counter.update(param)
 
+        # The gradient write is only enqueued when the hook runs. FSDP writes on the stream of its root, so one
+        # bucket can get writes from several streams. The latest event of a stream covers its earlier writes.
+        stream = torch.cuda.current_stream()
+        self._write_events[stream] = stream.record_event()
+
         if not self._accum_counter.is_ready():
             return
 
@@ -254,8 +260,11 @@ class SyncGradientBucket(AbstractGradientBucket):
             raise ValueError("The gradient buffer is not allocated. Call bind() first.")
 
         with record_function("Gradient Sync"):
-            # The reduction must see the gradients that the backward pass wrote on the current stream.
-            self._communicate_stream.wait_stream(torch.cuda.current_stream())
+            # The reduction must see the gradient writes of all streams, not only of the stream that made the bucket
+            # ready.
+            for event in self._write_events.values():
+                self._communicate_stream.wait_event(event)
+            self._write_events.clear()
             # A side stream overlaps the reduction with the rest of the backward pass; the all-reduces share the
             # buffer, so they run one after another on that stream.
             with torch.cuda.stream(self._communicate_stream):
@@ -279,6 +288,7 @@ class SyncGradientBucket(AbstractGradientBucket):
     def _unbind_buffer(self):
         """Frees the buffer and clears the parameter gradients."""
         self._buffer = None
+        self._write_events.clear()
 
         for param in self._params:
             param.grad = None
@@ -311,6 +321,7 @@ class SyncGradientBucket(AbstractGradientBucket):
 
         buffer.zero_()
         self._accum_counter.reset()
+        self._write_events.clear()
 
     def mark_sync(self):
         if not self._ready_to_sync:
