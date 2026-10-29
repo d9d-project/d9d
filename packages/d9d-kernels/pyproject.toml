@@ -1,6 +1,6 @@
 [project]
 name = "d9d-kernels"
-version = "0.24.0"
+version = "0.25.0"
 description = "GPU kernels for training in PyTorch, from the d9d training framework"
 authors = [
     {name = "Maksim Afanasev", email = "mr.applexz@gmail.com"}
