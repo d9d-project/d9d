@@ -1,7 +1,7 @@
 ---
 DEP: 0003
 Title: Event Bus Training Hooks
-Author: Daniil Sergeev @DaniilSergeev17 & Maksim Afanasyev @mrapplexz
+Author: Daniil Sergeev @DaniilSergeev17 & Maksim Afanasev @mrapplexz
 Status: Draft
 Type: Feature
 Created: 2026-03-12

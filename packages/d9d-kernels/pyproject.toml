@@ -3,7 +3,7 @@ name = "d9d-kernels"
 version = "0.24.0"
 description = "GPU kernels for training in PyTorch, from the d9d training framework"
 authors = [
-    {name = "Maksim Afanasyev", email = "mr.applexz@gmail.com"}
+    {name = "Maksim Afanasev", email = "mr.applexz@gmail.com"}
 ]
 license = "Apache-2.0"
 license-files = ["LICENSE"]
