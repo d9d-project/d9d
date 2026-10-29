@@ -20,7 +20,7 @@ Before starting work on a major feature, we highly recommend jumping into our [D
 
 2.  **Install dependencies:**
     ```bash
-    # Create .venv and install all workspace packages with all dependency groups (dev, test, docs, examples), without extras
+    # Create .venv and install all workspace packages, including the test packages, with all dependency groups (dev, docs, examples), without extras
     uv sync
 
     # Install pre-commit hooks
@@ -122,7 +122,7 @@ We use **[ty](https://github.com/astral-sh/ty)** to ensure type safety.
 
 *   **Coverage:**
     *   **Core Code:** strict type checking is enabled.
-    *   **Tests:** Excluded from strict type analysis (`test/**`) - at least for now.
+    *   **Tests:** Excluded from strict type analysis (`packages/*-dev/**`) - at least for now.
     *   **External Kernels:** External low-level kernels and wrappers (e.g., `packages/d9d/src/d9d/kernel/cce`, `deep_ep`) are explicitly ignored.
 
 ### Testing
@@ -131,6 +131,10 @@ We have two tiers of tests:
 2.  **Distributed (`-m distributed`):** Tests that strictly require `torchrun`.
 
 **Requirement:** All PRs must pass `make test`. If you add a feature, you must add corresponding tests.
+
+The tests and benchmarks of each published package are a workspace package of their own: `packages/d9d-dev` and
+`packages/d9d-kernels-dev`. `uv sync` installs them, so IDEs and tools import them like any other package. Add
+test-only dependencies to their `pyproject.toml`.
 
 ## Writing
 
