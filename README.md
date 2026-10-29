@@ -9,7 +9,7 @@
 d9d is for researchers and engineers who change the model, the parallelism or the training method itself. Each change stays in their own code.
 
 > [!WARNING]
-> d9d is in alpha, so public APIs can change between minor releases. Read the [changelog](./CHANGELOG.md) before you upgrade.
+> d9d is in alpha, so public APIs can change between minor releases. Read the [changelog](https://github.com/d9d-project/d9d/blob/main/CHANGELOG.md) before you upgrade.
 
 ## Get Started
 

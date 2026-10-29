@@ -1,4 +1,4 @@
-MODULE ?= test/d9d_test
+MODULE ?= packages/d9d/test/d9d_test
 
 .PHONY: test test-local test-distributed
 

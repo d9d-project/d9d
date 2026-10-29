@@ -160,7 +160,7 @@ inventories = [
     "https://docs.pydantic.dev/latest/objects.inv",
     "https://docs.pytorch.org/docs/stable/objects.inv",
 ]
-# paths = ["src"]
+paths = ["packages/d9d/src", "packages/d9d-kernels/src"]
 
 [project.plugins.mkdocstrings.handlers.python.options]
 docstring_style = "google"

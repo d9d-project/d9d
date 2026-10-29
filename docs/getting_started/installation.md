@@ -26,12 +26,12 @@ This page shows how to install d9d from PyPI or from a checkout of the repositor
 
 ## From a Checkout
 
-The `main` branch can be ahead of the latest release. To get these changes, install d9d from a checkout:
+The `main` branch can be ahead of the latest release. To get these changes, install d9d from a checkout. The repository holds two packages, `d9d` and `d9d-kernels`. d9d requires `d9d-kernels` of the same version, so you must install both:
 
 ```bash
 git clone https://github.com/d9d-project/d9d.git
 cd d9d
-pip install -e .
+pip install -e packages/d9d-kernels -e packages/d9d
 ```
 
 To work on d9d itself, follow the development setup in [CONTRIBUTING.md](https://github.com/d9d-project/d9d/blob/main/CONTRIBUTING.md).
@@ -42,7 +42,7 @@ Install an extra with its name in brackets. The quotes keep the shell from expan
 
 ```bash
 pip install "d9d[tracker-aim]"
-pip install -e ".[tracker-aim]"  # From a checkout.
+pip install -e packages/d9d-kernels -e "packages/d9d[tracker-aim]"  # From a checkout.
 ```
 
 The extras are:
