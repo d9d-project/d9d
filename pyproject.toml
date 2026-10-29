@@ -5,16 +5,6 @@ dev = [
     "python-semantic-release>=10.5.3,<11.0.0",
     "ty>=0.0.16,<0.0.17",
 ]
-test = [
-    "pytest>=9.0.2,<10.0.0",
-    "coverage>=7.13.1,<8.0.0",
-    "pytest-instafail>=0.5.0,<0.6.0",
-    "pandas>=3.0.0,<4.0.0",  # for triton benchmarks
-    "matplotlib>=3.10.8,<4.0.0",  # for triton benchmarks
-    "transformers>=5.5.0,<6.0.0",  # for comparing models
-    "scikit-learn>=1.8.0,<2.0.0",  # for comparing metrics
-    "liger-kernel>=0.7.0,<0.8.0",
-]
 docs = [
     "zensical>=0.0.24,<0.0.25",
     "mkdocstrings-python>=2.0.3,<3.0.0",
@@ -29,9 +19,11 @@ examples = [
 default-groups = "all"
 
 [tool.uv.workspace]
+# The -dev packages hold the tests. They are installed into the development environment, so that every tool finds them.
 members = ["packages/*"]
 
 [tool.uv.sources]
+d9d = { workspace = true }
 d9d-kernels = { workspace = true }
 # DeepEP is not published on PyPI: build it from a pinned commit against the exact torch/NVSHMEM from the lock
 deep-ep = { git = "https://github.com/deepseek-ai/DeepEP", rev = "9af0e0d0e74f3577af1979c9b9e1ac2cad0104ee" }
@@ -233,7 +225,7 @@ suppress-none-returning = true
 "packages/d9d/src/d9d/kernel/*.py" = [
     "N803"  # for uppercase kernel arg names
 ]
-"packages/*/test/*.py" = [
+"packages/*-dev/*.py" = [
     "S101", # asserts allowed in tests...
     "D", "DOC",  # no docs for tests sorry
     "ANN",  # no type annotations for tests
@@ -260,7 +252,7 @@ convention = "google"
 
 [tool.ty.src]
 exclude = [
-    "packages/*/test/**",
+    "packages/*-dev/**",
 ]
 
 [tool.ty.rules]
@@ -291,7 +283,8 @@ sed -i -E "s/^( *)\"d9d-kernels==[^\"]+\"/\\1\"d9d-kernels==$NEW_VERSION\"/" pac
 pip install uv
 uv lock --upgrade-package d9d --upgrade-package d9d-kernels
 git add packages/d9d/pyproject.toml uv.lock
-uv build --all-packages
+uv build --package d9d
+uv build --package d9d-kernels
 '''
 commit_parser = "conventional"
 

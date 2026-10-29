@@ -23,10 +23,11 @@ Most conventions are already documented. Always read relevant files (especially 
 
 ## Where things live
 
-- `packages/` - the packages of the uv workspace, released together under the same version. Each package has its own `pyproject.toml`, its code in `src/` and its tests in `test/`.
+- `packages/` - the packages of the uv workspace. The published packages `d9d` and `d9d-kernels` are released together under the same version, each with its own `pyproject.toml` and its code in `src/`. The tests and benchmarks of each are a separate workspace package `packages/<name>-dev/`, also with the code in `src/`, installed into the development environment and never published.
   - `packages/d9d/src/d9d/` - library source. Mirror its layout when adding docs in `docs/`.
-  - `packages/d9d/test/d9d_test/` - tests. `-m local` (single process) and `-m distributed` (require `torchrun`).
+  - `packages/d9d-dev/` - the `d9d-dev` package with the tests of d9d (`import d9d_dev`). `-m local` (single process) and `-m distributed` (require `torchrun`).
   - `packages/d9d-kernels/` - the `d9d-kernels` package (`import d9d_kernels`) for GPU kernels that must not import `d9d`. It is empty for now: the kernels still live in `packages/d9d/src/d9d/kernel/`.
+  - `packages/d9d-kernels-dev/` - the `d9d-kernels-dev` package with the tests and benchmarks of the kernels (`import d9d_kernels_dev`).
 - `deps/` - enhancement proposals.
 - `example/` - runnable training examples.
 

@@ -19,7 +19,9 @@ resolution-markers = [
 [manifest]
 members = [
     "d9d",
+    "d9d-dev",
     "d9d-kernels",
+    "d9d-kernels-dev",
 ]
 default-groups = "all"
 
@@ -37,16 +39,6 @@ docs = [
 examples = [
     { name = "datasets", specifier = ">=4.5.0,<5.0.0" },
     { name = "pyyaml", specifier = ">=6.0.0,<7.0.0" },
-]
-test = [
-    { name = "coverage", specifier = ">=7.13.1,<8.0.0" },
-    { name = "liger-kernel", specifier = ">=0.7.0,<0.8.0" },
-    { name = "matplotlib", specifier = ">=3.10.8,<4.0.0" },
-    { name = "pandas", specifier = ">=3.0.0,<4.0.0" },
-    { name = "pytest", specifier = ">=9.0.2,<10.0.0" },
-    { name = "pytest-instafail", specifier = ">=0.5.0,<0.6.0" },
-    { name = "scikit-learn", specifier = ">=1.8.0,<2.0.0" },
-    { name = "transformers", specifier = ">=5.5.0,<6.0.0" },
 ]
 
 [[manifest.dependency-metadata]]
@@ -1159,6 +1151,35 @@ requires-dist = [
 provides-extras = ["tracker-aim", "tracker-wandb", "tracker-tensorboard", "tracker-mlflow", "visualization", "cce", "linear-attention", "backend-sdpa-flash-attention-2", "backend-sdpa-flash-attention-4", "backend-grouped-mm-quack", "backend-grouped-mm-grouped-gemm", "backend-expert-parallel-deepep"]
 
 [[package]]
+name = "d9d-dev"
+version = "0.0.0"
+source = { editable = "packages/d9d-dev" }
+dependencies = [
+    { name = "coverage" },
+    { name = "d9d" },
+    { name = "liger-kernel" },
+    { name = "matplotlib" },
+    { name = "pandas" },
+    { name = "pytest" },
+    { name = "pytest-instafail" },
+    { name = "scikit-learn" },
+    { name = "transformers" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "coverage", specifier = ">=7.13.1,<8.0.0" },
+    { name = "d9d", editable = "packages/d9d" },
+    { name = "liger-kernel", specifier = ">=0.7.0,<0.8.0" },
+    { name = "matplotlib", specifier = ">=3.10.8,<4.0.0" },
+    { name = "pandas", specifier = ">=3.0.0,<4.0.0" },
+    { name = "pytest", specifier = ">=9.0.2,<10.0.0" },
+    { name = "pytest-instafail", specifier = ">=0.5.0,<0.6.0" },
+    { name = "scikit-learn", specifier = ">=1.8.0,<2.0.0" },
+    { name = "transformers", specifier = ">=5.5.0,<6.0.0" },
+]
+
+[[package]]
 name = "d9d-kernels"
 version = "0.25.0"
 source = { editable = "packages/d9d-kernels" }
@@ -1171,6 +1192,21 @@ dependencies = [
 requires-dist = [
     { name = "torch", specifier = ">=2.14.0" },
     { name = "triton", specifier = ">=3.6.0" },
+]
+
+[[package]]
+name = "d9d-kernels-dev"
+version = "0.0.0"
+source = { editable = "packages/d9d-kernels-dev" }
+dependencies = [
+    { name = "d9d-kernels" },
+    { name = "pytest" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "d9d-kernels", editable = "packages/d9d-kernels" },
+    { name = "pytest", specifier = ">=9.0.2,<10.0.0" },
 ]
 
 [[package]]
