@@ -195,7 +195,7 @@ A call reads a tensor on the current CUDA stream. You can change the tensor in p
 
 ## Adding a New Tracker
 
-The configuration union and the tracker factory live in `d9d/tracker/factory.py`, so a new tracker is a change to d9d itself. Open a pull request with it. The examples below add [Comet](https://www.comet.com/).
+The configuration union and the tracker factory live in `packages/d9d/src/d9d/tracker/factory.py`, so a new tracker is a change to d9d itself. Open a pull request with it. The examples below add [Comet](https://www.comet.com/).
 
 ### The Configuration
 
@@ -270,7 +270,7 @@ class CometTracker(BaseTracker[CometConfig]):
 
 ### Registration
 
-Add the configuration to the `AnyTrackerConfig` union in `d9d/tracker/factory.py`, and a `case` for it to `tracker_from_config()`. If the SDK is an optional dependency, add the extra `tracker-<provider>` to `pyproject.toml`. Import the tracker inside the `case`, so that d9d imports without the SDK and does not spend time to import an SDK that the job does not use:
+Add the configuration to the `AnyTrackerConfig` union in `packages/d9d/src/d9d/tracker/factory.py`, and a `case` for it to `tracker_from_config()`. If the SDK is an optional dependency, add the extra `tracker-<provider>` to `packages/d9d/pyproject.toml`. Import the tracker inside the `case`, so that d9d imports without the SDK and does not spend time to import an SDK that the job does not use:
 
 ```python
 case CometConfig():

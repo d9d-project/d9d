@@ -1,7 +1,7 @@
 ---
 DEP: 0009
 Title: Data Flow - JobSchedule & DataProvider
-Author: Maksim Afanasyev @mrapplexz
+Author: Maksim Afanasev @mrapplexz
 Status: Draft
 Type: Refactor
 Created: 2026-06-22

@@ -1,7 +1,7 @@
 ---
 DEP: 0008
 Title: Backend Selection Mechanism
-Author: Maksim Afanasyev @mrapplexz
+Author: Maksim Afanasev @mrapplexz
 Status: Draft
 Type: Feature
 Created: 2026-06-06
