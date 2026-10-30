@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.block.moe` package implements sparse Mixture-of-Experts layers. `MoELayer` combines a router, a token dispatcher and the experts, with an optional shared expert.
+The `d9d.nn.moe` package implements sparse Mixture-of-Experts layers. `MoELayer` combines a router, a token dispatcher and the experts, with an optional shared expert.
 
 ## Expert Parallelism
 
@@ -66,7 +66,7 @@ A shared expert processes every token, whatever the router chooses. Configure it
 ```python
 import torch
 
-from d9d.module.block.moe import MoELayer, SharedExpertParameters
+from d9d.nn.moe import MoELayer, SharedExpertParameters
 
 moe = MoELayer(
     hidden_dim=2048,
@@ -88,8 +88,8 @@ moe.reset_stats()
 
 ## API Reference
 
-::: d9d.module.block.moe
+::: d9d.nn.moe
 
-::: d9d.module.block.moe.communications
+::: d9d.nn.moe.communications
 
-::: d9d.module.block.moe.grouped_mm
+::: d9d.nn.moe.grouped_mm

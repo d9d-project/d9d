@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.parallelism` package provides functions that distribute modules across device meshes. These strategies are "horizontal": they split work within one pipeline stage. Pipeline parallelism is "vertical": it splits the model into stages of layers.
+The `d9d.parallel` package provides functions that distribute modules across device meshes. These strategies are "horizontal": they split work within one pipeline stage. Pipeline parallelism is "vertical": it splits the model into stages of layers.
 
 ## Design
 
@@ -58,7 +58,7 @@ The examples below use the mesh domains of [Distributed Context](../core/dist_co
 
 ```python
 from d9d.distributed import DENSE_DOMAIN, DistributedContext
-from d9d.module.parallelism.api import parallelize_replicate
+from d9d.parallel import parallelize_replicate
 
 ctx: DistributedContext = ...
 
@@ -74,8 +74,8 @@ parallelize_replicate(model, dense_mesh["dp_replicate", "cp_replicate"])
 
 ```python
 from d9d.distributed import EXPERT_DOMAIN, DistributedContext
-from d9d.module.block.moe import MoELayer
-from d9d.module.parallelism.api import parallelize_expert_parallel
+from d9d.nn.moe import MoELayer
+from d9d.parallel import parallelize_expert_parallel
 
 ctx: DistributedContext = ...
 
@@ -95,7 +95,7 @@ parallelize_expert_parallel(
 
 ```python
 from d9d.distributed import DENSE_DOMAIN, DistributedContext
-from d9d.module.parallelism.api import parallelize_fsdp
+from d9d.parallel import parallelize_fsdp
 
 ctx: DistributedContext = ...
 
@@ -110,7 +110,7 @@ parallelize_fsdp(model, mesh=dense_mesh["dp_cp_shard"])
 
 ```python
 from d9d.distributed import DENSE_DOMAIN, DistributedContext
-from d9d.module.parallelism.api import parallelize_hsdp
+from d9d.parallel import parallelize_hsdp
 
 ctx: DistributedContext = ...
 
@@ -128,6 +128,6 @@ parallelize_hsdp(
 
 ## API Reference
 
-::: d9d.module.parallelism.api
+::: d9d.parallel
 
-::: d9d.module.parallelism.style
+::: d9d.parallel.style

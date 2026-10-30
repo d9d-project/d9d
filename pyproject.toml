@@ -263,7 +263,7 @@ possibly-missing-attribute = "ignore"
 include = [
     "packages/d9d/src/d9d/kernel/cce/*",
     "packages/d9d/src/d9d/kernel/moe/*",
-    "packages/d9d/src/d9d/module/block/moe/communications/deepep.py"
+    "packages/d9d/src/d9d/nn/moe/communications/deepep.py"
 ]
 rules = { all = "ignore" }
 

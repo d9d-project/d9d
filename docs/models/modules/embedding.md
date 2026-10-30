@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.block.embedding` package provides the `SplitTokenEmbeddings` token embedding layer. It is built from several named embedding tables, called splits. Each split owns a contiguous range of the global vocabulary, in the order given by `split_order`.
+The `d9d.nn.embedding` package provides the `SplitTokenEmbeddings` token embedding layer. It is built from several named embedding tables, called splits. Each split owns a contiguous range of the global vocabulary, in the order given by `split_order`.
 
 ## Use Cases
 
@@ -16,7 +16,7 @@ The [`SplitLanguageModellingHead`](./head.md) uses the same splits for the outpu
 ```python
 import torch
 
-from d9d.module.block.embedding import SplitTokenEmbeddings
+from d9d.nn.embedding import SplitTokenEmbeddings
 
 embeddings = SplitTokenEmbeddings(
     split_vocab_size={"orig": 151936, "prompt": 16},
@@ -35,4 +35,4 @@ hidden_states = embeddings(input_ids)  # (1, 4, 2048)
 
 ## API Reference
 
-::: d9d.module.block.embedding
+::: d9d.nn.embedding

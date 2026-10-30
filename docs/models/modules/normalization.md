@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.block.normalization` package implements normalization layers.
+The `d9d.nn.normalization` package implements normalization layers.
 
 ## RMSNorm
 
@@ -59,7 +59,7 @@ It supports zero-centered scaling weights (`zero_centered=True`). They are initi
 ```python
 import torch
 
-from d9d.module.block.normalization import RMSNorm
+from d9d.nn.normalization import RMSNorm
 
 norm = RMSNorm(hidden_size=2048, eps=1e-6).cuda()
 norm.reset_parameters()
@@ -70,4 +70,4 @@ output = norm(hidden_states)  # (2, 16, 2048)
 
 ## API Reference
 
-::: d9d.module.block.normalization
+::: d9d.nn.normalization

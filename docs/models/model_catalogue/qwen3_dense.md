@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.model.qwen3_dense` package implements the dense [Qwen3](https://arxiv.org/abs/2505.09388) backbone. The `d9d.module.parallelism.model.qwen3_dense` package applies the default horizontal parallelism to it: HSDP for all modules. Tensor parallelism and context parallelism are not supported yet.
+The `d9d.models.qwen3_dense` package implements the dense [Qwen3](https://arxiv.org/abs/2505.09388) backbone. The `d9d.models.qwen3_dense.parallelize` package applies the default horizontal parallelism to it: HSDP for all modules. Tensor parallelism and context parallelism are not supported yet.
 
 ## Hugging Face Compatibility
 
@@ -13,10 +13,11 @@ There is one mapper pair for the bare backbone and one for each head type (causa
 ## Usage
 
 ```python
-from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.module.model import DecoderForCausalLM
-from d9d.module.model.qwen3_dense import Qwen3DenseModel, mapper_from_huggingface_qwen3_dense_for_causal_lm
-from d9d.module.parallelism.model import parallelize_causal_lm_head, parallelize_qwen3_dense_model
+from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
+from d9d.models import DecoderForCausalLM
+from d9d.models.qwen3_dense import Qwen3DenseModel, mapper_from_huggingface_qwen3_dense_for_causal_lm
+from d9d.models import parallelize_causal_lm_head
+from d9d.models.qwen3_dense import parallelize_qwen3_dense_model
 
 # In ModelProvider.initialize_model_stage.
 backbone = Qwen3DenseModel(
@@ -36,6 +37,4 @@ if context.stage.is_current_stage_last:
 
 ## API Reference
 
-::: d9d.module.model.qwen3_dense
-
-::: d9d.module.parallelism.model.qwen3_dense
+::: d9d.models.qwen3_dense

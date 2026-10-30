@@ -5,7 +5,7 @@ from torch import nn
 
 from d9d.model_state.mapper import ModelStateMapper
 from d9d.model_state.mapper.leaf import ModelStateMapperRename
-from d9d.module.block.moe import GroupedLinear
+from d9d.nn.moe import GroupedLinear
 
 from ..base import PeftInjectionResult, PeftMethod
 from .config import LoRAConfig

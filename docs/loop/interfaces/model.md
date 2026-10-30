@@ -49,10 +49,11 @@ from d9d.loop.control import (
     PrepareExportModelStageResult,
 )
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
-from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.module.model import DecoderForCausalLM
-from d9d.module.model.qwen3_moe import Qwen3MoEModel, Qwen3MoEParameters
-from d9d.module.parallelism.model import parallelize_causal_lm_head, parallelize_qwen3_moe_model
+from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
+from d9d.models import DecoderForCausalLM
+from d9d.models.qwen3_moe import Qwen3MoEModel, Qwen3MoEParameters
+from d9d.models import parallelize_causal_lm_head
+from d9d.models.qwen3_moe import parallelize_qwen3_moe_model
 
 
 class ModelProviderConfig(BaseModel):

@@ -10,7 +10,7 @@ from d9d.distributed import REGULAR_DOMAIN, DistributedContext
 from d9d.loop.config import ModelStageFactoryConfig, PipeliningConfig
 from d9d.loop.control import InitializeModelStageContext, ModelProvider, ParallelizeModelStageContext
 from d9d.model_state.io import load_model_state
-from d9d.module.base import ModuleLateInit
+from d9d.nn import ModuleLateInit
 from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory.factory import PipelineScheduleInfo, build_schedule

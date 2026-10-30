@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.block` package provides composable building blocks for models. The blocks are standard `nn.Module` classes. Some of them use custom kernels, and they work with the horizontal and expert parallelism strategies.
+The `d9d.nn` package provides composable building blocks for models. The blocks are standard `nn.Module` classes. Some of them use custom kernels, and they work with the horizontal and expert parallelism strategies.
 
 ## Navigation
 

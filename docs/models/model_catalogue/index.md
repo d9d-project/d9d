@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.model` package contains ready-to-use models. Each model comes with a default horizontal parallelism and with state mappers for Hugging Face checkpoints.
+The `d9d.models` package contains ready-to-use models. Each model comes with a default horizontal parallelism and with state mappers for Hugging Face checkpoints.
 
 ## Navigation
 

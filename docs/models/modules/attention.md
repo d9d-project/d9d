@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.block.attention` package provides softmax and linear attention layers. Softmax attention layers compute scaled dot-product attention (SDPA) with a pluggable backend.
+The `d9d.nn.attention` package provides softmax and linear attention layers. Softmax attention layers compute scaled dot-product attention (SDPA) with a pluggable backend.
 
 ## Softmax Attention
 
@@ -69,9 +69,9 @@ It uses kernels from [flash-linear-attention](https://github.com/fla-org/flash-l
 ```python
 import torch
 
-from d9d.module.block.attention import GroupedQueryAttention
-from d9d.module.block.attention.sdpa import TorchSdpaBackendConfig
-from d9d.module.block.positional import RotaryEmbeddingProvider, RotaryEmbeddingStyle
+from d9d.nn.attention import GroupedQueryAttention
+from d9d.nn.attention.sdpa import TorchSdpaBackendConfig
+from d9d.nn.positional import RotaryEmbeddingProvider, RotaryEmbeddingStyle
 
 rope = RotaryEmbeddingProvider(
     rope_base=1_000_000,
@@ -99,8 +99,8 @@ output = attention(hidden_states, attention_mask=None, position_embeddings=rope(
 
 ## API Reference
 
-::: d9d.module.block.attention
+::: d9d.nn.attention
 
-::: d9d.module.block.attention.sdpa
+::: d9d.nn.attention.sdpa
 
-::: d9d.module.block.attention.linear
+::: d9d.nn.attention.linear

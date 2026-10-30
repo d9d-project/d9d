@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.block.positional` package implements [rotary position embedding](https://arxiv.org/abs/2104.09864) (RoPE) from RoFormer.
+The `d9d.nn.positional` package implements [rotary position embedding](https://arxiv.org/abs/2104.09864) (RoPE) from RoFormer.
 
 ## Rotary Position Embedding
 
@@ -34,7 +34,7 @@ The provider and the applicator must use the same style.
 ```python
 import torch
 
-from d9d.module.block.positional import (
+from d9d.nn.positional import (
     RotaryEmbeddingApplicator,
     RotaryEmbeddingProvider,
     RotaryEmbeddingStyle,
@@ -64,4 +64,4 @@ query_states, key_states = applicator(query_states, key_states, cos, sin)
 
 ## API Reference
 
-::: d9d.module.block.positional
+::: d9d.nn.positional

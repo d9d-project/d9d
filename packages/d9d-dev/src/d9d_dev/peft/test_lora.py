@@ -49,9 +49,9 @@ def test_linear_math():
 
 @pytest.mark.local
 def test_grouped_lora_uses_backend_of_base_layer():
-    from d9d.module.block.moe import GroupedLinear
-    from d9d.module.block.moe.grouped_mm import EagerGroupedMmBackendConfig
-    from d9d.module.block.moe.grouped_mm.impl.eager import EagerGroupedMm
+    from d9d.nn.moe import GroupedLinear
+    from d9d.nn.moe.grouped_mm import EagerGroupedMmBackendConfig
+    from d9d.nn.moe.grouped_mm.impl.eager import EagerGroupedMm
     from d9d.peft.lora import LoRAGroupedLinear
 
     # An explicit backend that auto-detection would not pick on this machine.

@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.block.hidden_states_aggregator` package collects and reduces model hidden states during execution. Use it to keep hidden states for later use, such as reward modeling, custom distillation objectives or analysis. A reducing aggregator does not keep the full hidden states in memory. Create an aggregator with the `create_hidden_states_aggregator` factory.
+The `d9d.nn.hidden_states_aggregator` package collects and reduces model hidden states during execution. Use it to keep hidden states for later use, such as reward modeling, custom distillation objectives or analysis. A reducing aggregator does not keep the full hidden states in memory. Create an aggregator with the `create_hidden_states_aggregator` factory.
 
 ## Snapshots
 
@@ -30,7 +30,7 @@ If the aggregator collected nothing, `pack_with_snapshot` returns the snapshot u
 ```python
 import torch
 
-from d9d.module.block.hidden_states_aggregator import (
+from d9d.nn.hidden_states_aggregator import (
     HiddenStatesAggregationMode,
     create_hidden_states_aggregator,
 )
@@ -47,4 +47,4 @@ snapshot = aggregator.pack_with_snapshot(None)  # (3, 2, 2048)
 
 ## API Reference
 
-::: d9d.module.block.hidden_states_aggregator
+::: d9d.nn.hidden_states_aggregator

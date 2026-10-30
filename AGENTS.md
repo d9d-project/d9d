@@ -40,7 +40,9 @@ Top-level packages of the library.
 - `autograd/` - the global gradient context for split backward.
 - `offload/` - moving GPU state to host memory and back (the base of sleep/wake).
 - `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`, `sleep`).
-- `module/` - modeling building blocks: `base`, `block`, `model` (model catalogue), and `parallelism`.
+- `nn/` - modeling building blocks: attention, MoE, normalization, heads and other layers, and `ModuleLateInit`.
+- `parallel/` - horizontal parallelism: FSDP, HSDP, replicate and expert parallelism, and `style` (parallel styles).
+- `models/` - the model catalogue: the decoder backbone and heads, and one package per model with its Hugging Face mappers and its parallelization.
 - `pipelining/` - pipeline parallelism: `api`, `factory`, `infra` (the VM and schedules), and `training`.
 - `model_state/` - checkpoints: `mapper` (graph-based transform engine) and `io` (streaming reader/writers).
 - `data/` - distributed-aware dataset wrappers, bucketing, microbatch packing and the data protocols.

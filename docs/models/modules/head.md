@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.block.head` package provides task heads. A task head turns backbone hidden states into a typed output. Each head takes the hidden states and its own shared input, such as labels or a pooling mask.
+The `d9d.nn.head` package provides task heads. A task head turns backbone hidden states into a typed output. Each head takes the hidden states and its own shared input, such as labels or a pooling mask.
 
 ## Heads
 
@@ -29,7 +29,7 @@ Both `ClassificationHead` and `EmbeddingHead` take an optional `pooling_mask` th
 ```python
 import torch
 
-from d9d.module.block.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SplitLanguageModellingHead
+from d9d.nn.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SplitLanguageModellingHead
 
 head = SplitLanguageModellingHead(
     split_vocab_size={"orig": 151936, "special": 8},
@@ -46,4 +46,4 @@ loss = output.cross_entropy[labels != LM_IGNORE_INDEX].mean()
 
 ## API Reference
 
-::: d9d.module.block.head
+::: d9d.nn.head

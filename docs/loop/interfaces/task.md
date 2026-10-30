@@ -97,8 +97,8 @@ from d9d.loop.control import (
     ComputeLossResult,
     TrainTask,
 )
-from d9d.module.block.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
-from d9d.module.model.io import SequenceHeadShared, SequenceInput, SequenceShared
+from d9d.nn.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
+from d9d.models.io import SequenceHeadShared, SequenceInput, SequenceShared
 
 
 @dataclasses.dataclass

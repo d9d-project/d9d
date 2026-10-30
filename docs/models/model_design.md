@@ -42,4 +42,4 @@ See [Qwen3 MoE](./model_catalogue/qwen3_moe.md) for a reference implementation.
 
 ## API Reference
 
-::: d9d.module.base
+::: d9d.nn

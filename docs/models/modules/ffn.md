@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.block.ffn` package implements the dense feed-forward networks of Transformer blocks.
+The `d9d.nn.ffn` package implements the dense feed-forward networks of Transformer blocks.
 
 ## SwiGLU
 
@@ -19,7 +19,7 @@ It computes `SiLU(gate(x)) * up(x)` with a fused Triton kernel, so it requires a
 ```python
 import torch
 
-from d9d.module.block.ffn import SwiGLU
+from d9d.nn.ffn import SwiGLU
 
 ffn = SwiGLU(hidden_size=2048, intermediate_size=6144).cuda()
 
@@ -29,4 +29,4 @@ output = ffn(hidden_states)  # (2, 16, 2048)
 
 ## API Reference
 
-::: d9d.module.block.ffn
+::: d9d.nn.ffn

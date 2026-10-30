@@ -32,17 +32,17 @@ from d9d.loop.control import (
 )
 from d9d.loop.run import TrainingConfigurator
 from d9d.model_state.mapper.compose import ModelStateMapperSequential
-from d9d.module.block.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
-from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.module.model import DecoderForCausalLM
-from d9d.module.model.io import SequenceHeadShared, SequenceInput, SequenceShared
-from d9d.module.model.qwen3_dense import (
+from d9d.models import DecoderForCausalLM, parallelize_causal_lm_head
+from d9d.models.io import SequenceHeadShared, SequenceInput, SequenceShared
+from d9d.models.qwen3_dense import (
     Qwen3DenseModel,
     Qwen3DenseParameters,
     mapper_from_huggingface_qwen3_dense_for_causal_lm,
     mapper_to_huggingface_qwen3_dense_for_causal_lm,
+    parallelize_qwen3_dense_model,
 )
-from d9d.module.parallelism.model import parallelize_causal_lm_head, parallelize_qwen3_dense_model
+from d9d.nn.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
+from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
 from d9d.peft import inject_peft_and_freeze, merge_peft
 from d9d.peft.lora import LoRA, LoRAConfig
 from pydantic import BaseModel, ConfigDict

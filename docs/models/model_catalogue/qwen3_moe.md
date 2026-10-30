@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.module.model.qwen3_moe` package implements the [Qwen3](https://arxiv.org/abs/2505.09388) Mixture-of-Experts (MoE) backbone. The `d9d.module.parallelism.model.qwen3_moe` package applies the default horizontal parallelism to it: HSDP for the dense modules and expert parallelism for the MoE layers. Tensor parallelism and context parallelism are not supported yet.
+The `d9d.models.qwen3_moe` package implements the [Qwen3](https://arxiv.org/abs/2505.09388) Mixture-of-Experts (MoE) backbone. The `d9d.models.qwen3_moe.parallelize` package applies the default horizontal parallelism to it: HSDP for the dense modules and expert parallelism for the MoE layers. Tensor parallelism and context parallelism are not supported yet.
 
 ## Hugging Face Compatibility
 
@@ -15,14 +15,15 @@ An embedding model cannot be exported to Hugging Face if its embedding head has 
 ## Usage
 
 ```python
-from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.module.model import DecoderForCausalLM
-from d9d.module.model.qwen3_moe import (
+from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
+from d9d.models import DecoderForCausalLM
+from d9d.models.qwen3_moe import (
     Qwen3MoEExpertsFormat,
     Qwen3MoEModel,
     mapper_from_huggingface_qwen3_moe_for_causal_lm,
 )
-from d9d.module.parallelism.model import parallelize_causal_lm_head, parallelize_qwen3_moe_model
+from d9d.models import parallelize_causal_lm_head
+from d9d.models.qwen3_moe import parallelize_qwen3_moe_model
 
 # In ModelProvider.initialize_model_stage.
 backbone = Qwen3MoEModel(
@@ -42,6 +43,4 @@ if context.stage.is_current_stage_last:
 
 ## API Reference
 
-::: d9d.module.model.qwen3_moe
-
-::: d9d.module.parallelism.model.qwen3_moe
+::: d9d.models.qwen3_moe
