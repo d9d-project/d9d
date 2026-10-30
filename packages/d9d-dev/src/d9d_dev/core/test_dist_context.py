@@ -11,6 +11,7 @@ from d9d.core.dist_context import (
     DeviceMeshParameters,
 )
 from pydantic import ValidationError
+from torch.distributed.constants import default_pg_nccl_timeout
 
 
 @pytest.mark.local
@@ -136,7 +137,11 @@ def test_sync_primitives(dist_ctx_factory):
     ctx.wait_world()
 
     ctx.set_timeout(10.0)  # Set to 10 seconds
-    ctx.wait_world()
+    try:
+        ctx.wait_world()
+    finally:
+        # set_timeout also changes the default process group, which every later test in the session shares
+        ctx.set_timeout(default_pg_nccl_timeout.total_seconds())
 
 
 @pytest.mark.local
