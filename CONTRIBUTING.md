@@ -20,7 +20,7 @@ Before starting work on a major feature, we highly recommend jumping into our [D
 
 2.  **Install dependencies:**
     ```bash
-    # Create .venv and install the project with all dependency groups (dev, test, docs, examples), without extras
+    # Create .venv and install all workspace packages, including the test packages, with all dependency groups (dev, docs, examples), without extras
     uv sync
 
     # Install pre-commit hooks
@@ -73,10 +73,10 @@ We enforce strict quality standards to keep the codebase maintainable.
 
 They are not enforced by tooling, but PRs that violate them may be asked to change.
 
-* **Composition over inheritance**: components are small single-responsibility classes wired together (see `d9d/loop/component/`). Avoid "God classes" that accumulate unrelated responsibilities, avoid speculative base classes that exist only to hoard "common" code.
+* **Composition over inheritance**: components are small single-responsibility classes wired together (see `packages/d9d/src/d9d/loop/component/`). Avoid "God classes" that accumulate unrelated responsibilities, avoid speculative base classes that exist only to hoard "common" code.
 * **Define contracts structurally.** Use a `typing.Protocol` for a *trait* - a secondary capability bolted onto a type that already has its own base class (e.g. `ModuleLateInit` on an `nn.Module`), where you want duck-typed conformance without forcing inheritance. Use an `abc.ABC` when the interface *is* the object's primary identity and the hierarchy is the "main" type (e.g. `PipelineSchedule`).
 * **No reflection where it can be avoided.** Avoid `getattr` / `hasattr` / `inspect` and string-name dispatch. Prefer an explicit `match`-`case`, a proper interface, or a factory. Reflection is acceptable *only* when introspection is intrinsic to the feature itself - i.e. declarative registration APIs that cannot work without it, such as a `@subscribe`/`@register` decorator wiring handlers by signature.
-* **Inject dependencies; don't reach for them.** Components receive their collaborators as constructor arguments and store them as private fields. Don't pull them from globals/singletons or construct them internally - wiring happens at the edges (`d9d/loop/run/`).
+* **Inject dependencies; don't reach for them.** Components receive their collaborators as constructor arguments and store them as private fields. Don't pull them from globals/singletons or construct them internally - wiring happens at the edges (`packages/d9d/src/d9d/loop/run/`).
 * **Reuse before reinventing.** If PyTorch or the stdlib already solves it, use it, rather than hand-rolling an equivalent.
 * **No needless indirection.** Don't add a wrapper that only forwards to another function/object without adding meaning. Inline it instead.
 * **Validate eagerly, fail fast.** Validate constructor args up front; raise if a method is called outside its required lifecycle scope rather than silently misbehaving.
@@ -109,6 +109,7 @@ conforming code without memorizing rule codes.
 
 #### Boundaries
 *   Every package needs `__init__.py` (`INP`); `/example/` is exempt.
+*   The kernels package `packages/d9d-kernels` must not import `d9d` (`TID251`).
 *   `__init__.py` files expose the package's public surface via an explicit `__all__` re-export list.
 
 #### Test Code
@@ -121,8 +122,8 @@ We use **[ty](https://github.com/astral-sh/ty)** to ensure type safety.
 
 *   **Coverage:**
     *   **Core Code:** strict type checking is enabled.
-    *   **Tests:** Excluded from strict type analysis (`test/**`) - at least for now.
-    *   **External Kernels:** External low-level kernels and wrappers (e.g., `d9d/kernel/cce`, `deep_ep`) are explicitly ignored.
+    *   **Tests:** Excluded from strict type analysis (`packages/*-dev/**`) - at least for now.
+    *   **External Kernels:** External low-level kernels and wrappers (e.g., `packages/d9d/src/d9d/kernel/cce`, `deep_ep`) are explicitly ignored.
 
 ### Testing
 We have two tiers of tests:
@@ -130,6 +131,10 @@ We have two tiers of tests:
 2.  **Distributed (`-m distributed`):** Tests that strictly require `torchrun`.
 
 **Requirement:** All PRs must pass `make test`. If you add a feature, you must add corresponding tests.
+
+The tests and benchmarks of each published package are a workspace package of their own: `packages/d9d-dev` and
+`packages/d9d-kernels-dev`. `uv sync` installs them, so IDEs and tools import them like any other package. Add
+test-only dependencies to their `pyproject.toml`.
 
 ## Writing
 
@@ -278,7 +283,7 @@ Pages follow the [Writing](#writing) rules above, plus these:
 
 The site is built with **Zensical**.
 
-*   **Location:** Page sources live in `docs/`; the code they document lives in `d9d/`.
+*   **Location:** Page sources live in `docs/`; the code they document lives in `packages/d9d/src/d9d/`.
 *   **Building:** Run `make mkdocs` to preview changes locally.
 *   **Registering pages (`zensical.toml`):** The site navigation is **not** auto-generated from the `docs/` directory - it is defined explicitly in the `nav` table of `zensical.toml`. Whenever you add, remove, rename, or move a page under `docs/`, you must update `nav` accordingly. New top-level subsystems should also be added to the appropriate section (and mirrored in `docs/toc.md`).
 

@@ -1,0 +1,15 @@
+[project]
+name = "d9d-kernels-dev"
+version = "0.0.0"
+description = "Tests and benchmarks of d9d-kernels. Installed into the development environment, never published."
+requires-python = ">=3.11,<3.15"
+# PyPI rejects packages with this classifier, so the tests cannot be uploaded by mistake.
+classifiers = ["Private :: Do Not Upload"]
+dependencies = [
+    "d9d-kernels",
+    "pytest>=9.0.2,<10.0.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.6,<0.13.0"]
+build-backend = "uv_build"

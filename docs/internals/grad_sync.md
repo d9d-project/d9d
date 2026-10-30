@@ -30,7 +30,16 @@ Training often accumulates gradients over several microbatches before an optimiz
 
 2.  **Automatic trigger**: Each bucket counts the gradient accumulations of its parameters. The `all_reduce` starts *only* when all parameters of the bucket reach the `require_accumulations` count. The trigger runs inside the backward hook of the *last* microbatch. So the communication overlaps with the backward pass of the remaining layers. The communication runs on a separate CUDA stream. You must wait for it before you use the gradients on your default stream.
 
-3.  **Synchronization**: When the asynchronous reduction completes, the flat buffer holds the globally summed gradient. The gradients have the same `Replicate` placement as their parameters. So the optimizer can use them without any further synchronization.
+3.  **Fixed order**: Collectives are matched by call order, so all ranks must start them in the same order. The backward pass can make buckets ready in a different order on each rank. So a ready bucket starts its `all_reduce` only after all buckets before it have started theirs. Buckets are ordered by their first parameter in reverse parameter order across all parameter groups, which is the expected backward order. The gradients of one bucket can be written on several CUDA streams, e.g. by several FSDP roots. The `all_reduce` waits for the writes of all these streams.
+
+4.  **Synchronization**: When the asynchronous reduction completes, the flat buffer holds the globally summed gradient. The gradients have the same `Replicate` placement as their parameters. So the optimizer can use them without any further synchronization.
+
+## Limits
+
+*   **Owned gradients**: After `bind()`, each gradient of a parameter that needs a reduction is a view into the buffer of its bucket. Do not set gradients to `None`, e.g. with `optimizer.zero_grad()`. Call `zero_grad()` of the synchronizer instead. A backward pass into a replaced gradient raises an error.
+*   **Exact accumulation count**: Each parameter must get exactly `require_accumulations` gradients per step. An extra backward pass raises an error. A missing one makes `wait()` raise an error.
+*   **No unused parameters**: Every parameter that requires a gradient must get one in each backward pass. Otherwise its bucket never starts the reduction and `wait()` raises an error. If only some ranks skip the parameter, the other ranks wait in the `all_reduce` until the collective timeout.
+*   **No shared parameters**: A parameter can appear only once in the parameter groups. Tied weights in two parameter groups raise an error in `bind()`.
 
 ## API Reference
 

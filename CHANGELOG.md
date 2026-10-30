@@ -2,6 +2,33 @@
 
 <!-- version list -->
 
+## v0.25.0 (2026-10-29)
+
+### Bug Fixes
+
+- **grad_sync**: Clean up after a failed step and reject unused parameters
+  ([`ba139a7`](https://github.com/d9d-project/d9d/commit/ba139a766ce2d79f9ce08afeff07dd6d2f000ada))
+
+- **grad_sync**: Raise clear errors on misuse of the synchronizer
+  ([`ba139a7`](https://github.com/d9d-project/d9d/commit/ba139a766ce2d79f9ce08afeff07dd6d2f000ada))
+
+- **grad_sync**: Start bucket reductions in the same order on every rank
+  ([`ba139a7`](https://github.com/d9d-project/d9d/commit/ba139a766ce2d79f9ce08afeff07dd6d2f000ada))
+
+- **grad_sync**: Start bucket reductions in the same order on every rank and introduce additional
+  safety checks
+  ([`ba139a7`](https://github.com/d9d-project/d9d/commit/ba139a766ce2d79f9ce08afeff07dd6d2f000ada))
+
+- **grad_sync**: Wait for gradient writes on all streams before the all-reduce
+  ([`ba139a7`](https://github.com/d9d-project/d9d/commit/ba139a766ce2d79f9ce08afeff07dd6d2f000ada))
+
+### Features
+
+- Add the d9d-kernels package and move to a uv workspace
+  ([#123](https://github.com/d9d-project/d9d/pull/123),
+  [`9bd8d3e`](https://github.com/d9d-project/d9d/commit/9bd8d3e6ab08613394121c43233cc55d414f5ae7))
+
+
 ## v0.24.0 (2026-10-15)
 
 ### Documentation
