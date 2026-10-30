@@ -35,16 +35,18 @@ Most conventions are already documented. Always read relevant files (especially 
 
 Top-level packages of the library.
 
-- `core/` - distributed primitives: `dist_context` (the `DeviceMesh` source of truth), `dist_ops`, `pytree` (PyTree traversal), `offload` (sleep/wake state offloading), `autograd`, `protocol`, `types`.
-- `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`).
+- `distributed/` - the `DistributedContext` (the `DeviceMesh` source of truth) and its domains; `ops` (collectives that allocate their outputs).
+- `pytree/` - PyTree traversal and the `PyTree`/`TensorTree` aliases.
+- `autograd/` - the global gradient context for split backward.
+- `offload/` - moving GPU state to host memory and back (the base of sleep/wake).
+- `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`, `sleep`).
 - `module/` - modeling building blocks: `base`, `block`, `model` (model catalogue), and `parallelism`.
 - `pipelining/` - pipeline parallelism: `api`, `factory`, `infra` (the VM and schedules), and `training`.
 - `model_state/` - checkpoints: `mapper` (graph-based transform engine) and `io` (streaming reader/writers).
-- `dataset/` - distributed-aware dataset wrappers and bucketing.
+- `data/` - distributed-aware dataset wrappers, bucketing, microbatch packing and the data protocols.
 - `peft/` - parameter-efficient fine-tuning: `lora`, `full_tune`, `all` (method stacking).
 - `metric/` - distributed-aware metrics: `component` and `impl` (metric catalogue).
-- `optim/` - optimizers, including `stochastic` (stochastic-rounding low-precision).
-- `lr_scheduler/` - learning-rate schedules, including `piecewise` (composable schedules).
+- `optim/` - the optimizer and LR scheduler protocols, `stochastic` (stochastic-rounding low-precision optimizers) and `lr_scheduler` (`piecewise` composable schedules).
 - `tracker/` - experiment tracking integrations (`provider`, e.g. Aim).
 - `kernel/` - custom kernels: `cce`, `grouped_mm`, `moe`, `normalization`, `stochastic`, `swiglu`, `general`.
 - `internals/` - engine internals: `grad_sync`, `grad_norm`, `metric_collector`, `determinism`, `profiling`, `state`.

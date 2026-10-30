@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from d9d.core.dist_context import DistributedContext
+from d9d.distributed import DistributedContext
 from d9d.loop.config.config import TimeoutConfig
 
 

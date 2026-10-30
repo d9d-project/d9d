@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.core.autograd` package gives fine-grained control over the PyTorch autograd engine. Its main tool is the global grad context. It tells custom autograd functions which gradients to compute in a partial backward pass, as split-backward pipeline schedules such as Zero Bubble need.
+The `d9d.autograd` package gives fine-grained control over the PyTorch autograd engine. Its main tool is the global grad context. It tells custom autograd functions which gradients to compute in a partial backward pass, as split-backward pipeline schedules such as Zero Bubble need.
 
 ## The Global Grad Context
 
@@ -35,7 +35,7 @@ When you write a custom operation, assign a `GradDirection` to each gradient. Ch
 
 ```python
 import torch
-from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 
 
 class MyCustomOp(torch.autograd.Function):
@@ -67,7 +67,7 @@ If you write your own split-backward logic, you must set the context yourself:
 
 ```python
 import torch
-from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 
 with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs):
     torch.autograd.backward(outputs, grad_tensors=output_grads, inputs=stage_inputs, retain_graph=True)
@@ -75,4 +75,4 @@ with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs):
 
 ## API Reference
 
-::: d9d.core.autograd
+::: d9d.autograd

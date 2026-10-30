@@ -4,7 +4,7 @@ import torch
 import torch.distributed as dist
 from torch import nn
 
-from d9d.core import pytree
+from d9d import pytree
 from d9d.pipelining.api import (
     ModuleSupportsPipelining,
     PipelineStageInfo,

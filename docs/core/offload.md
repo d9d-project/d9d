@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.core.offload` package moves GPU-resident training state to host (CPU) memory and back. It is the base of the sleep / wake API of the `Trainer`. Sleep frees the GPUs for a colocated workload, for example a rollout engine that shares the GPUs in colocated reinforcement learning. The user entry points `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` are documented on the [Training Loop](../loop/train.md) page. This page covers the primitives they are built on.
+The `d9d.offload` package moves GPU-resident training state to host (CPU) memory and back. It is the base of the sleep / wake API of the `Trainer`. Sleep frees the GPUs for a colocated workload, for example a rollout engine that shares the GPUs in colocated reinforcement learning. The user entry points `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` are documented on the [Training Loop](../loop/train.md) page. This page covers the primitives they are built on.
 
 ## Building Blocks
 
@@ -38,7 +38,7 @@ The primitives swap the storage in place instead of creating new tensors. For a 
 
 ```python
 import torch
-from d9d.core.offload import offload_tensor, onload_tensor
+from d9d.offload import offload_tensor, onload_tensor
 
 device = torch.device("cuda")
 param = torch.randn(4096, 4096, device=device)
@@ -75,7 +75,7 @@ A subsystem that owns GPU state implements the protocol, so that the `Trainer` c
 
 ```python
 import torch
-from d9d.core.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
+from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 
 
 class MySubsystem(Offloadable):
@@ -107,4 +107,4 @@ The built-in implementations follow the same pattern: `TrackedModules` (model pa
 
 ## API Reference
 
-::: d9d.core.offload
+::: d9d.offload

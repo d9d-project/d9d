@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.lr_scheduler.piecewise` module builds piecewise learning rate schedules, such as "warmup, hold, decay". You chain phases together instead of writing an `LRScheduler` subclass or a `LambdaLR` function for each schedule.
+The `d9d.optim.lr_scheduler.piecewise` module builds piecewise learning rate schedules, such as "warmup, hold, decay". You chain phases together instead of writing an `LRScheduler` subclass or a `LambdaLR` function for each schedule.
 
 ## Phases
 
@@ -35,7 +35,7 @@ This example builds a "linear warmup, hold, cosine decay" schedule:
 
 ```python
 import torch
-from d9d.lr_scheduler.piecewise import CurveCosine, CurveLinear, piecewise_schedule
+from d9d.optim.lr_scheduler.piecewise import CurveCosine, CurveLinear, piecewise_schedule
 
 optimizer: torch.optim.Optimizer = ...
 total_steps: int = 1000
@@ -57,7 +57,7 @@ scheduler = (
 
 ```python
 import torch
-from d9d.lr_scheduler.piecewise import PiecewiseSchedulerConfig, piecewise_scheduler_from_config
+from d9d.optim.lr_scheduler.piecewise import PiecewiseSchedulerConfig, piecewise_scheduler_from_config
 
 optimizer: torch.optim.Optimizer = ...
 total_steps: int = 1000
@@ -92,4 +92,4 @@ scheduler = piecewise_scheduler_from_config(
 
 ## API Reference
 
-::: d9d.lr_scheduler.piecewise
+::: d9d.optim.lr_scheduler.piecewise

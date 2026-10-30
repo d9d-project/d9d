@@ -2,7 +2,7 @@ from typing import Any
 
 from torch.distributed.checkpoint.stateful import Stateful
 
-from d9d.core.dist_context import DistributedContext
+from d9d.distributed import DistributedContext
 
 
 def state_dict_main_process(dist_context: DistributedContext, obj: Stateful) -> dict[str, Any]:

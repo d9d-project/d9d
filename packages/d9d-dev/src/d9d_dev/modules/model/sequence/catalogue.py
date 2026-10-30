@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from enum import StrEnum, auto
 
-from d9d.core.dist_context import DistributedContext
+from d9d.distributed import DistributedContext
 from d9d.module.block.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
 from d9d.module.model import DecoderBackbone, DecoderWithHead, DecoderWithHeads

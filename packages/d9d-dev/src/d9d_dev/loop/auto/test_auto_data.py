@@ -1,12 +1,12 @@
 import pytest
 import torch
-from d9d.core.dist_context import DeviceMeshParameters
-from d9d.dataset import (
+from d9d.data import (
     FixedCountMicrobatchPacker,
     PinMemoryMicrobatchPackStream,
     ShardedDataset,
     ShardIndexingMode,
 )
+from d9d.distributed import DeviceMeshParameters
 from d9d.loop.auto import AutoDataConfig, AutoDataProvider
 from d9d.loop.control import InitializeDataProviderContext
 from torch.utils.data import Dataset, SequentialSampler

@@ -88,8 +88,8 @@ import dataclasses
 
 import torch
 
-from d9d.core.dist_context import DistributedContext
-from d9d.core.types import ScalarTree
+from d9d.distributed import DistributedContext
+from d9d.pytree.types import ScalarTree
 from d9d.loop.control import (
     BuildForwardInputsContext,
     BuildForwardInputsResult,

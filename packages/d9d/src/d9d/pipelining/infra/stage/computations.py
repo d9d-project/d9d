@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from torch.autograd.graph import Node
 
-from d9d.core import pytree
+from d9d import pytree
 from d9d.pipelining.api import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
 
 from .splitgrad import (

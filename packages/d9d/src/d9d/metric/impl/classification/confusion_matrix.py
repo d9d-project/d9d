@@ -2,7 +2,7 @@ from typing import Any, Self
 
 import torch
 
-from d9d.core.dist_context import DistributedContext
+from d9d.distributed import DistributedContext
 from d9d.metric import Metric
 from d9d.metric.component.classification import (
     AccuracyStatistic,

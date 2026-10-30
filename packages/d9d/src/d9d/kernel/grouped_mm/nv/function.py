@@ -4,7 +4,7 @@ import torch
 from grouped_gemm import backend
 from torch.autograd import Function
 
-from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 
 
 class GroupedGemmFunction(Function):

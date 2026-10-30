@@ -4,7 +4,6 @@ from typing import Generic, TypeVar, cast
 import torch
 from torch import nn
 
-from d9d.core.types import TensorSpec
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.head import (
     ClassificationHead,
@@ -32,6 +31,7 @@ from d9d.module.model.io import (
     SequenceTransfer,
 )
 from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo, StageBoundary
+from d9d.pipelining.api.tensor import TensorSpec
 
 TBackbone = TypeVar("TBackbone", bound=DecoderBackbone)
 THead = TypeVar("THead", bound=TaskHead)

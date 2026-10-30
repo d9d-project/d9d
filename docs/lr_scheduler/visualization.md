@@ -11,8 +11,8 @@ Pass a function that builds your scheduler for a given optimizer. `visualize_lr_
 ```python
 import torch
 
-from d9d.lr_scheduler.visualizer import visualize_lr_scheduler
-from d9d.lr_scheduler.piecewise import piecewise_schedule, CurveLinear, CurveCosine
+from d9d.optim.lr_scheduler.visualizer import visualize_lr_scheduler
+from d9d.optim.lr_scheduler.piecewise import piecewise_schedule, CurveLinear, CurveCosine
 
 
 def create_scheduler(optimizer: torch.optim.Optimizer):
@@ -34,4 +34,4 @@ visualize_lr_scheduler(
 
 ## API Reference
 
-::: d9d.lr_scheduler.visualizer
+::: d9d.optim.lr_scheduler.visualizer

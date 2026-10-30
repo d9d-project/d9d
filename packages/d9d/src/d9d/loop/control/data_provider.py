@@ -4,8 +4,8 @@ import dataclasses
 import typing
 from typing import Protocol
 
-from d9d.core.dist_context import DistributedContext
-from d9d.core.protocol import MicrobatchPackStream
+from d9d.data.protocol import MicrobatchPackStream
+from d9d.distributed import DistributedContext
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -28,7 +28,7 @@ class DataProvider(Protocol):
     ``MicrobatchPackStream``.
 
     The user is responsible for sharding the dataset across data-parallel ranks (e.g. with
-    ``d9d.dataset.shard_dataset_data_parallel``) inside the provider.
+    ``d9d.data.shard_dataset_data_parallel``) inside the provider.
     """
 
     def __call__(self, context: InitializeDataProviderContext) -> MicrobatchPackStream:

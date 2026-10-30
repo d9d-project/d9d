@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
 import torch
-from d9d.core.dist_context import DistributedContext
-from d9d.dataset import TokenPoolingType, token_pooling_mask_from_attention_mask
+from d9d.data import TokenPoolingType, token_pooling_mask_from_attention_mask
+from d9d.distributed import DistributedContext
 
 from d9d_dev.modules.helper.distributed import shard_batch_dim
 from d9d_dev.modules.model.sequence.batch import SequenceBatch, build_sequence_batch, shard_sequence_batch

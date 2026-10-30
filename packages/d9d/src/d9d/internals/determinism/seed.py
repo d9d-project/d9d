@@ -5,7 +5,7 @@ from typing import cast
 import torch
 import torch.distributed.tensor
 
-from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
+from d9d.distributed import REGULAR_DOMAIN, DistributedContext
 
 
 def set_seeds(

@@ -5,7 +5,6 @@ import torch
 from torch import nn
 from torch.utils.checkpoint import checkpoint
 
-from d9d.core.types import TensorSpec
 from d9d.module.base import ModuleLateInit
 from d9d.module.block.embedding import SplitTokenEmbeddings
 from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode, create_hidden_states_aggregator
@@ -18,6 +17,7 @@ from d9d.pipelining.api import (
     StageBoundary,
     distribute_layers_for_pipeline_stage,
 )
+from d9d.pipelining.api.tensor import TensorSpec
 
 from .decoder_layer import Qwen3MoELayer
 from .params import Qwen3MoEParameters

@@ -1,6 +1,6 @@
 import torch
 
-from d9d.core.autograd import GradDirection
+from d9d.autograd import GradDirection
 from d9d.kernel.grouped_mm.quack import grouped_mm
 
 from ..alignment import GroupedMmPadding

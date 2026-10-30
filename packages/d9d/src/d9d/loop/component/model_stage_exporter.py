@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
+from d9d.distributed import REGULAR_DOMAIN, DistributedContext
 from d9d.loop.control import ModelProvider, PrepareExportModelStageContext
 from d9d.model_state.io import save_model_state, save_model_state_pipeline_parallel
 from d9d.model_state.mapper.compose import ModelStateMapperParallel

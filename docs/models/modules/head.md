@@ -22,7 +22,7 @@ The vocabulary can consist of several independent splits, like in [`SplitTokenEm
 
 `EmbeddingHead` returns fp32 embeddings, with an optional linear projection and L2 normalization.
 
-Both `ClassificationHead` and `EmbeddingHead` take an optional `pooling_mask` that selects the tokens to use. You can build it with `d9d.dataset.token_pooling_mask_from_attention_mask`.
+Both `ClassificationHead` and `EmbeddingHead` take an optional `pooling_mask` that selects the tokens to use. You can build it with `d9d.data.token_pooling_mask_from_attention_mask`.
 
 ## Usage
 

@@ -3,7 +3,7 @@ import contextlib
 import torch
 from tqdm import tqdm
 
-from d9d.core.dist_context import DeviceMeshParameters
+from d9d.distributed import DeviceMeshParameters
 from d9d.internals.determinism import set_seeds
 from d9d.loop.component import (
     DataParallelMicrobatchPackStream,

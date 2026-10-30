@@ -8,7 +8,7 @@ from safetensors.torch import save_file
 from torch.distributed import DeviceMesh, ProcessGroup
 from tqdm import tqdm
 
-from d9d.core.dist_ops import all_gather_object
+from d9d.distributed.ops import all_gather_object
 from d9d.model_state.io.dto import (
     MODEL_STATE_INDEX_FILE_NAME,
     ModelStateIndex,

@@ -32,3 +32,5 @@ Inside a larger Pydantic config, declare a field of type `AutoOptimizerConfig` i
 ::: d9d.loop.auto.auto_optimizer
 
 ::: d9d.loop.control.optimizer_provider
+
+::: d9d.optim

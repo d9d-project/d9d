@@ -3,7 +3,7 @@ from contextlib import contextmanager
 
 import torch.profiler
 
-from d9d.core.dist_context import DistributedContext
+from d9d.distributed import DistributedContext
 from d9d.internals.profiling import Profiler
 from d9d.loop.config import ProfilingConfig
 

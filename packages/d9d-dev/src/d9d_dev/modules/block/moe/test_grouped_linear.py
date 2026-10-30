@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
 from d9d.module.block.moe import GroupedLinear
 from d9d.module.block.moe.grouped_mm import ExpertTokenGroups
 

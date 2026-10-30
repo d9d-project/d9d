@@ -4,7 +4,7 @@ import time
 
 import pytest
 import torch
-from d9d.dataset import FixedCountMicrobatchPacker, PinMemoryMicrobatchPackStream
+from d9d.data import FixedCountMicrobatchPacker, PinMemoryMicrobatchPackStream
 from d9d.loop.component import DirectDevicePackStream, PrefetchingDevicePackStream, build_device_pack_stream
 from torch.utils.data import Dataset
 from torchdata.stateful_dataloader import StatefulDataLoader

@@ -6,13 +6,13 @@ import torch
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.profiler import record_function
 
-from d9d.core import pytree
-from d9d.core.dist_context import DistributedContext
-from d9d.core.types import PyTree, ScalarTree
+from d9d import pytree
+from d9d.distributed import DistributedContext
 from d9d.internals.metric_collector import AsyncMetricCollector
 from d9d.internals.state import load_state_dict_main_process, state_dict_main_process
 from d9d.loop.config import JobLoggerConfig
 from d9d.metric.impl.container import ComposeMetric
+from d9d.pytree.types import PyTree, ScalarTree
 from d9d.tracker import BaseTracker, RunConfig, Scalar, tracker_from_config
 from d9d.tracker.provider.null import NullTrackerConfig
 

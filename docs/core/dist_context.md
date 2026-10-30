@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.core.dist_context` package is the single source of truth for the distributed execution environment. Its `DistributedContext` class holds the topology, the rank mapping and the communication groups, so that every rank agrees on them. Use the context for all distributed questions, such as "Am I the main process?" or "Which rank is my pipeline peer?". Do not read raw `os.environ` variables or create ad-hoc process groups: this can lead to silent inconsistencies. `DistributedContext` requires CUDA GPUs. It sets the current CUDA device of each process to its local rank.
+The `d9d.distributed` package is the single source of truth for the distributed execution environment. Its `DistributedContext` class holds the topology, the rank mapping and the communication groups, so that every rank agrees on them. Use the context for all distributed questions, such as "Am I the main process?" or "Which rank is my pipeline peer?". Do not read raw `os.environ` variables or create ad-hoc process groups: this can lead to silent inconsistencies. `DistributedContext` requires CUDA GPUs. It sets the current CUDA device of each process to its local rank.
 
 ## An Explicit Object
 
@@ -73,7 +73,7 @@ The physical GPUs stay the same, but each domain arranges them into a different 
 Build the context from `DeviceMeshParameters`.
 
 ```python
-from d9d.core.dist_context import DeviceMeshParameters
+from d9d.distributed import DeviceMeshParameters
 
 # Define the topology.
 params = DeviceMeshParameters(
@@ -93,7 +93,7 @@ dist_ctx = params.build()
 
 ```python
 from torch.distributed import DeviceMesh
-from d9d.core.dist_context import DistributedContext, DENSE_DOMAIN
+from d9d.distributed import DistributedContext, DENSE_DOMAIN
 
 dist_ctx: DistributedContext = ...
 
@@ -128,4 +128,4 @@ with dist_ctx.local_main_process_first():
 
 ## API Reference
 
-::: d9d.core.dist_context
+::: d9d.distributed

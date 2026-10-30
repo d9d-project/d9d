@@ -4,9 +4,10 @@ from typing import Any, Generic, cast
 import torch
 import torch.distributed as dist
 
-from d9d.core import pytree
-from d9d.core.types import PyTree, TensorSpec
+from d9d import pytree
 from d9d.pipelining.api import TStageTransfer
+from d9d.pipelining.api.tensor import TensorSpec
+from d9d.pytree.types import PyTree
 
 
 def _is_spec(node: Any) -> bool:

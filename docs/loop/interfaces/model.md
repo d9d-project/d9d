@@ -39,7 +39,7 @@ It usually reverses the state mapper returned by `initialize_model_stage(...)`.
 ```python
 from pydantic import BaseModel
 
-from d9d.core.types import ScalarTree
+from d9d.pytree.types import ScalarTree
 from d9d.loop.control import (
     InitializeModelStageContext,
     InitializeModelStageResult,

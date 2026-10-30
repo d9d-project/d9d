@@ -2,8 +2,9 @@ import typing
 
 from torch.profiler import record_function
 
-from d9d.core.types import MicrobatchPack, PyTree
+from d9d.data.types import MicrobatchPack
 from d9d.loop.control import BaseTask, BuildForwardInputsContext
+from d9d.pytree.types import PyTree
 
 from ..pipeline_state import PipelineStateHandler
 

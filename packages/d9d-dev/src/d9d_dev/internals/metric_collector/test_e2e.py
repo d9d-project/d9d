@@ -1,5 +1,5 @@
 import pytest
-from d9d.core.dist_context import DeviceMeshParameters
+from d9d.distributed import DeviceMeshParameters
 from d9d.internals.metric_collector.collector import AsyncMetricCollector
 
 from d9d_dev.internals.metric_collector.metric import MockMetric

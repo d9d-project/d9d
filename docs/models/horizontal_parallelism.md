@@ -57,7 +57,7 @@ The examples below use the mesh domains of [Distributed Context](../core/dist_co
 ### Replicate Parallelism
 
 ```python
-from d9d.core.dist_context import DENSE_DOMAIN, DistributedContext
+from d9d.distributed import DENSE_DOMAIN, DistributedContext
 from d9d.module.parallelism.api import parallelize_replicate
 
 ctx: DistributedContext = ...
@@ -73,7 +73,7 @@ parallelize_replicate(model, dense_mesh["dp_replicate", "cp_replicate"])
 ### Expert Parallelism
 
 ```python
-from d9d.core.dist_context import EXPERT_DOMAIN, DistributedContext
+from d9d.distributed import EXPERT_DOMAIN, DistributedContext
 from d9d.module.block.moe import MoELayer
 from d9d.module.parallelism.api import parallelize_expert_parallel
 
@@ -94,7 +94,7 @@ parallelize_expert_parallel(
 ### FSDP
 
 ```python
-from d9d.core.dist_context import DENSE_DOMAIN, DistributedContext
+from d9d.distributed import DENSE_DOMAIN, DistributedContext
 from d9d.module.parallelism.api import parallelize_fsdp
 
 ctx: DistributedContext = ...
@@ -109,7 +109,7 @@ parallelize_fsdp(model, mesh=dense_mesh["dp_cp_shard"])
 ### HSDP
 
 ```python
-from d9d.core.dist_context import DENSE_DOMAIN, DistributedContext
+from d9d.distributed import DENSE_DOMAIN, DistributedContext
 from d9d.module.parallelism.api import parallelize_hsdp
 
 ctx: DistributedContext = ...

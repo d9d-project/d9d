@@ -20,7 +20,7 @@ class SequencePoolingHeadShared:
 
     Attributes:
         pooling_mask: Binary mask of the tokens to pool. You can build it from an attention mask with
-            ``d9d.dataset.token_pooling_mask_from_attention_mask``. Shape: ``(batch, seq_len)``.
+            ``d9d.data.token_pooling_mask_from_attention_mask``. Shape: ``(batch, seq_len)``.
     """
 
     pooling_mask: torch.Tensor | None = None

@@ -1,11 +1,11 @@
-from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
-from d9d.core.protocol import LRSchedulerProtocol, OptimizerProtocol
+from d9d.distributed import REGULAR_DOMAIN, DistributedContext
 from d9d.loop.control import (
     InitializeLRSchedulerContext,
     InitializeOptimizerStageContext,
     LRSchedulerProvider,
     OptimizerProvider,
 )
+from d9d.optim.protocol import LRSchedulerProtocol, OptimizerProtocol
 from d9d.pipelining.training import PipelinedLRScheduler, PipelinedOptimizer
 
 from .job_schedule import JobSchedule

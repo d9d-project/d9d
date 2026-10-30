@@ -5,8 +5,8 @@ from typing import cast
 
 import pytest
 import torch
-from d9d.core.dist_context import REGULAR_DOMAIN, DeviceMeshParameters, DistributedContext
-from d9d.core.dist_ops import all_gather_object
+from d9d.distributed import REGULAR_DOMAIN, DeviceMeshParameters, DistributedContext
+from d9d.distributed.ops import all_gather_object
 from torch.distributed import GroupMember, destroy_process_group
 
 

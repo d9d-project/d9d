@@ -3,9 +3,9 @@
 import dataclasses
 from typing import TYPE_CHECKING
 
-from d9d.core.offload import SleepTag
-from d9d.core.protocol import LRSchedulerProtocol, OptimizerProtocol
 from d9d.loop.event import Event
+from d9d.loop.sleep import SleepTag
+from d9d.optim.protocol import LRSchedulerProtocol, OptimizerProtocol
 
 from .common import (
     EventConfigurationStartedContext,

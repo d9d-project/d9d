@@ -5,7 +5,7 @@ from types import TracebackType
 
 import torch
 
-from d9d.core import pytree
+from d9d import pytree
 from d9d.tracker import BaseTrackerRun, TrackerPoint, TrackerValue
 
 from .job_schedule import JobSchedule

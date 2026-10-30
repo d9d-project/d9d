@@ -4,10 +4,10 @@ from typing import Protocol
 
 import torch
 
-from d9d.core.types import TensorSpec
 from d9d.module.base import ModuleLateInit
 from d9d.module.model.io import SequenceInput, SequenceShared, SequenceTransfer
 from d9d.pipelining.api import ModuleSupportsPipelining, StageBoundary
+from d9d.pipelining.api.tensor import TensorSpec
 
 
 @typing.runtime_checkable

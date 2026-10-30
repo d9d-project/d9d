@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 import torch.distributed as dist
 import yaml
-from d9d.core.dist_context import FLAT_DOMAIN, DeviceMeshParameters, DistributedContext
+from d9d.distributed import FLAT_DOMAIN, DeviceMeshParameters, DistributedContext
 from d9d.loop.auto import AutoDataConfig, AutoDataProvider
 from d9d.loop.config import InferenceConfig
 from d9d.loop.control import (

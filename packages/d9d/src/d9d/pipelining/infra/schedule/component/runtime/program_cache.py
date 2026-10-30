@@ -1,7 +1,7 @@
 import dataclasses
 from typing import TYPE_CHECKING
 
-from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
+from d9d.distributed import REGULAR_DOMAIN, DistributedContext
 
 from .action import ActionBase
 

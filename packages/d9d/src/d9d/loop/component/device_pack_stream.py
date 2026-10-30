@@ -9,9 +9,9 @@ import torch
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.profiler import record_function
 
-from d9d.core import pytree
-from d9d.core.protocol import MicrobatchPackStream
-from d9d.core.types import MicrobatchPack
+from d9d import pytree
+from d9d.data.protocol import MicrobatchPackStream
+from d9d.data.types import MicrobatchPack
 
 TItem = TypeVar("TItem")
 

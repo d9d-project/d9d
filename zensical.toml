@@ -33,7 +33,6 @@ nav = [
         "core/dist_context.md",
         "core/dist_ops.md",
         "core/pytree.md",
-        "core/types.md",
         "core/offload.md",
     ] },
     { "Training and Inference" = [

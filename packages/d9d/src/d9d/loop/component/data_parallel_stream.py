@@ -1,9 +1,9 @@
 from collections.abc import Iterator
 from typing import Any
 
-from d9d.core.dist_context import BATCH_DOMAIN, DistributedContext
-from d9d.core.protocol import MicrobatchPackStream
-from d9d.core.types import MicrobatchPack
+from d9d.data.protocol import MicrobatchPackStream
+from d9d.data.types import MicrobatchPack
+from d9d.distributed import BATCH_DOMAIN, DistributedContext
 
 
 class DataParallelMicrobatchPackStream(MicrobatchPackStream):

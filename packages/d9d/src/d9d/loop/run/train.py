@@ -4,8 +4,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from d9d.core.dist_context import DeviceMeshParameters
-from d9d.core.offload import DEFAULT_SLEEP_TAGS, SleepTag
+from d9d.distributed import DeviceMeshParameters
 from d9d.internals.determinism import set_seeds
 from d9d.loop.component import (
     DataParallelMicrobatchPackStream,
@@ -65,6 +64,7 @@ from d9d.loop.event.catalogue.train import (
     EventTrainFinishedContext,
     EventTrainReadyContext,
 )
+from d9d.loop.sleep import DEFAULT_SLEEP_TAGS, SleepTag
 from d9d.loop.state import TrainJobState
 from d9d.metric.impl.container import ComposeMetric
 

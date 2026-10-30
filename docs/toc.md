@@ -32,7 +32,6 @@ The foundational primitives managing the cluster.
 *   **[Distributed Operations](./core/dist_ops.md)**: Utilities for gathering var-length tensors and objects.
 *   **[State Offloading](./core/offload.md)**: Releasing GPU training state to host memory for colocated RL (the sleep/wake primitives).
 *   **[PyTree Traversal](./core/pytree.md)**: Dataclass-aware recursive mapping and flattening over nested tensor structures.
-*   **[Typing Extensions](./core/types.md)**: Python type annotations for common objects and structures.
 
 
 ## 🚀 Execution Engine

@@ -2,10 +2,10 @@ import dataclasses
 from collections.abc import Callable
 from typing import Any
 
-from d9d.core.dist_context import FLAT_DOMAIN, DeviceMeshParameters
-from d9d.core.pytree import tree_map
-from d9d.core.types import TensorTree
+from d9d.distributed import FLAT_DOMAIN, DeviceMeshParameters
 from d9d.metric import Metric
+from d9d.pytree import tree_map
+from d9d.pytree.types import TensorTree
 from torch.testing import assert_close
 
 

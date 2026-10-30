@@ -2,7 +2,7 @@ from typing import Any
 
 from torch.distributed.checkpoint.stateful import Stateful
 
-from d9d.core.protocol import MicrobatchPackStream
+from d9d.data.protocol import MicrobatchPackStream
 from d9d.loop.config import JobScheduleConfig, StepActionPeriod, StepActionSpecial
 
 

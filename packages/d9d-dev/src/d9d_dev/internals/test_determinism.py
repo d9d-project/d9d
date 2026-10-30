@@ -5,9 +5,9 @@ import random
 import numpy as np
 import pytest
 import torch
-from d9d.core.dist_context import DeviceMeshParameters
-from d9d.core.dist_context.device_mesh_domains import FLAT_DOMAIN
-from d9d.core.dist_ops import all_gather_object
+from d9d.distributed import DeviceMeshParameters
+from d9d.distributed.device_mesh_domains import FLAT_DOMAIN
+from d9d.distributed.ops import all_gather_object
 from d9d.internals.determinism import set_seeds
 
 

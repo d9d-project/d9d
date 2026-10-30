@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.core.dist_context import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.distributed import DENSE_DOMAIN, DeviceMeshParameters
 from d9d.internals.grad_sync.synchronizer import GradientSynchronizer
 from torch import nn
 from torch.distributed import DeviceMesh

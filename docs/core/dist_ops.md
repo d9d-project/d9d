@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.core.dist_ops` package wraps `torch.distributed` collective operations and allocates their output buffers for you. With plain PyTorch, you must pre-allocate the outputs yourself, for example a list of empty tensors for `all_gather`. The package also has operations for **variadic shapes**. They let ranks exchange tensors without knowing the shapes of the incoming tensors in advance.
+The `d9d.distributed.ops` package wraps `torch.distributed` collective operations and allocates their output buffers for you. With plain PyTorch, you must pre-allocate the outputs yourself, for example a list of empty tensors for `all_gather`. The package also has operations for **variadic shapes**. They let ranks exchange tensors without knowing the shapes of the incoming tensors in advance.
 
 ## Usage
 
@@ -12,8 +12,8 @@ Gather tensors of the same shape from all ranks.
 
 ```python
 import torch
-from d9d.core.dist_context import DistributedContext, FLAT_DOMAIN
-from d9d.core.dist_ops import all_gather
+from d9d.distributed import DistributedContext, FLAT_DOMAIN
+from d9d.distributed.ops import all_gather
 
 # Setup.
 ctx: DistributedContext = ...
@@ -37,8 +37,8 @@ Gather tensors whose shapes differ across ranks.
 
 ```python
 import torch
-from d9d.core.dist_context import DistributedContext, FLAT_DOMAIN
-from d9d.core.dist_ops import all_gather_variadic_shape
+from d9d.distributed import DistributedContext, FLAT_DOMAIN
+from d9d.distributed.ops import all_gather_variadic_shape
 
 # Setup.
 ctx: DistributedContext = ...
@@ -61,8 +61,8 @@ for i, t in enumerate(gathered_tensors):
 Gather Python objects from all ranks. The objects must be picklable.
 
 ```python
-from d9d.core.dist_context import DistributedContext, FLAT_DOMAIN
-from d9d.core.dist_ops import all_gather_object
+from d9d.distributed import DistributedContext, FLAT_DOMAIN
+from d9d.distributed.ops import all_gather_object
 
 # Setup.
 ctx: DistributedContext = ...
@@ -85,4 +85,4 @@ for data in results:
 
 ## API Reference
 
-::: d9d.core.dist_ops
+::: d9d.distributed.ops

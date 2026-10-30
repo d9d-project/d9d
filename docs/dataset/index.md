@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.dataset` package provides PyTorch `Dataset` wrappers and helpers for distributed training. It covers length-based bucketing, data-parallel sharding, padding and token pooling masks.
+The `d9d.data` package provides PyTorch `Dataset` wrappers and helpers for distributed training. It covers length-based bucketing, data-parallel sharding, padding and token pooling masks.
 
 ## Why d9d Does Not Wrap Datasets Automatically
 
@@ -51,7 +51,7 @@ Variable-length sequences must be padded to the same length before they can be s
 
 ```python
 from torch.utils.data import Dataset
-from d9d.dataset import BufferSortedDataset
+from d9d.data import BufferSortedDataset
 
 class MyTextDataset(Dataset):
     def __init__(self, data: list[str]):
@@ -86,8 +86,8 @@ sorted_ds = BufferSortedDataset(
 ```python
 import torch
 from torch.utils.data import TensorDataset
-from d9d.core.dist_context import DistributedContext
-from d9d.dataset import shard_dataset_data_parallel, ShardIndexingMode
+from d9d.distributed import DistributedContext
+from d9d.data import shard_dataset_data_parallel, ShardIndexingMode
 
 # The data-parallel size and rank come from the DistributedContext.
 context: DistributedContext
@@ -110,8 +110,8 @@ print(f"I see {len(sharded_ds)} items.")
 ```python
 import torch
 from torch.utils.data import TensorDataset
-from d9d.core.dist_context import DistributedContext, BATCH_DOMAIN
-from d9d.dataset import ShardedDataset, ShardIndexingMode
+from d9d.distributed import DistributedContext, BATCH_DOMAIN
+from d9d.data import ShardedDataset, ShardIndexingMode
 
 # Take the data-parallel size and rank from the DistributedContext.
 context: DistributedContext
@@ -137,7 +137,7 @@ print(f"I am rank {dp_rank}, I see {len(sharded_ds)} items.")
 
 ```python
 import torch
-from d9d.dataset import pad_stack_1d, PaddingSide1D
+from d9d.data import pad_stack_1d, PaddingSide1D
 
 items = [
     torch.tensor([1, 2, 3]),
@@ -161,4 +161,4 @@ batch_aligned = pad_stack_1d(
 
 ## API Reference
 
-::: d9d.dataset
+::: d9d.data
