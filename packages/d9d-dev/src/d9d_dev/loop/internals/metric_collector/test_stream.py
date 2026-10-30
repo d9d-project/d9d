@@ -1,9 +1,9 @@
 import pytest
 import torch
 from d9d.distributed import DeviceMeshParameters
-from d9d.internals.metric_collector import AsyncMetricCollector
+from d9d.loop.internals.metric_collector import AsyncMetricCollector
 
-from d9d_dev.internals.metric_collector.metric import MockMetric
+from d9d_dev.loop.internals.metric_collector.metric import MockMetric
 
 
 @pytest.mark.local

@@ -4,8 +4,8 @@ import torch
 from torch.profiler import record_function
 
 from d9d.distributed import DistributedContext
-from d9d.internals.grad_sync import GradientSynchronizer
 from d9d.loop.config import GradientManagerConfig
+from d9d.loop.internals.grad_sync import GradientSynchronizer
 from d9d.metric.impl.aggregation import WeightedMeanMetric
 from d9d.offload import Offloadable, OffloadContext, OnloadContext
 

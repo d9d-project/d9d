@@ -1,7 +1,7 @@
 import pytest
 import torch
-from d9d.internals.grad_sync.bucket import AccumulationCounter
-from d9d.internals.grad_sync.synchronizer import GradientSynchronizer
+from d9d.loop.internals.grad_sync.bucket import AccumulationCounter
+from d9d.loop.internals.grad_sync.synchronizer import GradientSynchronizer
 from torch import nn
 
 

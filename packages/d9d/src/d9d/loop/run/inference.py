@@ -4,7 +4,6 @@ import torch
 from tqdm import tqdm
 
 from d9d.distributed import DeviceMeshParameters
-from d9d.internals.determinism import set_seeds
 from d9d.loop.component import (
     DataParallelMicrobatchPackStream,
     InferenceTaskOperator,
@@ -50,6 +49,7 @@ from d9d.loop.event.catalogue.inference import (
     EventInferenceFinishedContext,
     EventInferenceReadyContext,
 )
+from d9d.loop.internals.determinism import set_seeds
 from d9d.loop.state import InferenceJobState
 from d9d.pipelining.factory import PipelineScheduleInferenceConfig
 

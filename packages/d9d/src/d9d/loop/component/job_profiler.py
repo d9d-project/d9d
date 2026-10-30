@@ -4,8 +4,8 @@ from contextlib import contextmanager
 import torch.profiler
 
 from d9d.distributed import DistributedContext
-from d9d.internals.profiling import Profiler
 from d9d.loop.config import ProfilingConfig
+from d9d.loop.internals.profiling import Profiler
 
 from .job_schedule import JobSchedule
 
