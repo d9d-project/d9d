@@ -7,14 +7,13 @@ from torch import nn
 from torch.autograd.graph import Node
 
 from d9d import pytree
-from d9d.pipelining.api import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
-
-from .splitgrad import (
+from d9d.autograd.split_backward import (
     ParamGroup,
     stage_backward_full,
     stage_backward_input,
     stage_backward_weight,
 )
+from d9d.pipelining.api import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
 
 # FSDP resharding stays enabled between microbatches: disabling it changes FSDP behavior in unexpected ways.
 

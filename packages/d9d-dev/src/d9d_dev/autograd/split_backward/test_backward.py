@@ -2,7 +2,7 @@ import gc
 
 import pytest
 import torch
-from d9d.pipelining.infra.stage.splitgrad import (
+from d9d.autograd.split_backward import (
     stage_backward_full,
     stage_backward_input,
     stage_backward_weight,

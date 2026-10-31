@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.autograd.graph import GradientEdge, Node
 
-from d9d.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+from .context import GLOBAL_GRAD_CONTEXT, GradDirection
 
 
 def stage_backward_full(

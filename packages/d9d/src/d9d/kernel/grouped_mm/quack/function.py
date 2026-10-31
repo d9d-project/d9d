@@ -4,7 +4,7 @@ import torch
 from quack.gemm_interface import gemm
 from torch.autograd import Function
 
-from d9d.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GradDirection
 
 
 class QuackGroupedMmFunction(Function):

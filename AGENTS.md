@@ -37,7 +37,7 @@ Top-level packages of the library.
 
 - `distributed/` - the `DistributedContext` (the `DeviceMesh` source of truth) and its domains; `ops` (collectives that allocate their outputs).
 - `pytree/` - PyTree traversal and the `PyTree`/`TensorTree` aliases.
-- `autograd/` - the global gradient context for split backward.
+- `autograd/` - extensions of the autograd engine: `split_backward` (separate backward passes for input and weight gradients, and the gradient context that custom autograd functions check).
 - `offload/` - moving GPU state to host memory and back (the base of sleep/wake).
 - `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`, `sleep`), and `internals` (`grad_sync`, `grad_norm`, `metric_collector`, `determinism`, `profiling`, `state`).
 - `nn/` - modeling building blocks: attention, MoE, normalization, heads and other layers, and `ModuleLateInit`.

@@ -1,8 +1,18 @@
-# Autograd Extensions
+# Split Backward
 
 ## About
 
-The `d9d.autograd` package gives fine-grained control over the PyTorch autograd engine. Its main tool is the global grad context. It tells custom autograd functions which gradients to compute in a partial backward pass, as split-backward pipeline schedules such as Zero Bubble need.
+The `d9d.autograd.split_backward` package splits a backward pass into two phases: the gradients of the inputs and the gradients of the weights. Split-backward pipeline schedules, such as Zero Bubble, run the two phases at different times. The package has two parts. The split backward functions run the phases. The global grad context tells custom autograd functions which gradients the current phase needs.
+
+## The Two Phases
+
+A pipeline stage sends the gradients of its inputs to the previous stage. The weight gradients are needed only at the optimizer step. So a schedule computes the input gradients first and fills the idle time of the pipeline with the weight gradients later.
+
+*   **`stage_backward_input()`**: Computes the gradients of the inputs and defers the weight gradients. It captures the gradients at the nodes of the autograd graph where the weight gradients branch off.
+*   **`stage_backward_weight()`**: Replays the captured gradients and accumulates the weight gradients.
+*   **`stage_backward_full()`**: Runs both phases in one backward pass.
+
+The result of `stage_backward_input()` keeps the autograd graph alive. Keep it until you call `stage_backward_weight()`.
 
 ## The Global Grad Context
 
@@ -35,7 +45,7 @@ When you write a custom operation, assign a `GradDirection` to each gradient. Ch
 
 ```python
 import torch
-from d9d.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GradDirection
 
 
 class MyCustomOp(torch.autograd.Function):
@@ -61,13 +71,26 @@ class MyCustomOp(torch.autograd.Function):
 
 ### In Training Loops
 
-The d9d pipelining schedules set the context for split-backward passes. If you use them, directly or through the [`Trainer`](../loop/train.md), you do not need to do anything.
+The d9d pipelining schedules run the split backward pass for you. If you use them, directly or through the [`Trainer`](../loop/train.md), you do not need to do anything.
 
-If you write your own split-backward logic, you must set the context yourself:
+To split the backward pass in your own schedule, call the two phases. They set the global grad context themselves:
+
+```python
+from d9d.autograd.split_backward import stage_backward_input, stage_backward_weight
+
+# Phase 1: the input gradients. Keep the result until phase 2, it holds the autograd graph.
+result = stage_backward_input(outputs, output_grads, inputs, weights=model.parameters())
+input_grads = result.input_grads  # Send them to the previous stage.
+
+# Phase 2, later in the schedule: the weight gradients.
+stage_backward_weight(model.parameters(), result.param_groups)
+```
+
+If you run the backward pass without these functions, set the context yourself:
 
 ```python
 import torch
-from d9d.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GradDirection
 
 with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs):
     torch.autograd.backward(outputs, grad_tensors=output_grads, inputs=stage_inputs, retain_graph=True)
@@ -75,4 +98,4 @@ with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs):
 
 ## API Reference
 
-::: d9d.autograd
+::: d9d.autograd.split_backward

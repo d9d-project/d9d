@@ -80,6 +80,9 @@ nav = [
     { "PyTree" = [
         "pytree/index.md"
     ] },
+    { "Autograd" = [
+        "autograd/split_backward.md"
+    ] },
     { "Parameter-Efficient Fine-Tuning (PEFT)" = [
         "peft/overview.md",
         "peft/lora.md",
@@ -107,7 +110,6 @@ nav = [
         "lr_scheduler/visualization.md",
     ] },
     { "Internals" = [
-        "core/autograd_extensions.md",
         "internals/determinism.md",
         "internals/grad_norm.md",
         "internals/grad_sync.md",

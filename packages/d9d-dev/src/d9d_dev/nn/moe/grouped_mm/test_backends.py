@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GradDirection
 from d9d.nn.moe.grouped_mm import (
     AnyGroupedMmBackendConfig,
     EagerGroupedMmBackendConfig,

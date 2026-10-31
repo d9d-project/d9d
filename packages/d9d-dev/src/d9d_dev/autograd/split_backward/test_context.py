@@ -2,8 +2,7 @@ from typing import ClassVar
 
 import pytest
 import torch
-from d9d.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
-from d9d.autograd.grad_context import GlobalGradContext
+from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GlobalGradContext, GradDirection
 from torch.autograd import Function
 
 

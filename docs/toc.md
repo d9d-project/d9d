@@ -64,6 +64,7 @@ Strategies for distributing computations.
 
 *   **[Horizontal Parallelism](./models/horizontal_parallelism.md)**: Data parallelism, Fully Sharded Data Parallel (FSDP), expert parallelism and tensor parallelism.
 *   **[Pipeline Parallelism](./models/pipeline_parallelism.md)**: Vertical scaling, schedules (1F1B, Zero Bubble), and cross-stage communication.
+*   **[Split Backward](./autograd/split_backward.md)**: Separate backward passes for input and weight gradients, and the context that custom autograd functions check.
 
 ## 🔧 Fine-Tuning (PEFT)
 Parameter-Efficient Fine-Tuning framework.
@@ -88,7 +89,6 @@ Where the loss and the metrics go.
 ## ⚙️ Internals
 Deep dive into the engine room.
 
-*   **[Autograd Extensions](./core/autograd_extensions.md)**: How we do split backward for pipeline parallelism.
 *   **[Pipelining Internals](./internals/pipelining.md)**: How the VM and Schedules work.
 *   **[Gradient Synchronization](./internals/grad_sync.md)**: Custom backward hooks for overlapping comms.
 *   **[Gradient Norm and Clipping](./internals/grad_norm.md)**: Correct global norm calculation across hybrid meshes.
