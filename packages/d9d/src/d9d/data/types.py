@@ -1,7 +1,7 @@
 from collections.abc import Callable, Sequence
 from typing import TypeAlias, TypeVar
 
-from d9d.pytree.types import PyTree
+from d9d.pytree import PyTree
 
 TDataTree = TypeVar("TDataTree", bound=PyTree)
 

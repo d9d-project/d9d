@@ -12,7 +12,7 @@ from d9d.loop.config import JobLoggerConfig
 from d9d.loop.internals.metric_collector import AsyncMetricCollector
 from d9d.loop.internals.state import load_state_dict_main_process, state_dict_main_process
 from d9d.metric.impl.container import ComposeMetric
-from d9d.pytree.types import PyTree, ScalarTree
+from d9d.pytree import PyTree, ScalarTree
 from d9d.tracker import BaseTracker, RunConfig, Scalar, tracker_from_config
 from d9d.tracker.provider.null import NullTrackerConfig
 

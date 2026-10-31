@@ -39,7 +39,6 @@ It usually reverses the state mapper returned by `initialize_model_stage(...)`.
 ```python
 from pydantic import BaseModel
 
-from d9d.pytree.types import ScalarTree
 from d9d.loop.control import (
     InitializeModelStageContext,
     InitializeModelStageResult,
@@ -49,11 +48,10 @@ from d9d.loop.control import (
     PrepareExportModelStageResult,
 )
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
+from d9d.models import DecoderForCausalLM, parallelize_causal_lm_head
+from d9d.models.qwen3_moe import Qwen3MoEModel, Qwen3MoEParameters, parallelize_qwen3_moe_model
 from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.models import DecoderForCausalLM
-from d9d.models.qwen3_moe import Qwen3MoEModel, Qwen3MoEParameters
-from d9d.models import parallelize_causal_lm_head
-from d9d.models.qwen3_moe import parallelize_qwen3_moe_model
+from d9d.pytree import ScalarTree
 
 
 class ModelProviderConfig(BaseModel):

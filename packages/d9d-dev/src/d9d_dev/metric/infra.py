@@ -4,8 +4,7 @@ from typing import Any
 
 from d9d.distributed import FLAT_DOMAIN, DeviceMeshParameters
 from d9d.metric import Metric
-from d9d.pytree import tree_map
-from d9d.pytree.types import TensorTree
+from d9d.pytree import TensorTree, tree_map
 from torch.testing import assert_close
 
 

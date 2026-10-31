@@ -3,7 +3,7 @@ import enum
 import typing
 
 from d9d.pipelining.api.tensor import TensorSpec
-from d9d.pytree.types import PyTree
+from d9d.pytree import PyTree
 
 from .types import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
 

@@ -100,16 +100,16 @@ from tokenizers import Tokenizer
 from torch.utils.data import Dataset
 from torchdata.stateful_dataloader import StatefulDataLoader
 
-from d9d.data.protocol import MicrobatchPackStream
-from d9d.pytree.types import TensorTree
 from d9d.data import (
     BufferSortedDataset,
     DatasetImplementingSortKeyProtocol,
     FixedCountMicrobatchPacker,
+    MicrobatchPackStream,
     PinMemoryMicrobatchPackStream,
     num_microbatches_for_global_batch,
     shard_dataset_data_parallel,
 )
+from d9d.pytree import TensorTree
 from d9d.loop.control import DataProvider, InitializeDataProviderContext
 
 

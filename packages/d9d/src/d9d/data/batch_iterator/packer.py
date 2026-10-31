@@ -4,7 +4,7 @@ from typing import Any
 
 from d9d.data.protocol import DataLoaderProtocol, MicrobatchPackStream
 from d9d.data.types import MicrobatchPack
-from d9d.pytree.types import PyTree
+from d9d.pytree import PyTree
 
 
 class FixedCountMicrobatchPacker(MicrobatchPackStream):

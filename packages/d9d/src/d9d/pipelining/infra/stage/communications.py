@@ -7,7 +7,7 @@ import torch.distributed as dist
 from d9d import pytree
 from d9d.pipelining.api import TStageTransfer
 from d9d.pipelining.api.tensor import TensorSpec
-from d9d.pytree.types import PyTree
+from d9d.pytree import PyTree
 
 
 def _is_spec(node: Any) -> bool:

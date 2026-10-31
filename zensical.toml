@@ -32,7 +32,6 @@ nav = [
     { "Core" = [
         "core/dist_context.md",
         "core/dist_ops.md",
-        "core/pytree.md",
         "core/offload.md",
     ] },
     { "Training and Inference" = [
@@ -77,6 +76,9 @@ nav = [
     ] },
     { "Datasets" = [
         "dataset/index.md"
+    ] },
+    { "PyTree" = [
+        "pytree/index.md"
     ] },
     { "Parameter-Efficient Fine-Tuning (PEFT)" = [
         "peft/overview.md",

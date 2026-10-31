@@ -11,7 +11,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.distributed import DistributedContext
 from d9d.loop.event import EventBus
-from d9d.pytree.types import PyTree, ScalarTree
+from d9d.pytree import PyTree, ScalarTree
 
 if typing.TYPE_CHECKING:
     from d9d.loop.component import JobSchedule

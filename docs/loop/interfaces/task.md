@@ -89,7 +89,6 @@ import dataclasses
 import torch
 
 from d9d.distributed import DistributedContext
-from d9d.pytree.types import ScalarTree
 from d9d.loop.control import (
     BuildForwardInputsContext,
     BuildForwardInputsResult,
@@ -97,8 +96,9 @@ from d9d.loop.control import (
     ComputeLossResult,
     TrainTask,
 )
-from d9d.nn.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
 from d9d.models.io import SequenceHeadShared, SequenceInput, SequenceShared
+from d9d.nn.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
+from d9d.pytree import ScalarTree
 
 
 @dataclasses.dataclass

@@ -26,7 +26,7 @@ In d9d, models are **pipeline-aware**. Each pipeline rank builds only the stages
 
 ### The Four I/O Roles
 
-A pipelined model moves data across stage boundaries as four explicitly named, generic PyTree types. Dataclasses are the recommended form.
+A pipelined model moves data across stage boundaries as four explicitly named, generic [PyTree](../pytree/index.md) types. Dataclasses are the recommended form.
 
 | Role             | Meaning                                                     | Crosses P2P? |
 |------------------|-------------------------------------------------------------|--------------|

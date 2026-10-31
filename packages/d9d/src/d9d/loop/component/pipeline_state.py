@@ -5,7 +5,7 @@ from typing import Generic, TypeVar
 import torch
 
 from d9d import pytree
-from d9d.pytree.types import PyTree
+from d9d.pytree import PyTree
 
 TState = TypeVar("TState", bound=PyTree)
 
