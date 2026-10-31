@@ -52,12 +52,12 @@ During the forward pass, the module sees its parameters as plain local `torch.Te
 
 ## Usage
 
-The examples below use the mesh domains of [Distributed Context](../core/dist_context.md). `MyCustomLayer` stands for your own module.
+The examples below use the mesh domains of [Distributed Context](../dist_context/index.md). `MyCustomLayer` stands for your own module.
 
 ### Replicate Parallelism
 
 ```python
-from d9d.distributed import DENSE_DOMAIN, DistributedContext
+from d9d.dist_context import DENSE_DOMAIN, DistributedContext
 from d9d.parallel import parallelize_replicate
 
 ctx: DistributedContext = ...
@@ -73,7 +73,7 @@ parallelize_replicate(model, dense_mesh["dp_replicate", "cp_replicate"])
 ### Expert Parallelism
 
 ```python
-from d9d.distributed import EXPERT_DOMAIN, DistributedContext
+from d9d.dist_context import EXPERT_DOMAIN, DistributedContext
 from d9d.nn.moe import MoELayer
 from d9d.parallel import parallelize_expert_parallel
 
@@ -94,7 +94,7 @@ parallelize_expert_parallel(
 ### FSDP
 
 ```python
-from d9d.distributed import DENSE_DOMAIN, DistributedContext
+from d9d.dist_context import DENSE_DOMAIN, DistributedContext
 from d9d.parallel import parallelize_fsdp
 
 ctx: DistributedContext = ...
@@ -109,7 +109,7 @@ parallelize_fsdp(model, mesh=dense_mesh["dp_cp_shard"])
 ### HSDP
 
 ```python
-from d9d.distributed import DENSE_DOMAIN, DistributedContext
+from d9d.dist_context import DENSE_DOMAIN, DistributedContext
 from d9d.parallel import parallelize_hsdp
 
 ctx: DistributedContext = ...

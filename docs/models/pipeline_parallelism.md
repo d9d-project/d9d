@@ -189,7 +189,7 @@ To use pipelining outside the `Trainer`, for example in a custom loop, call the 
 from torch import Tensor
 import torch.nn.functional as F
 
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.pipelining.factory import build_schedule, PipelineSchedule1F1BConfig
 
 

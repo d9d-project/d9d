@@ -9,7 +9,7 @@ from typing import Any, Protocol
 import torch
 from torch.distributed.checkpoint.stateful import Stateful
 
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.loop.event import EventBus
 from d9d.pytree import PyTree, ScalarTree
 

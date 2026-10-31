@@ -5,9 +5,7 @@ import random
 import numpy as np
 import pytest
 import torch
-from d9d.distributed import DeviceMeshParameters
-from d9d.distributed.device_mesh_domains import FLAT_DOMAIN
-from d9d.distributed.ops import all_gather_object
+from d9d.dist_context import FLAT_DOMAIN, DeviceMeshParameters
 from d9d.loop.internals.determinism import set_seeds
 
 
@@ -78,7 +76,8 @@ def test_seed_variation_over_pp(dist_ctx_factory):
     # Generate a random number on each rank
     local_state = _get_random_states()
 
-    all_states = all_gather_object(local_state, group=dist_ctx.mesh_for(FLAT_DOMAIN).get_group())
+    all_states = [None] * world_size
+    torch.distributed.all_gather_object(all_states, local_state, group=dist_ctx.mesh_for(FLAT_DOMAIN).get_group())
     all_states_by_pp = [all_states[pp_rank * non_pp_size : (pp_rank + 1) * non_pp_size] for pp_rank in range(pp_size)]
 
     for pp_batch in all_states_by_pp:

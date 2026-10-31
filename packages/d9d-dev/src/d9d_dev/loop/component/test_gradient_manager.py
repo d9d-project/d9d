@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.distributed import DeviceMeshParameters
+from d9d.dist_context import DeviceMeshParameters
 from d9d.loop.component.gradient_manager import GradientManager
 from d9d.loop.component.model_stage_factory import TrackedModules
 from d9d.loop.config import GradientManagerConfig

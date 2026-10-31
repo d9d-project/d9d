@@ -1,4 +1,4 @@
-from d9d.distributed import DENSE_DOMAIN, DistributedContext
+from d9d.dist_context import DENSE_DOMAIN, DistributedContext
 from d9d.nn.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead
 from d9d.parallel import parallelize_hsdp
 

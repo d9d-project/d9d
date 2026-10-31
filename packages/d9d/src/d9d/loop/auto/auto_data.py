@@ -15,7 +15,7 @@ from d9d.data import (
 )
 from d9d.data.protocol import MicrobatchPackStream
 from d9d.data.types import CollateFn
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.loop.control import DataProvider, InitializeDataProviderContext
 
 DatasetFactory = Callable[[DistributedContext], Dataset]

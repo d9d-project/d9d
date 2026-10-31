@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.distributed` package is the single source of truth for the distributed execution environment. Its `DistributedContext` class holds the topology, the rank mapping and the communication groups, so that every rank agrees on them. Use the context for all distributed questions, such as "Am I the main process?" or "Which rank is my pipeline peer?". Do not read raw `os.environ` variables or create ad-hoc process groups: this can lead to silent inconsistencies. `DistributedContext` requires CUDA GPUs. It sets the current CUDA device of each process to its local rank.
+The `d9d.dist_context` package is the single source of truth for the distributed execution environment. Its `DistributedContext` class holds the topology, the rank mapping and the communication groups, so that every rank agrees on them. Use the context for all distributed questions, such as "Am I the main process?" or "Which rank is my pipeline peer?". Do not read raw `os.environ` variables or create ad-hoc process groups: this can lead to silent inconsistencies. `DistributedContext` requires CUDA GPUs. It sets the current CUDA device of each process to its local rank.
 
 ## An Explicit Object
 
@@ -12,7 +12,7 @@ The `d9d.distributed` package is the single source of truth for the distributed 
 
 Different parts of a model need different parallelism strategies, for example dense layers and Mixture-of-Experts (MoE) layers. d9d describes each strategy as a **`DeviceMesh` domain**.
 
-The physical GPUs stay the same, but each domain arranges them into a different mesh. There are domains for MoE layers, for dense layers and for the input batch. Get the `DeviceMesh` of a domain with `dist_ctx.mesh_for(domain_name)`.
+The physical GPUs stay the same, but each domain arranges them into a different mesh. There are domains for MoE layers, for dense layers and for the input batch. Get the `DeviceMesh` of a domain with `dist_context.mesh_for(domain_name)`.
 
 !!! info "Demonstration Video"
     To understand domains better, watch our short demonstration video [on YouTube](https://www.youtube.com/watch?v=UZ2yHTGdzzU).
@@ -73,7 +73,7 @@ The physical GPUs stay the same, but each domain arranges them into a different 
 Build the context from `DeviceMeshParameters`.
 
 ```python
-from d9d.distributed import DeviceMeshParameters
+from d9d.dist_context import DeviceMeshParameters
 
 # Define the topology.
 params = DeviceMeshParameters(
@@ -83,34 +83,35 @@ params = DeviceMeshParameters(
     context_parallel_replicate=1,
     context_parallel_shard=1,
     expert_parallel=8,
-    tensor_parallel=1
+    tensor_parallel=1,
 )
 
-dist_ctx = params.build()
+dist_context = params.build()
 ```
 
 ### Accessing DeviceMesh Domains
 
 ```python
 from torch.distributed import DeviceMesh
-from d9d.distributed import DistributedContext, DENSE_DOMAIN
 
-dist_ctx: DistributedContext = ...
+from d9d.dist_context import DENSE_DOMAIN, DistributedContext
 
-mesh_dense: DeviceMesh = dist_ctx.mesh_for(DENSE_DOMAIN)
+dist_context: DistributedContext = ...
+
+mesh_dense: DeviceMesh = dist_context.mesh_for(DENSE_DOMAIN)
 ```
 
 ### Rank Utilities
 
 ```python
-if dist_ctx.is_main_process:
+if dist_context.is_main_process:
     print("I am global rank 0")
 
-if dist_ctx.is_local_main_process:
+if dist_context.is_local_main_process:
     print("I am rank 0 on this node")
 
 # Synchronize.
-dist_ctx.wait_world()
+dist_context.wait_world()
 ```
 
 ### Context Managers
@@ -119,8 +120,8 @@ These context managers control the order in which ranks run a block.
 
 ```python
 # Only one process per node downloads the file.
-with dist_ctx.local_main_process_first():
-    if dist_ctx.is_local_main_process:
+with dist_context.local_main_process_first():
+    if dist_context.is_local_main_process:
         download_dataset()
     # Other ranks enter the block after the download.
 # All ranks continue together.
@@ -128,4 +129,4 @@ with dist_ctx.local_main_process_first():
 
 ## API Reference
 
-::: d9d.distributed
+::: d9d.dist_context

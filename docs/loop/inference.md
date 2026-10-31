@@ -13,7 +13,7 @@ You build the `Inference` engine with the `InferenceConfigurator`. It combines t
 `InferenceConfigurator.configure()` runs a setup sequence similar to training, but for forward-only execution:
 
 1.  **Distributed Context Initialization**:
-    *   Builds the global [DistributedContext](../core/dist_context.md).
+    *   Builds the global [DistributedContext](../dist_context/index.md).
 
 2.  **Seeding**:
     *   Sets distributed seeds, e.g. for reproducible sampling or validation splits.

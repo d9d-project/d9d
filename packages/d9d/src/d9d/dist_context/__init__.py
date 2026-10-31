@@ -1,4 +1,4 @@
-"""Distributed environment setup and its device meshes."""
+"""The distributed context of a job and the device meshes of its domains."""
 
 from .configured import DistributedContext
 from .device_mesh_domains import BATCH_DOMAIN, DENSE_DOMAIN, EXPERT_DOMAIN, FLAT_DOMAIN, REGULAR_DOMAIN

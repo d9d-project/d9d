@@ -2,7 +2,7 @@ import torch
 from torch.profiler import record_function
 
 from d9d import pytree
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.metric import Metric
 from d9d.pytree import PyTree
 

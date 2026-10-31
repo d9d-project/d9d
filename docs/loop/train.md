@@ -10,7 +10,7 @@ You do not create a `Trainer` from loose objects. You build it with the `Trainin
 
 The `TrainingConfigurator` combines:
 
-*   the [infrastructure configuration](../core/dist_context.md),
+*   the [infrastructure configuration](../dist_context/index.md),
 *   the [job configuration](./config.md),
 *   the [user logic](./interfaces/index.md) (providers).
 
@@ -21,7 +21,7 @@ It returns a `Trainer` that holds a prepared `TrainJobState`.
 `TrainingConfigurator.configure()` runs these steps:
 
 1.  **Distributed Context Initialization**:
-    *   Builds the global [DistributedContext](../core/dist_context.md). This creates the NCCL process groups and `DeviceMesh` objects.
+    *   Builds the global [DistributedContext](../dist_context/index.md). This creates the NCCL process groups and `DeviceMesh` objects.
 
 2.  **Seeding**:
     *   Sets distributed seeds from the configured `base_seed`. Model initialization and other initial states are then deterministic. [More info](../internals/determinism.md).

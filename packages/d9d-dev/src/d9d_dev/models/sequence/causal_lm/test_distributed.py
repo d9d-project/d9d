@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.distributed import DeviceMeshParameters
+from d9d.dist_context import DeviceMeshParameters
 from d9d.models.io import SequenceHeadShared, SequenceInput, SequenceShared
 from d9d.nn.head import SequenceCausalLMHeadShared, SequenceCausalLMOutput
 from d9d.pipelining.api import PipelineStageInfo

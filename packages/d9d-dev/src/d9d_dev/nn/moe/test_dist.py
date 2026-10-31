@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.distributed import BATCH_DOMAIN, EXPERT_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import BATCH_DOMAIN, EXPERT_DOMAIN, DeviceMeshParameters
 from d9d.nn.moe import MoELayer, SharedExpertParameters
 from d9d.parallel import parallelize_expert_parallel
 

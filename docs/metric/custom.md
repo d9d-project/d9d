@@ -25,7 +25,7 @@ from typing import Any
 
 from d9d.metric import Metric
 from d9d.metric.component import MetricAccumulator, MetricReduceOp
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 
 class MaxMetric(Metric[torch.Tensor]):
     def __init__(self):

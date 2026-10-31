@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 from torch.autograd.profiler import record_function
 
 from d9d import pytree
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedule
 from d9d.pipelining.api.tensor import TensorSpec
 from d9d.pipelining.infra.stage import PipelineStage

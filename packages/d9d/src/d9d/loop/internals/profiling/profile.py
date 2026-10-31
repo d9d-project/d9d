@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch.profiler as tprof
 
-from d9d.distributed import REGULAR_DOMAIN, DistributedContext
+from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
 
 
 class Profiler:

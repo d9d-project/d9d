@@ -8,7 +8,7 @@ from typing import Generic, TypeVar
 
 from torch import nn
 
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.loop.event import EventBus
 from d9d.model_state.mapper import ModelStateMapper
 from d9d.pipelining.api import PipelineStageInfo

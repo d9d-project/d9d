@@ -2,7 +2,7 @@ import gc
 from unittest.mock import MagicMock
 
 import pytest
-from d9d.distributed import DeviceMeshParameters
+from d9d.dist_context import DeviceMeshParameters
 from d9d.loop.component.garbage_collector import ManualGarbageCollector
 from d9d.loop.component.job_schedule import JobSchedule
 from d9d.loop.config import GarbageCollectionConfig, JobScheduleConfig, StepActionSpecial

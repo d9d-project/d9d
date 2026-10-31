@@ -1,6 +1,6 @@
 """Horizontal parallelism for the Qwen3 MoE model."""
 
-from d9d.distributed import DENSE_DOMAIN, EXPERT_DOMAIN, DistributedContext
+from d9d.dist_context import DENSE_DOMAIN, EXPERT_DOMAIN, DistributedContext
 from d9d.parallel import parallelize_expert_parallel, parallelize_hsdp
 from d9d.pipelining.api import PipelineStageInfo
 

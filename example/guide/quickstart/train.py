@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch
 import yaml
-from d9d.distributed import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
 from d9d.loop.auto import (
     AutoDataConfig,
     AutoDataProvider,

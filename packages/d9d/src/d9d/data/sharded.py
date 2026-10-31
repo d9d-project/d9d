@@ -6,7 +6,7 @@ from typing import Any, TypeVar
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.utils.data import Dataset
 
-from d9d.distributed import BATCH_DOMAIN, DistributedContext
+from d9d.dist_context import BATCH_DOMAIN, DistributedContext
 
 
 class ShardIndexingMode(StrEnum):

@@ -2,7 +2,7 @@ import copy
 
 import pytest
 import torch
-from d9d.distributed import FLAT_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import FLAT_DOMAIN, DeviceMeshParameters
 from d9d.metric.impl.aggregation import WeightedMeanMetric
 from d9d.metric.impl.container import ComposeMetric
 from d9d.pytree import tree_map

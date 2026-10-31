@@ -4,7 +4,7 @@ from typing import cast
 import torch
 from torch.profiler import record_function
 
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.loop.event import EventBus
 from d9d.loop.event.catalogue.train import (
     EVENT_TRAIN_SLEEP_POST,

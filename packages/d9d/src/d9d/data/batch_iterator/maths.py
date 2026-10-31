@@ -1,4 +1,4 @@
-from d9d.distributed import BATCH_DOMAIN, DistributedContext
+from d9d.dist_context import BATCH_DOMAIN, DistributedContext
 
 
 def num_microbatches_for_global_batch(

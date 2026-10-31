@@ -4,7 +4,7 @@ from collections.abc import Callable
 
 from torch import nn
 
-from d9d.distributed import REGULAR_DOMAIN, DistributedContext
+from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
 
 from ..api import PipelineSchedule, PipelineStageInfo
 from ..api.types import TPipelineInput, TPipelineOutput, TSharedInput

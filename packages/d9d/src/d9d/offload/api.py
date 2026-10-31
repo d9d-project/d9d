@@ -1,7 +1,7 @@
 import dataclasses
 from typing import Protocol, runtime_checkable
 
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)

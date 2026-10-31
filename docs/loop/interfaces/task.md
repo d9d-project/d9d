@@ -88,7 +88,7 @@ import dataclasses
 
 import torch
 
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.loop.control import (
     BuildForwardInputsContext,
     BuildForwardInputsResult,
@@ -122,8 +122,8 @@ class SFTTask(
         SFTState,
     ]
 ):
-    def __init__(self, dist_ctx: DistributedContext):
-        self._dist_ctx = dist_ctx
+    def __init__(self, dist_context: DistributedContext):
+        self._dist_context = dist_context
 
     def build_forward_inputs(
         self, ctx: BuildForwardInputsContext[SFTBatch]

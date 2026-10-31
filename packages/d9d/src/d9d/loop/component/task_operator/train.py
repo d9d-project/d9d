@@ -4,7 +4,7 @@ import torch
 from torch.profiler import record_function
 
 from d9d.data.types import MicrobatchPack
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.loop.control import ComputeLossContext, TrainTask, UpdateMetricsContext
 from d9d.metric.impl.container import ComposeMetric
 from d9d.pipelining.factory.factory import PipelineScheduleInfo

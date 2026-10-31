@@ -4,7 +4,7 @@ from typing import Any, Generic, TypeVar
 import torch
 from torch.distributed.checkpoint.stateful import Stateful
 
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.pytree import TensorTree
 
 TComputeResult = TypeVar("TComputeResult", bound=TensorTree)

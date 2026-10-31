@@ -1,5 +1,5 @@
 import torch
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.metric import Metric
 
 

@@ -79,7 +79,7 @@ The context therefore arranges the same ranks into several device meshes, called
 mesh = context.dist_context.mesh_for(DENSE_DOMAIN)
 ```
 
-[Distributed Context](../core/dist_context.md) lists the domains and their dimensions.
+[Distributed Context](../dist_context/index.md) lists the domains and their dimensions.
 
 ## The Model Build
 

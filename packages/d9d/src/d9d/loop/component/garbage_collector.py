@@ -6,7 +6,7 @@ from typing import Self
 
 from torch.profiler import record_function
 
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.loop.config import GarbageCollectionConfig
 
 from .job_schedule import JobSchedule

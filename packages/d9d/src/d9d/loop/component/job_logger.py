@@ -7,7 +7,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.profiler import record_function
 
 from d9d import pytree
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.loop.config import JobLoggerConfig
 from d9d.loop.internals.metric_collector import AsyncMetricCollector
 from d9d.loop.internals.state import load_state_dict_main_process, state_dict_main_process

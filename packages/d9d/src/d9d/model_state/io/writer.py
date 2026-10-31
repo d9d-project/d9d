@@ -8,7 +8,6 @@ from safetensors.torch import save_file
 from torch.distributed import DeviceMesh, ProcessGroup
 from tqdm import tqdm
 
-from d9d.distributed.ops import all_gather_object
 from d9d.model_state.io.dto import (
     MODEL_STATE_INDEX_FILE_NAME,
     ModelStateIndex,
@@ -244,7 +243,8 @@ def write_model_state_distributed(
         is_current_process_rank_master=True,
         position=position,
     ).write(state_generator=state_generator)
-    gather_idx = all_gather_object(current_idx, process_group)
+    gather_idx: list[ModelStateIndex | None] = [None] * process_group.size()
+    torch.distributed.all_gather_object(gather_idx, current_idx, group=process_group)
     gather_idx_filter = [x for x in gather_idx if x is not None]
     if process_group.rank() == 0:
         _finalize_master(dest_dir, gather_idx_filter)
@@ -302,7 +302,9 @@ def write_model_state_pipeline_parallel(
         is_current_process_rank_master=master_within_pipeline_rank,
         position=position,
     ).write(state_generator=state_generator)
-    gather_idx = all_gather_object(current_idx, device_mesh.get_group(0))
+    gather_group = device_mesh.get_group(0)
+    gather_idx: list[ModelStateIndex | None] = [None] * gather_group.size()
+    torch.distributed.all_gather_object(gather_idx, current_idx, group=gather_group)
     gather_idx_filter = [x for x in gather_idx if x is not None]
     if pipeline_rank == 0 and master_within_pipeline_rank:
         _finalize_master(dest_dir, gather_idx_filter)

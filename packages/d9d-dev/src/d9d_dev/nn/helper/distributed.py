@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 import torch
 import torch.distributed as dist
-from d9d.distributed import BATCH_DOMAIN, DENSE_DOMAIN, DistributedContext
+from d9d.dist_context import BATCH_DOMAIN, DENSE_DOMAIN, DistributedContext
 from torch import nn
 from torch.distributed.tensor import DTensor, Replicate, Shard, distribute_tensor
 

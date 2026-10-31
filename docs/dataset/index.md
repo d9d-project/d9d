@@ -86,7 +86,7 @@ sorted_ds = BufferSortedDataset(
 ```python
 import torch
 from torch.utils.data import TensorDataset
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 from d9d.data import shard_dataset_data_parallel, ShardIndexingMode
 
 # The data-parallel size and rank come from the DistributedContext.
@@ -110,7 +110,7 @@ print(f"I see {len(sharded_ds)} items.")
 ```python
 import torch
 from torch.utils.data import TensorDataset
-from d9d.distributed import DistributedContext, BATCH_DOMAIN
+from d9d.dist_context import DistributedContext, BATCH_DOMAIN
 from d9d.data import ShardedDataset, ShardIndexingMode
 
 # Take the data-parallel size and rank from the DistributedContext.

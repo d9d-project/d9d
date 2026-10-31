@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn.functional as F
-from d9d.distributed import DeviceMeshParameters
+from d9d.dist_context import DeviceMeshParameters
 from d9d.models.io import (
     SequenceHeadsOutput,
     SequenceHeadsShared,

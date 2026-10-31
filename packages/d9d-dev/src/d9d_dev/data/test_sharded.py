@@ -2,7 +2,7 @@ from typing import Any, cast
 
 import pytest
 from d9d.data import ShardedDataset, ShardIndexingMode, shard_dataset_data_parallel
-from d9d.distributed import DeviceMeshParameters
+from d9d.dist_context import DeviceMeshParameters
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.utils.data import Dataset
 

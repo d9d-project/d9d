@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.distributed import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
 from d9d.loop.component.model_stage_factory import TrackedModules
 from d9d.offload import OffloadContext, OnloadContext, offload_tensor, onload_tensor
 from d9d.pipelining.training.optimizer import PipelinedOptimizer

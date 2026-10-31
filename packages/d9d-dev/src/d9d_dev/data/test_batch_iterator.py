@@ -8,7 +8,7 @@ from d9d.data.batch_iterator import (
     PinMemoryMicrobatchPackStream,
     num_microbatches_for_global_batch,
 )
-from d9d.distributed import DeviceMeshParameters
+from d9d.dist_context import DeviceMeshParameters
 from torch.utils.data import Dataset
 from torchdata.stateful_dataloader import StatefulDataLoader
 

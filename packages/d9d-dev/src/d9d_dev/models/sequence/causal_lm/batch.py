@@ -2,7 +2,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 import torch
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 
 from d9d_dev.models.sequence.batch import SequenceBatch, build_sequence_batch, shard_sequence_batch
 from d9d_dev.nn.helper.distributed import shard_batch_dim

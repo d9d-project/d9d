@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 import torch
-from d9d.distributed import (
+from d9d.dist_context import (
     BATCH_DOMAIN,
     DENSE_DOMAIN,
     EXPERT_DOMAIN,

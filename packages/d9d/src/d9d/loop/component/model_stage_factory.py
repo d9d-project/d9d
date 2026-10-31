@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from torch.distributed.checkpoint.stateful import Stateful
 
-from d9d.distributed import REGULAR_DOMAIN, DistributedContext
+from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
 from d9d.loop.config import ModelStageFactoryConfig, PipeliningConfig
 from d9d.loop.control import InitializeModelStageContext, ModelProvider, ParallelizeModelStageContext
 from d9d.model_state.io import load_model_state

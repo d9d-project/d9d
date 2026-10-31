@@ -1,4 +1,4 @@
-from d9d.distributed import DeviceMeshParameters
+from d9d.dist_context import DeviceMeshParameters
 
 MESHES_FOR_MODEL_TESTS = [
     # DPR

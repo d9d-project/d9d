@@ -4,7 +4,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from d9d.distributed import DeviceMeshParameters
+from d9d.dist_context import DeviceMeshParameters
 from d9d.loop.component import (
     DataParallelMicrobatchPackStream,
     GradientClipper,

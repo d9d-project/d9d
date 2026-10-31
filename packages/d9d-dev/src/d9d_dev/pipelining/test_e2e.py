@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.distributed import REGULAR_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import (
     AnyPipelineScheduleConfig,

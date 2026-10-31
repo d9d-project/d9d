@@ -7,7 +7,7 @@ import datasets
 import torch
 import yaml
 from d9d.data import pad_stack_1d
-from d9d.distributed import DeviceMeshParameters, DistributedContext
+from d9d.dist_context import DeviceMeshParameters, DistributedContext
 from d9d.loop.auto import (
     AutoDataConfig,
     AutoDataProvider,

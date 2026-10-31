@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.distributed as dist
-from d9d.distributed import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
 from d9d.parallel import parallelize_hsdp
 from torch import nn
 from torch.distributed.fsdp import FSDPModule

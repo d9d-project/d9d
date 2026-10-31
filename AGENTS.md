@@ -35,7 +35,7 @@ Most conventions are already documented. Always read relevant files (especially 
 
 Top-level packages of the library.
 
-- `distributed/` - the `DistributedContext` (the `DeviceMesh` source of truth) and its domains; `ops` (collectives that allocate their outputs).
+- `dist_context/` - the `DistributedContext` (the `DeviceMesh` source of truth), its domains and `DeviceMeshParameters`.
 - `pytree/` - PyTree traversal and the `PyTree`/`TensorTree` aliases.
 - `autograd/` - extensions of the autograd engine: `split_backward` (separate backward passes for input and weight gradients, and the gradient context that custom autograd functions check).
 - `offload/` - moving GPU state to host memory and back (the base of sleep/wake).

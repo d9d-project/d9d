@@ -3,7 +3,7 @@ from typing import Any
 
 from d9d.data.protocol import MicrobatchPackStream
 from d9d.data.types import MicrobatchPack
-from d9d.distributed import BATCH_DOMAIN, DistributedContext
+from d9d.dist_context import BATCH_DOMAIN, DistributedContext
 
 
 class DataParallelMicrobatchPackStream(MicrobatchPackStream):

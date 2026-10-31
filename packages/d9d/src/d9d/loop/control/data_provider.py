@@ -5,7 +5,7 @@ import typing
 from typing import Protocol
 
 from d9d.data.protocol import MicrobatchPackStream
-from d9d.distributed import DistributedContext
+from d9d.dist_context import DistributedContext
 
 
 @dataclasses.dataclass(kw_only=True)
