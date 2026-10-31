@@ -29,7 +29,7 @@ Solutions for concrete tasks.
 The foundational primitives managing the cluster.
 
 *   **[Distributed Context](./dist_context/index.md)**: The source of truth for topology, and the `DeviceMesh` domains (`regular`, `dense`, `expert`, `batch`, `flat`).
-*   **[State Offloading](./core/offload.md)**: Releasing GPU training state to host memory for colocated RL (the sleep/wake primitives).
+*   **[State Offloading](./offload/index.md)**: Releasing GPU training state to host memory for colocated RL (the sleep/wake primitives).
 
 
 ## 🚀 Execution Engine

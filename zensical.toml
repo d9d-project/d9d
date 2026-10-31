@@ -32,8 +32,8 @@ nav = [
     { "Distributed Context" = [
         "dist_context/index.md"
     ] },
-    { "Core" = [
-        "core/offload.md",
+    { "State Offloading" = [
+        "offload/index.md"
     ] },
     { "Training and Inference" = [
         "loop/train.md",

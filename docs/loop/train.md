@@ -134,7 +134,7 @@ While a step runs, a background thread prepares the next `data_prefetch.prefetch
 
 ## Sleep and Wake (Colocated RL)
 
-In **colocated RL**, a rollout or inference engine shares the same GPUs as the `Trainer`. The two cannot occupy the device at once, so the `Trainer` must hand the GPU back for a while. `Trainer.sleep()` releases the training state to host memory and frees the device cache. `Trainer.wake()` restores it. Both are built on the [State Offloading](../core/offload.md) subsystem.
+In **colocated RL**, a rollout or inference engine shares the same GPUs as the `Trainer`. The two cannot occupy the device at once, so the `Trainer` must hand the GPU back for a while. `Trainer.sleep()` releases the training state to host memory and frees the device cache. `Trainer.wake()` restores it. Both are built on the [State Offloading](../offload/index.md) subsystem.
 
 Both calls are collective: every rank must call them with the same tags. Call `sleep()` only between steps, e.g. from an `EVENT_TRAIN_STEP_POST` handler.
 
@@ -149,7 +149,7 @@ trainer.wake()                  # Restore the training state, resume stepping
 
 ### What Gets Offloaded
 
-`sleep()` selects subsystems with a [`SleepTag`](../core/offload.md#sleep-tags). The default, `SleepTag.TENSOR_STATES`, offloads all GPU tensor state as a single unit:
+`sleep()` selects subsystems with a `SleepTag`. The default, `SleepTag.TENSOR_STATES`, offloads all GPU tensor state as a single unit:
 
 *   **Model** parameters and buffers (`TrackedModules`),
 *   **Optimizer** state (`PipelinedOptimizer`),
@@ -159,7 +159,7 @@ Data packs are not offloaded. The pack of the finished step and up to `prefetch_
 
 `SleepTag.COMMS` (NCCL process groups) is reserved but not implemented yet. Requesting it raises `NotImplementedError`.
 
-The round trip keeps object identity, optimizer state dict keys and `DTensor` metadata. So external references, e.g. a frozen reference model held by a task, stay valid after waking. See the [round-trip invariant](../core/offload.md) for details.
+The round trip keeps object identity, optimizer state dict keys and `DTensor` metadata. So external references, e.g. a frozen reference model held by a task, stay valid after waking. See the [round-trip guarantee](../offload/index.md#the-round-trip-guarantee) for details.
 
 ### Order of Operations
 
@@ -198,3 +198,5 @@ trainer.train()
 ::: d9d.loop.run.TrainingConfigurator
 
 ::: d9d.loop.run.Trainer
+
+::: d9d.loop.sleep

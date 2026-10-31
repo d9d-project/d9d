@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.offload` package moves GPU-resident training state to host (CPU) memory and back. It is the base of the sleep / wake API of the `Trainer`. Sleep frees the GPUs for a colocated workload, for example a rollout engine that shares the GPUs in colocated reinforcement learning. The user entry points `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` are documented on the [Training Loop](../loop/train.md) page. This page covers the primitives they are built on.
+The `d9d.offload` package moves GPU-resident training state to host (CPU) memory and back. It is the base of the sleep and wake API of the `Trainer`. Sleep frees the GPUs for a colocated workload, for example a rollout engine that shares the GPUs in colocated reinforcement learning. The user entry points `Trainer.sleep()`, `Trainer.wake()` and `Trainer.is_sleeping()` are documented on the [Training Loop](../loop/train.md) page. This page covers the primitives they are built on.
 
 ## Building Blocks
 
@@ -22,13 +22,6 @@ An `offload` followed by an `onload` changes nothing observable. Across the roun
 Only the device storage is allocated again. So external references stay valid after wake-up. Gradient hooks, optimizer state keyed by parameter and a frozen reference model held by a task all point at the same objects.
 
 The primitives swap the storage in place instead of creating new tensors. For a `DTensor`, only the storage of the local shard moves. The distributed metadata stays on the wrapper.
-
-## Sleep Tags
-
-`SleepTag` selects the subsystems that `Trainer.sleep` and `Trainer.wake` act on:
-
-*   **`SleepTag.TENSOR_STATES`**: All GPU tensor state (model parameters and buffers, optimizer state, gradient buckets and the residual loss accumulator). They are offloaded together. `DEFAULT_SLEEP_TAGS` holds only this tag.
-*   **`SleepTag.COMMS`**: NCCL process groups. Opt-in and not implemented yet. Requesting it raises `NotImplementedError`.
 
 ## Usage
 
@@ -67,7 +60,7 @@ onload_tensor(dt, handle, device=device)
 
 ### Implementing `Offloadable`
 
-A subsystem that owns GPU state implements the protocol, so that the `Trainer` can offload and onload it together with the others. A typical implementation does three things:
+The `Trainer` offloads a fixed set of subsystems. You cannot add your own subsystem to `Trainer.sleep()`, but you can implement the protocol for your own state and call it from an `EVENT_TRAIN_SLEEP_PRE` handler (see [Order of Operations](../loop/train.md#order-of-operations)). A typical implementation does three things:
 
 1.  Keep the handles in a mirror.
 2.  Wait for the asynchronous copies with `torch.cuda.synchronize`.
