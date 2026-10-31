@@ -81,12 +81,12 @@ class MySubsystem(Offloadable):
             raise RuntimeError("MySubsystem is already offloaded.")
         self._mirror = {id(t): offload_tensor(t, pin_memory=ctx.pin_memory) for t in self._tensors}
         # Wait for the non-blocking device-to-host copies before the storage is freed.
-        torch.cuda.synchronize(ctx.dist_context.current_device)
+        torch.cuda.synchronize(ctx.device)
 
     def onload(self, ctx: OnloadContext) -> None:
         if self._mirror is None:
             raise RuntimeError("MySubsystem is not offloaded.")
-        device = ctx.dist_context.current_device
+        device = ctx.device
         for t in self._tensors:
             onload_tensor(t, self._mirror[id(t)], device=device)
         torch.cuda.synchronize(device)

@@ -100,7 +100,7 @@ class TrackedModules(Stateful, Offloadable):
             mirror[id(tensor)] = offload_tensor(tensor, pin_memory=ctx.pin_memory)
 
         # Drain the pending non-blocking device-to-host copies before the device storage is released.
-        torch.cuda.synchronize(ctx.dist_context.current_device)
+        torch.cuda.synchronize(ctx.device)
         self._offload_mirror = mirror
 
     def onload(self, ctx: OnloadContext) -> None:
@@ -115,7 +115,7 @@ class TrackedModules(Stateful, Offloadable):
         if self._offload_mirror is None:
             raise RuntimeError("TrackedModules is not offloaded.")
 
-        device = ctx.dist_context.current_device
+        device = ctx.device
         for tensor in self._tensors():
             onload_tensor(tensor, self._offload_mirror[id(tensor)], device=device)
 

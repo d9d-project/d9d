@@ -85,7 +85,7 @@ class TrainSleeper:
             self._event_bus.trigger(EVENT_TRAIN_SLEEP_PRE, event_context)
             self._dist_context.wait_world()
 
-            offload_context = OffloadContext(dist_context=self._dist_context, pin_memory=False)
+            offload_context = OffloadContext(device=self._dist_context.current_device, pin_memory=False)
             self._gradient_manager.offload(offload_context)
             cast(Offloadable, self._optimizer).offload(offload_context)
             self._tracked_modules.offload(offload_context)
@@ -121,7 +121,7 @@ class TrainSleeper:
             self._event_bus.trigger(EVENT_TRAIN_WAKE_PRE, event_context)
             self._dist_context.wait_world()
 
-            onload_context = OnloadContext(dist_context=self._dist_context)
+            onload_context = OnloadContext(device=self._dist_context.current_device)
             self._tracked_modules.onload(onload_context)
             cast(Offloadable, self._optimizer).onload(onload_context)
             self._gradient_manager.onload(onload_context)

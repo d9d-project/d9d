@@ -1,7 +1,7 @@
 import dataclasses
 from typing import Protocol, runtime_checkable
 
-from d9d.dist_context import DistributedContext
+import torch
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
@@ -9,11 +9,11 @@ class OffloadContext:
     """Context passed to ``Offloadable.offload``.
 
     Attributes:
-        dist_context: The distributed context the subsystem was built under.
+        device: The device that holds the state of the subsystem.
         pin_memory: Whether to allocate the host buffer in pinned memory.
     """
 
-    dist_context: DistributedContext
+    device: torch.device
     pin_memory: bool
 
 
@@ -22,10 +22,10 @@ class OnloadContext:
     """Context passed to ``Offloadable.onload``.
 
     Attributes:
-        dist_context: The distributed context the subsystem was built under.
+        device: The device to move the state back to.
     """
 
-    dist_context: DistributedContext
+    device: torch.device
 
 
 @runtime_checkable
