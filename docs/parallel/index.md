@@ -35,7 +35,7 @@ During the forward pass, the module sees its parameters as plain local `torch.Te
 
 ### Expert Parallelism (MoE)
 
-`parallelize_expert_parallel` applies expert parallelism to an `MoELayer`:
+`parallelize_expert_parallel` applies expert parallelism to an `MoELayer`. It lives in `d9d.nn.moe` next to the layer, because it works only for that layer:
 
 1.  It shards the experts (the `GroupedLinear` weights) along the `ep_shard` mesh dimension, so each GPU holds a subset of experts. Along `ep_replicate`, the experts are replicated.
 2.  It replicates the router and the shared expert, if any, across the whole mesh.
@@ -76,8 +76,7 @@ parallelize_replicate(model, dense_mesh["dp_replicate", "cp_replicate"])
 
 ```python
 from d9d.dist_context import EXPERT_DOMAIN, DistributedContext
-from d9d.nn.moe import MoELayer
-from d9d.parallel import parallelize_expert_parallel
+from d9d.nn.moe import MoELayer, parallelize_expert_parallel
 
 ctx: DistributedContext = ...
 

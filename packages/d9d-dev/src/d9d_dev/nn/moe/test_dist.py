@@ -1,8 +1,7 @@
 import pytest
 import torch
 from d9d.dist_context import BATCH_DOMAIN, EXPERT_DOMAIN, DeviceMeshParameters
-from d9d.nn.moe import MoELayer, SharedExpertParameters
-from d9d.parallel import parallelize_expert_parallel
+from d9d.nn.moe import MoELayer, SharedExpertParameters, parallelize_expert_parallel
 
 from d9d_dev.nn.helper import (
     check_grad_distance_all_local_dist,

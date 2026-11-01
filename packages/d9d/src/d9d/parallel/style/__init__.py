@@ -1,9 +1,7 @@
-"""Custom ``ParallelStyle`` implementations for d9d modules."""
+"""Custom ``ParallelStyle`` implementations."""
 
-from .shard_experts import ShardMoESparseExpertsParallel
 from .to_local import ToLocalParallel
 
 __all__ = [
-    "ShardMoESparseExpertsParallel",
     "ToLocalParallel",
 ]
