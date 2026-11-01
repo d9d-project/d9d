@@ -185,12 +185,14 @@ To use pipelining outside the `Trainer`, for example in a custom loop, call the 
 
 `build_schedule` takes a model provider instead of a built model. The model provider is a function that accepts a `PipelineStageInfo` and returns the `nn.Module` for that stage. This keeps construction consistent.
 
+`build_schedule` also takes the program builder of the schedule. `build_program_builder` builds it from a schedule config. You can also pass your own builder (see [Building Custom Schedules](./internals.md#building-custom-schedules)).
+
 ```python
 import torch.nn.functional as F
 from torch import Tensor
 from torch.distributed import DeviceMesh
 
-from d9d.pipelining.factory import PipelineSchedule1F1BConfig, build_schedule
+from d9d.pipelining.factory import PipelineSchedule1F1BConfig, build_program_builder, build_schedule
 
 
 # 0. Define an object that computes the loss per microbatch. It receives the PipelineOutput
@@ -223,7 +225,7 @@ targets_microbatches = [...]  # One target tensor per microbatch
 loss_handler = MyLossHandler(targets_microbatches)
 schedule_info, modules = build_schedule(
     pp_mesh=pp_mesh,
-    schedule_config=schedule_config,
+    program_builder=build_program_builder(schedule_config),
     model_provider=lambda stage: MyModelChunk(stage, model_config),  # Factory function
 )
 

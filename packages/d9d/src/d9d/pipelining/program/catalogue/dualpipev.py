@@ -208,3 +208,7 @@ class DualPipeVPipelineProgramBuilder(PipelineProgramBuilder):
     @property
     def topology_style(self) -> ScheduleStyle:
         return ScheduleStyle.v
+
+    @property
+    def has_backward(self) -> bool:
+        return True

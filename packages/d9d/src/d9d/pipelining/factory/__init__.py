@@ -9,7 +9,7 @@ from .config import (
     PipelineScheduleLoopedBFSConfig,
     PipelineScheduleZeroBubbleVConfig,
 )
-from .factory import PipelineScheduleInfo, build_schedule
+from .factory import PipelineScheduleInfo, build_program_builder, build_schedule
 
 __all__ = [
     "AnyPipelineScheduleConfig",
@@ -20,5 +20,6 @@ __all__ = [
     "PipelineScheduleInfo",
     "PipelineScheduleLoopedBFSConfig",
     "PipelineScheduleZeroBubbleVConfig",
+    "build_program_builder",
     "build_schedule",
 ]

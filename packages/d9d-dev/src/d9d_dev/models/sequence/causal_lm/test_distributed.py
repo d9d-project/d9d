@@ -4,7 +4,7 @@ from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
 from d9d.models.io import SequenceHeadShared, SequenceInput, SequenceShared
 from d9d.nn.head import SequenceCausalLMHeadShared, SequenceCausalLMOutput
 from d9d.pipelining.api import PipelineStageInfo
-from d9d.pipelining.factory import PipelineScheduleGPipeConfig, build_schedule
+from d9d.pipelining.factory import PipelineScheduleGPipeConfig, build_program_builder, build_schedule
 from torch import nn
 
 from d9d_dev.models.meshes import MESHES_FOR_MODEL_TESTS
@@ -73,7 +73,7 @@ def test_consistent_to_itself_dist(
 
     schedule_info, models_dist = build_schedule(
         pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
-        schedule_config=PipelineScheduleGPipeConfig(),
+        program_builder=build_program_builder(PipelineScheduleGPipeConfig()),
         model_provider=_model_provider,
     )
 

@@ -32,3 +32,9 @@ class PipelineProgramBuilder(abc.ABC):
     def topology_style(self) -> ScheduleStyle:
         """The topology style used to assign stages to ranks."""
         ...
+
+    @property
+    @abc.abstractmethod
+    def has_backward(self) -> bool:
+        """Whether the programs of this builder run backward passes."""
+        ...

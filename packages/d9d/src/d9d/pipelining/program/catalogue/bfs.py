@@ -69,3 +69,7 @@ class LoopedBFSPipelineProgramBuilder(PipelineProgramBuilder):
     @property
     def topology_style(self) -> ScheduleStyle:
         return ScheduleStyle.loop
+
+    @property
+    def has_backward(self) -> bool:
+        return not self._inference_mode

@@ -8,16 +8,27 @@ from torch.distributed import DeviceMesh
 from ..api import PipelineSchedule, PipelineStageInfo
 from ..api.types import TPipelineInput, TPipelineOutput, TSharedInput
 from ..program.builder import (
+    PipelineProgramBuilder,
     build_stage_to_host_rank_topology,
     invert_stage_to_host_rank_topology,
+)
+from ..program.catalogue import (
+    DualPipeVPipelineProgramBuilder,
+    Interleaved1F1BPipelineProgramBuilder,
+    LoopedBFSPipelineProgramBuilder,
+    ZeroBubbleVPipelineProgramBuilder,
 )
 from ..runtime import OfflinePipelineExecutor, PipelineScheduleExecutor
 from ..stage import PipelineStage
 from .config import (
     AnyPipelineScheduleConfig,
+    PipelineSchedule1F1BConfig,
+    PipelineScheduleDualPipeVConfig,
+    PipelineScheduleGPipeConfig,
     PipelineScheduleInferenceConfig,
+    PipelineScheduleLoopedBFSConfig,
+    PipelineScheduleZeroBubbleVConfig,
 )
-from .registry import PIPELINE_PROGRAM_REGISTRY
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -35,25 +46,54 @@ class PipelineScheduleInfo(typing.Generic[TPipelineInput, TSharedInput, TPipelin
     has_last_stage: bool
 
 
+def build_program_builder(config: AnyPipelineScheduleConfig) -> PipelineProgramBuilder:
+    """Builds the program builder of a built-in pipeline schedule.
+
+    Args:
+        config: The configuration of the schedule.
+
+    Returns:
+        The program builder for ``build_schedule``.
+
+    Raises:
+        ValueError: If the configuration type is unknown.
+    """
+    match config:
+        case PipelineScheduleInferenceConfig():
+            return LoopedBFSPipelineProgramBuilder(num_stages_per_rank=1, inference_mode=True)
+        case PipelineScheduleGPipeConfig():
+            return LoopedBFSPipelineProgramBuilder(num_stages_per_rank=1, inference_mode=False)
+        case PipelineScheduleLoopedBFSConfig():
+            return LoopedBFSPipelineProgramBuilder(num_stages_per_rank=config.num_stages_per_rank, inference_mode=False)
+        case PipelineSchedule1F1BConfig():
+            return Interleaved1F1BPipelineProgramBuilder(
+                num_stages_per_rank=config.num_stages_per_rank, enable_zero_bubble=config.zero_bubble
+            )
+        case PipelineScheduleDualPipeVConfig():
+            return DualPipeVPipelineProgramBuilder()
+        case PipelineScheduleZeroBubbleVConfig():
+            return ZeroBubbleVPipelineProgramBuilder()
+        case _:
+            raise ValueError(f"Unknown pipeline schedule config ({type(config).__name__}).")
+
+
 def _build_schedule_local(
-    schedule_config: AnyPipelineScheduleConfig,
+    program_builder: PipelineProgramBuilder,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     stage_info = PipelineStageInfo(num_stages=1, current_stage=0)
 
     model = model_provider(stage_info)
-    has_backward = not isinstance(schedule_config, PipelineScheduleInferenceConfig)
-    scheduler = OfflinePipelineExecutor(model=model, do_backward=has_backward)
+    scheduler = OfflinePipelineExecutor(model=model, do_backward=program_builder.has_backward)
 
     return PipelineScheduleInfo(schedule=scheduler, has_first_stage=True, has_last_stage=True), [model]
 
 
 def _build_schedule_distributed(
     pp_mesh: DeviceMesh,
-    schedule_config: AnyPipelineScheduleConfig,
+    program_builder: PipelineProgramBuilder,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
-    program_builder = PIPELINE_PROGRAM_REGISTRY.program_for(schedule_config)
     num_stages = program_builder.num_stages_per_rank * pp_mesh.size()
 
     stage_to_host = build_stage_to_host_rank_topology(
@@ -95,7 +135,7 @@ def _build_schedule_distributed(
 
 def build_schedule(
     pp_mesh: DeviceMesh | None,
-    schedule_config: AnyPipelineScheduleConfig,
+    program_builder: PipelineProgramBuilder,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     """Constructs the pipeline schedule and instantiates model stages.
@@ -107,7 +147,8 @@ def build_schedule(
     Args:
         pp_mesh: The one-dimensional pipeline-parallel mesh, or ``None`` to run the model without
             distribution.
-        schedule_config: Configuration object determining the schedule strategy.
+        program_builder: The builder of the schedule programs. Use ``build_program_builder`` for a built-in
+            schedule, or pass your own ``PipelineProgramBuilder``.
         model_provider: A factory function that accepts stage info and returns the ``nn.Module``
             for that stage.
 
@@ -118,7 +159,7 @@ def build_schedule(
         ValueError: If ``pp_mesh`` has more than one dimension.
     """
     if pp_mesh is None:
-        return _build_schedule_local(schedule_config=schedule_config, model_provider=model_provider)
+        return _build_schedule_local(program_builder=program_builder, model_provider=model_provider)
 
     if pp_mesh.ndim != 1:
         raise ValueError(
@@ -128,6 +169,6 @@ def build_schedule(
 
     return _build_schedule_distributed(
         pp_mesh=pp_mesh,
-        schedule_config=schedule_config,
+        program_builder=program_builder,
         model_provider=model_provider,
     )

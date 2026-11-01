@@ -4,6 +4,7 @@ from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import (
     PipelineScheduleInferenceConfig,
+    build_program_builder,
     build_schedule,
 )
 from d9d.pipelining.runtime import OfflinePipelineExecutor
@@ -70,7 +71,7 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
 
     schedule_info, _ = build_schedule(
         pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
-        schedule_config=PipelineScheduleInferenceConfig(),
+        program_builder=build_program_builder(PipelineScheduleInferenceConfig()),
         model_provider=_model_provider,
     )
 
@@ -113,7 +114,7 @@ def test_inference_e2e_local():
 
     schedule_info, _ = build_schedule(
         pp_mesh=None,
-        schedule_config=PipelineScheduleInferenceConfig(),
+        program_builder=build_program_builder(PipelineScheduleInferenceConfig()),
         model_provider=_model_provider,
     )
 

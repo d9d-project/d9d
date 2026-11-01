@@ -235,3 +235,7 @@ class Interleaved1F1BPipelineProgramBuilder(PipelineProgramBuilder):
     @property
     def topology_style(self) -> ScheduleStyle:
         return ScheduleStyle.loop
+
+    @property
+    def has_backward(self) -> bool:
+        return True

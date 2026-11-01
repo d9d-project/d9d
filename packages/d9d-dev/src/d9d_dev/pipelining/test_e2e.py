@@ -9,6 +9,7 @@ from d9d.pipelining.factory import (
     PipelineScheduleGPipeConfig,
     PipelineScheduleLoopedBFSConfig,
     PipelineScheduleZeroBubbleVConfig,
+    build_program_builder,
     build_schedule,
 )
 from d9d.pipelining.runtime import OfflinePipelineExecutor
@@ -105,7 +106,7 @@ def test_e2e(
 
     schedule_info, _ = build_schedule(
         pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
-        schedule_config=schedule_config,
+        program_builder=build_program_builder(schedule_config),
         model_provider=_model_provider,
     )
 
@@ -173,7 +174,7 @@ def test_e2e_local(freeze_w1: bool):
 
     schedule_info, modules = build_schedule(
         pp_mesh=None,
-        schedule_config=schedule_config,
+        program_builder=build_program_builder(schedule_config),
         model_provider=_model_provider,
     )
 

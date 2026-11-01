@@ -111,6 +111,10 @@ class MyScheduleBuilder(PipelineProgramBuilder):
     def topology_style(self) -> ScheduleStyle:
         return ScheduleStyle.loop
 
+    @property
+    def has_backward(self) -> bool:
+        return True
+
     def compose(self, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:
         num_stages = self._stages_per_rank * pp_size
 
@@ -132,10 +136,21 @@ class MyScheduleBuilder(PipelineProgramBuilder):
         )
 ```
 
-### Register the Builder
+### Run the Builder
 
-1.  Add a config class for your schedule to `factory/config.py`, and add it to the `AnyPipelineScheduleConfig` union.
-2.  In `factory/registry.py`, register a function that builds your builder from the config with `@PIPELINE_PROGRAM_REGISTRY.register_program(MyScheduleConfig)`.
+Pass the builder to `build_schedule` instead of a built-in one:
+
+```python
+from d9d.pipelining.factory import build_schedule
+
+schedule_info, modules = build_schedule(
+    pp_mesh=pp_mesh,
+    program_builder=MyScheduleBuilder(stages_per_rank=2),
+    model_provider=model_provider,
+)
+```
+
+The `Trainer` builds its schedule from the configuration, so it runs only the built-in schedules.
 
 ## API Reference
 
