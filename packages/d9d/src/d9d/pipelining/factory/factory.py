@@ -3,8 +3,7 @@ import typing
 from collections.abc import Callable
 
 from torch import nn
-
-from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
+from torch.distributed import DeviceMesh
 
 from ..api import PipelineSchedule, PipelineStageInfo
 from ..api.types import TPipelineInput, TPipelineOutput, TSharedInput
@@ -50,20 +49,18 @@ def _build_schedule_local(
 
 
 def _build_schedule_distributed(
-    dist_context: DistributedContext,
+    pp_mesh: DeviceMesh,
     schedule_config: AnyPipelineScheduleConfig,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     program_builder = PIPELINE_PROGRAM_REGISTRY.program_for(schedule_config)
-    mesh = dist_context.mesh_for(REGULAR_DOMAIN)["pp"]
-
-    num_stages = program_builder.num_stages_per_rank * mesh.size()
+    num_stages = program_builder.num_stages_per_rank * pp_mesh.size()
 
     stage_to_host = build_stage_to_host_rank_topology(
-        num_stages=num_stages, pp_size=mesh.size(), style=program_builder.topology_style
+        num_stages=num_stages, pp_size=pp_mesh.size(), style=program_builder.topology_style
     )
     host_to_stage = invert_stage_to_host_rank_topology(stage_to_host)
-    this_rank_stages = host_to_stage[mesh.get_local_rank()]
+    this_rank_stages = host_to_stage[pp_mesh.get_local_rank()]
 
     stages = []
     modules = []
@@ -81,12 +78,12 @@ def _build_schedule_distributed(
         model = model_provider(stage_info)
         modules.append(model)
         stage = PipelineStage(
-            info=stage_info, module=model, group=mesh.get_group(), stage_to_host_topology=stage_to_host
+            info=stage_info, module=model, group=pp_mesh.get_group(), stage_to_host_topology=stage_to_host
         )
         stages.append(stage)
 
     schedule = PipelineScheduleExecutor(
-        dist_context=dist_context,
+        pp_group=pp_mesh.get_group(),
         stages=stages,
         program_builder=program_builder,
     )
@@ -97,30 +94,40 @@ def _build_schedule_distributed(
 
 
 def build_schedule(
-    dist_context: DistributedContext,
+    pp_mesh: DeviceMesh | None,
     schedule_config: AnyPipelineScheduleConfig,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     """Constructs the pipeline schedule and instantiates model stages.
 
-    If the context is distributed, it builds a ``PipelineScheduleExecutor`` with the stages this
-    rank hosts. Otherwise, it builds an ``OfflinePipelineExecutor`` that runs the model directly.
+    With ``pp_mesh``, it builds a ``PipelineScheduleExecutor`` with the stages this rank hosts.
+    Without it, it builds an ``OfflinePipelineExecutor`` that runs the model directly.
     The number of microbatches is not fixed here: each step takes it from the pack it receives.
 
     Args:
-        dist_context: The distributed context.
+        pp_mesh: The one-dimensional pipeline-parallel mesh, or ``None`` to run the model without
+            distribution.
         schedule_config: Configuration object determining the schedule strategy.
         model_provider: A factory function that accepts stage info and returns the ``nn.Module``
             for that stage.
 
     Returns:
         A tuple of the schedule info and the list of modules created on this rank.
+
+    Raises:
+        ValueError: If ``pp_mesh`` has more than one dimension.
     """
-    if dist_context.mesh_params.is_distributed:
-        return _build_schedule_distributed(
-            dist_context=dist_context,
-            schedule_config=schedule_config,
-            model_provider=model_provider,
-        )
-    else:
+    if pp_mesh is None:
         return _build_schedule_local(schedule_config=schedule_config, model_provider=model_provider)
+
+    if pp_mesh.ndim != 1:
+        raise ValueError(
+            f"pp_mesh must have one dimension, but pp_mesh.ndim ({pp_mesh.ndim}). Pass the pipeline-parallel "
+            'dimension only, e.g. mesh["pp"].'
+        )
+
+    return _build_schedule_distributed(
+        pp_mesh=pp_mesh,
+        schedule_config=schedule_config,
+        model_provider=model_provider,
+    )

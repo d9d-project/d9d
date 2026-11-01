@@ -104,7 +104,7 @@ def test_e2e(
         return microbatch.x.sum()
 
     schedule_info, _ = build_schedule(
-        dist_context=dist_ctx,
+        pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
         schedule_config=schedule_config,
         model_provider=_model_provider,
     )
@@ -151,9 +151,7 @@ def test_e2e(
 
 @pytest.mark.local
 @pytest.mark.parametrize("freeze_w1", [True, False])
-def test_e2e_local(dist_ctx_factory, freeze_w1: bool):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters())
-
+def test_e2e_local(freeze_w1: bool):
     x, y = build_pp_inputs(x_with_grad=False)
     model = build_pp_model()
 
@@ -174,7 +172,7 @@ def test_e2e_local(dist_ctx_factory, freeze_w1: bool):
     schedule_config = PipelineScheduleGPipeConfig()
 
     schedule_info, modules = build_schedule(
-        dist_context=dist_ctx,
+        pp_mesh=None,
         schedule_config=schedule_config,
         model_provider=_model_provider,
     )

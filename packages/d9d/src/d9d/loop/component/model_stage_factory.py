@@ -266,8 +266,11 @@ class ModelStageFactory:
         else:
             stateful_predicate = _stateful_predicate_always
 
+        pp_mesh = (
+            self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"] if self._dist_context.mesh_params.is_distributed else None
+        )
         schedule, modules = build_schedule(
-            dist_context=self._dist_context,
+            pp_mesh=pp_mesh,
             schedule_config=self._config_pipelining.schedule,
             model_provider=self._build_model_stage,
         )

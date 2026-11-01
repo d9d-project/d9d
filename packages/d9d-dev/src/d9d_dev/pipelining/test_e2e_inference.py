@@ -69,7 +69,7 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
         collected_results[microbatch_idx] = microbatch_outputs.x.detach().clone()
 
     schedule_info, _ = build_schedule(
-        dist_context=dist_ctx,
+        pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
         schedule_config=PipelineScheduleInferenceConfig(),
         model_provider=_model_provider,
     )
@@ -92,9 +92,7 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
 
 
 @pytest.mark.local
-def test_inference_e2e_local(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters())
-
+def test_inference_e2e_local():
     x, y = build_pp_inputs(x_with_grad=False)
     model = build_pp_model().eval()
     model.requires_grad_(False)
@@ -114,7 +112,7 @@ def test_inference_e2e_local(dist_ctx_factory):
         collected_results[microbatch_idx] = microbatch_outputs.x.detach().clone()
 
     schedule_info, _ = build_schedule(
-        dist_context=dist_ctx,
+        pp_mesh=None,
         schedule_config=PipelineScheduleInferenceConfig(),
         model_provider=_model_provider,
     )

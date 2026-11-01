@@ -1,7 +1,7 @@
 import dataclasses
 from typing import TYPE_CHECKING
 
-from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
+from torch.distributed import ProcessGroup
 
 from .action import ActionBase
 
@@ -29,14 +29,13 @@ class PipelineProgramCache:
     composed once and reused across steps.
     """
 
-    def __init__(self, dist_context: DistributedContext, builder: "PipelineProgramBuilder"):
+    def __init__(self, pp_group: ProcessGroup, builder: "PipelineProgramBuilder"):
         """Constructs the ``PipelineProgramCache`` object.
 
         Args:
-            dist_context: The distributed context, used to find the position of this rank in the ``pp`` group.
+            pp_group: The pipeline-parallel process group, used to find the position of this rank in it.
             builder: Builder that composes the all-rank action program for a microbatch count.
         """
-        pp_group = dist_context.mesh_for(REGULAR_DOMAIN).get_group("pp")
         self._pp_size = pp_group.size()
         self._pp_rank = pp_group.rank()
         self._builder = builder

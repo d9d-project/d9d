@@ -1,10 +1,11 @@
 import dataclasses
+import logging
 from typing import TYPE_CHECKING, Any
 
 from torch.autograd.profiler import record_function
+from torch.distributed import ProcessGroup
 
 from d9d import pytree
-from d9d.dist_context import DistributedContext
 from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedule
 from d9d.pipelining.api.tensor import TensorSpec
 from d9d.pipelining.stage import PipelineStage
@@ -16,6 +17,8 @@ from .program_cache import PipelineProgramCache
 
 if TYPE_CHECKING:
     from d9d.pipelining.program.builder import PipelineProgramBuilder
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -70,20 +73,19 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
 
     def __init__(
         self,
-        dist_context: DistributedContext,
+        pp_group: ProcessGroup,
         stages: list[PipelineStage],
         program_builder: "PipelineProgramBuilder",
     ):
         """Constructs the ``PipelineScheduleExecutor`` object.
 
         Args:
-            dist_context: The distributed context.
+            pp_group: The pipeline-parallel process group.
             stages: List of stages managed by this executor.
             program_builder: Builder that composes the per-rank action program for a microbatch count.
         """
-        self._dist_ctx = dist_context
         self._stages = {stage.info.current_stage: stage for stage in stages}
-        self._programs = PipelineProgramCache(dist_context, program_builder)
+        self._programs = PipelineProgramCache(pp_group, program_builder)
         self._comm_handler = PipelineCommunicationHandler(self._stages)
 
         self._buffer_config: _BufferConfig | None = None
@@ -125,7 +127,7 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
 
         callback_fn = PipelineLossHandler(callback) if program.has_backward else PipelineResultHandler(callback)
 
-        self._dist_ctx.logger.debug("Begin pipeline step")
+        _logger.debug("Begin pipeline step")
 
         for stage in self._stages.values():
             stage.reset()
@@ -140,9 +142,9 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
 
         for action in program.program_this_rank:
             with record_function(str(action)):
-                self._dist_ctx.logger.debug(f"Running pipeline action {action}")
+                _logger.debug(f"Running pipeline action {action}")
                 action.apply(ctx)
 
-        self._dist_ctx.logger.debug("Waiting for pending PP send comms")
+        _logger.debug("Waiting for pending PP send comms")
         self._comm_handler.wait_send_all()
-        self._dist_ctx.logger.debug("End pipeline step")
+        _logger.debug("End pipeline step")
