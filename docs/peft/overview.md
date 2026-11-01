@@ -10,7 +10,7 @@ This package is built on the [model state mapping](../model_states/mapper.md) fr
 
 Methods like LoRA change the model structure. For example, an `nn.Linear` layer becomes a `LoRALinear` wrapper. The keys in the original checkpoint (e.g. `layers.0.linear.weight`) then no longer match the model keys (e.g. `layers.0.linear.base.weight`). `d9d.peft` returns a `ModelStateMapper` that renames only the keys the method changes. Chain it after your checkpoint mapper with `ModelStateMapperSequential`, so all other keys load unchanged.
 
-So you can apply a PEFT method before the model is initialized or [horizontally distributed](../models/horizontal_parallelism.md). Other PEFT frameworks usually require initialized weights before they apply PEFT. That can break your horizontal parallelism setup or make it harder to reuse.
+So you can apply a PEFT method before the model is initialized or [horizontally distributed](../parallel/index.md). Other PEFT frameworks usually require initialized weights before they apply PEFT. That can break your horizontal parallelism setup or make it harder to reuse.
 
 ## Configuration
 

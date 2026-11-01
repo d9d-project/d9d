@@ -20,11 +20,11 @@ You can also apply [PEFT](../../peft/overview.md) methods and other architecture
 
 ### Implement `parallelize_model_stage(...)`
 
-This method applies a [horizontal parallelism](../../models/horizontal_parallelism.md) strategy to the model in place. The loop calls it only for distributed runs.
+This method applies a [horizontal parallelism](../../parallel/index.md) strategy to the model in place. The loop calls it only for distributed runs.
 
 For d9d models, you can use the default strategies. For example, apply `parallelize_qwen3_moe_model` to the backbone and the routine for each head type, such as `parallelize_causal_lm_head` ([reference](../../models/model_catalogue/qwen3_moe.md)).
 
-For a custom model, see the [horizontal parallelism](../../models/horizontal_parallelism.md) docs and the reference implementations.
+For a custom model, see the [horizontal parallelism](../../parallel/index.md) docs and the reference implementations.
 
 ### Implement `prepare_export_model_stage(...)` for Export
 

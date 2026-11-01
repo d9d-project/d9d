@@ -54,5 +54,5 @@ The extras are:
 *   `d9d[backend-sdpa-flash-attention-4]`: [FlashAttention 4](https://github.com/Dao-AILab/flash-attention) kernels as an [SDPA backend](../models/modules/attention.md#scaled-dot-product-attention-backends).
 *   `d9d[backend-grouped-mm-quack]`: [QuACK](https://github.com/Dao-AILab/quack) kernels as a [grouped GEMM backend](../models/modules/moe.md#grouped-gemm-backends) for MoE experts.
 *   `d9d[backend-grouped-mm-grouped-gemm]`: The [grouped_gemm](https://github.com/fanshiqing/grouped_gemm/) library as a [grouped GEMM backend](../models/modules/moe.md#grouped-gemm-backends) for MoE experts. You must build and install it manually first.
-*   `d9d[backend-expert-parallel-deepep]`: [DeepEP](https://github.com/deepseek-ai/DeepEP) for [expert parallelism](../models/horizontal_parallelism.md#expert-parallelism-moe). You must build and install it manually first.
+*   `d9d[backend-expert-parallel-deepep]`: [DeepEP](https://github.com/deepseek-ai/DeepEP) for [expert parallelism](../parallel/index.md#expert-parallelism-moe). You must build and install it manually first.
 *   `d9d[cce]`: Fused cross-entropy kernels for the [causal language modelling head](../models/modules/head.md#causal-language-modelling). You must install [Cut Cross Entropy](https://github.com/apple/ml-cross-entropy) from its repository first.

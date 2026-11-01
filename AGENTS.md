@@ -39,9 +39,9 @@ Top-level packages of the library.
 - `pytree/` - PyTree traversal and the `PyTree`/`TensorTree` aliases.
 - `autograd/` - extensions of the autograd engine: `split_backward` (separate backward passes for input and weight gradients, and the gradient context that custom autograd functions check).
 - `offload/` - moving GPU state to host memory and back (the base of sleep/wake).
-- `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`, `sleep`), and `internals` (`grad_sync`, `grad_norm`, `metric_collector`, `determinism`, `profiling`, `state`).
+- `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`, `sleep`), and `internals` (`metric_collector`, `determinism`, `profiling`, `state`).
 - `nn/` - modeling building blocks: attention, MoE, normalization, heads and other layers, and `ModuleLateInit`.
-- `parallel/` - horizontal parallelism: FSDP, HSDP, replicate and expert parallelism, and `style` (parallel styles).
+- `parallel/` - horizontal parallelism: FSDP, HSDP, replicate and expert parallelism, `style` (parallel styles), `grad_sync` (gradient reduction by placements) and `grad_norm` (global gradient norm and clipping).
 - `models/` - the model catalogue: the decoder backbone and heads, and one package per model with its Hugging Face mappers and its parallelization.
 - `pipelining/` - pipeline parallelism: `api`, `stage`, `runtime` (the VM), `program` (`builder` and the `catalogue` of schedules) and `factory`.
 - `model_state/` - checkpoints: `mapper` (graph-based transform engine) and `io` (streaming reader/writers).

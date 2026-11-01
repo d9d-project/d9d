@@ -8,7 +8,7 @@ from torch.autograd.profiler import record_function
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor
 
-from d9d.loop.internals.grad_norm.group import ParametersForNorm
+from .group import ParametersForNorm
 
 
 def _reduce_op_from_norm_type(norm_type: float) -> dist.ReduceOp.RedOpType:

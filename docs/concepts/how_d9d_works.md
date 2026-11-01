@@ -114,7 +114,7 @@ A distributed parameter records its own layout. It is a `DTensor`: a PyTorch ten
 
 The `parallelize_*` functions turn the parameters of a submodule into `DTensor`s. In `parallelize_model_stage()`, you call them on submodules, each call with the mesh of a domain. For example, `parallelize_hsdp()` shards a submodule with PyTorch FSDP along one mesh dimension and replicates it along the others.
 
-To add a strategy, write a function that sets the placements you need. [Why the Loop Needs No Model or Parallelism Code](#why-the-loop-needs-no-model-or-parallelism-code) shows what the loop does with them. See [Horizontal Parallelism](../models/horizontal_parallelism.md).
+To add a strategy, write a function that sets the placements you need. [Why the Loop Needs No Model or Parallelism Code](#why-the-loop-needs-no-model-or-parallelism-code) shows what the loop does with them. See [Horizontal Parallelism](../parallel/index.md).
 
 ## Steps and Packs
 
@@ -217,7 +217,7 @@ Each distributed parameter records its placements. The loop components read thes
 *   **Training checkpoints**: Every rank writes its own shards. A replicated tensor is written once.
 *   **Loading pretrained weights**: The job shards each loaded tensor to match the placements of its parameter.
 
-See [Gradient Norm and Clipping](../internals/grad_norm.md).
+See [Gradient Norm and Clipping](../parallel/grad_norm.md).
 
 ## Training Checkpoints and Model States
 

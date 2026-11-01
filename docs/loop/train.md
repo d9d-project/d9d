@@ -95,12 +95,12 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
     *   `JobLogger` starts an async reduction of all metrics across the ranks. [More info](../metric/overview.md).
 
 4.  **Gradient Synchronization**
-    *   **Wait & Scale**: The `GradientManager` waits for all backward hooks to finish. It then sums the loss weights across the ranks and divides all gradients by this total. This gives a correct average when the number of tokens varies, e.g. due to masking or packing. [More info](../internals/grad_sync.md).
+    *   **Wait & Scale**: The `GradientManager` waits for all backward hooks to finish. It then sums the loss weights across the ranks and divides all gradients by this total. This gives a correct average when the number of tokens varies, e.g. due to masking or packing. [More info](../parallel/grad_sync.md).
 
 5.  **Gradient Clipping**
     *   The `GradientClipper` computes the global L2 norm of all gradients.
     *   If `max_norm` is set, the gradients are clipped in place.
-    *   [More info](../internals/grad_norm.md).
+    *   [More info](../parallel/grad_norm.md).
 
 6.  **Optimization**
     *   Triggers the `EVENT_TRAIN_OPTIMIZER_STEP_PRE` event.

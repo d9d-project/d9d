@@ -72,7 +72,11 @@ nav = [
             "models/modules/hidden_states_aggregator.md",
         ] },
         "models/model_design.md",
-        "models/horizontal_parallelism.md",
+    ] },
+    { "Horizontal Parallelism" = [
+        "parallel/index.md",
+        "parallel/grad_sync.md",
+        "parallel/grad_norm.md",
     ] },
     { "Pipelining" = [
         "pipelining/index.md",
@@ -115,8 +119,6 @@ nav = [
     ] },
     { "Internals" = [
         "internals/determinism.md",
-        "internals/grad_norm.md",
-        "internals/grad_sync.md",
         "internals/metric_collector.md",
         "internals/profiling.md",
     ] },

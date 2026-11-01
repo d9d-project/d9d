@@ -1,7 +1,7 @@
 import pytest
 import torch
 from d9d.dist_context import EXPERT_DOMAIN, DeviceMeshParameters
-from d9d.loop.internals.grad_norm import group_parameters_for_norm
+from d9d.parallel.grad_norm import group_parameters_for_norm
 from torch import nn
 from torch.distributed.tensor import Replicate, Shard, distribute_tensor
 

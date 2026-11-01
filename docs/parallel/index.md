@@ -11,7 +11,9 @@ The `d9d.parallel` package provides functions that distribute modules across dev
 d9d requires every trainable parameter in a distributed run to be a `torch.distributed.tensor.DTensor`. This keeps the rest of the system simple:
 
 *   **Checkpointing**: The checkpointing engine does not need to know the parallel strategy. It reads `DTensor.placements` to decide how to gather, deduplicate and save each tensor.
-*   **Gradient synchronization**: [Gradient Synchronization](../internals/grad_sync.md) reads the placements to find the mesh dimensions along which a parameter is replicated.
+*   **Gradient synchronization**: [Gradient Synchronization](./grad_sync.md) reads the placements to find the mesh dimensions along which a parameter is replicated.
+
+The strategies in this package do not reduce gradients across replicas. The training loop does it with `GradientSynchronizer`. Without the loop, use it yourself.
 
 ### Composition over Monoliths
 

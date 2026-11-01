@@ -1,4 +1,4 @@
-"""Functions that apply horizontal parallelism strategies to modules."""
+"""Horizontal parallelism: placing parameters as ``DTensor`` on a device mesh and keeping gradients consistent."""
 
 from .expert_parallel import parallelize_expert_parallel
 from .fully_sharded import parallelize_fsdp

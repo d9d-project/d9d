@@ -61,7 +61,9 @@ Building blocks for LLMs.
 ## ⚡ Parallelism
 Strategies for distributing computations.
 
-*   **[Horizontal Parallelism](./models/horizontal_parallelism.md)**: Data parallelism, Fully Sharded Data Parallel (FSDP), expert parallelism and tensor parallelism.
+*   **[Horizontal Parallelism](./parallel/index.md)**: Replicate, FSDP, HSDP and expert parallelism over `DTensor` placements.
+*   **[Gradient Synchronization](./parallel/grad_sync.md)**: Custom backward hooks for overlapping comms.
+*   **[Gradient Norm and Clipping](./parallel/grad_norm.md)**: Correct global norm calculation across hybrid meshes.
 *   **[Pipeline Parallelism](./pipelining/index.md)**: Vertical scaling, schedules (1F1B, Zero Bubble), and cross-stage communication.
 *   **[Pipelining Internals](./pipelining/internals.md)**: How the pipeline virtual machine and the schedule programs work.
 *   **[Split Backward](./autograd/split_backward.md)**: Separate backward passes for input and weight gradients, and the context that custom autograd functions check.
@@ -89,8 +91,6 @@ Where the loss and the metrics go.
 ## ⚙️ Internals
 Deep dive into the engine room.
 
-*   **[Gradient Synchronization](./internals/grad_sync.md)**: Custom backward hooks for overlapping comms.
-*   **[Gradient Norm and Clipping](./internals/grad_norm.md)**: Correct global norm calculation across hybrid meshes.
 *   **[Metric Collection](./internals/metric_collector.md)**: Custom overlapped metric synchronization & computation.
 *   **[Determinism](./internals/determinism.md)**: RNG seeding across distributed processes.
 *   **[Profiling](./internals/profiling.md)**: A distributed-aware wrapper around the PyTorch Profiler.
