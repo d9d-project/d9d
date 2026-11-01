@@ -16,6 +16,8 @@ from .model_stage_exporter import ModelStageExporter
 from .model_stage_factory import ModelStageFactory, TrackedModules
 from .optimizer_factory import OptimizerFactory
 from .pipeline_state import PipelineStateHandler
+from .pipelined_lr_scheduler import PipelinedLRScheduler
+from .pipelined_optimizer import PipelinedOptimizer
 from .task_operator import InferenceTaskOperator, TrainTaskOperator
 from .timeout_manager import TimeoutManager
 from .tracker_writer import TrackerWriter
@@ -36,6 +38,8 @@ __all__ = [
     "ModelStageFactory",
     "OptimizerFactory",
     "PipelineStateHandler",
+    "PipelinedLRScheduler",
+    "PipelinedOptimizer",
     "PrefetchingDevicePackStream",
     "StateCheckpointer",
     "TimeoutManager",

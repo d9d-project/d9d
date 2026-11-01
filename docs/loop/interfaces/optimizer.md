@@ -2,7 +2,7 @@
 
 ## About
 
-The loop creates one optimizer per local model stage through an `OptimizerProvider`. You can configure a standard optimizer with `AutoOptimizerProvider`, or implement the `OptimizerProvider` protocol yourself.
+The loop creates one optimizer per local model stage through an `OptimizerProvider`. You can configure a standard optimizer with `AutoOptimizerProvider`, or implement the `OptimizerProvider` protocol yourself. The loop combines the optimizers of all local stages into one `PipelinedOptimizer`.
 
 ## Auto Optimizer
 
@@ -32,5 +32,7 @@ Inside a larger Pydantic config, declare a field of type `AutoOptimizerConfig` i
 ::: d9d.loop.auto.auto_optimizer
 
 ::: d9d.loop.control.optimizer_provider
+
+::: d9d.loop.component.PipelinedOptimizer
 
 ::: d9d.optim

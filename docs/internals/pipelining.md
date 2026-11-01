@@ -144,5 +144,3 @@ class MyScheduleBuilder(PipelineProgramBuilder):
 ::: d9d.pipelining.infra.schedule.component.program
 
 ::: d9d.pipelining.infra.schedule.program
-
-::: d9d.pipelining.training

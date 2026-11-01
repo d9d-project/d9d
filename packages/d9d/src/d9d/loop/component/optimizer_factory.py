@@ -6,10 +6,11 @@ from d9d.loop.control import (
     OptimizerProvider,
 )
 from d9d.optim.protocol import LRSchedulerProtocol, OptimizerProtocol
-from d9d.pipelining.training import PipelinedLRScheduler, PipelinedOptimizer
 
 from .job_schedule import JobSchedule
 from .model_stage_factory import TrackedModules
+from .pipelined_lr_scheduler import PipelinedLRScheduler
+from .pipelined_optimizer import PipelinedOptimizer
 
 
 class OptimizerFactory:
