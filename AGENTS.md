@@ -50,7 +50,7 @@ Top-level packages of the library.
 - `metric/` - distributed-aware metrics: `component` and `impl` (metric catalogue).
 - `optim/` - the optimizer and LR scheduler protocols, `stochastic` (stochastic-rounding low-precision optimizers) and `lr_scheduler` (`piecewise` composable schedules).
 - `tracker/` - experiment tracking integrations (`provider`, e.g. Aim).
-- `kernel/` - custom kernels: `cce`, `grouped_mm`, `moe`, `normalization`, `stochastic`, `swiglu`, `general`.
+- `kernel/` - custom kernels: `cce`, `moe`, `rms_norm`, `silu_mul`, `stochastic`.
 
 ## Working agreements for agents
 

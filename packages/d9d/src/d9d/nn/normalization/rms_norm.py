@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from d9d.kernel.normalization import rms_norm
+from d9d.kernel.rms_norm import rms_norm
 from d9d.nn import ModuleLateInit
 
 

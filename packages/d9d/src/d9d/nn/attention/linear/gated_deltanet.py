@@ -9,7 +9,7 @@ from fla.ops.kda.gate import fused_kda_gate
 from pydantic import BaseModel, ConfigDict, Field
 from torch import nn
 
-from d9d.kernel.swiglu import silu_mul
+from d9d.kernel.silu_mul import silu_mul
 from d9d.nn import ModuleLateInit
 from d9d.nn.normalization import RMSNorm
 
