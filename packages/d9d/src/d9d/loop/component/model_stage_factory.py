@@ -13,7 +13,7 @@ from d9d.model_state.io import load_model_state
 from d9d.nn import ModuleLateInit
 from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 from d9d.pipelining.api import PipelineStageInfo
-from d9d.pipelining.factory.factory import PipelineScheduleInfo, build_schedule
+from d9d.pipelining.factory import PipelineScheduleInfo, build_schedule
 
 StatefulPredicate = Callable[[str, torch.Tensor], bool]
 """Determines if a specific parameter or buffer should be included in the state dictionary."""

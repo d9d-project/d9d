@@ -7,7 +7,7 @@ from d9d.data.types import MicrobatchPack
 from d9d.dist_context import DistributedContext
 from d9d.loop.control import ComputeLossContext, TrainTask, UpdateMetricsContext
 from d9d.metric.impl.container import ComposeMetric
-from d9d.pipelining.factory.factory import PipelineScheduleInfo
+from d9d.pipelining.factory import PipelineScheduleInfo
 from d9d.pytree import PyTree
 
 from ..gradient_manager import GradientManager

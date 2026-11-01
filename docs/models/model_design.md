@@ -22,7 +22,7 @@ Instead, d9d composes each architecture explicitly, as Hugging Face Transformers
 
 ### Pipelining-Aware Models
 
-See [Pipeline Parallelism](./pipeline_parallelism.md).
+See [Pipeline Parallelism](../pipelining/index.md).
 
 ### Late Initialization
 

@@ -5,7 +5,7 @@ from torch.profiler import record_function
 from d9d.data.types import MicrobatchPack
 from d9d.dist_context import DistributedContext
 from d9d.loop.control import InferenceTask, ProcessOutputsContext
-from d9d.pipelining.factory.factory import PipelineScheduleInfo
+from d9d.pipelining.factory import PipelineScheduleInfo
 from d9d.pytree import PyTree
 
 from ..pipeline_state import PipelineStateHandler

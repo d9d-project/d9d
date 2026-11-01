@@ -10,8 +10,8 @@ from d9d.pipelining.factory import (
     PipelineScheduleLoopedBFSConfig,
     PipelineScheduleZeroBubbleVConfig,
 )
-from d9d.pipelining.infra.schedule.component.program import PipelineProgramBuilder
-from d9d.pipelining.infra.schedule.program import (
+from d9d.pipelining.program.builder import PipelineProgramBuilder
+from d9d.pipelining.program.catalogue import (
     DualPipeVPipelineProgramBuilder,
     Interleaved1F1BPipelineProgramBuilder,
     LoopedBFSPipelineProgramBuilder,

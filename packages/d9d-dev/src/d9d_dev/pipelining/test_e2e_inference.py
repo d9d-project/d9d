@@ -6,7 +6,7 @@ from d9d.pipelining.factory import (
     PipelineScheduleInferenceConfig,
     build_schedule,
 )
-from d9d.pipelining.infra.schedule.component.runtime import OfflinePipelineExecutor
+from d9d.pipelining.runtime import OfflinePipelineExecutor
 
 from d9d_dev.pipelining.definitions import (
     PipelineModel,

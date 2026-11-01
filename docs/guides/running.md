@@ -36,7 +36,7 @@ mesh:
 
 With `AutoDataProvider`, as in the Quickstart, `global_batch_size` stays the same when you add data-parallel ranks. `AutoDataProvider` shards the dataset across the ranks and changes the number of microbatches per step, so that each step still processes `global_batch_size` samples. `global_batch_size` must be divisible by the number of data-parallel ranks × `microbatch_size`. A [custom data provider](../loop/interfaces/data.md#writing-a-custom-dataprovider) decides this itself.
 
-The model provider decides how each module is distributed. The Quickstart provider calls `parallelize_hsdp`, which works for both meshes above. Pipeline, tensor and expert parallelism need support in the model. See [Horizontal Parallelism](../models/horizontal_parallelism.md) and [Pipeline Parallelism](../models/pipeline_parallelism.md).
+The model provider decides how each module is distributed. The Quickstart provider calls `parallelize_hsdp`, which works for both meshes above. Pipeline, tensor and expert parallelism need support in the model. See [Horizontal Parallelism](../models/horizontal_parallelism.md) and [Pipeline Parallelism](../pipelining/index.md).
 
 If you already ran the Quickstart, delete `runs/` or change `trainer.run.name` first. Otherwise, the job tries to resume the Quickstart run (see [Checkpoints and Resuming](#checkpoints-and-resuming)).
 

@@ -72,7 +72,7 @@ Tensors stored in the state are detached from the autograd graph, so the cached 
 
 ## Task Input and Output Types
 
-The task I/O uses the same PyTree roles as the model pipeline (see [Pipeline Parallelism](../../models/pipeline_parallelism.md)). `TrainTask` is generic over `[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]`:
+The task I/O uses the same PyTree roles as the model pipeline (see [Pipeline Parallelism](../../pipelining/index.md)). `TrainTask` is generic over `[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]`:
 
 *   `TBatch`: the raw microbatch produced by the data stream.
 *   `TPipelineInput`: the `PipelineInput` fed to the first stage.

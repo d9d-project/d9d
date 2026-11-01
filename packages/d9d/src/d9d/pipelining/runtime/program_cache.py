@@ -6,7 +6,7 @@ from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
 from .action import ActionBase
 
 if TYPE_CHECKING:
-    from ..program import PipelineProgramBuilder
+    from d9d.pipelining.program.builder import PipelineProgramBuilder
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

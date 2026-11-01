@@ -1,17 +1,18 @@
 from collections import deque
 
-from ..component.program import (
-    PipelineProgramBuilder,
-    ScheduleStyle,
-    add_communication_ops,
-    build_stage_to_host_rank_topology,
-)
-from ..component.runtime import (
+from d9d.pipelining.runtime import (
     ActionBase,
     BackwardFullInputComputeAction,
     BackwardWeightComputeAction,
     ComposeAction,
     ForwardComputeAction,
+)
+
+from ..builder import (
+    PipelineProgramBuilder,
+    ScheduleStyle,
+    add_communication_ops,
+    build_stage_to_host_rank_topology,
 )
 
 

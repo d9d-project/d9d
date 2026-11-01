@@ -73,7 +73,10 @@ nav = [
         ] },
         "models/model_design.md",
         "models/horizontal_parallelism.md",
-        "models/pipeline_parallelism.md",
+    ] },
+    { "Pipelining" = [
+        "pipelining/index.md",
+        "pipelining/internals.md",
     ] },
     { "Datasets" = [
         "dataset/index.md"
@@ -115,7 +118,6 @@ nav = [
         "internals/grad_norm.md",
         "internals/grad_sync.md",
         "internals/metric_collector.md",
-        "internals/pipelining.md",
         "internals/profiling.md",
     ] },
 ]

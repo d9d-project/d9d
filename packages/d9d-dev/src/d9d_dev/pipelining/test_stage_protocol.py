@@ -1,7 +1,7 @@
 import pytest
 import torch
 from d9d.pipelining.api import PipelineStageInfo
-from d9d.pipelining.infra.stage import PipelineStage
+from d9d.pipelining.stage import PipelineStage
 from torch import nn
 
 

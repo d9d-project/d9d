@@ -43,7 +43,7 @@ Top-level packages of the library.
 - `nn/` - modeling building blocks: attention, MoE, normalization, heads and other layers, and `ModuleLateInit`.
 - `parallel/` - horizontal parallelism: FSDP, HSDP, replicate and expert parallelism, and `style` (parallel styles).
 - `models/` - the model catalogue: the decoder backbone and heads, and one package per model with its Hugging Face mappers and its parallelization.
-- `pipelining/` - pipeline parallelism: `api`, `factory` and `infra` (the VM and schedules).
+- `pipelining/` - pipeline parallelism: `api`, `stage`, `runtime` (the VM), `program` (`builder` and the `catalogue` of schedules) and `factory`.
 - `model_state/` - checkpoints: `mapper` (graph-based transform engine) and `io` (streaming reader/writers).
 - `data/` - distributed-aware dataset wrappers, bucketing, microbatch packing and the data protocols.
 - `peft/` - parameter-efficient fine-tuning: `lora`, `full_tune`, `all` (method stacking).

@@ -20,7 +20,7 @@ With this split, a research schedule such as Zero Bubble or DualPipeV is a list 
 
 ### Core Components
 
-#### PipelineStage (`infra/stage/stage.py`)
+#### PipelineStage (`stage/stage.py`)
 
 Wraps a user `nn.Module`. It does not decide *when* to run. It gives the actions and the executor the atomic operations of a pipeline stage, such as the forward and backward passes.
 
@@ -31,7 +31,7 @@ It consists of:
     *   `BackwardComputeHandler`: Runs the backward pass. It can split the backward pass into `backward_input` (dI) and `backward_weight` (dW) for Zero Bubble schedules.
 *   **Communication handlers**: Own the P2P buffers for the forward and backward passes. Buffer sizes are inferred per microbatch, so the microbatches in a pack can differ in shape.
 
-#### Actions (`infra/schedule/component/runtime/action.py`)
+#### Actions (`runtime/action.py`)
 
 The atomic instructions for the pipeline virtual machine.
 
@@ -47,9 +47,11 @@ Actions are declarative and immutable.
 
 A program is a `dict[int, list[ActionBase]]`: it maps each rank to its sequential list of actions.
 
+The `d9d.pipelining.program.builder` package holds the `PipelineProgramBuilder` base class and the passes that help to build programs. The `d9d.pipelining.program.catalogue` package holds the ready programs: looped BFS (also used for GPipe and inference), interleaved 1F1B, Zero Bubble V and DualPipeV.
+
 A program depends only on the microbatch count and the fixed pipeline topology. The `PipelineProgramCache` composes a program once per microbatch count and reuses it across steps. For each program, it keeps the action list of this rank and whether the program contains backward work.
 
-#### Executor (`infra/schedule/component/runtime/executor.py`)
+#### Executor (`runtime/executor.py`)
 
 The `PipelineScheduleExecutor` is the runtime engine.
 
@@ -85,13 +87,13 @@ To build a new schedule, implement a `PipelineProgramBuilder`.
 ### Implement the Builder
 
 ```python
-from d9d.pipelining.infra.schedule.component.program import (
+from d9d.pipelining.program.builder import (
     PipelineProgramBuilder,
     ScheduleStyle,
     add_communication_ops,
     build_stage_to_host_rank_topology,
 )
-from d9d.pipelining.infra.schedule.component.runtime import (
+from d9d.pipelining.runtime import (
     ActionBase,
     ForwardComputeAction,
 )
@@ -137,10 +139,10 @@ class MyScheduleBuilder(PipelineProgramBuilder):
 
 ## API Reference
 
-::: d9d.pipelining.infra.stage
+::: d9d.pipelining.stage
 
-::: d9d.pipelining.infra.schedule.component.runtime
+::: d9d.pipelining.runtime
 
-::: d9d.pipelining.infra.schedule.component.program
+::: d9d.pipelining.program.builder
 
-::: d9d.pipelining.infra.schedule.program
+::: d9d.pipelining.program.catalogue

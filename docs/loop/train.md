@@ -85,7 +85,7 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
     *   The `DevicePackStream` hands out a pack of $N$ microbatches, already on the device (see [Data Prefetching](#data-prefetching)).
     *   Triggers the `EVENT_TRAIN_FORWARD_BACKWARD_PRE` event.
     *   The `TrainTask` maps each microbatch to model inputs.
-    *   The [pipeline program](../internals/pipelining.md) runs the forward and backward passes over all microbatches of the pack. Without pipeline parallelism, the program has a single stage.
+    *   The [pipeline program](../pipelining/internals.md) runs the forward and backward passes over all microbatches of the pack. Without pipeline parallelism, the program has a single stage.
     *   Gradients accumulate locally. Between the forward and backward passes, the `TrainTask` computes the loss.
     *   The last accumulation of each gradient bucket starts its all-reduce, which overlaps with the remaining backward work.
     *   The `TrainTask` updates the local metrics (e.g. token counts, accuracy) for each microbatch.

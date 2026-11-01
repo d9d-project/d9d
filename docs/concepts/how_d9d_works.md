@@ -103,7 +103,7 @@ With pipeline parallelism, the model must also:
 *   **Build only the layers of its stage**: The model provider reads the stage from `context.stage` and builds the model for it.
 *   **Implement `stage_transfer_spec()`**: Describes the tensors that the stage receives from the previous stage and sends to the next one.
 
-See [Model Design](../models/model_design.md) and [Pipeline Parallelism](../models/pipeline_parallelism.md).
+See [Model Design](../models/model_design.md) and [Pipeline Parallelism](../pipelining/index.md).
 
 ## Parameter Placements
 
@@ -154,7 +154,7 @@ backward              mb3        send gradient         mb3
 
 Each column lists the actions of one rank in order. The rows are not aligned in time, because a pass waits for the data that it needs. Rank 0 starts with several forward passes and then alternates. Rank 1, the last rank, alternates from the start. Other schedules, such as Zero Bubble, produce other programs, and the ranks run them the same way.
 
-See [Pipeline Parallelism](../models/pipeline_parallelism.md) and [Pipelining Internals](../internals/pipelining.md).
+See [Pipeline Parallelism](../pipelining/index.md) and [Pipelining Internals](../pipelining/internals.md).
 
 ## The Loss of a Step
 

@@ -1,7 +1,7 @@
 import copy
 import dataclasses
 
-from ..runtime.action import (
+from d9d.pipelining.runtime.action import (
     ActionBase,
     BackwardFullInputComputeAction,
     BackwardReceiveAction,

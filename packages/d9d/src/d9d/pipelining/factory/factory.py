@@ -8,12 +8,12 @@ from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
 
 from ..api import PipelineSchedule, PipelineStageInfo
 from ..api.types import TPipelineInput, TPipelineOutput, TSharedInput
-from ..infra.schedule.component.program import (
+from ..program.builder import (
     build_stage_to_host_rank_topology,
     invert_stage_to_host_rank_topology,
 )
-from ..infra.schedule.component.runtime import OfflinePipelineExecutor, PipelineScheduleExecutor
-from ..infra.stage import PipelineStage
+from ..runtime import OfflinePipelineExecutor, PipelineScheduleExecutor
+from ..stage import PipelineStage
 from .config import (
     AnyPipelineScheduleConfig,
     PipelineScheduleInferenceConfig,

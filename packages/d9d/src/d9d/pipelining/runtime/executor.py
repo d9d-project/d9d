@@ -7,7 +7,7 @@ from d9d import pytree
 from d9d.dist_context import DistributedContext
 from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedule
 from d9d.pipelining.api.tensor import TensorSpec
-from d9d.pipelining.infra.stage import PipelineStage
+from d9d.pipelining.stage import PipelineStage
 
 from .action import ActionContext
 from .callback import PipelineLossHandler, PipelineResultHandler
@@ -15,7 +15,7 @@ from .communications import PipelineCommunicationHandler
 from .program_cache import PipelineProgramCache
 
 if TYPE_CHECKING:
-    from ..program import PipelineProgramBuilder
+    from d9d.pipelining.program.builder import PipelineProgramBuilder
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

@@ -1,7 +1,8 @@
 import abc
 
-from ..program.topology import ScheduleStyle
-from ..runtime import ActionBase
+from d9d.pipelining.runtime import ActionBase
+
+from .topology import ScheduleStyle
 
 
 class PipelineProgramBuilder(abc.ABC):

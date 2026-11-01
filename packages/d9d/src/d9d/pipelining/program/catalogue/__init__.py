@@ -1,4 +1,4 @@
-"""Pipeline schedule implementations."""
+"""Catalogue of ready pipeline schedule programs."""
 
 from .bfs import LoopedBFSPipelineProgramBuilder
 from .dualpipev import DualPipeVPipelineProgramBuilder

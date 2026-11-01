@@ -1,6 +1,6 @@
 import torch.distributed as dist
 
-from d9d.pipelining.infra.stage import PipelineStage
+from d9d.pipelining.stage import PipelineStage
 
 
 def _schedule_batched_p2p(ops: list[dist.P2POp]) -> list[dist.Work]:

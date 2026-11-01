@@ -4,7 +4,7 @@ from enum import StrEnum
 from typing import Generic
 
 from d9d.pipelining.api import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
-from d9d.pipelining.infra.stage import PipelineStage
+from d9d.pipelining.stage import PipelineStage
 
 from .callback import PipelineLossHandler, PipelineResultHandler
 from .communications import PipelineCommunicationHandler
