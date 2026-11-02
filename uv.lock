@@ -1135,7 +1135,7 @@ requires-dist = [
     { name = "flash-attn-4", marker = "extra == 'backend-sdpa-flash-attention-4'", specifier = ">=4.0.0b32" },
     { name = "mlflow-skinny", marker = "extra == 'tracker-mlflow'", specifier = ">=3.0.0" },
     { name = "nv-grouped-gemm", marker = "extra == 'backend-grouped-mm-grouped-gemm'", specifier = ">=1.1.4" },
-    { name = "optree", specifier = ">=0.19.0" },
+    { name = "optree", specifier = ">=0.19.1" },
     { name = "plotly", marker = "extra == 'visualization'", specifier = ">=6.0.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "quack-kernels", marker = "extra == 'backend-grouped-mm-quack'", specifier = ">=0.6.5" },

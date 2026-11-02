@@ -64,13 +64,12 @@ class PyTreeFlattener:
         Returns:
             ``True`` if all leaves were already fully expanded (nothing to register), else ``False``.
         """
+        # Collecting the leaf types runs in C, so the Python loop covers only the few distinct types.
         unregistered = {
-            type(leaf)
-            for leaf in leaves
-            if type(leaf) not in self._registered
-            and self._is_dataclass_type(type(leaf))
-            and not (is_leaf is not None and is_leaf(leaf))
+            tp for tp in set(map(type, leaves)) if tp not in self._registered and self._is_dataclass_type(tp)
         }
+        if unregistered and is_leaf is not None:
+            unregistered = {type(leaf) for leaf in leaves if type(leaf) in unregistered and not is_leaf(leaf)}
         if not unregistered:
             return True
 
