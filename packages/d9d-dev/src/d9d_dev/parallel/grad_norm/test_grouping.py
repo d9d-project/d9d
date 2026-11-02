@@ -3,7 +3,7 @@ import torch
 from d9d.dist_context import EXPERT_DOMAIN, DeviceMeshParameters
 from d9d.parallel.grad_norm import group_parameters_for_norm
 from torch import nn
-from torch.distributed.tensor import Replicate, Shard, distribute_tensor
+from torch.distributed.tensor import DTensor, Partial, Replicate, Shard, distribute_tensor
 
 
 @pytest.mark.distributed
@@ -46,3 +46,20 @@ def test_grouping_mechanism(dist_ctx_factory):
 
     assert groups[first_group][0] is sharded_param
     assert groups[second_group][0] is local_param
+
+
+@pytest.mark.distributed
+def test_grouping_rejects_partial_placement(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=4, expert_parallel=2, data_parallel_replicate=2))
+    ep_mesh = dist_ctx.mesh_for(EXPERT_DOMAIN)
+
+    partial_param = nn.Parameter(
+        DTensor.from_local(
+            torch.randn(16, 16, device="cuda"),
+            device_mesh=ep_mesh[["ep_replicate", "ep_shard"]],
+            placements=[Replicate(), Partial()],
+        )
+    )
+
+    with pytest.raises(ValueError, match="is not supported"):
+        group_parameters_for_norm([partial_param])

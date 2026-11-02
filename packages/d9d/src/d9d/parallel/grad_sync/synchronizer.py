@@ -6,46 +6,17 @@ from typing import cast
 import torch
 from torch import nn
 from torch.distributed import DeviceMesh
-from torch.distributed.tensor import DTensor, Replicate, Shard
+from torch.distributed.tensor import DTensor
 
+from ..placement import split_placement_dims
 from .bucket import AbstractGradientBucket, LocalGradientBucket, SyncGradientBucket
 
 
 def _find_reduce_mesh(data: DTensor) -> DeviceMesh | None:
-    """Finds the sub-mesh to reduce the gradient over, from the placements of the parameter.
-
-    Args:
-        data: The parameter tensor.
-
-    Returns:
-        The sub-mesh of the replicated dimensions, or ``None`` if no reduction is needed.
-
-    Raises:
-        ValueError: If a placement is neither ``Replicate`` nor ``Shard``.
-    """
-    reduce_dims: set[int] = set()
-
-    for dim_i, dim_placement in enumerate(data.placements):
-        match dim_placement:
-            case Replicate():
-                reduce_dims.add(dim_i)
-            case Shard():
-                pass
-            case _:
-                raise ValueError(
-                    f"Gradient placement ({dim_placement}) is not supported. Use Replicate or Shard placements."
-                )
-
-    if len(reduce_dims) == 0:
+    replicate_dim_names = split_placement_dims(data).replicate_dim_names
+    if len(replicate_dim_names) == 0:
         return None
-
-    device_mesh: DeviceMesh = data.device_mesh
-
-    # d9d builds every device mesh with dimension names.
-    mesh_dim_names = cast(tuple[str, ...], device_mesh.mesh_dim_names)
-    reduce_mesh = device_mesh[tuple(mesh_dim_names[dim_i] for dim_i in reduce_dims)]
-
-    return reduce_mesh
+    return data.device_mesh[replicate_dim_names]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -206,8 +177,8 @@ class GradientSynchronizer:
         It must be called before the backward pass.
 
         Raises:
-            ValueError: If the synchronizer is already bound, or if a parameter appears more than once in the
-                parameter groups.
+            ValueError: If the synchronizer is already bound, if a parameter appears more than once in the
+                parameter groups, or if a ``DTensor`` parameter has a placement other than ``Replicate`` or ``Shard``.
         """
         if self._communicate_stream is not None:
             raise ValueError("The synchronizer is already bound. Call unbind() first.")
