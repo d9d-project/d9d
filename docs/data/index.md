@@ -15,7 +15,7 @@ d9d provides explicit wrappers that you compose yourself. It does not inject sam
 
 In sequence processing, the items of a batch often have different lengths. With random sampling, every batch is padded to its longest sequence, so compute is spent on padding tokens.
 
-`BufferSortedDataset` reads a buffer of items, sorts it by a sort key (usually the length) and splits it into packs. Items in one pack, e.g. one microbatch, have similar lengths, which reduces padding. It then shuffles the packs and the items within each pack, so the data order is not strictly sorted.
+`BufferSortedDataset` reads a buffer of items, sorts it by a sort key (usually the length) and splits it into packs. Items in one pack, e.g. one microbatch, have similar lengths, which reduces padding. It then shuffles the packs and the items within each pack, so the data order is not strictly sorted. All ranks must use the same `seed`, so that their shards cover every item exactly once.
 
 The underlying dataset must implement `DatasetImplementingSortKeyProtocol`, i.e. it must have a `sort_key(index)` method.
 
@@ -79,7 +79,7 @@ sorted_ds = BufferSortedDataset(
     base_dataset=base_ds,
     buffer_size=100,
     pack_size=4,
-    init_seed=42
+    seed=42
 )
 ```
 

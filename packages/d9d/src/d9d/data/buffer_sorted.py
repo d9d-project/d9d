@@ -1,4 +1,3 @@
-import pickle  # noqa: S403 - only for the RNG state that this class writes and reads itself
 import random
 from typing import Any, Protocol, TypeVar
 
@@ -56,7 +55,7 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
         base_dataset: DatasetImplementingSortKeyProtocol[_T_co],
         buffer_size: int,
         pack_size: int,
-        init_seed: int | None = None,
+        seed: int = 0,
     ):
         """Constructs the ``BufferSortedDataset`` object.
 
@@ -64,13 +63,14 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
             base_dataset: The underlying dataset.
             buffer_size: The number of items sorted together.
             pack_size: The size of a group of similar items, usually the batch or microbatch size.
-            init_seed: Seed for the random number generator.
+            seed: The seed of the shuffling. All copies of the dataset, e.g. on all ranks and in all workers, must
+                use the same seed, so that they serve the same item at the same index.
         """
         self._base_dataset = base_dataset
         self._buffer_size = buffer_size
         self._pack_size = pack_size
+        self._seed = seed
 
-        self._rng = random.Random(init_seed ^ 0x105E7 if init_seed is not None else None)
         self._buffer_indices: list[int] = []
         self._buffer_idx: int = -1
 
@@ -81,9 +81,12 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
 
         base_idx = list(range(select_start, select_end))
 
+        # A generator per buffer, so that the order does not depend on the buffers read before.
+        rng = random.Random(f"{self._seed}:{buffer_idx}")
+
         sort_keys = [
             # The random tie-breaker shuffles items with equal sort keys.
-            (self._base_dataset.sort_key(idx), self._rng.random())
+            (self._base_dataset.sort_key(idx), rng.random())
             for idx in base_idx
         ]
 
@@ -92,10 +95,10 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
 
         local_idx_packs = [local_idx[i : i + self._pack_size] for i in range(0, len(local_idx), self._pack_size)]
 
-        self._rng.shuffle(local_idx_packs)
+        rng.shuffle(local_idx_packs)
 
         for pack in local_idx_packs:
-            self._rng.shuffle(pack)
+            rng.shuffle(pack)
 
         flat_local_idx = [y for x in local_idx_packs for y in x]
 
@@ -114,18 +117,11 @@ class BufferSortedDataset(Dataset[_T_co], Stateful):
         return len(self._base_dataset)
 
     def state_dict(self) -> dict[str, Any]:
-        ret = {
-            "seed": pickle.dumps(self._rng.getstate()),
-            "buffer_idx": self._buffer_idx,
-            "buffer_indices": self._buffer_indices,
-        }
+        # The order of every buffer follows from the seed, so only the base dataset has state.
         if isinstance(self._base_dataset, Stateful):
-            ret["base_dataset"] = self._base_dataset.state_dict()
-        return ret
+            return {"base_dataset": self._base_dataset.state_dict()}
+        return {}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        self._rng.setstate(pickle.loads(state_dict["seed"]))  # noqa: S301 - our own checkpoint, from state_dict()
-        self._buffer_idx = state_dict["buffer_idx"]
-        self._buffer_indices = state_dict["buffer_indices"]
         if isinstance(self._base_dataset, Stateful):
             self._base_dataset.load_state_dict(state_dict["base_dataset"])

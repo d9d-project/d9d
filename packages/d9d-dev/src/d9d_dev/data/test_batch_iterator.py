@@ -225,7 +225,7 @@ def _freeze(state):
     [
         pytest.param(lambda: SimpleDataset(64), id="plain"),
         pytest.param(
-            lambda: BufferSortedDataset(_SortableDataset(64), buffer_size=16, pack_size=4, init_seed=0),
+            lambda: BufferSortedDataset(_SortableDataset(64), buffer_size=16, pack_size=4, seed=0),
             id="buffer_sorted",
         ),
         pytest.param(
