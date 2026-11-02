@@ -8,7 +8,7 @@ from d9d.metric.catalogue.aggregation import WeightedMeanMetric
 from d9d.offload import Offloadable, OffloadContext, OnloadContext
 from d9d.parallel.grad_sync import GradientSynchronizer
 
-from ..config import GradientManagerConfig
+from ..config import GradientManagerConfig, dtype_from_name
 from .model_stage_factory import TrackedModules
 
 
@@ -51,10 +51,11 @@ class GradientManager(Offloadable):
         if self._config.grad_dtype is None:
             return
 
+        grad_dtype = dtype_from_name(self._config.grad_dtype)
         for mod in self._tracked_modules.modules:
             for param in mod.parameters():
                 if param.requires_grad:
-                    param.grad_dtype = getattr(torch, self._config.grad_dtype)
+                    param.grad_dtype = grad_dtype
 
     def _bind(self):
         self._setup_grad_dtype()

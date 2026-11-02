@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from d9d.pipelining.factory import AnyPipelineScheduleConfig, PipelineScheduleGPipeConfig
 from d9d.tracker import AnyTrackerConfig, RunConfig
 
-from .types import StepActionPeriod
+from .types import DtypeName, StepActionPeriod
 
 
 class JobScheduleConfig(BaseModel):
@@ -172,14 +172,13 @@ class GradientManagerConfig(BaseModel):
     """Configuration for gradient synchronization.
 
     Attributes:
-        grad_dtype: The name of the ``torch`` dtype for gradients, e.g. ``"float32"``. If ``None``, gradients
-            use the parameter dtype.
+        grad_dtype: The dtype of the gradients. If ``None``, gradients use the parameter dtype.
         bucket_size_mb: The maximum size of a gradient communication bucket, in MiB.
     """
 
     model_config = ConfigDict(extra="forbid")
 
-    grad_dtype: str | None = None
+    grad_dtype: DtypeName | None = None
     bucket_size_mb: int = 32
 
 
