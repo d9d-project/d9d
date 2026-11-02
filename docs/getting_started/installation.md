@@ -48,7 +48,7 @@ pip install -e packages/d9d-kernels -e "packages/d9d[tracker-aim]"  # From a che
 The extras are:
 
 *   `d9d[tracker-wandb]`, `d9d[tracker-tensorboard]`, `d9d[tracker-mlflow]`, `d9d[tracker-aim]`: The SDKs of the [experiment trackers](../tracker/index.md).
-*   `d9d[visualization]`: [Plotly](https://plotly.com/python/), for [plotting learning rate schedules](../lr_scheduler/visualization.md).
+*   `d9d[visualization]`: [Plotly](https://plotly.com/python/), for [plotting learning rate schedules](../optim/lr_scheduler/visualization.md).
 *   `d9d[linear-attention]`: [Flash Linear Attention](https://github.com/fla-org/flash-linear-attention) kernels for [linear attention](../models/modules/attention.md#linear-attention).
 *   `d9d[backend-sdpa-flash-attention-2]`: [FlashAttention 2](https://github.com/Dao-AILab/flash-attention) kernels as an [SDPA backend](../models/modules/attention.md#scaled-dot-product-attention-backends). You may need to build FlashAttention 2 from source if no prebuilt wheel matches your setup.
 *   `d9d[backend-sdpa-flash-attention-4]`: [FlashAttention 4](https://github.com/Dao-AILab/flash-attention) kernels as an [SDPA backend](../models/modules/attention.md#scaled-dot-product-attention-backends).

@@ -6,7 +6,7 @@ The loop creates one optimizer per local model stage through an `OptimizerProvid
 
 ## Auto Optimizer
 
-The `d9d.loop.auto` package builds standard optimizers from a Pydantic configuration. It supports `AdamW`, `Adam`, `SGD` and [`StochasticAdamW`](../../optimizer/stochastic.md). The `name` field selects the optimizer.
+The `d9d.loop.auto` package builds standard optimizers from a Pydantic configuration. It supports `AdamW`, `Adam`, `SGD` and [`StochasticAdamW`](../../optim/stochastic.md). The `name` field selects the optimizer.
 
 ## Custom Optimizer
 

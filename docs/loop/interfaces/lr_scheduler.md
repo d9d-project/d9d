@@ -6,7 +6,7 @@ The loop creates one learning rate scheduler per optimizer through an `LRSchedul
 
 ## Auto Scheduler
 
-The `d9d.loop.auto` package builds schedulers from a Pydantic configuration. It supports [piecewise](../../lr_scheduler/piecewise.md) schedules (warmup, hold, decay). The `name` field selects the scheduler.
+The `d9d.loop.auto` package builds schedulers from a Pydantic configuration. It supports [piecewise](../../optim/lr_scheduler/piecewise.md) schedules (warmup, hold, decay). The `name` field selects the scheduler.
 
 ## Custom Scheduler
 

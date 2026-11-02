@@ -111,11 +111,11 @@ nav = [
         "tracker/index.md",
     ] },
     { "Optimizers" = [
-        "optimizer/stochastic.md",
-    ] },
-    { "Learning Rate Schedulers" = [
-        "lr_scheduler/piecewise.md",
-        "lr_scheduler/visualization.md",
+        "optim/stochastic.md",
+        { "Learning Rate Schedulers" = [
+            "optim/lr_scheduler/piecewise.md",
+            "optim/lr_scheduler/visualization.md",
+        ] },
     ] },
     { "Internals" = [
         "internals/determinism.md",

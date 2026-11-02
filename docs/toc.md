@@ -80,8 +80,8 @@ Metrics, learning rate schedules and optimizers.
 *   **[Metrics Overview](./metric/overview.md)**: Distributed-aware statistic accumulation.
 *   **[Metric Catalogue](./metric/metric_catalogue/index.md)**: Ready-to-use metric implementations.
 *   **[Custom Metrics](./metric/custom.md)**: Implementing custom metrics.
-*   **[Piecewise Scheduler](./lr_scheduler/piecewise.md)**: Composable LR schedules and [Schedule Visualization](./lr_scheduler/visualization.md).
-*   **[Stochastic Optimizers](./optimizer/stochastic.md)**: Low-precision training using stochastic rounding.
+*   **[Piecewise Scheduler](./optim/lr_scheduler/piecewise.md)**: Composable LR schedules and [Schedule Visualization](./optim/lr_scheduler/visualization.md).
+*   **[Stochastic Optimizers](./optim/stochastic.md)**: Low-precision training using stochastic rounding.
 
 ## 📊 Experiment Tracking
 Where the loss and the metrics go.

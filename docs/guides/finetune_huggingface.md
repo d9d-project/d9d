@@ -60,7 +60,7 @@ See [Model State Mapper](../model_state/mapper.md).
 
 ## Optimizer
 
-The provider casts the model to bf16 with `.bfloat16()`. The config keeps the gradients in fp32 and uses `stochastic_adamw`, which updates bf16 weights with stochastic rounding (see [Stochastic Optimizers](../optimizer/stochastic.md)):
+The provider casts the model to bf16 with `.bfloat16()`. The config keeps the gradients in fp32 and uses `stochastic_adamw`, which updates bf16 weights with stochastic rounding (see [Stochastic Optimizers](../optim/stochastic.md)):
 
 ```yaml
 trainer:
