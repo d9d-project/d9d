@@ -2,13 +2,23 @@ import dataclasses
 from collections import deque
 from contextlib import AbstractContextManager
 from types import TracebackType
+from typing import Protocol
 
 import torch
 
 from d9d import pytree
-from d9d.tracker import BaseTrackerRun, TrackerPoint, TrackerValue
 
-from .job_schedule import JobSchedule
+from .base import BaseTrackerRun, TrackerPoint
+from .value import TrackerValue
+
+
+class StepSource(Protocol):
+    """Protocol for an object that tells the current step, e.g. the job schedule of the training loop."""
+
+    @property
+    def current_step(self) -> int:
+        """The current step."""
+        ...
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -135,16 +145,16 @@ class TrackerWriter:
     when the run closes. Each value gets the step that is current at the call.
     """
 
-    def __init__(self, pending: PendingTrackerWrites, schedule: JobSchedule, context: dict[str, str]):
+    def __init__(self, pending: PendingTrackerWrites, step_source: StepSource, context: dict[str, str]):
         """Constructs the ``TrackerWriter`` object.
 
         Args:
             pending: The queue that passes the writes to the tracker run.
-            schedule: The job schedule whose current step is attached to a value at the call.
+            step_source: The source of the current step, which is attached to a value at the call.
             context: The tags attached to every value, e.g. ``{"stage": "train"}``.
         """
         self._pending = pending
-        self._schedule = schedule
+        self._step_source = step_source
         self._context = context
 
     def log(self, name: str, value: TrackerValue, context: dict[str, str] | None = None):
@@ -160,4 +170,6 @@ class TrackerWriter:
 
     def _point(self, name: str, context: dict[str, str] | None) -> TrackerPoint:
         # Each point owns its context, so a change by a tracker run does not leak into other points.
-        return TrackerPoint(name=name, step=self._schedule.current_step, context={**self._context, **(context or {})})
+        return TrackerPoint(
+            name=name, step=self._step_source.current_step, context={**self._context, **(context or {})}
+        )

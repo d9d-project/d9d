@@ -20,7 +20,6 @@ from .pipelined_lr_scheduler import PipelinedLRScheduler
 from .pipelined_optimizer import PipelinedOptimizer
 from .task_operator import InferenceTaskOperator, TrainTaskOperator
 from .timeout_manager import TimeoutManager
-from .tracker_writer import TrackerWriter
 from .train_sleeper import TrainSleeper
 
 __all__ = [
@@ -44,7 +43,6 @@ __all__ = [
     "StateCheckpointer",
     "TimeoutManager",
     "TrackedModules",
-    "TrackerWriter",
     "TrainSleeper",
     "TrainTaskOperator",
     "build_device_pack_stream",

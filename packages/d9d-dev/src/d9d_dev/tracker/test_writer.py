@@ -1,15 +1,13 @@
+import dataclasses
+
 import pytest
 import torch
-from d9d.loop.component import JobSchedule, TrackerWriter
-from d9d.loop.component.tracker_writer import PendingTrackerWrites
-from d9d.loop.config import JobScheduleConfig
-from d9d.tracker import BaseTrackerRun, Histogram, Scalar
+from d9d.tracker import BaseTrackerRun, Histogram, PendingTrackerWrites, Scalar, TrackerWriter
 
 
-class _FakeStream:
-    @property
-    def total_steps(self) -> int | None:
-        return None
+@dataclasses.dataclass
+class _StepCounter:
+    current_step: int
 
 
 class _RecordingRun(BaseTrackerRun):
@@ -35,18 +33,17 @@ class _RecordingRun(BaseTrackerRun):
 )
 def test_writer(max_pending_steps, must_be_written_before_exit):
     run = _RecordingRun()
-    schedule = JobSchedule(config=JobScheduleConfig(total_steps=100), stream=_FakeStream())
-    schedule._current_step = 5
+    steps = _StepCounter(5)
 
     with PendingTrackerWrites(run, max_pending_steps=max_pending_steps) as pending:
-        writer = TrackerWriter(pending, schedule=schedule, context={"stage": "train"})
+        writer = TrackerWriter(pending, step_source=steps, context={"stage": "train"})
 
         # fp64 needs no conversion, so the copy reads the tensor itself.
         loss = torch.tensor(1.5, device="cuda", dtype=torch.float64)
         writer.log("loss", Scalar(value=loss))
         # The logged value is read at the call, so a later in-place change on the same stream does not affect it.
         loss.add_(1.0)
-        schedule.step()
+        steps.current_step += 1
         writer.log("lr", Scalar(value=1e-5), context={"group": "0"})
         writer.log("tokens", Scalar(value=torch.tensor(1_000_000_003, device="cuda")))
         writer.log("counts", Histogram(counts=torch.arange(4.0, device="cuda")))

@@ -13,11 +13,10 @@ from d9d.loop.internals.metric_collector import AsyncMetricCollector
 from d9d.loop.internals.state import load_state_dict_main_process, state_dict_main_process
 from d9d.metric.impl.container import ComposeMetric
 from d9d.pytree import PyTree, ScalarTree
-from d9d.tracker import BaseTracker, RunConfig, Scalar, tracker_from_config
+from d9d.tracker import BaseTracker, PendingTrackerWrites, RunConfig, Scalar, TrackerWriter, tracker_from_config
 from d9d.tracker.provider.null import NullTrackerConfig
 
 from .job_schedule import JobSchedule
-from .tracker_writer import PendingTrackerWrites, TrackerWriter
 
 
 def _flatten_pytree_for_metrics(tree: PyTree[torch.Tensor]) -> dict[str, torch.Tensor]:
@@ -92,7 +91,7 @@ class JobLogger(Stateful):
             PendingTrackerWrites(run, max_pending_steps=self._config.max_pending_steps) as pending,
         ):
             self._pending = pending
-            self._writer = TrackerWriter(pending, schedule=self._schedule, context=context)
+            self._writer = TrackerWriter(pending, step_source=self._schedule, context=context)
             yield self._writer
 
     @contextmanager

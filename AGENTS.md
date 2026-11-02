@@ -49,7 +49,7 @@ Top-level packages of the library.
 - `peft/` - parameter-efficient fine-tuning: `lora`, `full_tune`, `all` (method stacking).
 - `metric/` - distributed-aware metrics: `component` and `impl` (metric catalogue).
 - `optim/` - the optimizer and LR scheduler protocols, `stochastic` (stochastic-rounding low-precision optimizers) and `lr_scheduler` (`piecewise` composable schedules).
-- `tracker/` - experiment tracking integrations (`provider`, e.g. Aim).
+- `tracker/` - experiment tracking: the trackers (`provider`, e.g. W&B, TensorBoard, MLflow, Aim) and `TrackerWriter`, which logs GPU values without waiting for the GPU.
 - `kernel/` - custom kernels: `cce`, `moe`, `rms_norm`, `silu_mul`, `stochastic`.
 
 ## Working agreements for agents

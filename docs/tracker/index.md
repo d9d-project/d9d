@@ -134,7 +134,6 @@ This task logs a histogram of each weight matrix every 100 steps:
 import torch
 from torch.distributed.tensor import DTensor
 
-from d9d.loop.component import TrackerWriter
 from d9d.loop.control import RegisterTaskEventsContext, TrainTask
 from d9d.loop.event import subscribe, subscribe_annotated
 from d9d.loop.event.catalogue.common import EventModelStagesReadyContext, EventStepContext
@@ -144,7 +143,7 @@ from d9d.loop.event.catalogue.train import (
     EVENT_TRAIN_STEP_POST,
     EventTrainReadyContext,
 )
-from d9d.tracker import Histogram
+from d9d.tracker import Histogram, TrackerWriter
 
 PERIOD_STEPS = 100
 
@@ -192,6 +191,34 @@ The histograms go to the writer and not to a [metric](../metric/overview.md). A 
 A `Histogram` holds only the counts, so W&B, TensorBoard and Aim show the bin numbers on the x-axis, not the values. MLflow and the log tracker do not log histograms.
 
 A call reads a tensor on the current CUDA stream. You can change the tensor in place after the call, on the same stream, without changing the logged value. The writer works only while the run is open, until `train()` returns. Later calls raise an error.
+
+### Logging Without the Training Loop
+
+The `TrackerWriter` works without the training loop. It takes the open run, a source of the current step and the context of every value. Any object with a `current_step` property is a step source (see `StepSource`).
+
+```python
+from d9d.tracker import PendingTrackerWrites, RunConfig, Scalar, TrackerWriter, tracker_from_config
+
+
+class Steps:
+    current_step = 0
+
+
+steps = Steps()
+tracker = tracker_from_config(config)  # Any tracker configuration, e.g. LogTrackerConfig()
+
+with (
+    tracker.open(RunConfig(name="my-run")) as run,
+    PendingTrackerWrites(run, max_pending_steps=4) as pending,
+):
+    writer = TrackerWriter(pending, step_source=steps, context={"stage": "train"})
+    for step in range(1000):
+        steps.current_step = step
+        loss = ...  # A GPU tensor
+        writer.log("loss", Scalar(value=loss))
+```
+
+`max_pending_steps` sets how many steps the writes can wait for the GPU. A new write waits for the writes that are this many steps behind it.
 
 ## Adding a New Tracker
 
@@ -283,4 +310,3 @@ case CometConfig():
 
 ::: d9d.tracker
 
-::: d9d.loop.component.TrackerWriter
