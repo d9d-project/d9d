@@ -2,9 +2,8 @@
 DEP: 0009
 Title: Data Flow - JobSchedule & DataProvider
 Author: Maksim Afanasev @mrapplexz
-Status: Draft
 Type: Refactor
-Created: 2026-06-22
+Implemented: #39
 ---
 
 # DEP-0009: Data Flow - `JobSchedule` & `DataProvider`

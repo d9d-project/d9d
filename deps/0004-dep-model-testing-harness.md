@@ -2,9 +2,8 @@
 DEP: 0004
 Title: Model Testing Harness
 Author: Maksim Afanasev @mrapplexz & Roman Malkiv @RMalkiv
-Status: Implemented
 Type: Feature
-Created: 2026-03-24
+Implemented: dcd1a37
 ---
 
 # Model Testing Harness

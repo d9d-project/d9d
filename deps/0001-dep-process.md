@@ -2,9 +2,7 @@
 DEP: 0001
 Title: The D9D Enhancement Proposal (DEP) Process
 Author: @mrapplexz
-Status: Active
 Type: Process
-Created: 2026-02-04
 ---
 
 # DEP-0001: The DEP Process
@@ -27,10 +25,10 @@ The DEP process is designed to force the **think before you do**, i.e. force the
 The process for a feature to land in `d9d` is strictly sequential.
 
 ### 1. Proposal Phase
-1.  **Draft:** The author copies `deps/TEMPLATE.md` to `deps/XXXX-my-feature.md`.
-2.  **Pull Request:** A PR is opened with the design document. Status is set to `Draft`.
+1.  **Draft:** The author copies `deps/TEMPLATE.md` to `deps/<number>-dep-<name>.md`.
+2.  **Pull Request:** A PR is opened with the design document.
 3.  **Review:** The proposal is discussed.
-4.  **Acceptance:** Once approved by maintainers, the PR acts as a "green light". The status changes to `Accepted` and the document is merged into the main branch.
+4.  **Acceptance:** Once approved by maintainers, the PR acts as a "green light". Merging the document into the main branch accepts it.
 
 ### 2. Development Phase
 Now you start the main development process. You should open a Pull Request for the feature and mark it a **draft**. A feature is not considered complete until the following is fulfilled:
@@ -54,16 +52,17 @@ Once you complete development of your feature, these steps will be passed:
 
 1. **Pull Request**: Author should open (or mark it as **ready**) Pull Request
 2. **Code Review**: Discuss the code changes with project maintainers.
-3. **Integration**: Once approved by maintainers, PR will be merged.
+3. **Integration**: Once approved by maintainers, PR will be merged. The PR adds `Implemented: #<PR>` to the header of the DEP.
 
 ## When is a DEP required?
-* Any changes to the existing public API that break backward compatibility.
-* New major public API (i.e. new distributed strategies, new base modules).
+* New major public API (i.e. new public abstractions, new distributed strategies, new base modules).
+* Changes to the existing public API that break backward compatibility, once d9d reaches 1.0.
 
 Note that DEP is **not** required especially for:
 * Adding new models that are build on top of existing API.
 * Bug fixes.
+* Breaking changes that introduce no new abstraction, while d9d is on 0.x.
 
 ## DEP Maintenance
-DEPs are historical records. Once a DEP status is `Implemented`, the document should not be changed (except for minor typos). 
-If the design changes significantly later, a new DEP should be drafted to supersede the old one.
+DEPs are historical records. Once the implementation of a DEP is merged, the document should not be changed (except for minor typos). 
+If the design changes significantly later, a new DEP should be drafted to supersede the old one. The PR of the new DEP adds `Superseded-By: DEP-<number>` to the header of the old one.

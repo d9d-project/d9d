@@ -2,9 +2,8 @@
 DEP: 0006
 Title: Trainer Wake / Sleep APIs for Colocated RL
 Author: Daniil Sergeev @DaniilSergeev17
-Status: Draft
 Type: Feature
-Created: 2026-05-22
+Implemented: #27
 ---
 
 # DEP-0006: Trainer Wake / Sleep APIs for Colocated RL

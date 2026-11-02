@@ -2,9 +2,8 @@
 DEP: 0005
 Title: Scaled RoPE
 Author: Illarion Iov @AngrySigma
-Status: Implemented
 Type: Feature
-Created: 2026-04-29
+Implemented: 92d6e0e
 ---
 
 # DEP-0005: Scaled RoPE
