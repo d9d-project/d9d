@@ -25,13 +25,6 @@ Solutions for concrete tasks.
 *   **[Fine-Tune a Hugging Face Model](./guides/finetune_huggingface.md)**: Load Qwen3 from a Hugging Face checkpoint, fine-tune all weights or LoRA adapters and export it back.
 *   **[Troubleshooting](./guides/troubleshooting.md)**: Reading the logs of a multi-rank job.
 
-## 🌐 Distributed Core
-The foundational primitives managing the cluster.
-
-*   **[Distributed Context](./dist_context/index.md)**: The source of truth for topology, and the `DeviceMesh` domains (`regular`, `dense`, `expert`, `batch`, `flat`).
-*   **[State Offloading](./offload/index.md)**: Releasing GPU training state to host memory for colocated RL (the sleep/wake primitives).
-
-
 ## 🚀 Execution Engine
 How to configure and run jobs.
 
@@ -40,30 +33,32 @@ How to configure and run jobs.
 *   **[Checkpointing](./loop/checkpointing.md)**: What a checkpoint holds, when the job saves, how it resumes and where it must be stored.
 *   **[Configuration](./loop/config.md)**: Pydantic schemas for configuring jobs, scheduling, and logging.
 *   **[Interfaces](./loop/interfaces/index.md)**: How to inject your custom Model, Data, and Step logic (Train & Infer).
-*   **[Determinism](./loop/determinism.md)**: RNG seeding across distributed processes.
-*   **[Profiling](./loop/profiling.md)**: Profiling the loop steps with the PyTorch profiler, with one trace file per rank.
 
+## 💾 Data
+Datasets and the streams of microbatches that a job consumes.
 
-## 💾 Data and State
-Managing data loading and model checkpoints.
-
-*   **[Model State Mapper](./model_state/mapper.md)**: The graph-based transformation engine for checkpoints (transform architectures on-the-fly).
-*   **[Model State I/O](./model_state/io.md)**: Streaming reader/writers for checkpoints.
 *   **[Data](./data/index.md)**: Distributed-aware dataset wrappers, length bucketing, padding and the streams of microbatch packs.
-*   **[PyTree Traversal](./pytree/index.md)**: Dataclass-aware recursive mapping and flattening over nested tensor structures.
 
-
-## 🧠 Modeling and Architecture
-Building blocks for LLMs.
+## 🧠 Modeling
+Models, their building blocks and parameter-efficient fine-tuning.
 
 *   **[Model Catalogue](./models/index.md)**: Models available directly in d9d.
 *   **[Decoder with Heads](./models/decoder.md)**: A decoder backbone composed with task heads, and the pipeline I/O types.
 *   **[Model Design](./models/model_design.md)**: Principles for creating compatible models.
 *   **[Modules](./nn/index.md)**: Building blocks for implementing compatible models.
+*   **[PEFT Overview](./peft/overview.md)**: Injection lifecycle and state mapping.
+*   **Methods**: [LoRA](./peft/lora.md), [Full Fine-Tuning](./peft/full_tune.md), and [Method Stacking](./peft/stack.md).
+
+## 📦 Model State
+Loading and exporting model weights, including Hugging Face checkpoints.
+
+*   **[Model State Mapper](./model_state/mapper.md)**: The graph-based transformation engine for checkpoints (transform architectures on-the-fly).
+*   **[Model State I/O](./model_state/io.md)**: Streaming reader/writers for checkpoints.
 
 ## ⚡ Parallelism
 Strategies for distributing computations.
 
+*   **[Distributed Context](./dist_context/index.md)**: The source of truth for topology, and the `DeviceMesh` domains (`regular`, `dense`, `expert`, `batch`, `flat`).
 *   **[Horizontal Parallelism](./parallel/index.md)**: Replicate, FSDP, HSDP and expert parallelism over `DTensor` placements.
 *   **[Gradient Synchronization](./parallel/grad_sync.md)**: Custom backward hooks for overlapping comms.
 *   **[Gradient Norm and Clipping](./parallel/grad_norm.md)**: Correct global norm calculation across hybrid meshes.
@@ -71,23 +66,23 @@ Strategies for distributing computations.
 *   **[Pipelining Internals](./pipelining/internals.md)**: How the pipeline virtual machine and the schedule programs work.
 *   **[Split Backward](./autograd/split_backward.md)**: Separate backward passes for input and weight gradients, and the context that custom autograd functions check.
 
-## 🔧 Fine-Tuning (PEFT)
-Parameter-Efficient Fine-Tuning framework.
+## 📉 Optimization
+Optimizers and learning rate schedules.
 
-*   **[PEFT Overview](./peft/overview.md)**: Injection lifecycle and state mapping.
-*   **Methods**: [LoRA](./peft/lora.md), [Full Fine-Tuning](./peft/full_tune.md), and [Method Stacking](./peft/stack.md).
+*   **[Stochastic Optimizers](./optim/stochastic.md)**: Low-precision training using stochastic rounding.
+*   **[Piecewise Scheduler](./optim/lr_scheduler/piecewise.md)**: Composable LR schedules and [Schedule Visualization](./optim/lr_scheduler/visualization.md).
 
-## 📈 Optimization and Metrics
-Metrics, learning rate schedules and optimizers.
+## 📊 Metrics and Tracking
+What the job measures and where it goes.
 
 *   **[Metrics Overview](./metric/overview.md)**: Distributed-aware statistic accumulation.
 *   **[Metric Catalogue](./metric/catalogue/index.md)**: Ready-to-use metric implementations.
 *   **[Custom Metrics](./metric/custom.md)**: Implementing custom metrics.
 *   **[Metric Collection](./metric/collector.md)**: Synchronizing and computing a metric on a side CUDA stream, without blocking the loop.
-*   **[Piecewise Scheduler](./optim/lr_scheduler/piecewise.md)**: Composable LR schedules and [Schedule Visualization](./optim/lr_scheduler/visualization.md).
-*   **[Stochastic Optimizers](./optim/stochastic.md)**: Low-precision training using stochastic rounding.
-
-## 📊 Experiment Tracking
-Where the loss and the metrics go.
-
 *   **[Experiment Tracking](./tracker/index.md)**: Choosing a tracker (the log, W&B, TensorBoard, MLflow, Aim), what the loop logs and adding a new tracker.
+
+## 🧰 Utilities
+Low-level helpers: nested tensor structures and moving GPU state to host memory.
+
+*   **[PyTree Traversal](./pytree/index.md)**: Dataclass-aware recursive mapping and flattening over nested tensor structures.
+*   **[State Offloading](./offload/index.md)**: Releasing GPU training state to host memory for colocated RL (the sleep/wake primitives).

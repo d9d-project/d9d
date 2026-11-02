@@ -54,7 +54,7 @@ Before the loop starts:
     *   If the save directory holds a checkpoint of this job, the `StateCheckpointer` loads it (see [Checkpointing](./checkpointing.md)).
     *   This restores the model state, the `JobSchedule` and the data stream position, so an interrupted job resumes where it stopped.
 3.  **Context Entry**:
-    *   Enters the UI, garbage collector and profiler contexts.
+    *   Enters the UI, garbage collector and profiler contexts. The profiler works as in [training](./train.md#profiling).
 4.  **Ready Hook Trigger**: Triggers the `EVENT_INFERENCE_READY` event.
 
 ### 2. The Step Loop

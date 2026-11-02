@@ -29,14 +29,6 @@ nav = [
         "guides/troubleshooting.md",
     ] },
     { "Table of Contents" = "toc.md" },
-    { "Distributed Core" = [
-        { "Distributed Context" = [
-            "dist_context/index.md",
-        ] },
-        { "State Offloading" = [
-            "offload/index.md",
-        ] },
-    ] },
     { "Execution Engine" = [
         "loop/train.md",
         "loop/inference.md",
@@ -51,22 +43,9 @@ nav = [
             "loop/interfaces/optimizer.md",
             "loop/interfaces/lr_scheduler.md",
         ] },
-        "loop/determinism.md",
-        "loop/profiling.md",
     ] },
-    { "Data and State" = [
-        { "Model State" = [
-            "model_state/mapper.md",
-            "model_state/io.md",
-        ] },
-        { "Data" = [
-            "data/index.md",
-        ] },
-        { "PyTree" = [
-            "pytree/index.md",
-        ] },
-    ] },
-    { "Modeling and Architecture" = [
+    { "Data" = "data/index.md" },
+    { "Modeling" = [
         { "Models" = [
             "models/index.md",
             "models/decoder.md",
@@ -85,8 +64,21 @@ nav = [
             "nn/normalization.md",
             "nn/hidden_states_aggregator.md",
         ] },
+        { "Fine-Tuning (PEFT)" = [
+            "peft/overview.md",
+            "peft/lora.md",
+            "peft/full_tune.md",
+            "peft/stack.md",
+        ] },
+    ] },
+    { "Model State" = [
+        "model_state/mapper.md",
+        "model_state/io.md",
     ] },
     { "Parallelism" = [
+        { "Distributed Context" = [
+            "dist_context/index.md",
+        ] },
         { "Horizontal Parallelism" = [
             "parallel/index.md",
             "parallel/grad_sync.md",
@@ -98,13 +90,14 @@ nav = [
         ] },
         { "Split Backward" = "autograd/split_backward.md" },
     ] },
-    { "Fine-Tuning (PEFT)" = [
-        "peft/overview.md",
-        "peft/lora.md",
-        "peft/full_tune.md",
-        "peft/stack.md",
+    { "Optimization" = [
+        { "Optimizers" = "optim/stochastic.md" },
+        { "Learning Rate Schedulers" = [
+            "optim/lr_scheduler/piecewise.md",
+            "optim/lr_scheduler/visualization.md",
+        ] },
     ] },
-    { "Optimization and Metrics" = [
+    { "Metrics and Tracking" = [
         { "Metrics" = [
             "metric/overview.md",
             { "Metric Catalogue" = [
@@ -116,13 +109,18 @@ nav = [
             "metric/custom.md",
             "metric/collector.md",
         ] },
-        { "Learning Rate Schedulers" = [
-            "optim/lr_scheduler/piecewise.md",
-            "optim/lr_scheduler/visualization.md",
+        { "Experiment Tracking" = [
+            "tracker/index.md",
         ] },
-        { "Optimizers" = "optim/stochastic.md" },
     ] },
-    { "Experiment Tracking" = "tracker/index.md" },
+    { "Utilities" = [
+        { "PyTree" = [
+            "pytree/index.md",
+        ] },
+        { "State Offloading" = [
+            "offload/index.md",
+        ] },
+    ] },
 ]
 
 

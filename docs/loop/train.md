@@ -24,7 +24,7 @@ It returns a `Trainer` that holds a prepared `TrainJobState`.
     *   Builds the global [DistributedContext](../dist_context/index.md). This creates the NCCL process groups and `DeviceMesh` objects.
 
 2.  **Seeding**:
-    *   Sets distributed seeds from the configured `base_seed`. Model initialization and other initial states are then deterministic. [More info](./determinism.md).
+    *   Seeds Python, NumPy, PyTorch and the `DTensor` RNG from the configured `base_seed`. Model initialization and other initial states are then deterministic. Ranks in different pipeline stages get different seeds, and ranks along the other mesh dimensions share a seed.
 
 3.  **Task Instantiation**:
     *   Creates the `TrainTask` with the `TrainTaskProvider`.
@@ -70,7 +70,7 @@ Before the loop starts:
     *   **UI**: Shows a progress bar.
     *   **Logging**: Starts a new run in the experiment tracker and logs the run hyperparameters. [More info](../tracker/index.md).
     *   **Garbage Collector**: Disables automatic Python garbage collection.
-    *   **Profiler**: Starts the `torch.profiler` hooks. [More info](./profiling.md).
+    *   **Profiler**: Starts the `torch.profiler` hooks (see [Profiling](#profiling)).
     *   **Gradient Manager**: Installs the backward hooks that all-reduce gradients.
     *   **Gradient Clipper**: Groups the parameters for global gradient norm computation.
     *   **Metric Collector**: Binds the async metric collector to the device.
@@ -131,6 +131,10 @@ While a step runs, a background thread prepares the next `data_prefetch.prefetch
 *   **Pinned memory** makes the copies asynchronous. Set `pin_memory` in `AutoDataConfig`, or wrap a custom stream in `PinMemoryMicrobatchPackStream`. Without prefetching, pinning only adds a host-side copy.
 *   **Memory**: Every prefetched pack occupies device memory. `prefetch_factor: 0` disables prefetching.
 *   **Checkpoints** save the data position of the last completed step. Packs that were prefetched but not consumed are read again after a restart. A checkpoint can be loaded with any `prefetch_factor`.
+
+## Profiling
+
+The `profiling` section of the configuration enables the PyTorch profiler. All ranks profile the same steps: the profiler repeats a cycle of `period_steps` steps and records the last `active_steps` of it. Each rank writes its trace to `traces_dir/step_<step>/rank-<rank>-coord-<mesh coordinates>-trace.tar.gz`, so the ranks never write to the same file. A single-process job writes `trace.tar.gz`. A trace is compressed right after export, because a raw Chrome trace can take several GiB.
 
 ## Sleep and Wake (Colocated RL)
 
