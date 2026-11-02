@@ -3,8 +3,7 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 import torch
-from d9d.tracker import Histogram, RunConfig, Scalar, TrackerPoint, tracker_from_config
-from d9d.tracker.provider.wandb.config import WandbConfig
+from d9d.tracker import Histogram, RunConfig, Scalar, TrackerPoint, WandbConfig, tracker_from_config
 from d9d.tracker.provider.wandb.tracker import WandbTracker
 
 

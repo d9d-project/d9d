@@ -4,10 +4,11 @@ from pathlib import Path
 
 from tqdm import tqdm
 
-from d9d.core.dist_context import DeviceMeshParameters
-from d9d.core.offload import DEFAULT_SLEEP_TAGS, SleepTag
-from d9d.internals.determinism import set_seeds
-from d9d.loop.component import (
+from d9d.data import build_device_pack_stream
+from d9d.dist_context import DeviceMeshParameters
+from d9d.metric.catalogue.container import ComposeMetric
+
+from ..component import (
     DataParallelMicrobatchPackStream,
     GradientClipper,
     GradientManager,
@@ -23,10 +24,9 @@ from d9d.loop.component import (
     TimeoutManager,
     TrainSleeper,
     TrainTaskOperator,
-    build_device_pack_stream,
 )
-from d9d.loop.config import TrainerConfig
-from d9d.loop.control import (
+from ..config import TrainerConfig
+from ..control import (
     CreateMetricsContext,
     DataProvider,
     FinalizeContext,
@@ -39,14 +39,15 @@ from d9d.loop.control import (
     TrainTaskProvider,
     TrainTaskProviderContext,
 )
-from d9d.loop.event import EventBus
-from d9d.loop.event.catalogue.common import (
+from ..determinism import set_seeds
+from ..event import EventBus
+from ..event.catalogue.common import (
     EventConfigurationStartedContext,
     EventDataStreamReadyContext,
     EventModelStagesReadyContext,
     EventStepContext,
 )
-from d9d.loop.event.catalogue.train import (
+from ..event.catalogue.train import (
     EVENT_TRAIN_CONFIG_STARTED,
     EVENT_TRAIN_DATA_STREAM_READY,
     EVENT_TRAIN_FINISHED,
@@ -65,8 +66,8 @@ from d9d.loop.event.catalogue.train import (
     EventTrainFinishedContext,
     EventTrainReadyContext,
 )
-from d9d.loop.state import TrainJobState
-from d9d.metric.impl.container import ComposeMetric
+from ..sleep import DEFAULT_SLEEP_TAGS, SleepTag
+from ..state import TrainJobState
 
 
 class TrainingConfigurator:

@@ -63,7 +63,7 @@ To start from a Hugging Face checkpoint, a framework maps its tensors to the par
 *   **An offline converter**: DeepSpeed merges its per-rank files into one Hugging Face checkpoint with an offline script. OLMo-core converts a Hugging Face checkpoint with a script that loads the whole model into memory.
 *   **A map per model, applied while loading**: Megatron Bridge and torchtitan keep a map for each model. Megatron Bridge streams the weights parameter by parameter. torchtitan reads the Hugging Face checkpoint through PyTorch Distributed Checkpoint (DCP), so each rank reads only its shards.
 *   **The Hugging Face format as the training checkpoint**: Halo saves standard Hugging Face SafeTensors, so it needs no map.
-*   **A mapper from your model provider**: In d9d, your model provider returns a graph of [state mappers](../model_states/mapper.md) for the model it builds, and another one for export. d9d streams the checkpoint through the graph one file at a time.
+*   **A mapper from your model provider**: In d9d, your model provider returns a graph of [state mappers](../model_state/mapper.md) for the model it builds, and another one for export. d9d streams the checkpoint through the graph one file at a time.
 
 ### Who Owns the Loop
 
@@ -136,7 +136,7 @@ This matters more when an AI coding agent writes the change. An agent writes cod
 
 d9d makes choices that cost something:
 
-*   **A Transformers model does not run as it is**: For a model outside the [catalogue](../models/model_catalogue/index.md), you must write a d9d model, a state mapper and a model provider. Accelerate and Halo train Transformers models without this step.
+*   **A Transformers model does not run as it is**: For a model outside the [catalogue](../models/index.md), you must write a d9d model, a state mapper and a model provider. Accelerate and Halo train Transformers models without this step.
 *   **Pipeline parallelism needs model support**: The model builds only the layers of its stage and describes the tensors it sends to the next stage. You write this code for every model.
 *   **The step order is fixed**: Providers, tasks and events change what a step does, but not the order of its parts. A training method with a different step order, e.g. several optimizer steps per batch, requires changes in d9d.
 

@@ -1,9 +1,8 @@
 import pytest
 import torch
 from d9d.model_state.mapper import StateGroup
-from d9d.module.block.moe import GroupedLinear
-from d9d.peft import inject_peft_and_freeze, merge_peft
-from d9d.peft.all import peft_method_from_config
+from d9d.nn.moe import GroupedLinear
+from d9d.peft import inject_peft_and_freeze, merge_peft, peft_method_from_config
 from d9d.peft.lora import LoRAGroupedLinear, LoRALinear
 from torch import nn
 from torch.optim import SGD

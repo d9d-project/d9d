@@ -29,14 +29,7 @@ nav = [
         "guides/troubleshooting.md",
     ] },
     { "Table of Contents" = "toc.md" },
-    { "Core" = [
-        "core/dist_context.md",
-        "core/dist_ops.md",
-        "core/pytree.md",
-        "core/types.md",
-        "core/offload.md",
-    ] },
-    { "Training and Inference" = [
+    { "Execution Engine" = [
         "loop/train.md",
         "loop/inference.md",
         "loop/checkpointing.md",
@@ -49,70 +42,84 @@ nav = [
             "loop/interfaces/events.md",
             "loop/interfaces/optimizer.md",
             "loop/interfaces/lr_scheduler.md",
-        ] }
+        ] },
     ] },
-    { "Model States" = [
-        "model_states/io.md",
-        "model_states/mapper.md",
-    ] },
-    { "Models" = [
-        { "Model Catalogue" = [
-            "models/model_catalogue/index.md",
-            "models/model_catalogue/qwen3_moe.md",
-            "models/model_catalogue/qwen3_dense.md"
+    { "Data" = "data/index.md" },
+    { "Modeling" = [
+        { "Models" = [
+            "models/index.md",
+            "models/decoder.md",
+            "models/qwen3_moe.md",
+            "models/qwen3_dense.md",
+            "models/model_design.md",
         ] },
         { "Modules" = [
-            "models/modules/index.md",
-            "models/modules/embedding.md",
-            "models/modules/head.md",
-            "models/modules/attention.md",
-            "models/modules/ffn.md",
-            "models/modules/moe.md",
-            "models/modules/positional.md",
-            "models/modules/normalization.md",
-            "models/modules/hidden_states_aggregator.md",
+            "nn/index.md",
+            "nn/embedding.md",
+            "nn/head.md",
+            "nn/attention.md",
+            "nn/ffn.md",
+            "nn/moe.md",
+            "nn/positional.md",
+            "nn/normalization.md",
+            "nn/hidden_states_aggregator.md",
         ] },
-        "models/model_design.md",
-        "models/horizontal_parallelism.md",
-        "models/pipeline_parallelism.md",
-    ] },
-    { "Datasets" = [
-        "dataset/index.md"
-    ] },
-    { "Parameter-Efficient Fine-Tuning (PEFT)" = [
-        "peft/overview.md",
-        "peft/lora.md",
-        "peft/full_tune.md",
-        "peft/stack.md",
-    ] },
-    { "Metrics" = [
-        "metric/overview.md",
-        { "Metric Catalogue" = [
-            "metric/metric_catalogue/index.md",
-            "metric/metric_catalogue/aggregation.md",
-            "metric/metric_catalogue/classification.md",
-            "metric/metric_catalogue/container.md",
+        { "Fine-Tuning (PEFT)" = [
+            "peft/overview.md",
+            "peft/lora.md",
+            "peft/full_tune.md",
+            "peft/stack.md",
         ] },
-        "metric/custom.md",
     ] },
-    { "Experiment Tracking" = [
-        "tracker/index.md",
+    { "Model State" = [
+        "model_state/mapper.md",
+        "model_state/io.md",
     ] },
-    { "Optimizers" = [
-        "optimizer/stochastic.md",
+    { "Parallelism" = [
+        { "Distributed Context" = [
+            "dist_context/index.md",
+        ] },
+        { "Horizontal Parallelism" = [
+            "parallel/index.md",
+            "parallel/grad_sync.md",
+            "parallel/grad_norm.md",
+        ] },
+        { "Pipeline Parallelism" = [
+            "pipelining/index.md",
+            "pipelining/internals.md",
+        ] },
+        { "Split Backward" = "autograd/split_backward.md" },
     ] },
-    { "Learning Rate Schedulers" = [
-        "lr_scheduler/piecewise.md",
-        "lr_scheduler/visualization.md",
+    { "Optimization" = [
+        { "Optimizers" = "optim/stochastic.md" },
+        { "Learning Rate Schedulers" = [
+            "optim/lr_scheduler/piecewise.md",
+            "optim/lr_scheduler/visualization.md",
+        ] },
     ] },
-    { "Internals" = [
-        "core/autograd_extensions.md",
-        "internals/determinism.md",
-        "internals/grad_norm.md",
-        "internals/grad_sync.md",
-        "internals/metric_collector.md",
-        "internals/pipelining.md",
-        "internals/profiling.md",
+    { "Metrics and Tracking" = [
+        { "Metrics" = [
+            "metric/overview.md",
+            { "Metric Catalogue" = [
+                "metric/catalogue/index.md",
+                "metric/catalogue/aggregation.md",
+                "metric/catalogue/classification.md",
+                "metric/catalogue/container.md",
+            ] },
+            "metric/custom.md",
+            "metric/collector.md",
+        ] },
+        { "Experiment Tracking" = [
+            "tracker/index.md",
+        ] },
+    ] },
+    { "Utilities" = [
+        { "PyTree" = [
+            "pytree/index.md",
+        ] },
+        { "State Offloading" = [
+            "offload/index.md",
+        ] },
     ] },
 ]
 

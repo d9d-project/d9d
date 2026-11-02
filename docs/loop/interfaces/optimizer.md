@@ -2,11 +2,11 @@
 
 ## About
 
-The loop creates one optimizer per local model stage through an `OptimizerProvider`. You can configure a standard optimizer with `AutoOptimizerProvider`, or implement the `OptimizerProvider` protocol yourself.
+The loop creates one optimizer per local model stage through an `OptimizerProvider`. You can configure a standard optimizer with `AutoOptimizerProvider`, or implement the `OptimizerProvider` protocol yourself. The loop combines the optimizers of all local stages into one `PipelinedOptimizer`.
 
 ## Auto Optimizer
 
-The `d9d.loop.auto` package builds standard optimizers from a Pydantic configuration. It supports `AdamW`, `Adam`, `SGD` and [`StochasticAdamW`](../../optimizer/stochastic.md). The `name` field selects the optimizer.
+The `d9d.loop.auto` package builds standard optimizers from a Pydantic configuration. It supports `AdamW`, `Adam`, `SGD` and [`StochasticAdamW`](../../optim/stochastic.md). The `name` field selects the optimizer.
 
 ## Custom Optimizer
 
@@ -32,3 +32,7 @@ Inside a larger Pydantic config, declare a field of type `AutoOptimizerConfig` i
 ::: d9d.loop.auto.auto_optimizer
 
 ::: d9d.loop.control.optimizer_provider
+
+::: d9d.loop.component.PipelinedOptimizer
+
+::: d9d.optim

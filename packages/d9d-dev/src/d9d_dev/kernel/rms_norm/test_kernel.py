@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.kernel.normalization import rms_norm
+from d9d.kernel.rms_norm import rms_norm
 from torch.testing import assert_close
 
 from d9d_dev.kernel.rms_norm.reference_impl import rms_norm_torch

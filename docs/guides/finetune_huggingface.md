@@ -56,11 +56,11 @@ The job streams the weights into the model through the state mapper that `initia
 --8<-- "example/guide/finetune_qwen3/finetune.py:provider"
 ```
 
-See [Model State Mapper](../model_states/mapper.md).
+See [Model State Mapper](../model_state/mapper.md).
 
 ## Optimizer
 
-The provider casts the model to bf16 with `.bfloat16()`. The config keeps the gradients in fp32 and uses `stochastic_adamw`, which updates bf16 weights with stochastic rounding (see [Stochastic Optimizers](../optimizer/stochastic.md)):
+The provider casts the model to bf16 with `.bfloat16()`. The config keeps the gradients in fp32 and uses `stochastic_adamw`, which updates bf16 weights with stochastic rounding (see [Stochastic Optimizers](../optim/stochastic.md)):
 
 ```yaml
 trainer:
@@ -148,7 +148,7 @@ The script reuses the dataset and the model provider of `finetune.py`. Its task 
 
 ## More GPUs
 
-`parallelize_model_stage()` applies the default Qwen3 strategy: HSDP over the data-parallel dimensions. Set `data_parallel_replicate` or `data_parallel_shard` in `mesh` and launch with `torchrun`, as described in [Running Jobs](./running.md). See [Qwen3 Dense](../models/model_catalogue/qwen3_dense.md) for the supported parallelism.
+`parallelize_model_stage()` applies the default Qwen3 strategy: HSDP over the data-parallel dimensions. Set `data_parallel_replicate` or `data_parallel_shard` in `mesh` and launch with `torchrun`, as described in [Running Jobs](./running.md). See [Qwen3 Dense](../models/qwen3_dense.md) for the supported parallelism.
 
 ## The Code
 

@@ -5,10 +5,9 @@ from typing import Any, Self, TypedDict, cast
 import numpy as np
 import wandb
 
-from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig, TrackerPoint
-from d9d.tracker.provider.flat import series_key
-from d9d.tracker.value import Histogram, Scalar, TrackerValue
-
+from ...base import BaseTracker, BaseTrackerRun, RunConfig, TrackerPoint
+from ...flat import series_key
+from ...value import Histogram, Scalar, TrackerValue
 from .config import WandbConfig
 
 

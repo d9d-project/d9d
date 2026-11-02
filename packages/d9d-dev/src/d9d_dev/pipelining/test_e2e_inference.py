@@ -1,12 +1,13 @@
 import pytest
 import torch
-from d9d.core.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import (
     PipelineScheduleInferenceConfig,
+    build_program_builder,
     build_schedule,
 )
-from d9d.pipelining.infra.schedule.component.runtime import OfflinePipelineExecutor
+from d9d.pipelining.runtime import OfflinePipelineExecutor
 
 from d9d_dev.pipelining.definitions import (
     PipelineModel,
@@ -69,8 +70,8 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
         collected_results[microbatch_idx] = microbatch_outputs.x.detach().clone()
 
     schedule_info, _ = build_schedule(
-        dist_context=dist_ctx,
-        schedule_config=PipelineScheduleInferenceConfig(),
+        pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
+        program_builder=build_program_builder(PipelineScheduleInferenceConfig()),
         model_provider=_model_provider,
     )
 
@@ -92,9 +93,7 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
 
 
 @pytest.mark.local
-def test_inference_e2e_local(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters())
-
+def test_inference_e2e_local():
     x, y = build_pp_inputs(x_with_grad=False)
     model = build_pp_model().eval()
     model.requires_grad_(False)
@@ -114,8 +113,8 @@ def test_inference_e2e_local(dist_ctx_factory):
         collected_results[microbatch_idx] = microbatch_outputs.x.detach().clone()
 
     schedule_info, _ = build_schedule(
-        dist_context=dist_ctx,
-        schedule_config=PipelineScheduleInferenceConfig(),
+        pp_mesh=None,
+        program_builder=build_program_builder(PipelineScheduleInferenceConfig()),
         model_provider=_model_provider,
     )
 

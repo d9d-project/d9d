@@ -2,10 +2,10 @@ import abc
 from typing import Any, Generic, TypeVar
 
 import torch
+from torch.distributed import ProcessGroup
 from torch.distributed.checkpoint.stateful import Stateful
 
-from d9d.core.dist_context import DistributedContext
-from d9d.core.types import TensorTree
+from d9d.pytree import TensorTree
 
 TComputeResult = TypeVar("TComputeResult", bound=TensorTree)
 
@@ -27,13 +27,14 @@ class Metric(abc.ABC, Stateful, Generic[TComputeResult]):
         """
 
     @abc.abstractmethod
-    def sync(self, dist_context: DistributedContext):
-        """Synchronizes the metric state across distributed processes.
+    def sync(self, group: ProcessGroup):
+        """Synchronizes the metric state across a process group.
 
-        It aggregates statistics from all ranks, e.g. with an all-reduce, so that every rank has the global state.
+        It aggregates statistics from all ranks of ``group``, e.g. with an all-reduce, so that every rank has the
+        global state. Every rank of ``group`` must call it.
 
         Args:
-            dist_context: The distributed context.
+            group: The process group to synchronize over.
         """
 
     @abc.abstractmethod

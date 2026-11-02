@@ -4,8 +4,8 @@ from typing import Any, Literal, Self
 
 from pydantic import BaseModel, ConfigDict
 
-from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig, TrackerPoint
-from d9d.tracker.value import TrackerValue
+from ..base import BaseTracker, BaseTrackerRun, RunConfig, TrackerPoint
+from ..value import TrackerValue
 
 
 class NullTrackerConfig(BaseModel):

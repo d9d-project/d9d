@@ -1,0 +1,46 @@
+# Gradient Synchronization
+
+## About
+
+The `d9d.parallel.grad_sync` package synchronizes gradients of `DTensor` parameters in distributed training. PyTorch `DistributedDataParallel` applies one communication strategy to the whole model. This package instead supports the mixed layouts of ND parallelism, which combines data, tensor, context and pipeline parallelism. It reads the `DTensor` placements of each parameter to find the mesh dimensions that need an all-reduce. Then it groups the parameters into communication buckets.
+
+!!! info "Training loop"
+    The d9d training loop synchronizes the gradients itself. Call this package directly when you train without the loop.
+
+## Bucketing and Flattening
+
+When many small tensors are reduced, latency dominates the communication cost. So `GradientSynchronizer` groups parameters into **buckets**.
+
+A `SyncGradientBucket` stores the gradients of all its parameters in one contiguous buffer. Its reduction is a single `all_reduce` per process group on this buffer, instead of hundreds of small operations.
+
+Parameters share a bucket only if they have the same:
+
+1.  **Optimizer parameter group**
+2.  **Device**
+3.  **Gradient dtype**
+4.  **Reduce mesh**: The mesh dimensions where the parameter has a `Replicate` placement.
+
+The `bucket_size_mb` argument limits the size of a bucket in MiB. The limit counts the local shard of each gradient in the gradient dtype. Parameters are bucketed in reverse order, because the backward pass produces gradients roughly in that order. Parameters with no `Replicate` placement need no reduction. They go to local buckets that do not communicate.
+
+## Asynchronous Reduction
+
+Training often accumulates gradients over several microbatches before an optimizer step. This package manages the `DTensor` gradients during the accumulation. You do not need a `no_sync` context manager.
+
+1.  **Local accumulation**: During the backward pass of the first $N-1$ microbatches, local gradients accumulate in the bucket buffer. The parameter `DTensor` is `Replicate`, so the gradient also has a `Replicate` placement across the data parallel mesh. Its data still differs between ranks at this point.
+
+2.  **Automatic trigger**: Each bucket counts the gradient accumulations of its parameters. The `all_reduce` starts *only* when all parameters of the bucket reach the `require_accumulations` count. The trigger runs inside the backward hook of the *last* microbatch. So the communication overlaps with the backward pass of the remaining layers. The communication runs on a separate CUDA stream. You must wait for it before you use the gradients on your default stream.
+
+3.  **Fixed order**: Collectives are matched by call order, so all ranks must start them in the same order. The backward pass can make buckets ready in a different order on each rank. So a ready bucket starts its `all_reduce` only after all buckets before it have started theirs. Buckets are ordered by their first parameter in reverse parameter order across all parameter groups, which is the expected backward order. The gradients of one bucket can be written on several CUDA streams, e.g. by several FSDP roots. The `all_reduce` waits for the writes of all these streams.
+
+4.  **Synchronization**: When the asynchronous reduction completes, the flat buffer holds the globally summed gradient. The gradients have the same `Replicate` placement as their parameters. So the optimizer can use them without any further synchronization.
+
+## Limits
+
+*   **Owned gradients**: After `bind()`, each gradient of a parameter that needs a reduction is a view into the buffer of its bucket. Do not set gradients to `None`, e.g. with `optimizer.zero_grad()`. Call `zero_grad()` of the synchronizer instead. A backward pass into a replaced gradient raises an error.
+*   **Exact accumulation count**: Each parameter must get exactly `require_accumulations` gradients per step. An extra backward pass raises an error. A missing one makes `wait()` raise an error.
+*   **No unused parameters**: Every parameter that requires a gradient must get one in each backward pass. Otherwise its bucket never starts the reduction and `wait()` raises an error. If only some ranks skip the parameter, the other ranks wait in the `all_reduce` until the collective timeout.
+*   **No shared parameters**: A parameter can appear only once in the parameter groups. Tied weights in two parameter groups raise an error in `bind()`.
+
+## API Reference
+
+::: d9d.parallel.grad_sync

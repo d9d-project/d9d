@@ -41,7 +41,7 @@ You write a few parts of a job, each behind an interface. d9d provides ready imp
 | Interface | What it decides | Who provides it |
 |:----------|:----------------|:----------------|
 | [Data provider](../loop/interfaces/data.md) | The microbatches of each step. | `AutoDataProvider` with your dataset and collate function, or you. |
-| [Model](../models/model_design.md) | The forward pass, from the model inputs to the outputs. | You, or the [Model Catalogue](../models/model_catalogue/index.md). The model provider builds it. |
+| [Model](../models/model_design.md) | The forward pass, from the model inputs to the outputs. | You, or the [Model Catalogue](../models/index.md). The model provider builds it. |
 | [Task](../loop/interfaces/task.md) | The model inputs, the loss and the metrics. | You. |
 | [Model provider](../loop/interfaces/model.md) | The construction, distribution, loading and export of the model. | You. |
 | [Optimizer](../loop/interfaces/optimizer.md) and [LR scheduler](../loop/interfaces/lr_scheduler.md) providers | The update of the parameters. | `AutoOptimizerProvider` and `AutoLRSchedulerProvider`, or you. |
@@ -79,7 +79,7 @@ The context therefore arranges the same ranks into several device meshes, called
 mesh = context.dist_context.mesh_for(DENSE_DOMAIN)
 ```
 
-[Distributed Context](../core/dist_context.md) lists the domains and their dimensions.
+[Distributed Context](../dist_context/index.md) lists the domains and their dimensions.
 
 ## The Model Build
 
@@ -103,7 +103,7 @@ With pipeline parallelism, the model must also:
 *   **Build only the layers of its stage**: The model provider reads the stage from `context.stage` and builds the model for it.
 *   **Implement `stage_transfer_spec()`**: Describes the tensors that the stage receives from the previous stage and sends to the next one.
 
-See [Model Design](../models/model_design.md) and [Pipeline Parallelism](../models/pipeline_parallelism.md).
+See [Model Design](../models/model_design.md) and [Pipeline Parallelism](../pipelining/index.md).
 
 ## Parameter Placements
 
@@ -114,7 +114,7 @@ A distributed parameter records its own layout. It is a `DTensor`: a PyTorch ten
 
 The `parallelize_*` functions turn the parameters of a submodule into `DTensor`s. In `parallelize_model_stage()`, you call them on submodules, each call with the mesh of a domain. For example, `parallelize_hsdp()` shards a submodule with PyTorch FSDP along one mesh dimension and replicates it along the others.
 
-To add a strategy, write a function that sets the placements you need. [Why the Loop Needs No Model or Parallelism Code](#why-the-loop-needs-no-model-or-parallelism-code) shows what the loop does with them. See [Horizontal Parallelism](../models/horizontal_parallelism.md).
+To add a strategy, write a function that sets the placements you need. [Why the Loop Needs No Model or Parallelism Code](#why-the-loop-needs-no-model-or-parallelism-code) shows what the loop does with them. See [Horizontal Parallelism](../parallel/index.md).
 
 ## Steps and Packs
 
@@ -154,7 +154,7 @@ backward              mb3        send gradient         mb3
 
 Each column lists the actions of one rank in order. The rows are not aligned in time, because a pass waits for the data that it needs. Rank 0 starts with several forward passes and then alternates. Rank 1, the last rank, alternates from the start. Other schedules, such as Zero Bubble, produce other programs, and the ranks run them the same way.
 
-See [Pipeline Parallelism](../models/pipeline_parallelism.md) and [Pipelining Internals](../internals/pipelining.md).
+See [Pipeline Parallelism](../pipelining/index.md) and [Pipelining Internals](../pipelining/internals.md).
 
 ## The Loss of a Step
 
@@ -217,7 +217,7 @@ Each distributed parameter records its placements. The loop components read thes
 *   **Training checkpoints**: Every rank writes its own shards. A replicated tensor is written once.
 *   **Loading pretrained weights**: The job shards each loaded tensor to match the placements of its parameter.
 
-See [Gradient Norm and Clipping](../internals/grad_norm.md).
+See [Gradient Norm and Clipping](../parallel/grad_norm.md).
 
 ## Training Checkpoints and Model States
 
@@ -248,7 +248,7 @@ mapper = ModelStateMapperParallel([
 
 Each mapper declares groups: sets of input tensors and the output tensors that they produce. The **reader** streams a model state through a mapper, one file at a time. It reads only the tensors that the mapper needs and frees them once their group is done. Memory holds the needed tensors of the current file, plus the inputs of groups that still wait for tensors in later files.
 
-The model provider returns the loading mapper from `initialize_model_stage()`. It returns the export mapper from `prepare_export_model_stage()`. A PEFT method, such as LoRA, returns a mapper for the layers that it changes. See [Model State Mapper](../model_states/mapper.md) and [Model State I/O](../model_states/io.md).
+The model provider returns the loading mapper from `initialize_model_stage()`. It returns the export mapper from `prepare_export_model_stage()`. A PEFT method, such as LoRA, returns a mapper for the layers that it changes. See [Model State Mapper](../model_state/mapper.md) and [Model State I/O](../model_state/io.md).
 
 ## Events
 

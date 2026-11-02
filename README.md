@@ -33,9 +33,9 @@ d9d runs the same job code from a quick experiment on one consumer GPU, such as 
 *   **LLM pre-training**: Dense and MoE language models across many nodes. See [Choosing Parallelism](https://d9d-project.github.io/d9d/concepts/parallelism/).
 *   **Fine-tuning and post-training**: Load a Hugging Face checkpoint, train all weights or LoRA adapters with your own loss, and export the model back. See [Fine-Tune a Hugging Face Model](https://d9d-project.github.io/d9d/guides/finetune_huggingface/).
 *   **Reinforcement learning**: Hand the GPUs to a rollout engine between training steps and take them back. See [Colocated RL](https://d9d-project.github.io/d9d/loop/train/#sleep-and-wake-colocated-rl).
-*   **Classifiers, embedding models and multi-head models**: Put classification, embedding or several heads on a language model backbone, and track metrics such as AUROC and F1 across ranks. See [Model Heads](https://d9d-project.github.io/d9d/models/modules/head/).
+*   **Classifiers, embedding models and multi-head models**: Put classification, embedding or several heads on a language model backbone, and track metrics such as AUROC and F1 across ranks. See [Model Heads](https://d9d-project.github.io/d9d/nn/head/).
 *   **New architectures**: A model that no framework ships yet: a new attention variant, a recurrent or state-space model, or something that is not a transformer at all. Write it in plain PyTorch, reuse d9d blocks where they fit, and train it like any other d9d model. See [Model Design](https://d9d-project.github.io/d9d/models/model_design/).
-*   **New parallelism strategies**: A way to split a model that no framework offers yet, e.g. a new expert placement or a custom tensor-parallel layout for your own layer. Write it as a function that turns the parameters of a submodule into `DTensor`s with your placements. Gradient synchronization and checkpointing read the placements, so the rest of d9d works with it unchanged. See [Horizontal Parallelism](https://d9d-project.github.io/d9d/models/horizontal_parallelism/).
+*   **New parallelism strategies**: A way to split a model that no framework offers yet, e.g. a new expert placement or a custom tensor-parallel layout for your own layer. Write it as a function that turns the parameters of a submodule into `DTensor`s with your placements. Gradient synchronization and checkpointing read the placements, so the rest of d9d works with it unchanged. See [Horizontal Parallelism](https://d9d-project.github.io/d9d/parallel/).
 *   **Evaluation and batch inference**: Run a model over a dataset with the same data, model and parallelism code. See [Inference Loop](https://d9d-project.github.io/d9d/loop/inference/).
 *   **Anything else that trains with a loss**: The model, the data and the loss are your code, e.g. the regression model of the [Quickstart](https://d9d-project.github.io/d9d/getting_started/quickstart/).
 
@@ -200,11 +200,11 @@ d9d is a package that you install, not a repository that you fork. Every part of
 | To try | You write | See |
 |:-------|:----------|:----|
 | A new model | An `nn.Module` with `reset_parameters()` and `forward(inputs, shared)`. You can build it from d9d blocks such as attention, MoE and RMSNorm. | [Model Design](https://d9d-project.github.io/d9d/models/model_design/) |
-| A new parallelism strategy | A function that distributes submodules over a device mesh, called from `parallelize_model_stage()`. | [Horizontal Parallelism](https://d9d-project.github.io/d9d/models/horizontal_parallelism/) |
+| A new parallelism strategy | A function that distributes submodules over a device mesh, called from `parallelize_model_stage()`. | [Horizontal Parallelism](https://d9d-project.github.io/d9d/parallel/) |
 | A new loss or training method | A `TrainTask`. | [User Tasks](https://d9d-project.github.io/d9d/loop/interfaces/task/) |
 | A new data pipeline | A `DataProvider`. | [Data Loading](https://d9d-project.github.io/d9d/loop/interfaces/data/) |
 | A new optimizer or LR schedule | An `OptimizerProvider` or an `LRSchedulerProvider`. | [Optimizer](https://d9d-project.github.io/d9d/loop/interfaces/optimizer/) |
-| A new checkpoint format | A state mapper. | [Model State Mapper](https://d9d-project.github.io/d9d/model_states/mapper/) |
+| A new checkpoint format | A state mapper. | [Model State Mapper](https://d9d-project.github.io/d9d/model_state/mapper/) |
 | A change to the loop | An event handler, e.g. one that runs RL rollouts between steps. | [Event Bus and Hooks](https://d9d-project.github.io/d9d/loop/interfaces/events/) |
 
 Updating d9d is then a version bump, not a rebase of your changes.

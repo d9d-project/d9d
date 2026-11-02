@@ -5,9 +5,8 @@ from typing import cast
 
 import pytest
 import torch
-from d9d.core.dist_context import REGULAR_DOMAIN, DeviceMeshParameters, DistributedContext
-from d9d.core.dist_ops import all_gather_object
-from torch.distributed import GroupMember, destroy_process_group
+from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters, DistributedContext
+from torch.distributed import GroupMember, all_gather_object, destroy_process_group
 
 
 @pytest.fixture(autouse=True)
@@ -41,11 +40,13 @@ def shared_tmp_dir(dist_ctx_factory) -> Generator[Path, None, None]:
     if dist_ctx.is_main_process:
         with tempfile.TemporaryDirectory() as tmp_dir_str:
             tmp_dir = Path(tmp_dir_str)
-            all_gather_object(tmp_dir, reg_domain.get_group())
+            all_gather_object([None] * reg_domain.size(), tmp_dir, reg_domain.get_group())
             yield tmp_dir
             dist_ctx.wait_world()  # wait before destroying the directory
     else:
-        tmp_dir = next(x for x in all_gather_object(None, reg_domain.get_group()) if x is not None)
+        gathered = [None] * reg_domain.size()
+        all_gather_object(gathered, None, reg_domain.get_group())
+        tmp_dir = next(x for x in gathered if x is not None)
         tmp_dir = cast(Path, tmp_dir)  # we know it is received
         yield tmp_dir
         dist_ctx.wait_world()  # wait before destroying the directory

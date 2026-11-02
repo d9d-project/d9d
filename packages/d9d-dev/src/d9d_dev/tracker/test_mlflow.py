@@ -1,7 +1,6 @@
 import pytest
 import torch
-from d9d.tracker import Histogram, RunConfig, Scalar, TrackerPoint, tracker_from_config
-from d9d.tracker.provider.mlflow.config import MLflowConfig
+from d9d.tracker import Histogram, MLflowConfig, RunConfig, Scalar, TrackerPoint, tracker_from_config
 from d9d.tracker.provider.mlflow.tracker import MLflowTracker
 from mlflow import MlflowClient
 

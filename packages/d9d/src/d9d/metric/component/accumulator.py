@@ -3,6 +3,7 @@ from typing import Any
 
 import torch
 import torch.distributed as dist
+from torch.distributed import ProcessGroup
 from torch.distributed.checkpoint.stateful import Stateful
 
 
@@ -92,13 +93,16 @@ class MetricAccumulator(Stateful):
 
         self._is_synchronized = False
 
-    def sync(self):
-        """Synchronizes the accumulator across the default process group.
+    def sync(self, group: ProcessGroup):
+        """Synchronizes the accumulator across a process group.
 
-        Every rank must call it. The local state stays unchanged.
+        Every rank of ``group`` must call it. The local state stays unchanged.
+
+        Args:
+            group: The process group to reduce over.
         """
         self._synchronized.copy_(self._local)
-        dist.all_reduce(self._synchronized, op=_torch_reduce_op_for(self._reduce_op))
+        dist.all_reduce(self._synchronized, op=_torch_reduce_op_for(self._reduce_op), group=group)
 
         self._is_synchronized = True
 

@@ -20,7 +20,7 @@ A training checkpoint also holds:
 
 With `model_stage_factory.checkpoint_only_trainable_parameters`, a checkpoint holds only the parameters that require gradients, e.g. the LoRA adapters. On resume, the job loads the frozen parameters again from the model state that `model_stage_factory.source_checkpoint` points to.
 
-A checkpoint is not a model state. To share the weights with other tools, export the model as `.safetensors` files (see [Export](../guides/running.md#export) and [Model State Mapper](../model_states/mapper.md)).
+A checkpoint is not a model state. To share the weights with other tools, export the model as `.safetensors` files (see [Export](../guides/running.md#export) and [Model State Mapper](../model_state/mapper.md)).
 
 ## Where and When
 

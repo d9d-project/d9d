@@ -6,17 +6,18 @@ from pydantic import BaseModel, ConfigDict
 from torch.utils.data import Dataset
 from torchdata.stateful_dataloader import StatefulDataLoader
 
-from d9d.core.dist_context import DistributedContext
-from d9d.core.protocol import MicrobatchPackStream
-from d9d.core.types import CollateFn
-from d9d.dataset import (
+from d9d.data import (
+    CollateFn,
     FixedCountMicrobatchPacker,
+    MicrobatchPackStream,
     PinMemoryMicrobatchPackStream,
     ShardIndexingMode,
     num_microbatches_for_global_batch,
     shard_dataset_data_parallel,
 )
-from d9d.loop.control import DataProvider, InitializeDataProviderContext
+from d9d.dist_context import DistributedContext
+
+from ..control import DataProvider, InitializeDataProviderContext
 
 DatasetFactory = Callable[[DistributedContext], Dataset]
 """A callable that builds the (unsharded) dataset, given the distributed context.

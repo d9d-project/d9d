@@ -2,8 +2,9 @@ from typing import Any
 
 from torch.distributed.checkpoint.stateful import Stateful
 
-from d9d.core.protocol import MicrobatchPackStream
-from d9d.loop.config import JobScheduleConfig, StepActionPeriod, StepActionSpecial
+from d9d.data import MicrobatchPackStream
+
+from ..config import JobScheduleConfig, StepActionPeriod, StepActionSpecial
 
 
 def _resolve_total_steps(config: JobScheduleConfig, stream: MicrobatchPackStream) -> int:

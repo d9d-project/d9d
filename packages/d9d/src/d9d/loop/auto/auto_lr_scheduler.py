@@ -4,9 +4,10 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from d9d.core.protocol import LRSchedulerProtocol
-from d9d.loop.control import InitializeLRSchedulerContext, LRSchedulerProvider
-from d9d.lr_scheduler.piecewise import PiecewiseSchedulerConfig, piecewise_scheduler_from_config
+from d9d.optim import LRSchedulerProtocol
+from d9d.optim.lr_scheduler.piecewise import PiecewiseSchedulerConfig, piecewise_scheduler_from_config
+
+from ..control import InitializeLRSchedulerContext, LRSchedulerProvider
 
 
 class PiecewiseConfig(BaseModel):

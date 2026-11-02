@@ -8,29 +8,29 @@ The `ModelProvider` controls the lifecycle of the `nn.Module`. In distributed tr
 
 ### Choose a Model
 
-Choose a model from the d9d [catalogue](../../models/model_catalogue/index.md), or [create your own](../../models/model_design.md).
+Choose a model from the d9d [catalogue](../../models/index.md), or [create your own](../../models/model_design.md).
 
 ### Implement `initialize_model_stage(...)`
 
-This method builds the `nn.Module` for one [pipeline parallel](../../models/pipeline_parallelism.md) stage, in the target `torch.dtype`.
+This method builds the `nn.Module` for one [pipeline parallel](../../pipelining/index.md) stage, in the target `torch.dtype`.
 
-The loop calls it on the meta device, so you must not load model weights here. Instead, return a [state mapper](../../model_states/mapper.md) that maps the weights on disk to the weights in memory.
+The loop calls it on the meta device, so you must not load model weights here. Instead, return a [state mapper](../../model_state/mapper.md) that maps the weights on disk to the weights in memory.
 
 You can also apply [PEFT](../../peft/overview.md) methods and other architecture patches here. The returned state mapper must reflect the changes they make.
 
 ### Implement `parallelize_model_stage(...)`
 
-This method applies a [horizontal parallelism](../../models/horizontal_parallelism.md) strategy to the model in place. The loop calls it only for distributed runs.
+This method applies a [horizontal parallelism](../../parallel/index.md) strategy to the model in place. The loop calls it only for distributed runs.
 
-For d9d models, you can use the default strategies. For example, apply `parallelize_qwen3_moe_model` to the backbone and the routine for each head type, such as `parallelize_causal_lm_head` ([reference](../../models/model_catalogue/qwen3_moe.md)).
+For d9d models, you can use the default strategies. For example, apply `parallelize_qwen3_moe_model` to the backbone and the routine for each head type, such as `parallelize_causal_lm_head` ([reference](../../models/qwen3_moe.md)).
 
-For a custom model, see the [horizontal parallelism](../../models/horizontal_parallelism.md) docs and the reference implementations.
+For a custom model, see the [horizontal parallelism](../../parallel/index.md) docs and the reference implementations.
 
 ### Implement `prepare_export_model_stage(...)` for Export
 
 You must implement this method if the job calls `Trainer.export()`. Other jobs can skip it. Without it, `export()` raises a `NotImplementedError`.
 
-This method returns a [state mapper](../../model_states/mapper.md) for the final export. It converts the in-memory model state to the state saved on disk.
+This method returns a [state mapper](../../model_state/mapper.md) for the final export. It converts the in-memory model state to the state saved on disk.
 
 It usually reverses the state mapper returned by `initialize_model_stage(...)`.
 
@@ -39,7 +39,6 @@ It usually reverses the state mapper returned by `initialize_model_stage(...)`.
 ```python
 from pydantic import BaseModel
 
-from d9d.core.types import ScalarTree
 from d9d.loop.control import (
     InitializeModelStageContext,
     InitializeModelStageResult,
@@ -49,10 +48,10 @@ from d9d.loop.control import (
     PrepareExportModelStageResult,
 )
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
-from d9d.module.block.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.module.model import DecoderForCausalLM
-from d9d.module.model.qwen3_moe import Qwen3MoEModel, Qwen3MoEParameters
-from d9d.module.parallelism.model import parallelize_causal_lm_head, parallelize_qwen3_moe_model
+from d9d.models import DecoderForCausalLM, parallelize_causal_lm_head
+from d9d.models.qwen3_moe import Qwen3MoEModel, Qwen3MoEParameters, parallelize_qwen3_moe_model
+from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
+from d9d.pytree import ScalarTree
 
 
 class ModelProviderConfig(BaseModel):

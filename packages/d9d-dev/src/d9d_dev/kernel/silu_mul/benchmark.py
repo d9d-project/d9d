@@ -2,7 +2,7 @@ import functools
 
 import torch
 import triton
-from d9d.kernel.swiglu import silu_mul
+from d9d.kernel.silu_mul import silu_mul
 
 from d9d_dev.kernel.silu_mul.reference_impl import silu_mul_torch
 

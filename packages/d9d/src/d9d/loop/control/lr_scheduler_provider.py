@@ -7,8 +7,8 @@ from typing import Protocol
 
 from torch.optim import Optimizer
 
-from d9d.core.dist_context import DistributedContext
-from d9d.core.protocol import LRSchedulerProtocol
+from d9d.dist_context import DistributedContext
+from d9d.optim import LRSchedulerProtocol
 
 
 @dataclasses.dataclass(kw_only=True)

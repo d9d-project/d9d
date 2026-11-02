@@ -1,7 +1,8 @@
 from enum import StrEnum
 
-from d9d.core.dist_context import DistributedContext
-from d9d.loop.config.config import TimeoutConfig
+from d9d.dist_context import DistributedContext
+
+from ..config.config import TimeoutConfig
 
 
 class TimeoutState(StrEnum):

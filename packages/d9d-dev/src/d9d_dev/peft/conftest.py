@@ -2,11 +2,11 @@ import re
 
 import pytest
 import torch
-from d9d.module.block.moe import GroupedLinear
-from d9d.module.block.moe.grouped_mm import ExpertTokenGroups
-from d9d.peft.all import PeftStackConfig
+from d9d.nn.moe import GroupedLinear
+from d9d.nn.moe.grouped_mm import ExpertTokenGroups
 from d9d.peft.full_tune import FullTuneConfig
 from d9d.peft.lora import LoRAConfig, LoRAParameters
+from d9d.peft.stack import PeftStackConfig
 from torch import nn
 
 

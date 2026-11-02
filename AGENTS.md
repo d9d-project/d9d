@@ -35,19 +35,22 @@ Most conventions are already documented. Always read relevant files (especially 
 
 Top-level packages of the library.
 
-- `core/` - distributed primitives: `dist_context` (the `DeviceMesh` source of truth), `dist_ops`, `pytree` (PyTree traversal), `offload` (sleep/wake state offloading), `autograd`, `protocol`, `types`.
-- `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`).
-- `module/` - modeling building blocks: `base`, `block`, `model` (model catalogue), and `parallelism`.
-- `pipelining/` - pipeline parallelism: `api`, `factory`, `infra` (the VM and schedules), and `training`.
+- `dist_context/` - the `DistributedContext` (the `DeviceMesh` source of truth), its domains and `DeviceMeshParameters`.
+- `pytree/` - PyTree traversal and the `PyTree`/`TensorTree` aliases.
+- `autograd/` - extensions of the autograd engine: `split_backward` (separate backward passes for input and weight gradients, and the gradient context that custom autograd functions check).
+- `offload/` - moving GPU state to host memory and back (the base of sleep/wake).
+- `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`, `sleep`), and the `determinism` module.
+- `nn/` - modeling building blocks: attention, MoE (with its expert parallelism), normalization, heads and other layers, and `ModuleLateInit`.
+- `parallel/` - horizontal parallelism: FSDP, HSDP and replicate, `style` (parallel styles), `grad_sync` (gradient reduction by placements) and `grad_norm` (global gradient norm and clipping).
+- `models/` - the model catalogue: the decoder backbone and heads, and one package per model with its Hugging Face mappers and its parallelization.
+- `pipelining/` - pipeline parallelism: `api`, `stage`, `runtime` (the VM), `program` (`builder` and the `catalogue` of schedules) and `factory`.
 - `model_state/` - checkpoints: `mapper` (graph-based transform engine) and `io` (streaming reader/writers).
-- `dataset/` - distributed-aware dataset wrappers and bucketing.
-- `peft/` - parameter-efficient fine-tuning: `lora`, `full_tune`, `all` (method stacking).
-- `metric/` - distributed-aware metrics: `component` and `impl` (metric catalogue).
-- `optim/` - optimizers, including `stochastic` (stochastic-rounding low-precision).
-- `lr_scheduler/` - learning-rate schedules, including `piecewise` (composable schedules).
-- `tracker/` - experiment tracking integrations (`provider`, e.g. Aim).
-- `kernel/` - custom kernels: `cce`, `grouped_mm`, `moe`, `normalization`, `stochastic`, `swiglu`, `general`.
-- `internals/` - engine internals: `grad_sync`, `grad_norm`, `metric_collector`, `determinism`, `profiling`, `state`.
+- `data/` - distributed-aware dataset wrappers, bucketing, microbatch packing, the streams that hand packs to the device and the data protocols.
+- `peft/` - parameter-efficient fine-tuning: `lora`, `full_tune`, `stack` (method stacking) and the `factory` of any PEFT method.
+- `metric/` - distributed-aware metrics: `component`, `catalogue` (metric catalogue) and `AsyncMetricCollector` (synchronization on a side CUDA stream).
+- `optim/` - the optimizer and LR scheduler protocols, `stochastic` (stochastic-rounding low-precision optimizers) and `lr_scheduler` (`piecewise` composable schedules).
+- `tracker/` - experiment tracking: the trackers (`provider`, e.g. W&B, TensorBoard, MLflow, Aim) and `TrackerWriter`, which logs GPU values without waiting for the GPU.
+- `kernel/` - custom kernels: `cce`, `moe`, `rms_norm`, `silu_mul`, `stochastic`.
 
 ## Working agreements for agents
 

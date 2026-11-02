@@ -2,8 +2,7 @@
 
 import dataclasses
 
-from d9d.loop.event import Event
-
+from ..core import Event
 from .common import (
     EventConfigurationStartedContext,
     EventDataStreamReadyContext,

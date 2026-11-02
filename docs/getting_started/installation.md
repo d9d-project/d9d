@@ -48,11 +48,11 @@ pip install -e packages/d9d-kernels -e "packages/d9d[tracker-aim]"  # From a che
 The extras are:
 
 *   `d9d[tracker-wandb]`, `d9d[tracker-tensorboard]`, `d9d[tracker-mlflow]`, `d9d[tracker-aim]`: The SDKs of the [experiment trackers](../tracker/index.md).
-*   `d9d[visualization]`: [Plotly](https://plotly.com/python/), for [plotting learning rate schedules](../lr_scheduler/visualization.md).
-*   `d9d[linear-attention]`: [Flash Linear Attention](https://github.com/fla-org/flash-linear-attention) kernels for [linear attention](../models/modules/attention.md#linear-attention).
-*   `d9d[backend-sdpa-flash-attention-2]`: [FlashAttention 2](https://github.com/Dao-AILab/flash-attention) kernels as an [SDPA backend](../models/modules/attention.md#scaled-dot-product-attention-backends). You may need to build FlashAttention 2 from source if no prebuilt wheel matches your setup.
-*   `d9d[backend-sdpa-flash-attention-4]`: [FlashAttention 4](https://github.com/Dao-AILab/flash-attention) kernels as an [SDPA backend](../models/modules/attention.md#scaled-dot-product-attention-backends).
-*   `d9d[backend-grouped-mm-quack]`: [QuACK](https://github.com/Dao-AILab/quack) kernels as a [grouped GEMM backend](../models/modules/moe.md#grouped-gemm-backends) for MoE experts.
-*   `d9d[backend-grouped-mm-grouped-gemm]`: The [grouped_gemm](https://github.com/fanshiqing/grouped_gemm/) library as a [grouped GEMM backend](../models/modules/moe.md#grouped-gemm-backends) for MoE experts. You must build and install it manually first.
-*   `d9d[backend-expert-parallel-deepep]`: [DeepEP](https://github.com/deepseek-ai/DeepEP) for [expert parallelism](../models/horizontal_parallelism.md#expert-parallelism-moe). You must build and install it manually first.
-*   `d9d[cce]`: Fused cross-entropy kernels for the [causal language modelling head](../models/modules/head.md#causal-language-modelling). You must install [Cut Cross Entropy](https://github.com/apple/ml-cross-entropy) from its repository first.
+*   `d9d[visualization]`: [Plotly](https://plotly.com/python/), for [plotting learning rate schedules](../optim/lr_scheduler/visualization.md).
+*   `d9d[linear-attention]`: [Flash Linear Attention](https://github.com/fla-org/flash-linear-attention) kernels for [linear attention](../nn/attention.md#linear-attention).
+*   `d9d[backend-sdpa-flash-attention-2]`: [FlashAttention 2](https://github.com/Dao-AILab/flash-attention) kernels as an [SDPA backend](../nn/attention.md#scaled-dot-product-attention-backends). You may need to build FlashAttention 2 from source if no prebuilt wheel matches your setup.
+*   `d9d[backend-sdpa-flash-attention-4]`: [FlashAttention 4](https://github.com/Dao-AILab/flash-attention) kernels as an [SDPA backend](../nn/attention.md#scaled-dot-product-attention-backends).
+*   `d9d[backend-grouped-mm-quack]`: [QuACK](https://github.com/Dao-AILab/quack) kernels as a [grouped GEMM backend](../nn/moe.md#grouped-gemm-backends) for MoE experts.
+*   `d9d[backend-grouped-mm-grouped-gemm]`: The [grouped_gemm](https://github.com/fanshiqing/grouped_gemm/) library as a [grouped GEMM backend](../nn/moe.md#grouped-gemm-backends) for MoE experts. You must build and install it manually first.
+*   `d9d[backend-expert-parallel-deepep]`: [DeepEP](https://github.com/deepseek-ai/DeepEP) for [expert parallelism](../parallel/index.md#expert-parallelism-moe). You must build and install it manually first.
+*   `d9d[cce]`: Fused cross-entropy kernels for the [causal language modelling head](../nn/head.md#causal-language-modelling). You must install [Cut Cross Entropy](https://github.com/apple/ml-cross-entropy) from its repository first.

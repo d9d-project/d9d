@@ -2,11 +2,11 @@
 
 ## About
 
-The loop creates one learning rate scheduler per optimizer through an `LRSchedulerProvider`. You can configure a standard schedule with `AutoLRSchedulerProvider`, or implement the `LRSchedulerProvider` protocol yourself.
+The loop creates one learning rate scheduler per optimizer through an `LRSchedulerProvider`. You can configure a standard schedule with `AutoLRSchedulerProvider`, or implement the `LRSchedulerProvider` protocol yourself. The loop combines the schedulers of all local stages into one `PipelinedLRScheduler`.
 
 ## Auto Scheduler
 
-The `d9d.loop.auto` package builds schedulers from a Pydantic configuration. It supports [piecewise](../../lr_scheduler/piecewise.md) schedules (warmup, hold, decay). The `name` field selects the scheduler.
+The `d9d.loop.auto` package builds schedulers from a Pydantic configuration. It supports [piecewise](../../optim/lr_scheduler/piecewise.md) schedules (warmup, hold, decay). The `name` field selects the scheduler.
 
 ## Custom Scheduler
 
@@ -53,3 +53,5 @@ Inside a larger Pydantic config, declare a field of type `AutoLRSchedulerConfig`
 ::: d9d.loop.auto.auto_lr_scheduler
 
 ::: d9d.loop.control.lr_scheduler_provider
+
+::: d9d.loop.component.PipelinedLRScheduler

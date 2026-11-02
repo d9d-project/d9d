@@ -3,8 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
-from d9d.tracker import Histogram, RunConfig, Scalar, TrackerPoint, tracker_from_config
-from d9d.tracker.provider.aim.config import AimConfig
+from d9d.tracker import AimConfig, Histogram, RunConfig, Scalar, TrackerPoint, tracker_from_config
 from d9d.tracker.provider.aim.tracker import AimTracker
 
 

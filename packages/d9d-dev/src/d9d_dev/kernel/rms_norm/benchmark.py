@@ -2,7 +2,7 @@ from collections.abc import Sequence
 from typing import Any
 
 import torch
-from d9d.kernel.normalization import rms_norm
+from d9d.kernel.rms_norm import rms_norm
 
 from d9d_dev.kernel.helper.benchmark import (
     BenchmarkMode,

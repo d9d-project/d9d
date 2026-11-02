@@ -45,9 +45,9 @@ d9d runs the same job code from a quick experiment on one consumer GPU, such as 
 *   **LLM pre-training**: Dense and MoE language models across many nodes. See [Choosing Parallelism](./concepts/parallelism.md).
 *   **Fine-tuning and post-training**: Load a Hugging Face checkpoint, train all weights or LoRA adapters with your own loss, and export the model back. See [Fine-Tune a Hugging Face Model](./guides/finetune_huggingface.md).
 *   **Reinforcement learning**: Hand the GPUs to a rollout engine between training steps and take them back. See [Colocated RL](./loop/train.md#sleep-and-wake-colocated-rl).
-*   **Classifiers, embedding models and multi-head models**: Put classification, embedding or several heads on a language model backbone, and track metrics such as AUROC and F1 across ranks. See [Model Heads](./models/modules/head.md).
+*   **Classifiers, embedding models and multi-head models**: Put classification, embedding or several heads on a language model backbone, and track metrics such as AUROC and F1 across ranks. See [Model Heads](./nn/head.md).
 *   **New architectures**: A model that no framework ships yet: a new attention variant, a recurrent or state-space model, or something that is not a transformer at all. Write it in plain PyTorch, reuse d9d blocks where they fit, and train it like any other d9d model. See [Model Design](./models/model_design.md).
-*   **New parallelism strategies**: A way to split a model that no framework offers yet, e.g. a new expert placement or a custom tensor-parallel layout for your own layer. Write it as a function that turns the parameters of a submodule into `DTensor`s with your placements. Gradient synchronization and checkpointing read the placements, so the rest of d9d works with it unchanged. See [Horizontal Parallelism](./models/horizontal_parallelism.md).
+*   **New parallelism strategies**: A way to split a model that no framework offers yet, e.g. a new expert placement or a custom tensor-parallel layout for your own layer. Write it as a function that turns the parameters of a submodule into `DTensor`s with your placements. Gradient synchronization and checkpointing read the placements, so the rest of d9d works with it unchanged. See [Horizontal Parallelism](./parallel/index.md).
 *   **Evaluation and batch inference**: Run a model over a dataset with the same data, model and parallelism code. See [Inference Loop](./loop/inference.md).
 *   **Anything else that trains with a loss**: The model, the data and the loss are your code, e.g. the regression model of the [Quickstart](./getting_started/quickstart.md).
 
@@ -197,11 +197,11 @@ d9d is a package that you install, not a repository that you fork. Every part of
 | To try | You write | See |
 |:-------|:----------|:----|
 | A new model | An `nn.Module` with `reset_parameters()` and `forward(inputs, shared)`. You can build it from d9d blocks such as attention, MoE and RMSNorm. | [Model Design](./models/model_design.md) |
-| A new parallelism strategy | A function that distributes submodules over a device mesh, called from `parallelize_model_stage()`. | [Horizontal Parallelism](./models/horizontal_parallelism.md) |
+| A new parallelism strategy | A function that distributes submodules over a device mesh, called from `parallelize_model_stage()`. | [Horizontal Parallelism](./parallel/index.md) |
 | A new loss or training method | A `TrainTask`. | [User Tasks](./loop/interfaces/task.md) |
 | A new data pipeline | A `DataProvider`. | [Data Loading](./loop/interfaces/data.md) |
 | A new optimizer or LR schedule | An `OptimizerProvider` or an `LRSchedulerProvider`. | [Optimizer](./loop/interfaces/optimizer.md) |
-| A new checkpoint format | A state mapper. | [Model State Mapper](./model_states/mapper.md) |
+| A new checkpoint format | A state mapper. | [Model State Mapper](./model_state/mapper.md) |
 | A change to the loop | An event handler, e.g. one that runs RL rollouts between steps. | [Event Bus and Hooks](./loop/interfaces/events.md) |
 
 Updating d9d is then a version bump, not a rebase of your changes.

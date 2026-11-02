@@ -1,21 +1,18 @@
 """Events of the training loop."""
 
 import dataclasses
-from typing import TYPE_CHECKING
 
-from d9d.core.offload import SleepTag
-from d9d.core.protocol import LRSchedulerProtocol, OptimizerProtocol
-from d9d.loop.event import Event
+from d9d.optim import LRSchedulerProtocol, OptimizerProtocol
+from d9d.tracker import TrackerWriter
 
+from ...sleep import SleepTag
+from ..core import Event
 from .common import (
     EventConfigurationStartedContext,
     EventDataStreamReadyContext,
     EventModelStagesReadyContext,
     EventStepContext,
 )
-
-if TYPE_CHECKING:
-    from d9d.loop.component import TrackerWriter
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -48,7 +45,7 @@ class EventTrainReadyContext:
         writer: The writer that logs values, including GPU tensors, to the experiment tracker at the current step.
     """
 
-    writer: "TrackerWriter"
+    writer: TrackerWriter
 
 
 @dataclasses.dataclass(kw_only=True)

@@ -8,7 +8,11 @@ import triton
 import triton.language as tl
 from triton.language.standard import _log2
 
-from d9d.kernel.general import get_int_dtype
+
+# Triton's own get_int_dtype is a plain function, so it cannot be called from a jit kernel.
+@triton.constexpr_function
+def _get_int_dtype(bitwidth: int, signed: bool) -> tl.dtype:
+    return tl.core.get_int_dtype(bitwidth, signed)
 
 
 @triton.jit
@@ -30,7 +34,7 @@ def _compare_and_swap(x, indices, flip, i: tl.constexpr, n_dims: tl.constexpr):
     l_indice = tl.reshape(tl.broadcast_to(tl.sum(z * (1 - mask), 1)[:, None, :], shape), x.shape)
     r_indice = tl.reshape(tl.broadcast_to(tl.sum(z * mask, 1)[:, None, :], shape), x.shape)
 
-    idtype = get_int_dtype(bitwidth=x.dtype.primitive_bitwidth, signed=True)
+    idtype = _get_int_dtype(bitwidth=x.dtype.primitive_bitwidth, signed=True)
 
     il_value = l_value.to(idtype, bitcast=True)
     ir_value = r_value.to(idtype, bitcast=True)

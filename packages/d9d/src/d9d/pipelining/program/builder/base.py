@@ -1,0 +1,40 @@
+import abc
+
+from d9d.pipelining.runtime import ActionBase
+
+from .topology import ScheduleStyle
+
+
+class PipelineProgramBuilder(abc.ABC):
+    """Abstract base class for builders of pipeline execution schedules."""
+
+    @abc.abstractmethod
+    def compose(self, num_microbatches: int, pp_size: int) -> dict[int, list[ActionBase]]:
+        """Generates the execution program for all ranks in the pipeline.
+
+        Args:
+            num_microbatches: Number of microbatches per step.
+            pp_size: Number of pipeline-parallel ranks.
+
+        Returns:
+            A dictionary mapping rank indices to their list of sequential actions.
+        """
+        ...
+
+    @property
+    @abc.abstractmethod
+    def num_stages_per_rank(self) -> int:
+        """The number of model stages hosted on each rank."""
+        ...
+
+    @property
+    @abc.abstractmethod
+    def topology_style(self) -> ScheduleStyle:
+        """The topology style used to assign stages to ranks."""
+        ...
+
+    @property
+    @abc.abstractmethod
+    def has_backward(self) -> bool:
+        """Whether the programs of this builder run backward passes."""
+        ...

@@ -2,10 +2,9 @@ import dataclasses
 from collections.abc import Callable
 from typing import Any
 
-from d9d.core.dist_context import FLAT_DOMAIN, DeviceMeshParameters
-from d9d.core.pytree import tree_map
-from d9d.core.types import TensorTree
+from d9d.dist_context import FLAT_DOMAIN, DeviceMeshParameters
 from d9d.metric import Metric
+from d9d.pytree import TensorTree, tree_map
 from torch.testing import assert_close
 
 
@@ -88,7 +87,7 @@ def assert_metric_distributed(dist_ctx_factory, case: MetricCase, atol: float | 
                 metric.to("cuda")
                 metric.load_state_dict(state)
 
-            metric.sync(dist_ctx)
+            metric.sync(dist_ctx.mesh_for(FLAT_DOMAIN).get_group())
 
             expect = tree_map(lambda x: x.to("cuda"), step.expect)
             assert_close(metric.compute(), expect, equal_nan=True, atol=atol, rtol=rtol)

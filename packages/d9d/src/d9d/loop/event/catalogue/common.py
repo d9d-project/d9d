@@ -5,11 +5,11 @@ from typing import TYPE_CHECKING
 
 from torch import nn
 
-from d9d.core.dist_context import DistributedContext
-from d9d.core.protocol import MicrobatchPackStream
+from d9d.data import MicrobatchPackStream
+from d9d.dist_context import DistributedContext
 
 if TYPE_CHECKING:
-    from d9d.loop.component import JobSchedule
+    from ...component import JobSchedule
 
 
 @dataclasses.dataclass(kw_only=True)

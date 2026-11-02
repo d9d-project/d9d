@@ -22,7 +22,7 @@ Instead, d9d composes each architecture explicitly, as Hugging Face Transformers
 
 ### Pipelining-Aware Models
 
-See [Pipeline Parallelism](./pipeline_parallelism.md).
+See [Pipeline Parallelism](../pipelining/index.md).
 
 ### Late Initialization
 
@@ -38,8 +38,8 @@ The `Trainer` initializes a model stage in this order:
 
 ## Reference Implementations
 
-See [Qwen3 MoE](./model_catalogue/qwen3_moe.md) for a reference implementation.
+See [Qwen3 MoE](./qwen3_moe.md) for a reference implementation.
 
 ## API Reference
 
-::: d9d.module.base
+::: d9d.nn

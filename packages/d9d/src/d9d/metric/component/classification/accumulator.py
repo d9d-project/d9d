@@ -1,6 +1,7 @@
 from typing import Any
 
 import torch
+from torch.distributed import ProcessGroup
 from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.metric.component import MetricAccumulator
@@ -63,12 +64,16 @@ class ConfusionMatrixAccumulator(Stateful):
         self._tn.update(tn)
         self._fn.update(fn)
 
-    def sync(self):
-        """Synchronizes the accumulated counts across the default process group."""
-        self._tp.sync()
-        self._fp.sync()
-        self._tn.sync()
-        self._fn.sync()
+    def sync(self, group: ProcessGroup):
+        """Synchronizes the accumulated counts across a process group.
+
+        Args:
+            group: The process group to reduce over.
+        """
+        self._tp.sync(group)
+        self._fp.sync(group)
+        self._tn.sync(group)
+        self._fn.sync(group)
 
     def reset(self):
         """Resets all internal metric accumulators to zero."""

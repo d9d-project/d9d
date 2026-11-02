@@ -1,11 +1,7 @@
+"""The components that the training and inference loops are composed of."""
+
 from .checkpointer import StateCheckpointer
 from .data_parallel_stream import DataParallelMicrobatchPackStream
-from .device_pack_stream import (
-    DevicePackStream,
-    DirectDevicePackStream,
-    PrefetchingDevicePackStream,
-    build_device_pack_stream,
-)
 from .garbage_collector import ManualGarbageCollector
 from .gradient_clipper import GradientClipper
 from .gradient_manager import GradientManager
@@ -16,15 +12,14 @@ from .model_stage_exporter import ModelStageExporter
 from .model_stage_factory import ModelStageFactory, TrackedModules
 from .optimizer_factory import OptimizerFactory
 from .pipeline_state import PipelineStateHandler
+from .pipelined_lr_scheduler import PipelinedLRScheduler
+from .pipelined_optimizer import PipelinedOptimizer
 from .task_operator import InferenceTaskOperator, TrainTaskOperator
 from .timeout_manager import TimeoutManager
-from .tracker_writer import TrackerWriter
 from .train_sleeper import TrainSleeper
 
 __all__ = [
     "DataParallelMicrobatchPackStream",
-    "DevicePackStream",
-    "DirectDevicePackStream",
     "GradientClipper",
     "GradientManager",
     "InferenceTaskOperator",
@@ -36,12 +31,11 @@ __all__ = [
     "ModelStageFactory",
     "OptimizerFactory",
     "PipelineStateHandler",
-    "PrefetchingDevicePackStream",
+    "PipelinedLRScheduler",
+    "PipelinedOptimizer",
     "StateCheckpointer",
     "TimeoutManager",
     "TrackedModules",
-    "TrackerWriter",
     "TrainSleeper",
     "TrainTaskOperator",
-    "build_device_pack_stream",
 ]

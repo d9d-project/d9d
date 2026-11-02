@@ -134,17 +134,17 @@ This task logs a histogram of each weight matrix every 100 steps:
 import torch
 from torch.distributed.tensor import DTensor
 
-from d9d.loop.component import TrackerWriter
 from d9d.loop.control import RegisterTaskEventsContext, TrainTask
 from d9d.loop.event import subscribe, subscribe_annotated
-from d9d.loop.event.catalogue.common import EventModelStagesReadyContext, EventStepContext
-from d9d.loop.event.catalogue.train import (
+from d9d.loop.event.catalogue import (
     EVENT_TRAIN_MODEL_STAGES_READY,
     EVENT_TRAIN_READY,
     EVENT_TRAIN_STEP_POST,
+    EventModelStagesReadyContext,
+    EventStepContext,
     EventTrainReadyContext,
 )
-from d9d.tracker import Histogram
+from d9d.tracker import Histogram, TrackerWriter
 
 PERIOD_STEPS = 100
 
@@ -193,6 +193,34 @@ A `Histogram` holds only the counts, so W&B, TensorBoard and Aim show the bin nu
 
 A call reads a tensor on the current CUDA stream. You can change the tensor in place after the call, on the same stream, without changing the logged value. The writer works only while the run is open, until `train()` returns. Later calls raise an error.
 
+### Logging Without the Training Loop
+
+The `TrackerWriter` works without the training loop. It takes the open run, a source of the current step and the context of every value. Any object with a `current_step` property is a step source (see `StepSource`).
+
+```python
+from d9d.tracker import PendingTrackerWrites, RunConfig, Scalar, TrackerWriter, tracker_from_config
+
+
+class Steps:
+    current_step = 0
+
+
+steps = Steps()
+tracker = tracker_from_config(config)  # Any tracker configuration, e.g. LogTrackerConfig()
+
+with (
+    tracker.open(RunConfig(name="my-run")) as run,
+    PendingTrackerWrites(run, max_pending_steps=4) as pending,
+):
+    writer = TrackerWriter(pending, step_source=steps, context={"stage": "train"})
+    for step in range(1000):
+        steps.current_step = step
+        loss = ...  # A GPU tensor
+        writer.log("loss", Scalar(value=loss))
+```
+
+`max_pending_steps` sets how many steps the writes can wait for the GPU. A new write waits for the writes that are this many steps behind it.
+
 ## Adding a New Tracker
 
 The configuration union and the tracker factory live in `packages/d9d/src/d9d/tracker/factory.py`, so a new tracker is a change to d9d itself. Open a pull request with it. The examples below add [Comet](https://www.comet.com/).
@@ -216,11 +244,10 @@ class CometConfig(BaseModel):
 
 Implement `BaseTrackerRun`. Its `write()` gets a `TrackerPoint` with the name, the step and the context, and a value of one of the types in `TrackerValue`. The tensors of the value are already on the CPU. End the `match` with `case _:` that raises a `ValueError`, so that a value type that your tracker does not handle yet, e.g. after an update of d9d, fails loudly. A tracker that writes only some types on purpose, such as the log tracker, can skip the others with `case _: pass`.
 
-If the tracker has no tags, build the name of the series with `series_key()` from `d9d.tracker.provider.flat`. It puts the context before the name, e.g. `train/loss`, as the W&B, TensorBoard and MLflow trackers do.
+If the tracker has no tags, build the name of the series with `series_key()` from `d9d.tracker`. It puts the context before the name, e.g. `train/loss`, as the W&B, TensorBoard and MLflow trackers do.
 
 ```python
-from d9d.tracker import BaseTrackerRun, Scalar, TrackerPoint, TrackerValue
-from d9d.tracker.provider.flat import series_key
+from d9d.tracker import BaseTrackerRun, Scalar, TrackerPoint, TrackerValue, series_key
 
 
 class CometRun(BaseTrackerRun):
@@ -283,4 +310,3 @@ case CometConfig():
 
 ::: d9d.tracker
 
-::: d9d.loop.component.TrackerWriter

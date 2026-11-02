@@ -4,18 +4,19 @@ from typing import cast
 import torch
 from torch.profiler import record_function
 
-from d9d.core.dist_context import DistributedContext
-from d9d.core.offload import DEFAULT_SLEEP_TAGS, Offloadable, OffloadContext, OnloadContext, SleepTag
-from d9d.core.protocol import OptimizerProtocol
-from d9d.loop.event import EventBus
-from d9d.loop.event.catalogue.train import (
+from d9d.dist_context import DistributedContext
+from d9d.offload import Offloadable, OffloadContext, OnloadContext
+from d9d.optim import OptimizerProtocol
+
+from ..event import EventBus
+from ..event.catalogue.train import (
     EVENT_TRAIN_SLEEP_POST,
     EVENT_TRAIN_SLEEP_PRE,
     EVENT_TRAIN_WAKE_POST,
     EVENT_TRAIN_WAKE_PRE,
     EventSleepContext,
 )
-
+from ..sleep import DEFAULT_SLEEP_TAGS, SleepTag
 from .gradient_manager import GradientManager
 from .model_stage_factory import TrackedModules
 
@@ -84,7 +85,7 @@ class TrainSleeper:
             self._event_bus.trigger(EVENT_TRAIN_SLEEP_PRE, event_context)
             self._dist_context.wait_world()
 
-            offload_context = OffloadContext(dist_context=self._dist_context, pin_memory=False)
+            offload_context = OffloadContext(device=self._dist_context.current_device, pin_memory=False)
             self._gradient_manager.offload(offload_context)
             cast(Offloadable, self._optimizer).offload(offload_context)
             self._tracked_modules.offload(offload_context)
@@ -120,7 +121,7 @@ class TrainSleeper:
             self._event_bus.trigger(EVENT_TRAIN_WAKE_PRE, event_context)
             self._dist_context.wait_world()
 
-            onload_context = OnloadContext(dist_context=self._dist_context)
+            onload_context = OnloadContext(device=self._dist_context.current_device)
             self._tracked_modules.onload(onload_context)
             cast(Offloadable, self._optimizer).onload(onload_context)
             self._gradient_manager.onload(onload_context)

@@ -10,7 +10,7 @@ Replace `RegressionDataset` with your `Dataset` and its `collate()` with a funct
 
 `dataset_factory` runs on every rank. Return the whole dataset from it: `AutoDataProvider` shards it across the data-parallel ranks. Wrap downloads in `dist_context.main_process_first()`, so that only rank 0 fills the cache. See [Data Loading](../loop/interfaces/data.md#using-autodataprovider).
 
-If samples differ in length, pad them in `collate()` with [`pad_stack_1d`](../dataset/index.md#padding) and mark the padding in the labels. The task then weights the loss by the number of real tokens (see [Write the Task](#write-the-task)). The [Qwen3 fine-tuning example](./finetune_huggingface.md) does both:
+If samples differ in length, pad them in `collate()` with [`pad_stack_1d`](../data/index.md#padding) and mark the padding in the labels. The task then weights the loss by the number of real tokens (see [Write the Task](#write-the-task)). The [Qwen3 fine-tuning example](./finetune_huggingface.md) does both:
 
 ```python
 # One microbatch of token sequences, padded to one length.
@@ -144,7 +144,7 @@ class ProjectConfig(BaseModel):
 model_provider = ResidualMLPProvider(config.model)
 ```
 
-To start from pretrained weights, set `trainer.model_stage_factory.source_checkpoint`. The loop then loads the checkpoint through the [state mapper](../model_states/mapper.md) of `initialize_model_stage()`, which translates its keys into the keys of your model. The [Qwen3 fine-tuning example](./finetune_huggingface.md#loading-the-checkpoint) loads a Hugging Face checkpoint this way. See [Model Definition](../loop/interfaces/model.md).
+To start from pretrained weights, set `trainer.model_stage_factory.source_checkpoint`. The loop then loads the checkpoint through the [state mapper](../model_state/mapper.md) of `initialize_model_stage()`, which translates its keys into the keys of your model. The [Qwen3 fine-tuning example](./finetune_huggingface.md#loading-the-hugging-face-model) loads a Hugging Face checkpoint this way. See [Model Definition](../loop/interfaces/model.md).
 
 ## Write the Task
 
@@ -188,7 +188,7 @@ For a loss per token, return the number of tokens as `loss_weight`, as in the [Q
 The loop logs the loss and the gradient norm without any code. For other values, add metrics to the task. The loop aggregates them across the ranks, logs them every `logging.period_steps` steps and then resets them. This metric counts the samples of the Quickstart task:
 
 ```python
-from d9d.metric.impl.aggregation import SumMetric
+from d9d.metric.catalogue.aggregation import SumMetric
 
 
 class RegressionTask(TrainTask[...]):
@@ -204,7 +204,7 @@ class RegressionTask(TrainTask[...]):
         ctx.metrics["num_samples"].update(torch.ones_like(ctx.state.y))
 ```
 
-With the Quickstart config, the log shows `num_samples=2560` every 10 steps. The [Metric Catalogue](../metric/metric_catalogue/index.md) lists the ready metrics, and [Custom Metrics](../metric/custom.md) shows how to write your own. See [Metrics Overview](../metric/overview.md).
+With the Quickstart config, the log shows `num_samples=2560` every 10 steps. The [Metric Catalogue](../metric/catalogue/index.md) lists the ready metrics, and [Custom Metrics](../metric/custom.md) shows how to write your own. See [Metrics Overview](../metric/overview.md).
 
 ## Set the Config
 

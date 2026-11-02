@@ -8,7 +8,7 @@ from typing import Protocol
 from torch import nn
 from torch.optim import Optimizer
 
-from d9d.core.dist_context import DistributedContext
+from d9d.dist_context import DistributedContext
 
 
 @dataclasses.dataclass(kw_only=True)

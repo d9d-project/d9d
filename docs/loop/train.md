@@ -10,7 +10,7 @@ You do not create a `Trainer` from loose objects. You build it with the `Trainin
 
 The `TrainingConfigurator` combines:
 
-*   the [infrastructure configuration](../core/dist_context.md),
+*   the [infrastructure configuration](../dist_context/index.md),
 *   the [job configuration](./config.md),
 *   the [user logic](./interfaces/index.md) (providers).
 
@@ -21,10 +21,10 @@ It returns a `Trainer` that holds a prepared `TrainJobState`.
 `TrainingConfigurator.configure()` runs these steps:
 
 1.  **Distributed Context Initialization**:
-    *   Builds the global [DistributedContext](../core/dist_context.md). This creates the NCCL process groups and `DeviceMesh` objects.
+    *   Builds the global [DistributedContext](../dist_context/index.md). This creates the NCCL process groups and `DeviceMesh` objects.
 
 2.  **Seeding**:
-    *   Sets distributed seeds from the configured `base_seed`. Model initialization and other initial states are then deterministic. [More info](../internals/determinism.md).
+    *   Seeds Python, NumPy, PyTorch and the `DTensor` RNG from the configured `base_seed`. Model initialization and other initial states are then deterministic. Ranks in different pipeline stages get different seeds, and ranks along the other mesh dimensions share a seed.
 
 3.  **Task Instantiation**:
     *   Creates the `TrainTask` with the `TrainTaskProvider`.
@@ -70,7 +70,7 @@ Before the loop starts:
     *   **UI**: Shows a progress bar.
     *   **Logging**: Starts a new run in the experiment tracker and logs the run hyperparameters. [More info](../tracker/index.md).
     *   **Garbage Collector**: Disables automatic Python garbage collection.
-    *   **Profiler**: Starts the `torch.profiler` hooks. [More info](../internals/profiling.md).
+    *   **Profiler**: Starts the `torch.profiler` hooks (see [Profiling](#profiling)).
     *   **Gradient Manager**: Installs the backward hooks that all-reduce gradients.
     *   **Gradient Clipper**: Groups the parameters for global gradient norm computation.
     *   **Metric Collector**: Binds the async metric collector to the device.
@@ -85,7 +85,7 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
     *   The `DevicePackStream` hands out a pack of $N$ microbatches, already on the device (see [Data Prefetching](#data-prefetching)).
     *   Triggers the `EVENT_TRAIN_FORWARD_BACKWARD_PRE` event.
     *   The `TrainTask` maps each microbatch to model inputs.
-    *   The [pipeline program](../internals/pipelining.md) runs the forward and backward passes over all microbatches of the pack. Without pipeline parallelism, the program has a single stage.
+    *   The [pipeline program](../pipelining/internals.md) runs the forward and backward passes over all microbatches of the pack. Without pipeline parallelism, the program has a single stage.
     *   Gradients accumulate locally. Between the forward and backward passes, the `TrainTask` computes the loss.
     *   The last accumulation of each gradient bucket starts its all-reduce, which overlaps with the remaining backward work.
     *   The `TrainTask` updates the local metrics (e.g. token counts, accuracy) for each microbatch.
@@ -95,12 +95,12 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
     *   `JobLogger` starts an async reduction of all metrics across the ranks. [More info](../metric/overview.md).
 
 4.  **Gradient Synchronization**
-    *   **Wait & Scale**: The `GradientManager` waits for all backward hooks to finish. It then sums the loss weights across the ranks and divides all gradients by this total. This gives a correct average when the number of tokens varies, e.g. due to masking or packing. [More info](../internals/grad_sync.md).
+    *   **Wait & Scale**: The `GradientManager` waits for all backward hooks to finish. It then sums the loss weights across the ranks and divides all gradients by this total. This gives a correct average when the number of tokens varies, e.g. due to masking or packing. [More info](../parallel/grad_sync.md).
 
 5.  **Gradient Clipping**
     *   The `GradientClipper` computes the global L2 norm of all gradients.
     *   If `max_norm` is set, the gradients are clipped in place.
-    *   [More info](../internals/grad_norm.md).
+    *   [More info](../parallel/grad_norm.md).
 
 6.  **Optimization**
     *   Triggers the `EVENT_TRAIN_OPTIMIZER_STEP_PRE` event.
@@ -132,9 +132,13 @@ While a step runs, a background thread prepares the next `data_prefetch.prefetch
 *   **Memory**: Every prefetched pack occupies device memory. `prefetch_factor: 0` disables prefetching.
 *   **Checkpoints** save the data position of the last completed step. Packs that were prefetched but not consumed are read again after a restart. A checkpoint can be loaded with any `prefetch_factor`.
 
+## Profiling
+
+The `profiling` section of the configuration enables the PyTorch profiler. All ranks profile the same steps: the profiler repeats a cycle of `period_steps` steps and records the last `active_steps` of it. Each rank writes its trace to `traces_dir/step_<step>/rank-<rank>-coord-<mesh coordinates>-trace.tar.gz`, so the ranks never write to the same file. A single-process job writes `trace.tar.gz`. A trace is compressed right after export, because a raw Chrome trace can take several GiB.
+
 ## Sleep and Wake (Colocated RL)
 
-In **colocated RL**, a rollout or inference engine shares the same GPUs as the `Trainer`. The two cannot occupy the device at once, so the `Trainer` must hand the GPU back for a while. `Trainer.sleep()` releases the training state to host memory and frees the device cache. `Trainer.wake()` restores it. Both are built on the [State Offloading](../core/offload.md) subsystem.
+In **colocated RL**, a rollout or inference engine shares the same GPUs as the `Trainer`. The two cannot occupy the device at once, so the `Trainer` must hand the GPU back for a while. `Trainer.sleep()` releases the training state to host memory and frees the device cache. `Trainer.wake()` restores it. Both are built on the [State Offloading](../offload/index.md) subsystem.
 
 Both calls are collective: every rank must call them with the same tags. Call `sleep()` only between steps, e.g. from an `EVENT_TRAIN_STEP_POST` handler.
 
@@ -149,7 +153,7 @@ trainer.wake()                  # Restore the training state, resume stepping
 
 ### What Gets Offloaded
 
-`sleep()` selects subsystems with a [`SleepTag`](../core/offload.md#sleep-tags). The default, `SleepTag.TENSOR_STATES`, offloads all GPU tensor state as a single unit:
+`sleep()` selects subsystems with a `SleepTag`. The default, `SleepTag.TENSOR_STATES`, offloads all GPU tensor state as a single unit:
 
 *   **Model** parameters and buffers (`TrackedModules`),
 *   **Optimizer** state (`PipelinedOptimizer`),
@@ -159,7 +163,7 @@ Data packs are not offloaded. The pack of the finished step and up to `prefetch_
 
 `SleepTag.COMMS` (NCCL process groups) is reserved but not implemented yet. Requesting it raises `NotImplementedError`.
 
-The round trip keeps object identity, optimizer state dict keys and `DTensor` metadata. So external references, e.g. a frozen reference model held by a task, stay valid after waking. See the [round-trip invariant](../core/offload.md) for details.
+The round trip keeps object identity, optimizer state dict keys and `DTensor` metadata. So external references, e.g. a frozen reference model held by a task, stay valid after waking. See the [round-trip guarantee](../offload/index.md#the-round-trip-guarantee) for details.
 
 ### Order of Operations
 
@@ -198,3 +202,5 @@ trainer.train()
 ::: d9d.loop.run.TrainingConfigurator
 
 ::: d9d.loop.run.Trainer
+
+::: d9d.loop.sleep

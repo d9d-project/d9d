@@ -56,27 +56,27 @@ You can leave out the fields and sections that have defaults. An unknown key fai
     options:
       heading_level: 4
 
-::: d9d.tracker.provider.log.LogTrackerConfig
+::: d9d.tracker.LogTrackerConfig
     options:
       heading_level: 4
 
-::: d9d.tracker.provider.null.NullTrackerConfig
+::: d9d.tracker.NullTrackerConfig
     options:
       heading_level: 4
 
-::: d9d.tracker.provider.wandb.config.WandbConfig
+::: d9d.tracker.WandbConfig
     options:
       heading_level: 4
 
-::: d9d.tracker.provider.tensorboard.config.TensorBoardConfig
+::: d9d.tracker.TensorBoardConfig
     options:
       heading_level: 4
 
-::: d9d.tracker.provider.mlflow.config.MLflowConfig
+::: d9d.tracker.MLflowConfig
     options:
       heading_level: 4
 
-::: d9d.tracker.provider.aim.config.AimConfig
+::: d9d.tracker.AimConfig
     options:
       heading_level: 4
 

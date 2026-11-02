@@ -6,7 +6,7 @@ from pathlib import Path
 import torch
 import torch.distributed as dist
 import yaml
-from d9d.core.dist_context import FLAT_DOMAIN, DeviceMeshParameters, DistributedContext
+from d9d.dist_context import FLAT_DOMAIN, DeviceMeshParameters, DistributedContext
 from d9d.loop.auto import AutoDataConfig, AutoDataProvider
 from d9d.loop.config import InferenceConfig
 from d9d.loop.control import (
@@ -17,9 +17,9 @@ from d9d.loop.control import (
     ProcessOutputsContext,
 )
 from d9d.loop.run import InferenceConfigurator
-from d9d.module.block.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
-from d9d.module.model.io import SequenceHeadShared, SequenceInput, SequenceShared
-from d9d.module.model.qwen3_dense import Qwen3DenseParameters
+from d9d.models.io import SequenceHeadShared, SequenceInput, SequenceShared
+from d9d.models.qwen3_dense import Qwen3DenseParameters
+from d9d.nn.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
 from finetune import DataConfig, Qwen3Provider, TextBatch, TextDataset, build_dataset
 from pydantic import BaseModel, ConfigDict
 

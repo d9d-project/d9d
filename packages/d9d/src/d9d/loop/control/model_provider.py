@@ -8,11 +8,12 @@ from typing import Generic, TypeVar
 
 from torch import nn
 
-from d9d.core.dist_context import DistributedContext
-from d9d.core.types import ScalarTree
-from d9d.loop.event import EventBus
+from d9d.dist_context import DistributedContext
 from d9d.model_state.mapper import ModelStateMapper
 from d9d.pipelining.api import PipelineStageInfo
+from d9d.pytree import ScalarTree
+
+from ..event import EventBus
 
 
 @dataclasses.dataclass(kw_only=True)

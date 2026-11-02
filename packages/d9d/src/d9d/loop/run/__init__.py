@@ -1,3 +1,5 @@
+"""The training and inference loops and their configurators."""
+
 from .inference import Inference, InferenceConfigurator
 from .train import SleepTag, Trainer, TrainingConfigurator
 

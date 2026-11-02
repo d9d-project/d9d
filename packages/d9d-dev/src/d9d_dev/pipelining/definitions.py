@@ -1,7 +1,7 @@
 import dataclasses
 
 import torch
-from d9d.core.autograd import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GradDirection
 from d9d.pipelining.api import ModuleSupportsPipelining, StageBoundary, TensorSpec
 from torch import nn
 

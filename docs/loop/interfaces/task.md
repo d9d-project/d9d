@@ -72,7 +72,7 @@ Tensors stored in the state are detached from the autograd graph, so the cached 
 
 ## Task Input and Output Types
 
-The task I/O uses the same PyTree roles as the model pipeline (see [Pipeline Parallelism](../../models/pipeline_parallelism.md)). `TrainTask` is generic over `[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]`:
+The task I/O uses the same PyTree roles as the model pipeline (see [Pipeline Parallelism](../../pipelining/index.md)). `TrainTask` is generic over `[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]`:
 
 *   `TBatch`: the raw microbatch produced by the data stream.
 *   `TPipelineInput`: the `PipelineInput` fed to the first stage.
@@ -88,8 +88,7 @@ import dataclasses
 
 import torch
 
-from d9d.core.dist_context import DistributedContext
-from d9d.core.types import ScalarTree
+from d9d.dist_context import DistributedContext
 from d9d.loop.control import (
     BuildForwardInputsContext,
     BuildForwardInputsResult,
@@ -97,8 +96,9 @@ from d9d.loop.control import (
     ComputeLossResult,
     TrainTask,
 )
-from d9d.module.block.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
-from d9d.module.model.io import SequenceHeadShared, SequenceInput, SequenceShared
+from d9d.models.io import SequenceHeadShared, SequenceInput, SequenceShared
+from d9d.nn.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
+from d9d.pytree import ScalarTree
 
 
 @dataclasses.dataclass
@@ -122,8 +122,8 @@ class SFTTask(
         SFTState,
     ]
 ):
-    def __init__(self, dist_ctx: DistributedContext):
-        self._dist_ctx = dist_ctx
+    def __init__(self, dist_context: DistributedContext):
+        self._dist_context = dist_context
 
     def build_forward_inputs(
         self, ctx: BuildForwardInputsContext[SFTBatch]

@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 import torch
-from d9d.core.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
 from d9d.model_state.io import load_model_state, save_model_state
 from d9d.model_state.io.reader import _StateLoadingFlow  # noqa: PLC2701 - unit under test
 from d9d.model_state.io.writer import _StateWritingFlowLocal  # noqa: PLC2701 - unit under test

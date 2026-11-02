@@ -6,14 +6,15 @@ import torch
 from torch import nn
 from torch.distributed.checkpoint.stateful import Stateful
 
-from d9d.core.dist_context import REGULAR_DOMAIN, DistributedContext
-from d9d.core.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
-from d9d.loop.config import ModelStageFactoryConfig, PipeliningConfig
-from d9d.loop.control import InitializeModelStageContext, ModelProvider, ParallelizeModelStageContext
+from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
 from d9d.model_state.io import load_model_state
-from d9d.module.base import ModuleLateInit
+from d9d.nn import ModuleLateInit
+from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 from d9d.pipelining.api import PipelineStageInfo
-from d9d.pipelining.factory.factory import PipelineScheduleInfo, build_schedule
+from d9d.pipelining.factory import PipelineScheduleInfo, build_program_builder, build_schedule
+
+from ..config import ModelStageFactoryConfig, PipeliningConfig
+from ..control import InitializeModelStageContext, ModelProvider, ParallelizeModelStageContext
 
 StatefulPredicate = Callable[[str, torch.Tensor], bool]
 """Determines if a specific parameter or buffer should be included in the state dictionary."""
@@ -100,7 +101,7 @@ class TrackedModules(Stateful, Offloadable):
             mirror[id(tensor)] = offload_tensor(tensor, pin_memory=ctx.pin_memory)
 
         # Drain the pending non-blocking device-to-host copies before the device storage is released.
-        torch.cuda.synchronize(ctx.dist_context.current_device)
+        torch.cuda.synchronize(ctx.device)
         self._offload_mirror = mirror
 
     def onload(self, ctx: OnloadContext) -> None:
@@ -115,7 +116,7 @@ class TrackedModules(Stateful, Offloadable):
         if self._offload_mirror is None:
             raise RuntimeError("TrackedModules is not offloaded.")
 
-        device = ctx.dist_context.current_device
+        device = ctx.device
         for tensor in self._tensors():
             onload_tensor(tensor, self._offload_mirror[id(tensor)], device=device)
 
@@ -266,9 +267,12 @@ class ModelStageFactory:
         else:
             stateful_predicate = _stateful_predicate_always
 
+        pp_mesh = (
+            self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"] if self._dist_context.mesh_params.is_distributed else None
+        )
         schedule, modules = build_schedule(
-            dist_context=self._dist_context,
-            schedule_config=self._config_pipelining.schedule,
+            pp_mesh=pp_mesh,
+            program_builder=build_program_builder(self._config_pipelining.schedule),
             model_provider=self._build_model_stage,
         )
 

@@ -81,12 +81,12 @@ The batch sizes are known, so the stream reports its `total_steps`. `JobSchedule
 
 A custom provider builds the same default stack by hand. It has two layers:
 
-1.  A **loader**: any `DataLoaderProtocol` (from `d9d.core.protocol`). It is a `Stateful`, `Sized` iterable of single collated microbatches. torchdata's `StatefulDataLoader` satisfies it directly.
+1.  A **loader**: any `DataLoaderProtocol` (from `d9d.data`). It is a `Stateful`, `Sized` iterable of single collated microbatches. torchdata's `StatefulDataLoader` satisfies it directly.
 2.  A **packer**: `FixedCountMicrobatchPacker(microbatches_per_step=k)` groups `k` microbatches into each pack, which gives gradient accumulation. `drop_last` controls whether a short trailing pack is dropped. Training drops it, evaluation keeps it. The helper `num_microbatches_for_global_batch` derives `k`.
 
-Wrap the packer in a `PinMemoryMicrobatchPackStream` to pin the packs, so the loop copies them to the device asynchronously. The packer and the pinning stream live in `d9d.dataset.batch_iterator`.
+Wrap the packer in a `PinMemoryMicrobatchPackStream` to pin the packs, so the loop copies them to the device asynchronously. The packer and the pinning stream live in `d9d.data.batch_iterator`.
 
-Unlike with `AutoDataProvider`, you own the data-parallel sharding. Shard the dataset yourself before you build the loader, e.g. with `shard_dataset_data_parallel`. See the [Dataset Utilities](../../dataset/index.md) documentation.
+Unlike with `AutoDataProvider`, you own the data-parallel sharding. Shard the dataset yourself before you build the loader, e.g. with `shard_dataset_data_parallel`. See [Data](../../data/index.md).
 
 ```python
 import dataclasses
@@ -100,16 +100,16 @@ from tokenizers import Tokenizer
 from torch.utils.data import Dataset
 from torchdata.stateful_dataloader import StatefulDataLoader
 
-from d9d.core.protocol import MicrobatchPackStream
-from d9d.core.types import TensorTree
-from d9d.dataset import (
+from d9d.data import (
     BufferSortedDataset,
     DatasetImplementingSortKeyProtocol,
     FixedCountMicrobatchPacker,
+    MicrobatchPackStream,
     PinMemoryMicrobatchPackStream,
     num_microbatches_for_global_batch,
     shard_dataset_data_parallel,
 )
+from d9d.pytree import TensorTree
 from d9d.loop.control import DataProvider, InitializeDataProviderContext
 
 
@@ -199,4 +199,4 @@ class ProjectDataProvider(DataProvider):
 
 ::: d9d.loop.auto.auto_data
 
-::: d9d.dataset.batch_iterator
+::: d9d.data.batch_iterator

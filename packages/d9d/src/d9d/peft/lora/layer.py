@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 
-from d9d.module.block.moe import GroupedLinear
-from d9d.module.block.moe.grouped_mm import ExpertTokenGroups
+from d9d.nn.moe import GroupedLinear
+from d9d.nn.moe.grouped_mm import ExpertTokenGroups
 
 from .config import LoRAParameters
 

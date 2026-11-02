@@ -2,9 +2,10 @@ import typing
 
 from torch.profiler import record_function
 
-from d9d.core.types import MicrobatchPack, PyTree
-from d9d.loop.control import BaseTask, BuildForwardInputsContext
+from d9d.data import MicrobatchPack
+from d9d.pytree import PyTree
 
+from ...control import BaseTask, BuildForwardInputsContext
 from ..pipeline_state import PipelineStateHandler
 
 TBatch = typing.TypeVar("TBatch", bound=PyTree)

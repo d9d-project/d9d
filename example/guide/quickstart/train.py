@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch
 import yaml
-from d9d.core.dist_context import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
 from d9d.loop.auto import (
     AutoDataConfig,
     AutoDataProvider,
@@ -30,7 +30,7 @@ from d9d.loop.control import (
 )
 from d9d.loop.run import TrainingConfigurator
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
-from d9d.module.parallelism.api import parallelize_hsdp
+from d9d.parallel import parallelize_hsdp
 from pydantic import BaseModel, ConfigDict
 from torch import nn
 from torch.utils.data import Dataset

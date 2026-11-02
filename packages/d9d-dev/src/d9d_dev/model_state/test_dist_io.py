@@ -2,7 +2,7 @@ import json
 
 import pytest
 import torch
-from d9d.core.dist_context import FLAT_DOMAIN, REGULAR_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import FLAT_DOMAIN, REGULAR_DOMAIN, DeviceMeshParameters
 from d9d.model_state.io import (
     read_model_state,
     save_model_state_pipeline_parallel,
