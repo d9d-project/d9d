@@ -2,8 +2,9 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from d9d.models.backbone import DecoderBackbone
 from d9d.nn.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead, TaskHead
+
+from .backbone import DecoderBackbone
 
 
 class CausalLMHeadConfig(BaseModel):

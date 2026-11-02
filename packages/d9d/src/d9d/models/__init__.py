@@ -1,3 +1,5 @@
+"""Ready-to-use models: the decoder composed with task heads, and the Qwen3 models with their state mappers."""
+
 from .backbone import DecoderBackbone
 from .decoder import (
     SINGLE_HEAD_PREFIX,

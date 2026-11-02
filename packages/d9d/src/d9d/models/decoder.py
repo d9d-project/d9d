@@ -4,20 +4,6 @@ from typing import Generic, TypeVar, cast
 import torch
 from torch import nn
 
-from d9d.models.backbone import DecoderBackbone
-from d9d.models.head import (
-    CausalLMHeadConfig,
-    ClassificationHeadConfig,
-    EmbeddingHeadConfig,
-    build_decoder_head,
-)
-from d9d.models.io import (
-    SequenceHeadShared,
-    SequenceHeadsOutput,
-    SequenceHeadsShared,
-    SequenceInput,
-    SequenceTransfer,
-)
 from d9d.nn import ModuleLateInit
 from d9d.nn.head import (
     ClassificationHead,
@@ -30,8 +16,22 @@ from d9d.nn.head import (
     SplitLanguageModellingHead,
     TaskHead,
 )
-from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo, StageBoundary
-from d9d.pipelining.api.tensor import TensorSpec
+from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo, StageBoundary, TensorSpec
+
+from .backbone import DecoderBackbone
+from .head import (
+    CausalLMHeadConfig,
+    ClassificationHeadConfig,
+    EmbeddingHeadConfig,
+    build_decoder_head,
+)
+from .io import (
+    SequenceHeadShared,
+    SequenceHeadsOutput,
+    SequenceHeadsShared,
+    SequenceInput,
+    SequenceTransfer,
+)
 
 TBackbone = TypeVar("TBackbone", bound=DecoderBackbone)
 THead = TypeVar("THead", bound=TaskHead)

@@ -15,8 +15,8 @@ from d9d.model_state.mapper.leaf import (
     ModelStateMapperTranspose,
     ModelStateMapperUnstackTensors,
 )
-from d9d.models import SINGLE_HEAD_PREFIX
 
+from ..decoder import SINGLE_HEAD_PREFIX
 from .params import (
     Qwen3MoELayerParameters,
     Qwen3MoEParameters,
