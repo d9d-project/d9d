@@ -8,3 +8,4 @@
 /.venv/
 /example/*/*/runs/
 /example/*/*/models/
+/.claude/*.lock

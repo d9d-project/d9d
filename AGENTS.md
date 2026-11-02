@@ -7,19 +7,12 @@ Guidance for AI agents working in the **d9d** repository.
 Most conventions are already documented. Always read relevant files (especially `CONTRIBUTING.md` before solving any task).
 
 - @README.md - project purpose, philosophy, and what d9d is/isn't.
-- @CONTRIBUTING.md - the canonical reference. It covers:
-  - Development setup.
-  - The `Makefile` workflow.
-  - Design Principles. Treat these as hard rules when writing or changing code.
-  - Linting (`ruff`), type checking (`ty`) and testing tiers.
-  - Writing rules for comments, docstrings, documentation pages and PR descriptions.
-  - The DEP process for major changes.
-  - Conventional Commits format and the PR checklist.
-- @deps/0001-dep-process.md - when and how to write a D9D Enhancement Proposal.
+- @CONTRIBUTING.md - the canonical reference. Treat its Design Principles as hard rules when writing or changing code.
+- `deps/0001-dep-process.md` and `deps/TEMPLATE.md` - when a D9D Enhancement Proposal is needed, how it moves from draft to merge, and what goes into each section. The `dep` skill runs the whole process.
 - `pyproject.toml` - authoritative source for enabled `ruff` rules, `ty` config and the uv workspace. The dependencies of each package are in `packages/<name>/pyproject.toml`.
 - `docs/` - user-facing documentation, mirrors the package layout in `packages/d9d/src/d9d/`.
-  - @docs/index.md - user-facing intro.
-  - @docs/toc.md - annotated map of every subsystem and its docs page.
+  - `docs/index.md` - user-facing intro, the same as `README.md`.
+  - `docs/toc.md` - annotated map of every subsystem and its docs page.
 
 ## Where things live
 
@@ -58,6 +51,6 @@ Top-level packages of the library.
 - Add tests for any feature or fix. Match the existing tier (`local` vs `distributed`). Note: `make test` includes distributed tests that require an 8-GPU setup; run `make test-local` when GPUs are unavailable, and say so.
 - Follow the Design Principles in CONTRIBUTING.md. PRs that violate them get rejected.
 - PR titles must be Conventional Commits. Versioning is automated via Semantic Release — a wrong `type` produces a wrong release.
-- Do not break public APIs without a DEP. Bug fixes and new models on existing APIs do not need one; breaking changes and new distributed strategies do.
+- New public abstractions and new distributed strategies need a DEP. While d9d is on 0.x, a breaking change that introduces no new abstraction does not; neither do bug fixes and new models on existing APIs.
 - Do not add backward-compat shims for old PyTorch/hardware. The project intentionally targets modern APIs (`DTensor`, `DeviceMesh`).
 - Only commit, push, or open PRs when explicitly asked.
