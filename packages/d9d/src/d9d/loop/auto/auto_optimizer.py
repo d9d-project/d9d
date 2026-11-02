@@ -7,7 +7,7 @@ from torch.optim import SGD, Adam, AdamW, Optimizer
 
 from d9d.optim.stochastic import StochasticAdamW
 
-from ..config import dtype_from_name
+from ..config import DtypeName, dtype_from_name
 from ..control import InitializeOptimizerStageContext, OptimizerProvider
 
 
@@ -31,7 +31,7 @@ class StochasticAdamWOptimizerConfig(BaseModel):
     betas: tuple[float, float] = (0.9, 0.999)
     eps: float = 1e-8
     weight_decay: float = 1e-2
-    state_dtype: Literal["float32", "bfloat16"]
+    state_dtype: Literal[DtypeName.float32, DtypeName.bfloat16]
 
 
 class AdamWOptimizerConfig(BaseModel):

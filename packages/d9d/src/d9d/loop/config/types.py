@@ -1,5 +1,4 @@
 from enum import StrEnum
-from typing import Literal
 
 import torch
 
@@ -23,8 +22,18 @@ An ``int`` is the period in steps. A ``StepActionSpecial`` runs the action only 
 """
 
 
-DtypeName = Literal["float32", "bfloat16", "float16"]
-"""Name of a floating-point ``torch`` dtype in a configuration."""
+class DtypeName(StrEnum):
+    """Name of a floating-point ``torch`` dtype in a configuration.
+
+    Attributes:
+        float32: ``torch.float32``.
+        bfloat16: ``torch.bfloat16``.
+        float16: ``torch.float16``.
+    """
+
+    float32 = "float32"
+    bfloat16 = "bfloat16"
+    float16 = "float16"
 
 
 def dtype_from_name(name: DtypeName) -> torch.dtype:
@@ -40,11 +49,11 @@ def dtype_from_name(name: DtypeName) -> torch.dtype:
         ValueError: If ``name`` is not a ``DtypeName``.
     """
     match name:
-        case "float32":
+        case DtypeName.float32:
             return torch.float32
-        case "bfloat16":
+        case DtypeName.bfloat16:
             return torch.bfloat16
-        case "float16":
+        case DtypeName.float16:
             return torch.float16
         case _:
             raise ValueError(f"Unknown dtype name ({name}).")
