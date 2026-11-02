@@ -1,5 +1,5 @@
 ---
-DEP: <Leave blank for maintainers>
+DEP: <Next free number>
 Title: <Short, descriptive title>
 Author: <Your Name>
 Type: Feature
