@@ -33,7 +33,7 @@ For more details, see [PyTorch Issue #174017](https://github.com/pytorch/pytorch
 d9d adds the `GlobalGradContext` to work around this limitation. It is shared state through which the training loop tells custom operations which gradients it needs.
 
 1.  **Training loop**: Sets the enabled gradient directions, e.g. "input gradients only".
-2.  **Operation**: The custom `backward` checks the context. It computes a gradient only if `needs_input_grad` is `True` and the context enables its direction.
+2.  **Operation**: The custom `backward` calls `needs_input_grad()`. It computes a gradient only if autograd needs it and the context enables its direction.
 
 By default, `GLOBAL_GRAD_CONTEXT` enables both input and weight gradients.
 
@@ -41,11 +41,11 @@ By default, `GLOBAL_GRAD_CONTEXT` enables both input and weight gradients.
 
 ### In Custom Autograd Functions
 
-When you write a custom operation, assign a `GradDirection` to each gradient. Check the context before you compute it.
+When you write a custom operation, assign a `GradDirection` to each input. Call `needs_input_grad()` instead of `ctx.needs_input_grad` before you compute a gradient.
 
 ```python
 import torch
-from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd.split_backward import GradDirection, needs_input_grad
 
 
 class MyCustomOp(torch.autograd.Function):
@@ -59,11 +59,10 @@ class MyCustomOp(torch.autograd.Function):
         inputs, weight = ctx.saved_tensors
         grad_input = grad_weight = None
 
-        # Compute a gradient only if PyTorch needs it AND the context enables its direction.
-        if ctx.needs_input_grad[0] and GLOBAL_GRAD_CONTEXT.check_direction(GradDirection.inputs):
+        if needs_input_grad(ctx, 0, GradDirection.inputs):
             grad_input = torch.matmul(grad_output, weight.t())
 
-        if ctx.needs_input_grad[1] and GLOBAL_GRAD_CONTEXT.check_direction(GradDirection.weight):
+        if needs_input_grad(ctx, 1, GradDirection.weight):
             grad_weight = torch.matmul(inputs.t(), grad_output)
 
         return grad_input, grad_weight

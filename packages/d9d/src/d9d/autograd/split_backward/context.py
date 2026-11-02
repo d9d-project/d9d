@@ -1,6 +1,8 @@
 from contextlib import contextmanager
 from enum import StrEnum
 
+from torch.autograd.function import BackwardCFunction
+
 
 class GradDirection(StrEnum):
     """Gradient edges that a custom autograd function can compute.
@@ -68,5 +70,22 @@ class GlobalGradContext:
 GLOBAL_GRAD_CONTEXT = GlobalGradContext()
 """The singleton ``GlobalGradContext``.
 
-Custom autograd functions call ``GLOBAL_GRAD_CONTEXT.check_direction()`` in their backward pass.
+Custom autograd functions check it in their backward pass through ``needs_input_grad()``.
 """
+
+
+def needs_input_grad(ctx: BackwardCFunction, index: int, direction: GradDirection) -> bool:
+    """Checks whether the backward pass of a custom autograd function must compute the gradient of an input.
+
+    Use it in ``backward`` instead of ``ctx.needs_input_grad``, so that split backward passes skip the gradients of
+    the other direction.
+
+    Args:
+        ctx: The autograd context passed to ``backward``.
+        index: The position of the input in the arguments of ``forward``, without ``ctx``.
+        direction: The gradient direction of the input.
+
+    Returns:
+        ``True`` if autograd needs the gradient of the input and ``GLOBAL_GRAD_CONTEXT`` enables its direction.
+    """
+    return ctx.needs_input_grad[index] and GLOBAL_GRAD_CONTEXT.check_direction(direction)

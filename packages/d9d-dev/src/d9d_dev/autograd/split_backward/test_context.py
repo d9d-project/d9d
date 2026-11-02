@@ -2,7 +2,7 @@ from typing import ClassVar
 
 import pytest
 import torch
-from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GlobalGradContext, GradDirection
+from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GlobalGradContext, GradDirection, needs_input_grad
 from torch.autograd import Function
 
 
@@ -82,11 +82,11 @@ class ControlledMatmul(Function):
         a, b = ctx.saved_tensors
         grad_a = grad_b = None
 
-        if GLOBAL_GRAD_CONTEXT.check_direction(GradDirection.inputs) and ctx.needs_input_grad[0]:
+        if needs_input_grad(ctx, 0, GradDirection.inputs):
             ControlledMatmul.execution_log.append("calc_inputs")
             grad_a = grad_output @ b.transpose(-1, -2)
 
-        if GLOBAL_GRAD_CONTEXT.check_direction(GradDirection.weight) and ctx.needs_input_grad[1]:
+        if needs_input_grad(ctx, 1, GradDirection.weight):
             ControlledMatmul.execution_log.append("calc_weights")
             grad_b = a.transpose(-1, -2) @ grad_output
 
@@ -146,3 +146,16 @@ def test_integration_default_behavior():
 
     assert a.grad is not None
     assert w.grad is not None
+
+
+@pytest.mark.local
+def test_integration_input_without_grad():
+    a = torch.randn(2, 4)
+    w = torch.randn(4, 3, requires_grad=True)
+
+    out = ControlledMatmul.apply(a, w)
+    out.sum().backward()
+
+    # Both directions are enabled, but autograd does not need the gradient of ``a``.
+    assert "calc_inputs" not in ControlledMatmul.execution_log
+    assert "calc_weights" in ControlledMatmul.execution_log

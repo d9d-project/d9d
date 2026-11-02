@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch.autograd import Function
 
-from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd.split_backward import GradDirection, needs_input_grad
 
 from ..alignment import GroupedMmPadding
 from ..config import GroupedMmParameters
@@ -28,8 +28,6 @@ class _TorchGroupedMmFunction(Function):
         a: torch.Tensor,
         b: torch.Tensor,
         group_ends: torch.Tensor,
-        a_grad_direction: GradDirection | None,
-        b_grad_direction: GradDirection | None,
     ) -> torch.Tensor:
         """Computes the grouped GEMM.
 
@@ -38,34 +36,30 @@ class _TorchGroupedMmFunction(Function):
             a: Rows of all groups, sorted by group. Shape: ``(total_rows, in_features)``.
             b: Per-group weights. Shape: ``(n_groups, in_features, out_features)``.
             group_ends: Cumulative row count at the end of each group, on the device. int32, shape ``(n_groups,)``.
-            a_grad_direction: Gradient category for ``a``.
-            b_grad_direction: Gradient category for ``b``.
 
         Returns:
             The result. Shape: ``(total_rows, out_features)``.
         """
         ctx.save_for_backward(a, b, group_ends)
-        ctx.a_grad_direction = a_grad_direction
-        ctx.b_grad_direction = b_grad_direction
         return F.grouped_mm(a, b, offs=group_ends)
 
     @staticmethod
     def backward(  # ty: ignore[invalid-method-override] - torch declares backward with variadic grad_outputs
         ctx: Any, grad: torch.Tensor
-    ) -> tuple[torch.Tensor | None, torch.Tensor | None, None, None, None]:
+    ) -> tuple[torch.Tensor | None, torch.Tensor | None, None]:
         grad = grad.contiguous()
         a, b, group_ends = ctx.saved_tensors
 
         a_grad = None
-        if ctx.needs_input_grad[0] and GLOBAL_GRAD_CONTEXT.check_direction(ctx.a_grad_direction):
+        if needs_input_grad(ctx, 0, GradDirection.inputs):
             a_grad = F.grouped_mm(grad, b.transpose(-2, -1), offs=group_ends)
 
         b_grad = None
-        if ctx.needs_input_grad[1] and GLOBAL_GRAD_CONTEXT.check_direction(ctx.b_grad_direction):
+        if needs_input_grad(ctx, 1, GradDirection.weight):
             # In the 2D x 2D form, groups run along the contracted dimension.
             b_grad = F.grouped_mm(a.t(), grad, offs=group_ends)
 
-        return a_grad, b_grad, None, None, None
+        return a_grad, b_grad, None
 
 
 class TorchGroupedMm(GroupedMmBackend):
@@ -81,7 +75,5 @@ class TorchGroupedMm(GroupedMmBackend):
 
     def __call__(self, x: torch.Tensor, weight: torch.Tensor, groups: ExpertTokenGroups) -> torch.Tensor:
         x, weight = self._padding.pad(x, weight)
-        out = _TorchGroupedMmFunction.apply(
-            x, weight, groups.offsets[1:], a_grad_direction=GradDirection.inputs, b_grad_direction=GradDirection.weight
-        )
+        out = _TorchGroupedMmFunction.apply(x, weight, groups.offsets[1:])
         return self._padding.unpad(out)
