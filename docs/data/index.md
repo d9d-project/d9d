@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.data` package provides PyTorch `Dataset` wrappers and helpers for distributed training. It covers length-based bucketing, data-parallel sharding, padding and token pooling masks.
+The `d9d.data` package provides PyTorch `Dataset` wrappers and helpers for distributed training. It covers length-based bucketing, data-parallel sharding, padding, token pooling masks and the streams of microbatch packs.
 
 ## Why d9d Does Not Wrap Datasets Automatically
 
@@ -44,6 +44,8 @@ Variable-length sequences must be padded to the same length before they can be s
 ## Microbatch Packing
 
 `FixedCountMicrobatchPacker`, `PinMemoryMicrobatchPackStream` and `num_microbatches_for_global_batch` build the stream of microbatch packs that the training loop consumes. See [Data Loading](../loop/interfaces/data.md) for how to use them.
+
+`build_device_pack_stream` hands the packs out on the device. With a positive prefetch factor, it copies the next packs on a side CUDA stream while the current step runs. See [Data Prefetching](../loop/train.md#data-prefetching).
 
 ## Usage
 

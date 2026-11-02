@@ -7,14 +7,14 @@ from torch.utils.data import Dataset
 from torchdata.stateful_dataloader import StatefulDataLoader
 
 from d9d.data import (
+    CollateFn,
     FixedCountMicrobatchPacker,
+    MicrobatchPackStream,
     PinMemoryMicrobatchPackStream,
     ShardIndexingMode,
     num_microbatches_for_global_batch,
     shard_dataset_data_parallel,
 )
-from d9d.data.protocol import MicrobatchPackStream
-from d9d.data.types import CollateFn
 from d9d.dist_context import DistributedContext
 from d9d.loop.control import DataProvider, InitializeDataProviderContext
 

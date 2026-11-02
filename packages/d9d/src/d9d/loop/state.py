@@ -3,9 +3,9 @@ from typing import Any
 
 from torch.distributed.checkpoint.stateful import Stateful
 
+from d9d.data import DevicePackStream
 from d9d.dist_context import DistributedContext
 from d9d.loop.component import (
-    DevicePackStream,
     GradientClipper,
     GradientManager,
     InferenceTaskOperator,

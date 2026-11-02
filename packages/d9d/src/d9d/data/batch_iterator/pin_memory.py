@@ -4,8 +4,9 @@ from typing import Any
 import torch
 
 from d9d import pytree
-from d9d.data.protocol import MicrobatchPackStream
-from d9d.data.types import MicrobatchPack
+
+from ..protocol import MicrobatchPackStream
+from ..types import MicrobatchPack
 
 
 def _pin_pack(pack: MicrobatchPack) -> MicrobatchPack:

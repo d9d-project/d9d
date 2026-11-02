@@ -4,6 +4,7 @@ from pathlib import Path
 
 from tqdm import tqdm
 
+from d9d.data import build_device_pack_stream
 from d9d.dist_context import DeviceMeshParameters
 from d9d.loop.component import (
     DataParallelMicrobatchPackStream,
@@ -21,7 +22,6 @@ from d9d.loop.component import (
     TimeoutManager,
     TrainSleeper,
     TrainTaskOperator,
-    build_device_pack_stream,
 )
 from d9d.loop.config import TrainerConfig
 from d9d.loop.control import (

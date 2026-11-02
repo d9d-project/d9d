@@ -2,9 +2,10 @@ import math
 from collections.abc import Iterator
 from typing import Any
 
-from d9d.data.protocol import DataLoaderProtocol, MicrobatchPackStream
-from d9d.data.types import MicrobatchPack
 from d9d.pytree import PyTree
+
+from ..protocol import DataLoaderProtocol, MicrobatchPackStream
+from ..types import MicrobatchPack
 
 
 class FixedCountMicrobatchPacker(MicrobatchPackStream):

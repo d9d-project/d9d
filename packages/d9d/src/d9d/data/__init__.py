@@ -1,8 +1,12 @@
 """Dataset wrappers and data utilities for distributed training."""
 
 from .batch_iterator import (
+    DevicePackStream,
+    DirectDevicePackStream,
     FixedCountMicrobatchPacker,
     PinMemoryMicrobatchPackStream,
+    PrefetchingDevicePackStream,
+    build_device_pack_stream,
     num_microbatches_for_global_batch,
 )
 from .buffer_sorted import BufferSortedDataset, DatasetImplementingSortKeyProtocol
@@ -17,14 +21,18 @@ __all__ = [
     "CollateFn",
     "DataLoaderProtocol",
     "DatasetImplementingSortKeyProtocol",
+    "DevicePackStream",
+    "DirectDevicePackStream",
     "FixedCountMicrobatchPacker",
     "MicrobatchPack",
     "MicrobatchPackStream",
     "PaddingSide1D",
     "PinMemoryMicrobatchPackStream",
+    "PrefetchingDevicePackStream",
     "ShardIndexingMode",
     "ShardedDataset",
     "TokenPoolingType",
+    "build_device_pack_stream",
     "num_microbatches_for_global_batch",
     "pad_stack_1d",
     "shard_dataset_data_parallel",

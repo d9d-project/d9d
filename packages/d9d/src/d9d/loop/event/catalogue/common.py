@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from torch import nn
 
-from d9d.data.protocol import MicrobatchPackStream
+from d9d.data import MicrobatchPackStream
 from d9d.dist_context import DistributedContext
 
 if TYPE_CHECKING:

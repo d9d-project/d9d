@@ -1,8 +1,9 @@
 from collections.abc import Iterator
 from typing import Any, Protocol, runtime_checkable
 
-from d9d.data.types import MicrobatchPack
 from d9d.pytree import PyTree
+
+from .types import MicrobatchPack
 
 
 @runtime_checkable
