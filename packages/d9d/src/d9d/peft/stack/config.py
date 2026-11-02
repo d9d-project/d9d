@@ -2,8 +2,8 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from d9d.peft.full_tune.config import FullTuneConfig
-from d9d.peft.lora.config import LoRAConfig
+from ..full_tune.config import FullTuneConfig
+from ..lora.config import LoRAConfig
 
 
 class PeftStackConfig(BaseModel):
@@ -21,8 +21,10 @@ class PeftStackConfig(BaseModel):
     methods: list["AnyPeftConfig"]
 
 
+# The union lives next to the stack config because they refer to each other. Pydantic resolves the forward
+# reference above from this module.
 AnyPeftConfig = Annotated[
     LoRAConfig | FullTuneConfig | PeftStackConfig,
     Field(discriminator="kind"),
 ]
-"""Any valid PEFT configuration, discriminated by the ``kind`` field."""
+"""Union of all PEFT configurations, discriminated by the ``kind`` field."""

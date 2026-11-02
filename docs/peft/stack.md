@@ -2,7 +2,7 @@
 
 ## About
 
-Fine-tuning can combine several methods. The `d9d.peft.all` package groups multiple PEFT configurations into a single `PeftStack`. The stack injects its methods in order and merges them in reverse order.
+Fine-tuning can combine several methods. The `d9d.peft.stack` package groups multiple PEFT configurations into a single `PeftStack`. The stack injects its methods in order and merges them in reverse order.
 
 ## Usage
 
@@ -13,10 +13,10 @@ import re
 
 from d9d.model_state.mapper.adapters import identity_mapper_from_module
 from d9d.model_state.mapper.compose import ModelStateMapperSequential
-from d9d.peft import inject_peft_and_freeze, merge_peft
-from d9d.peft.all import PeftStackConfig, peft_method_from_config
+from d9d.peft import inject_peft_and_freeze, merge_peft, peft_method_from_config
 from d9d.peft.full_tune import FullTuneConfig
 from d9d.peft.lora import LoRAConfig, LoRAParameters
+from d9d.peft.stack import PeftStackConfig
 
 model = ...  # Your model, before its weights are loaded.
 
@@ -56,4 +56,4 @@ merge_peft(method, model)
 
 ## API Reference
 
-::: d9d.peft.all
+::: d9d.peft.stack

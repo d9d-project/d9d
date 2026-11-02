@@ -46,7 +46,7 @@ Top-level packages of the library.
 - `pipelining/` - pipeline parallelism: `api`, `stage`, `runtime` (the VM), `program` (`builder` and the `catalogue` of schedules) and `factory`.
 - `model_state/` - checkpoints: `mapper` (graph-based transform engine) and `io` (streaming reader/writers).
 - `data/` - distributed-aware dataset wrappers, bucketing, microbatch packing, the streams that hand packs to the device and the data protocols.
-- `peft/` - parameter-efficient fine-tuning: `lora`, `full_tune`, `all` (method stacking).
+- `peft/` - parameter-efficient fine-tuning: `lora`, `full_tune`, `stack` (method stacking) and the `factory` of any PEFT method.
 - `metric/` - distributed-aware metrics: `component`, `catalogue` (metric catalogue) and `AsyncMetricCollector` (synchronization on a side CUDA stream).
 - `optim/` - the optimizer and LR scheduler protocols, `stochastic` (stochastic-rounding low-precision optimizers) and `lr_scheduler` (`piecewise` composable schedules).
 - `tracker/` - experiment tracking: the trackers (`provider`, e.g. W&B, TensorBoard, MLflow, Aim) and `TrackerWriter`, which logs GPU values without waiting for the GPU.

@@ -14,7 +14,7 @@ So you can apply a PEFT method before the model is initialized or [horizontally 
 
 ## Configuration
 
-Every PEFT method has a Pydantic configuration. Pydantic validates the hyperparameters and serializes the configuration. `d9d.peft.all.peft_method_from_config` builds the method for any configuration (see [Method Stacking](./stack.md)).
+Every PEFT method has a Pydantic configuration. Pydantic validates the hyperparameters and serializes the configuration. `peft_method_from_config` builds the method for any configuration. A field of type `AnyPeftConfig` accepts any of them in your own configuration (see [Method Stacking](./stack.md)).
 
 ## The Injection Lifecycle
 

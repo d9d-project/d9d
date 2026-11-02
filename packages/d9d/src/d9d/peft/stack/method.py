@@ -1,14 +1,9 @@
-from typing import Self, cast
+from typing import Self
 
-from pydantic import BaseModel
 from torch import nn
 
-from ..all.config import PeftStackConfig
-from ..base import PeftInjectionResult, PeftMethod, TConfig
-from ..full_tune.config import FullTuneConfig
-from ..full_tune.method import FullTune
-from ..lora.config import LoRAConfig
-from ..lora.method import LoRA
+from ..base import PeftInjectionResult, PeftMethod
+from .config import PeftStackConfig
 
 
 class PeftStack(PeftMethod[PeftStackConfig]):
@@ -39,29 +34,7 @@ class PeftStack(PeftMethod[PeftStackConfig]):
 
     @classmethod
     def from_config(cls, config: PeftStackConfig) -> Self:
-        methods = []
+        # The factory imports this module to build a stack.
+        from ..factory import peft_method_from_config  # noqa: PLC0415 - circular import
 
-        for method in config.methods:
-            methods.append(peft_method_from_config(method))
-
-        return cls(methods)
-
-
-_PEFT_CONFIG_MAP: dict[type[BaseModel], type[PeftMethod]] = {
-    LoRAConfig: LoRA,
-    FullTuneConfig: FullTune,
-    PeftStackConfig: PeftStack,
-}
-
-
-def peft_method_from_config(config: TConfig) -> PeftMethod[TConfig]:
-    """Builds the PEFT method that matches the configuration type.
-
-    Args:
-        config: A PEFT configuration object, e.g. ``LoRAConfig``.
-
-    Returns:
-        The corresponding method instance.
-    """
-    method_cls = cast(type[PeftMethod[TConfig]], _PEFT_CONFIG_MAP[type(config)])
-    return method_cls.from_config(config)
+        return cls([peft_method_from_config(method) for method in config.methods])
