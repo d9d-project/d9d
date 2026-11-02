@@ -1,3 +1,5 @@
+"""The interfaces that user code implements: tasks and the model, data, optimizer and LR scheduler providers."""
+
 from .data_provider import DataProvider, InitializeDataProviderContext
 from .lr_scheduler_provider import InitializeLRSchedulerContext, LRSchedulerProvider
 from .model_provider import (

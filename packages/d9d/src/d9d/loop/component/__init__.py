@@ -1,3 +1,5 @@
+"""The components that the training and inference loops are composed of."""
+
 from .checkpointer import StateCheckpointer
 from .data_parallel_stream import DataParallelMicrobatchPackStream
 from .garbage_collector import ManualGarbageCollector

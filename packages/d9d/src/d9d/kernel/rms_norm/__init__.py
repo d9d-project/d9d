@@ -1,3 +1,5 @@
+"""Fused RMSNorm kernels."""
+
 from .function import rms_norm
 
 __all__ = [

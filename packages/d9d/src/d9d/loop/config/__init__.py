@@ -1,3 +1,5 @@
+"""Pydantic configurations of the training and inference loops."""
+
 from .config import (
     CheckpointingConfig,
     DataPrefetchConfig,
