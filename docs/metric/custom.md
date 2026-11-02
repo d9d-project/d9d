@@ -23,9 +23,10 @@ This `MaxMetric` tracks the maximum value seen across all ranks with a `MetricAc
 import torch
 from typing import Any
 
+from torch.distributed import ProcessGroup
+
 from d9d.metric import Metric
 from d9d.metric.component import MetricAccumulator, MetricReduceOp
-from d9d.dist_context import DistributedContext
 
 class MaxMetric(Metric[torch.Tensor]):
     def __init__(self):
@@ -38,9 +39,9 @@ class MaxMetric(Metric[torch.Tensor]):
         # Updates the local maximum, no communication.
         self._max_val.update(value)
 
-    def sync(self, dist_context: DistributedContext):
-        # Runs all_reduce across the default process group.
-        self._max_val.sync()
+    def sync(self, group: ProcessGroup):
+        # Runs all_reduce across the group.
+        self._max_val.sync(group)
 
     def compute(self) -> torch.Tensor:
         # Returns the synchronized value.

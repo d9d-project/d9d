@@ -1,3 +1,5 @@
+"""Components for building classification metrics from a confusion matrix."""
+
 from .accumulator import ConfusionMatrixAccumulator
 from .aggregator import ClassificationAggregationMethod, ConfusionMatrixAggregator
 from .confusion_matrix import ConfusionMatrix

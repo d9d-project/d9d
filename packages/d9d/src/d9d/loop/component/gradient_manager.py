@@ -3,9 +3,9 @@ from contextlib import contextmanager
 import torch
 from torch.profiler import record_function
 
-from d9d.dist_context import DistributedContext
+from d9d.dist_context import FLAT_DOMAIN, DistributedContext
 from d9d.loop.config import GradientManagerConfig
-from d9d.metric.impl.aggregation import WeightedMeanMetric
+from d9d.metric.catalogue.aggregation import WeightedMeanMetric
 from d9d.offload import Offloadable, OffloadContext, OnloadContext
 from d9d.parallel.grad_sync import GradientSynchronizer
 
@@ -112,7 +112,7 @@ class GradientManager(Offloadable):
             self._grad_sync.wait()
 
             if self._dist_context.mesh_params.is_distributed:
-                self._loss.sync(self._dist_context)
+                self._loss.sync(self._dist_context.mesh_for(FLAT_DOMAIN).get_group())
             self._grad_sync.scale_grads(1.0 / self._loss.accumulated_weight)
 
     def compute_global_loss(self) -> torch.Tensor:

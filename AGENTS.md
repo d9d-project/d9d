@@ -39,15 +39,15 @@ Top-level packages of the library.
 - `pytree/` - PyTree traversal and the `PyTree`/`TensorTree` aliases.
 - `autograd/` - extensions of the autograd engine: `split_backward` (separate backward passes for input and weight gradients, and the gradient context that custom autograd functions check).
 - `offload/` - moving GPU state to host memory and back (the base of sleep/wake).
-- `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`, `sleep`), and `internals` (`metric_collector`, `determinism`, `profiling`, `state`).
+- `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`, `sleep`), and `internals` (`determinism`, `profiling`, `state`).
 - `nn/` - modeling building blocks: attention, MoE (with its expert parallelism), normalization, heads and other layers, and `ModuleLateInit`.
 - `parallel/` - horizontal parallelism: FSDP, HSDP and replicate, `style` (parallel styles), `grad_sync` (gradient reduction by placements) and `grad_norm` (global gradient norm and clipping).
 - `models/` - the model catalogue: the decoder backbone and heads, and one package per model with its Hugging Face mappers and its parallelization.
 - `pipelining/` - pipeline parallelism: `api`, `stage`, `runtime` (the VM), `program` (`builder` and the `catalogue` of schedules) and `factory`.
 - `model_state/` - checkpoints: `mapper` (graph-based transform engine) and `io` (streaming reader/writers).
-- `data/` - distributed-aware dataset wrappers, bucketing, microbatch packing and the data protocols.
+- `data/` - distributed-aware dataset wrappers, bucketing, microbatch packing, the streams that hand packs to the device and the data protocols.
 - `peft/` - parameter-efficient fine-tuning: `lora`, `full_tune`, `all` (method stacking).
-- `metric/` - distributed-aware metrics: `component` and `impl` (metric catalogue).
+- `metric/` - distributed-aware metrics: `component`, `catalogue` (metric catalogue) and `AsyncMetricCollector` (synchronization on a side CUDA stream).
 - `optim/` - the optimizer and LR scheduler protocols, `stochastic` (stochastic-rounding low-precision optimizers) and `lr_scheduler` (`piecewise` composable schedules).
 - `tracker/` - experiment tracking: the trackers (`provider`, e.g. W&B, TensorBoard, MLflow, Aim) and `TrackerWriter`, which logs GPU values without waiting for the GPU.
 - `kernel/` - custom kernels: `cce`, `moe`, `rms_norm`, `silu_mul`, `stochastic`.

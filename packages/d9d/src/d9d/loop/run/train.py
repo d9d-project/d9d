@@ -66,7 +66,7 @@ from d9d.loop.event.catalogue.train import (
 from d9d.loop.internals.determinism import set_seeds
 from d9d.loop.sleep import DEFAULT_SLEEP_TAGS, SleepTag
 from d9d.loop.state import TrainJobState
-from d9d.metric.impl.container import ComposeMetric
+from d9d.metric.catalogue.container import ComposeMetric
 
 
 class TrainingConfigurator:

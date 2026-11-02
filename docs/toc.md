@@ -78,8 +78,9 @@ Parameter-Efficient Fine-Tuning framework.
 Metrics, learning rate schedules and optimizers.
 
 *   **[Metrics Overview](./metric/overview.md)**: Distributed-aware statistic accumulation.
-*   **[Metric Catalogue](./metric/metric_catalogue/index.md)**: Ready-to-use metric implementations.
+*   **[Metric Catalogue](./metric/catalogue/index.md)**: Ready-to-use metric implementations.
 *   **[Custom Metrics](./metric/custom.md)**: Implementing custom metrics.
+*   **[Metric Collection](./metric/collector.md)**: Synchronizing and computing a metric on a side CUDA stream, without blocking the loop.
 *   **[Piecewise Scheduler](./optim/lr_scheduler/piecewise.md)**: Composable LR schedules and [Schedule Visualization](./optim/lr_scheduler/visualization.md).
 *   **[Stochastic Optimizers](./optim/stochastic.md)**: Low-precision training using stochastic rounding.
 
@@ -91,6 +92,5 @@ Where the loss and the metrics go.
 ## ⚙️ Internals
 Deep dive into the engine room.
 
-*   **[Metric Collection](./internals/metric_collector.md)**: Custom overlapped metric synchronization & computation.
 *   **[Determinism](./internals/determinism.md)**: RNG seeding across distributed processes.
 *   **[Profiling](./internals/profiling.md)**: A distributed-aware wrapper around the PyTorch Profiler.

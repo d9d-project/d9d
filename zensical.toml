@@ -100,12 +100,13 @@ nav = [
     { "Metrics" = [
         "metric/overview.md",
         { "Metric Catalogue" = [
-            "metric/metric_catalogue/index.md",
-            "metric/metric_catalogue/aggregation.md",
-            "metric/metric_catalogue/classification.md",
-            "metric/metric_catalogue/container.md",
+            "metric/catalogue/index.md",
+            "metric/catalogue/aggregation.md",
+            "metric/catalogue/classification.md",
+            "metric/catalogue/container.md",
         ] },
         "metric/custom.md",
+        "metric/collector.md",
     ] },
     { "Experiment Tracking" = [
         "tracker/index.md",
@@ -119,7 +120,6 @@ nav = [
     ] },
     { "Internals" = [
         "internals/determinism.md",
-        "internals/metric_collector.md",
         "internals/profiling.md",
     ] },
 ]

@@ -87,7 +87,7 @@ def assert_metric_distributed(dist_ctx_factory, case: MetricCase, atol: float | 
                 metric.to("cuda")
                 metric.load_state_dict(state)
 
-            metric.sync(dist_ctx)
+            metric.sync(dist_ctx.mesh_for(FLAT_DOMAIN).get_group())
 
             expect = tree_map(lambda x: x.to("cuda"), step.expect)
             assert_close(metric.compute(), expect, equal_nan=True, atol=atol, rtol=rtol)

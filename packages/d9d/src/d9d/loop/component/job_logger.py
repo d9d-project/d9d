@@ -7,11 +7,11 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.profiler import record_function
 
 from d9d import pytree
-from d9d.dist_context import DistributedContext
+from d9d.dist_context import FLAT_DOMAIN, DistributedContext
 from d9d.loop.config import JobLoggerConfig
-from d9d.loop.internals.metric_collector import AsyncMetricCollector
 from d9d.loop.internals.state import load_state_dict_main_process, state_dict_main_process
-from d9d.metric.impl.container import ComposeMetric
+from d9d.metric import AsyncMetricCollector
+from d9d.metric.catalogue.container import ComposeMetric
 from d9d.pytree import PyTree, ScalarTree
 from d9d.tracker import (
     BaseTracker,
@@ -116,7 +116,11 @@ class JobLogger(Stateful):
         if not self._schedule.should_do_action(self._config.period_steps, enable_on_last_step_if_periodic=True):
             return
 
-        self._metric_collector.schedule_collection(self._dist_context)
+        self._metric_collector.schedule_collection(
+            self._dist_context.mesh_for(FLAT_DOMAIN).get_group()
+            if self._dist_context.mesh_params.is_distributed
+            else None
+        )
 
     def log(self, loss: torch.Tensor, grad_norm: torch.Tensor):
         """Logs the loss and the gradient norm of the current step and, on logging steps, the metric results.

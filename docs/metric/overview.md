@@ -27,8 +27,8 @@ In large-scale distributed training, this approach fails:
 
 The `Metric` interface is:
 
-*   **Distributed**: Each metric synchronizes its state across all ranks in its `sync` method.
-*   **Async-compatible**: A `Metric` implementation can stay simple and synchronous. The training loop drives it through the [`AsyncMetricCollector`](../internals/metric_collector.md), which runs synchronization and computation on a side CUDA stream. The main training loop continues meanwhile.
+*   **Distributed**: Each metric synchronizes its state across the ranks of a process group in its `sync` method.
+*   **Async-compatible**: A `Metric` implementation can stay simple and synchronous. The training loop drives it through the [`AsyncMetricCollector`](./collector.md), which runs synchronization and computation on a side CUDA stream. The main training loop continues meanwhile.
 *   **Stateful**: Metrics implement the `torch.distributed.checkpoint.stateful.Stateful` interface, so they are saved in checkpoints.
 *   **Small**: `Metric` is a lightweight interface with no hidden state accounting. Implement its methods and respect the lifecycle below.
 
@@ -37,7 +37,7 @@ The `Metric` interface is:
 A metric in d9d follows this lifecycle:
 
 1.  **Update**: Runs every training step. The metric accumulates data locally on the GPU, e.g. with `.add_()`. No communication happens.
-2.  **Sync**: Runs at the logging interval. The metric aggregates data across all ranks, e.g. with `all_reduce`.
+2.  **Sync**: Runs at the logging interval. The metric aggregates data across the ranks of a process group, e.g. with `all_reduce`.
 3.  **Compute**: Computes the final value from the synchronized data, e.g. total loss divided by total samples.
 4.  **Reset**: Clears the state for the next logging window.
 
@@ -52,14 +52,14 @@ Usually, you create and update metrics in your `TrainTask`. See the examples in 
 You can also use d9d metrics without the `Trainer`. Called directly, `sync()` runs the reduction on the current CUDA stream. To overlap it with other work, call it within `torch.cuda.stream(...)`.
 
 ```python
-from d9d.metric.impl.aggregation import WeightedMeanMetric
+from d9d.metric.catalogue.aggregation import WeightedMeanMetric
 
 # 1. Create the metric.
 metric = WeightedMeanMetric()
 metric.to("cuda")
 
 dataloader = ...
-dist_context = ...  # The DistributedContext of the job.
+group = ...  # The process group to reduce over, e.g. dist.group.WORLD.
 
 # 2. Training loop.
 for batch in dataloader:
@@ -71,8 +71,8 @@ for batch in dataloader:
     metric.update(values=loss, weights=num_tokens)
 
 # 3. Synchronize and compute.
-# Reduces the state across all ranks on the current stream.
-metric.sync(dist_context)
+# Reduces the state across the ranks of the group on the current stream.
+metric.sync(group)
 print(f"Global average loss: {metric.compute()}")
 
 # 4. Reset for the next epoch.

@@ -21,7 +21,7 @@ from d9d.loop.component import (
 )
 from d9d.loop.control import InferenceTask, TrainTask
 from d9d.loop.event import EventBus
-from d9d.metric.impl.container import ComposeMetric
+from d9d.metric.catalogue.container import ComposeMetric
 from d9d.optim.protocol import LRSchedulerProtocol, OptimizerProtocol
 
 

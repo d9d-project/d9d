@@ -188,7 +188,7 @@ For a loss per token, return the number of tokens as `loss_weight`, as in the [Q
 The loop logs the loss and the gradient norm without any code. For other values, add metrics to the task. The loop aggregates them across the ranks, logs them every `logging.period_steps` steps and then resets them. This metric counts the samples of the Quickstart task:
 
 ```python
-from d9d.metric.impl.aggregation import SumMetric
+from d9d.metric.catalogue.aggregation import SumMetric
 
 
 class RegressionTask(TrainTask[...]):
@@ -204,7 +204,7 @@ class RegressionTask(TrainTask[...]):
         ctx.metrics["num_samples"].update(torch.ones_like(ctx.state.y))
 ```
 
-With the Quickstart config, the log shows `num_samples=2560` every 10 steps. The [Metric Catalogue](../metric/metric_catalogue/index.md) lists the ready metrics, and [Custom Metrics](../metric/custom.md) shows how to write your own. See [Metrics Overview](../metric/overview.md).
+With the Quickstart config, the log shows `num_samples=2560` every 10 steps. The [Metric Catalogue](../metric/catalogue/index.md) lists the ready metrics, and [Custom Metrics](../metric/custom.md) shows how to write your own. See [Metrics Overview](../metric/overview.md).
 
 ## Set the Config
 
