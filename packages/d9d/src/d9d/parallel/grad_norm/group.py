@@ -6,7 +6,9 @@ from typing import Any
 import torch
 from torch import nn
 from torch.distributed import DeviceMesh
-from torch.distributed.tensor import DTensor, Shard
+from torch.distributed.tensor import DTensor
+
+from ..placement import split_placement_dims
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
@@ -37,21 +39,11 @@ def _extract_shard_meshes(param: nn.Parameter) -> tuple[DeviceMesh, ...] | None:
     if not isinstance(data, DTensor):
         return None
 
-    mesh = data.device_mesh
-    mesh_dim_names = mesh.mesh_dim_names
-    if mesh_dim_names is None:
-        raise ValueError("Only named meshes are supported.")
-
-    shard_placement_dim_names: list[str] = []
-
-    for dim_i, placement in enumerate(data.placements):
-        if isinstance(placement, Shard):
-            shard_placement_dim_names.append(mesh_dim_names[dim_i])
-
-    if len(shard_placement_dim_names) == 0:
+    shard_dim_names = split_placement_dims(data).shard_dim_names
+    if len(shard_dim_names) == 0:
         return None
 
-    return tuple(mesh[name] for name in shard_placement_dim_names)
+    return tuple(data.device_mesh[name] for name in shard_dim_names)
 
 
 def _group_sort_key(item: tuple[GradNormGroup, list[nn.Parameter]]) -> Any:
@@ -69,6 +61,9 @@ def group_parameters_for_norm(parameters: Iterable[nn.Parameter]) -> ParametersF
 
     Returns:
         A dict that maps groups to their parameters.
+
+    Raises:
+        ValueError: If a ``DTensor`` parameter has a placement other than ``Replicate`` or ``Shard``.
     """
     grouped_params: ParametersForNorm = defaultdict(list)
     for param in parameters:

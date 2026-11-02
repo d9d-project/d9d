@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.parallel.grad_norm` package computes and clips gradient norms in distributed jobs. The standard PyTorch `clip_grad_norm_` does not know about ND parallelism, which mixes pipeline, data, tensor and context parallelism. This package computes the global norm correctly across all parallel dimensions. It handles `DTensor` sharding without materializing full tensors. Tensors sharded on more than one mesh dimension are not supported.
+The `d9d.parallel.grad_norm` package computes and clips gradient norms in distributed jobs. The standard PyTorch `clip_grad_norm_` does not know about ND parallelism, which mixes pipeline, data, tensor and context parallelism. This package computes the global norm correctly across all parallel dimensions. It handles `DTensor` sharding without materializing full tensors. Tensors sharded on more than one mesh dimension are not supported. `DTensor` parameters must have only `Replicate` and `Shard` placements.
 
 !!! info "Training loop"
     The d9d training loop clips the gradients itself. Call this package directly when you train without the loop.
