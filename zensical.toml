@@ -82,8 +82,8 @@ nav = [
         "pipelining/index.md",
         "pipelining/internals.md",
     ] },
-    { "Datasets" = [
-        "dataset/index.md"
+    { "Data" = [
+        "data/index.md"
     ] },
     { "PyTree" = [
         "pytree/index.md"

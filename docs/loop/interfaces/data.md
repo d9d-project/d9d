@@ -86,7 +86,7 @@ A custom provider builds the same default stack by hand. It has two layers:
 
 Wrap the packer in a `PinMemoryMicrobatchPackStream` to pin the packs, so the loop copies them to the device asynchronously. The packer and the pinning stream live in `d9d.data.batch_iterator`.
 
-Unlike with `AutoDataProvider`, you own the data-parallel sharding. Shard the dataset yourself before you build the loader, e.g. with `shard_dataset_data_parallel`. See the [Dataset Utilities](../../dataset/index.md) documentation.
+Unlike with `AutoDataProvider`, you own the data-parallel sharding. Shard the dataset yourself before you build the loader, e.g. with `shard_dataset_data_parallel`. See [Data](../../data/index.md).
 
 ```python
 import dataclasses

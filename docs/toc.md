@@ -47,7 +47,7 @@ Managing data loading and model checkpoints.
 
 *   **[Model State Mapper](./model_state/mapper.md)**: The graph-based transformation engine for checkpoints (transform architectures on-the-fly).
 *   **[Model State I/O](./model_state/io.md)**: Streaming reader/writers for checkpoints.
-*   **[Datasets](./dataset/index.md)**: Distributed-aware dataset wrappers and length bucketing.
+*   **[Data](./data/index.md)**: Distributed-aware dataset wrappers, length bucketing, padding and the streams of microbatch packs.
 *   **[PyTree Traversal](./pytree/index.md)**: Dataclass-aware recursive mapping and flattening over nested tensor structures.
 
 

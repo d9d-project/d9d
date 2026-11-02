@@ -10,7 +10,7 @@ Replace `RegressionDataset` with your `Dataset` and its `collate()` with a funct
 
 `dataset_factory` runs on every rank. Return the whole dataset from it: `AutoDataProvider` shards it across the data-parallel ranks. Wrap downloads in `dist_context.main_process_first()`, so that only rank 0 fills the cache. See [Data Loading](../loop/interfaces/data.md#using-autodataprovider).
 
-If samples differ in length, pad them in `collate()` with [`pad_stack_1d`](../dataset/index.md#padding) and mark the padding in the labels. The task then weights the loss by the number of real tokens (see [Write the Task](#write-the-task)). The [Qwen3 fine-tuning example](./finetune_huggingface.md) does both:
+If samples differ in length, pad them in `collate()` with [`pad_stack_1d`](../data/index.md#padding) and mark the padding in the labels. The task then weights the loss by the number of real tokens (see [Write the Task](#write-the-task)). The [Qwen3 fine-tuning example](./finetune_huggingface.md) does both:
 
 ```python
 # One microbatch of token sequences, padded to one length.
