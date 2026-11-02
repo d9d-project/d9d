@@ -51,6 +51,6 @@ Top-level packages of the library.
 - Add tests for any feature or fix. Match the existing tier (`local` vs `distributed`). Note: `make test` includes distributed tests that require an 8-GPU setup; run `make test-local` when GPUs are unavailable, and say so.
 - Follow the Design Principles in CONTRIBUTING.md. PRs that violate them get rejected.
 - PR titles must be Conventional Commits. Versioning is automated via Semantic Release — a wrong `type` produces a wrong release.
-- New public abstractions and new distributed strategies need a DEP. While d9d is on 0.x, a breaking change that introduces no new abstraction does not; neither do bug fixes and new models on existing APIs.
+- Check "The DEP Process" in CONTRIBUTING.md before a change that adds public API. The `dep` skill writes the DEP.
 - Do not add backward-compat shims for old PyTorch/hardware. The project intentionally targets modern APIs (`DTensor`, `DeviceMesh`).
 - Only commit, push, or open PRs when explicitly asked.
