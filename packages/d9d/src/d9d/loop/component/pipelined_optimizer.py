@@ -5,7 +5,7 @@ from torch.distributed import DeviceMesh
 from torch.profiler import record_function
 
 from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
-from d9d.optim.protocol import OptimizerProtocol
+from d9d.optim import OptimizerProtocol
 
 
 class PipelinedOptimizer(OptimizerProtocol, Offloadable):

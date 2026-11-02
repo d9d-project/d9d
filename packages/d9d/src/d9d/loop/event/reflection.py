@@ -1,9 +1,7 @@
 import inspect
 from collections.abc import Callable
 
-from d9d.loop.event import TContext
-
-from .core import Event, EventBus
+from .core import Event, EventBus, TContext
 
 _SUBSCRIBE_MARKER = "_d9d_subscribed_events"
 

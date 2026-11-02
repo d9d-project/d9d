@@ -1,38 +1,17 @@
 """Optimizer provider built from a configuration."""
 
-import abc
-from abc import ABC
-from collections.abc import Iterable
 from typing import Annotated, Literal
 
 import torch
 from pydantic import BaseModel, ConfigDict, Field
-from torch import nn
 from torch.optim import SGD, Adam, AdamW, Optimizer
 
-from d9d.loop.control import InitializeOptimizerStageContext, OptimizerProvider
 from d9d.optim.stochastic import StochasticAdamW
 
-
-class BaseAutoOptimizerConfig(BaseModel, ABC):
-    """Abstract base class for optimizer configurations."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    @abc.abstractmethod
-    def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """Creates the PyTorch optimizer instance.
-
-        Args:
-            params: An iterable of model parameters to optimize.
-
-        Returns:
-            The instantiated optimizer.
-        """
-        ...
+from ..control import InitializeOptimizerStageContext, OptimizerProvider
 
 
-class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
+class StochasticAdamWOptimizerConfig(BaseModel):
     """Configuration for the Stochastic AdamW optimizer.
 
     Attributes:
@@ -44,6 +23,8 @@ class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
         state_dtype: The name of the ``torch`` dtype for the optimizer states, e.g. ``"bfloat16"``.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     name: Literal["stochastic_adamw"] = "stochastic_adamw"
 
     lr: float
@@ -52,23 +33,8 @@ class StochasticAdamWOptimizerConfig(BaseAutoOptimizerConfig):
     weight_decay: float = 1e-2
     state_dtype: str
 
-    def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """Builds ``StochasticAdamW`` with the configured parameters.
 
-        Returns:
-            The constructed ``StochasticAdamW`` optimizer.
-        """
-        return StochasticAdamW(
-            params=params,
-            lr=self.lr,
-            betas=self.betas,
-            eps=self.eps,
-            weight_decay=self.weight_decay,
-            state_dtype=getattr(torch, self.state_dtype),
-        )
-
-
-class AdamWOptimizerConfig(BaseAutoOptimizerConfig):
+class AdamWOptimizerConfig(BaseModel):
     """Configuration for the PyTorch AdamW optimizer.
 
     Attributes:
@@ -81,6 +47,8 @@ class AdamWOptimizerConfig(BaseAutoOptimizerConfig):
         maximize: Whether to maximize the objective instead of minimizing it.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     name: Literal["adamw"] = "adamw"
 
     lr: float
@@ -90,25 +58,8 @@ class AdamWOptimizerConfig(BaseAutoOptimizerConfig):
     amsgrad: bool = False
     maximize: bool = False
 
-    def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """Builds fused AdamW with the configured parameters.
 
-        Returns:
-            The constructed AdamW optimizer.
-        """
-        return AdamW(
-            params=params,
-            lr=self.lr,
-            betas=self.betas,
-            eps=self.eps,
-            weight_decay=self.weight_decay,
-            amsgrad=self.amsgrad,
-            maximize=self.maximize,
-            fused=True,
-        )
-
-
-class AdamOptimizerConfig(BaseAutoOptimizerConfig):
+class AdamOptimizerConfig(BaseModel):
     """Configuration for the PyTorch Adam optimizer.
 
     Attributes:
@@ -122,6 +73,8 @@ class AdamOptimizerConfig(BaseAutoOptimizerConfig):
         maximize: Whether to maximize the objective instead of minimizing it.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     name: Literal["adam"] = "adam"
 
     lr: float
@@ -132,26 +85,8 @@ class AdamOptimizerConfig(BaseAutoOptimizerConfig):
     amsgrad: bool = False
     maximize: bool = False
 
-    def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """Builds fused Adam with the configured parameters.
 
-        Returns:
-            The constructed Adam optimizer.
-        """
-        return Adam(
-            params=params,
-            lr=self.lr,
-            betas=self.betas,
-            eps=self.eps,
-            weight_decay=self.weight_decay,
-            decoupled_weight_decay=self.decoupled_weight_decay,
-            amsgrad=self.amsgrad,
-            maximize=self.maximize,
-            fused=True,
-        )
-
-
-class SGDOptimizerConfig(BaseAutoOptimizerConfig):
+class SGDOptimizerConfig(BaseModel):
     """Configuration for the PyTorch SGD optimizer.
 
     Attributes:
@@ -164,6 +99,8 @@ class SGDOptimizerConfig(BaseAutoOptimizerConfig):
         maximize: Whether to maximize the objective instead of minimizing it.
     """
 
+    model_config = ConfigDict(extra="forbid")
+
     name: Literal["sgd"] = "sgd"
 
     lr: float
@@ -172,23 +109,6 @@ class SGDOptimizerConfig(BaseAutoOptimizerConfig):
     weight_decay: float = 0
     nesterov: bool = False
     maximize: bool = False
-
-    def build(self, params: Iterable[nn.Parameter]) -> Optimizer:
-        """Builds fused SGD with the configured parameters.
-
-        Returns:
-            The constructed SGD optimizer.
-        """
-        return SGD(
-            params,
-            lr=self.lr,
-            momentum=self.momentum,
-            dampening=self.dampening,
-            weight_decay=self.weight_decay,
-            nesterov=self.nesterov,
-            maximize=self.maximize,
-            fused=True,
-        )
 
 
 AutoOptimizerConfig = Annotated[
@@ -199,11 +119,60 @@ AutoOptimizerConfig = Annotated[
 
 
 class AutoOptimizerProvider(OptimizerProvider):
-    """Provider that builds a PyTorch optimizer from a configuration object."""
+    """Provider that builds a PyTorch optimizer from a configuration object.
+
+    The PyTorch optimizers (AdamW, Adam and SGD) are built with ``fused=True``.
+    """
 
     def __init__(self, config: AutoOptimizerConfig):
         """Constructs the ``AutoOptimizerProvider`` object."""
         self._config = config
 
     def __call__(self, context: InitializeOptimizerStageContext) -> Optimizer:
-        return self._config.build(context.model.parameters())
+        params = context.model.parameters()
+        match self._config:
+            case StochasticAdamWOptimizerConfig():
+                return StochasticAdamW(
+                    params=params,
+                    lr=self._config.lr,
+                    betas=self._config.betas,
+                    eps=self._config.eps,
+                    weight_decay=self._config.weight_decay,
+                    state_dtype=getattr(torch, self._config.state_dtype),
+                )
+            case AdamWOptimizerConfig():
+                return AdamW(
+                    params=params,
+                    lr=self._config.lr,
+                    betas=self._config.betas,
+                    eps=self._config.eps,
+                    weight_decay=self._config.weight_decay,
+                    amsgrad=self._config.amsgrad,
+                    maximize=self._config.maximize,
+                    fused=True,
+                )
+            case AdamOptimizerConfig():
+                return Adam(
+                    params=params,
+                    lr=self._config.lr,
+                    betas=self._config.betas,
+                    eps=self._config.eps,
+                    weight_decay=self._config.weight_decay,
+                    decoupled_weight_decay=self._config.decoupled_weight_decay,
+                    amsgrad=self._config.amsgrad,
+                    maximize=self._config.maximize,
+                    fused=True,
+                )
+            case SGDOptimizerConfig():
+                return SGD(
+                    params,
+                    lr=self._config.lr,
+                    momentum=self._config.momentum,
+                    dampening=self._config.dampening,
+                    weight_decay=self._config.weight_decay,
+                    nesterov=self._config.nesterov,
+                    maximize=self._config.maximize,
+                    fused=True,
+                )
+            case _:
+                raise ValueError(f"Optimizer configuration type ({type(self._config).__name__}) is not supported.")

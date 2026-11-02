@@ -2,10 +2,10 @@
 
 ## About
 
-The `d9d.loop.internals.profiling` package wraps the PyTorch profiler for distributed jobs.
+The `d9d.loop.profiling` module wraps the PyTorch profiler for distributed jobs.
 
 !!! warning "Internal API"
-    If you use the standard d9d training loop, you do not need to call this package. d9d profiles the job based on its configuration. This page is for users who extend d9d.
+    If you use the standard d9d training loop, you do not need to call this module. d9d profiles the job based on its configuration. This page is for users who extend d9d.
 
 ## Problems It Solves
 
@@ -19,4 +19,4 @@ The `Profiler` class solves them. It names each trace file after the `DeviceMesh
 
 ## API Reference
 
-::: d9d.loop.internals.profiling
+::: d9d.loop.profiling

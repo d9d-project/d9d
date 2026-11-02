@@ -5,7 +5,10 @@ from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.data import DevicePackStream
 from d9d.dist_context import DistributedContext
-from d9d.loop.component import (
+from d9d.metric.catalogue.container import ComposeMetric
+from d9d.optim import LRSchedulerProtocol, OptimizerProtocol
+
+from .component import (
     GradientClipper,
     GradientManager,
     InferenceTaskOperator,
@@ -19,10 +22,8 @@ from d9d.loop.component import (
     TrackedModules,
     TrainTaskOperator,
 )
-from d9d.loop.control import InferenceTask, TrainTask
-from d9d.loop.event import EventBus
-from d9d.metric.catalogue.container import ComposeMetric
-from d9d.optim.protocol import LRSchedulerProtocol, OptimizerProtocol
+from .control import InferenceTask, TrainTask
+from .event import EventBus
 
 
 @dataclasses.dataclass(kw_only=True)

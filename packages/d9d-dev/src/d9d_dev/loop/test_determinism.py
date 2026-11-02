@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 from d9d.dist_context import FLAT_DOMAIN, DeviceMeshParameters
-from d9d.loop.internals.determinism import set_seeds
+from d9d.loop.determinism import set_seeds
 
 
 @dataclasses.dataclass(frozen=True, kw_only=True)

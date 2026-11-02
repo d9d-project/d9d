@@ -5,11 +5,11 @@ from torch.profiler import record_function
 
 from d9d.data import MicrobatchPack
 from d9d.dist_context import DistributedContext
-from d9d.loop.control import ComputeLossContext, TrainTask, UpdateMetricsContext
 from d9d.metric.catalogue.container import ComposeMetric
 from d9d.pipelining.factory import PipelineScheduleInfo
 from d9d.pytree import PyTree
 
+from ...control import ComputeLossContext, TrainTask, UpdateMetricsContext
 from ..gradient_manager import GradientManager
 from ..job_schedule import JobSchedule
 from ..pipeline_state import PipelineStateHandler

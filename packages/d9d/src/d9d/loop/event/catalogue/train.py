@@ -2,11 +2,11 @@
 
 import dataclasses
 
-from d9d.loop.event import Event
-from d9d.loop.sleep import SleepTag
-from d9d.optim.protocol import LRSchedulerProtocol, OptimizerProtocol
+from d9d.optim import LRSchedulerProtocol, OptimizerProtocol
 from d9d.tracker import TrackerWriter
 
+from ...sleep import SleepTag
+from ..core import Event
 from .common import (
     EventConfigurationStartedContext,
     EventDataStreamReadyContext,

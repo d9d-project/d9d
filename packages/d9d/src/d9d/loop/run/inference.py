@@ -5,7 +5,9 @@ from tqdm import tqdm
 
 from d9d.data import build_device_pack_stream
 from d9d.dist_context import DeviceMeshParameters
-from d9d.loop.component import (
+from d9d.pipelining.factory import PipelineScheduleInferenceConfig
+
+from ..component import (
     DataParallelMicrobatchPackStream,
     InferenceTaskOperator,
     JobProfiler,
@@ -16,8 +18,8 @@ from d9d.loop.component import (
     StateCheckpointer,
     TimeoutManager,
 )
-from d9d.loop.config import InferenceConfig, PipeliningConfig
-from d9d.loop.control import (
+from ..config import InferenceConfig, PipeliningConfig
+from ..control import (
     DataProvider,
     FinalizeContext,
     InferenceTaskProvider,
@@ -27,16 +29,17 @@ from d9d.loop.control import (
     RegisterModelEventsContext,
     RegisterTaskEventsContext,
 )
-from d9d.loop.event import (
+from ..determinism import set_seeds
+from ..event import (
     EventBus,
 )
-from d9d.loop.event.catalogue.common import (
+from ..event.catalogue.common import (
     EventConfigurationStartedContext,
     EventDataStreamReadyContext,
     EventModelStagesReadyContext,
     EventStepContext,
 )
-from d9d.loop.event.catalogue.inference import (
+from ..event.catalogue.inference import (
     EVENT_INFERENCE_CONFIG_STARTED,
     EVENT_INFERENCE_DATA_STREAM_READY,
     EVENT_INFERENCE_FINISHED,
@@ -49,9 +52,7 @@ from d9d.loop.event.catalogue.inference import (
     EventInferenceFinishedContext,
     EventInferenceReadyContext,
 )
-from d9d.loop.internals.determinism import set_seeds
-from d9d.loop.state import InferenceJobState
-from d9d.pipelining.factory import PipelineScheduleInferenceConfig
+from ..state import InferenceJobState
 
 
 class InferenceConfigurator:

@@ -8,8 +8,6 @@ from torch.profiler import record_function
 
 from d9d import pytree
 from d9d.dist_context import FLAT_DOMAIN, DistributedContext
-from d9d.loop.config import JobLoggerConfig
-from d9d.loop.internals.state import load_state_dict_main_process, state_dict_main_process
 from d9d.metric import AsyncMetricCollector
 from d9d.metric.catalogue.container import ComposeMetric
 from d9d.pytree import PyTree, ScalarTree
@@ -23,6 +21,7 @@ from d9d.tracker import (
     tracker_from_config,
 )
 
+from ..config import JobLoggerConfig
 from .job_schedule import JobSchedule
 
 
@@ -154,9 +153,11 @@ class JobLogger(Stateful):
         # A checkpoint marks the steps that are done, so the tracker must have every value logged before it.
         if self._pending is not None:
             self._pending.flush()
+        # Only the main process has a real tracker, so the other ranks save nothing.
         return {
-            "tracker": state_dict_main_process(self._dist_context, self._tracker),
+            "tracker": {"main_process": self._tracker.state_dict()} if self._dist_context.is_main_process else {},
         }
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        load_state_dict_main_process(self._dist_context, self._tracker, state_dict["tracker"])
+        if self._dist_context.is_main_process:
+            self._tracker.load_state_dict(state_dict["tracker"]["main_process"])

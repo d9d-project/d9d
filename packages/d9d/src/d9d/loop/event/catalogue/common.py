@@ -9,7 +9,7 @@ from d9d.data import MicrobatchPackStream
 from d9d.dist_context import DistributedContext
 
 if TYPE_CHECKING:
-    from d9d.loop.component import JobSchedule
+    from ...component import JobSchedule
 
 
 @dataclasses.dataclass(kw_only=True)

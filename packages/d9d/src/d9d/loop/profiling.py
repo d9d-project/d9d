@@ -1,3 +1,5 @@
+"""Distributed-aware wrapper around the PyTorch profiler."""
+
 import tarfile
 import time
 from contextlib import contextmanager

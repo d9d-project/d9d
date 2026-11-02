@@ -40,6 +40,8 @@ nav = [
         "loop/inference.md",
         "loop/checkpointing.md",
         "loop/config.md",
+        "loop/determinism.md",
+        "loop/profiling.md",
         { "Interfaces" = [
             "loop/interfaces/index.md",
             "loop/interfaces/task.md",
@@ -116,10 +118,6 @@ nav = [
             "optim/lr_scheduler/piecewise.md",
             "optim/lr_scheduler/visualization.md",
         ] },
-    ] },
-    { "Internals" = [
-        "internals/determinism.md",
-        "internals/profiling.md",
     ] },
 ]
 

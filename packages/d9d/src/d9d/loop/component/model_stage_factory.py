@@ -7,13 +7,14 @@ from torch import nn
 from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
-from d9d.loop.config import ModelStageFactoryConfig, PipeliningConfig
-from d9d.loop.control import InitializeModelStageContext, ModelProvider, ParallelizeModelStageContext
 from d9d.model_state.io import load_model_state
 from d9d.nn import ModuleLateInit
 from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import PipelineScheduleInfo, build_program_builder, build_schedule
+
+from ..config import ModelStageFactoryConfig, PipeliningConfig
+from ..control import InitializeModelStageContext, ModelProvider, ParallelizeModelStageContext
 
 StatefulPredicate = Callable[[str, torch.Tensor], bool]
 """Determines if a specific parameter or buffer should be included in the state dictionary."""

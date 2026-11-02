@@ -3,9 +3,9 @@ from contextlib import contextmanager
 import torch
 
 from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
-from d9d.loop.config import GradientClippingConfig
 from d9d.parallel.grad_norm import ParametersForNorm, clip_grad_norm_distributed_, group_parameters_for_norm
 
+from ..config import GradientClippingConfig
 from .model_stage_factory import TrackedModules
 
 

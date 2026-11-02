@@ -5,18 +5,18 @@ import torch
 from torch.profiler import record_function
 
 from d9d.dist_context import DistributedContext
-from d9d.loop.event import EventBus
-from d9d.loop.event.catalogue.train import (
+from d9d.offload import Offloadable, OffloadContext, OnloadContext
+from d9d.optim import OptimizerProtocol
+
+from ..event import EventBus
+from ..event.catalogue.train import (
     EVENT_TRAIN_SLEEP_POST,
     EVENT_TRAIN_SLEEP_PRE,
     EVENT_TRAIN_WAKE_POST,
     EVENT_TRAIN_WAKE_PRE,
     EventSleepContext,
 )
-from d9d.loop.sleep import DEFAULT_SLEEP_TAGS, SleepTag
-from d9d.offload import Offloadable, OffloadContext, OnloadContext
-from d9d.optim.protocol import OptimizerProtocol
-
+from ..sleep import DEFAULT_SLEEP_TAGS, SleepTag
 from .gradient_manager import GradientManager
 from .model_stage_factory import TrackedModules
 

@@ -10,12 +10,14 @@ import torch
 from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.dist_context import DistributedContext
-from d9d.loop.event import EventBus
 from d9d.pytree import PyTree, ScalarTree
 
+from ..event import EventBus
+
 if typing.TYPE_CHECKING:
-    from d9d.loop.component import JobSchedule
     from d9d.metric import Metric
+
+    from ..component import JobSchedule
 
 
 TBatch = typing.TypeVar("TBatch", bound=PyTree)

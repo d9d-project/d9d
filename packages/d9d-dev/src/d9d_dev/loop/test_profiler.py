@@ -5,7 +5,7 @@ import threading
 import pytest
 import torch
 from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
-from d9d.loop.internals.profiling import Profiler
+from d9d.loop.profiling import Profiler
 
 
 @pytest.mark.distributed

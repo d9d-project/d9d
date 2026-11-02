@@ -2,7 +2,7 @@ from typing import Any
 
 from torch.distributed import DeviceMesh
 
-from d9d.optim.protocol import LRSchedulerProtocol
+from d9d.optim import LRSchedulerProtocol
 
 
 class PipelinedLRScheduler(LRSchedulerProtocol):

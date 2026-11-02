@@ -16,7 +16,8 @@ from d9d.data import (
     shard_dataset_data_parallel,
 )
 from d9d.dist_context import DistributedContext
-from d9d.loop.control import DataProvider, InitializeDataProviderContext
+
+from ..control import DataProvider, InitializeDataProviderContext
 
 DatasetFactory = Callable[[DistributedContext], Dataset]
 """A callable that builds the (unsharded) dataset, given the distributed context.

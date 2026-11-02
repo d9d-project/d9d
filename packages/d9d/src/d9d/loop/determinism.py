@@ -1,3 +1,5 @@
+"""Seeding of random number generators across distributed processes."""
+
 import os
 import random
 from typing import cast

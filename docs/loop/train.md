@@ -24,7 +24,7 @@ It returns a `Trainer` that holds a prepared `TrainJobState`.
     *   Builds the global [DistributedContext](../dist_context/index.md). This creates the NCCL process groups and `DeviceMesh` objects.
 
 2.  **Seeding**:
-    *   Sets distributed seeds from the configured `base_seed`. Model initialization and other initial states are then deterministic. [More info](../internals/determinism.md).
+    *   Sets distributed seeds from the configured `base_seed`. Model initialization and other initial states are then deterministic. [More info](./determinism.md).
 
 3.  **Task Instantiation**:
     *   Creates the `TrainTask` with the `TrainTaskProvider`.
@@ -70,7 +70,7 @@ Before the loop starts:
     *   **UI**: Shows a progress bar.
     *   **Logging**: Starts a new run in the experiment tracker and logs the run hyperparameters. [More info](../tracker/index.md).
     *   **Garbage Collector**: Disables automatic Python garbage collection.
-    *   **Profiler**: Starts the `torch.profiler` hooks. [More info](../internals/profiling.md).
+    *   **Profiler**: Starts the `torch.profiler` hooks. [More info](./profiling.md).
     *   **Gradient Manager**: Installs the backward hooks that all-reduce gradients.
     *   **Gradient Clipper**: Groups the parameters for global gradient norm computation.
     *   **Metric Collector**: Binds the async metric collector to the device.

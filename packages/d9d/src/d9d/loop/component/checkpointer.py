@@ -8,8 +8,8 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.profiler import record_function
 
 from d9d.dist_context import DistributedContext
-from d9d.loop.config import CheckpointingConfig
 
+from ..config import CheckpointingConfig
 from .garbage_collector import ManualGarbageCollector
 from .job_schedule import JobSchedule
 
