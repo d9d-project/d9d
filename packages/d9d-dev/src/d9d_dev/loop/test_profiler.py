@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import tarfile
 import threading
@@ -5,7 +6,13 @@ import threading
 import pytest
 import torch
 from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
-from d9d.loop.profiling import Profiler
+from d9d.loop.component import JobProfiler
+from d9d.loop.config import ProfilingConfig
+
+
+@dataclasses.dataclass
+class _Schedule:
+    current_step: int
 
 
 @pytest.mark.distributed
@@ -28,18 +35,21 @@ def test_e2e(
     will_write_at,
 ):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    profiler_wrapper = Profiler(
-        save_dir=shared_tmp_dir,
-        period_steps=period_steps,
-        warmup_steps=warmup_steps,
-        active_steps=active_steps,
-        record_shapes=True,
-        with_stack=True,
+    profiler_wrapper = JobProfiler(
         dist_context=dist_ctx,
+        config=ProfilingConfig(
+            traces_dir=shared_tmp_dir,
+            period_steps=period_steps,
+            warmup_steps=warmup_steps,
+            active_steps=active_steps,
+            record_shapes=True,
+            with_stack=True,
+        ),
+        schedule=_Schedule(current_step=start_step),
     )
 
     # We must run exactly 'period_steps' to complete one cycle and trigger the dump
-    with profiler_wrapper.open(start_step=start_step) as prof:
+    with profiler_wrapper.open() as prof:
         for _ in range(simulate_steps):
             x = torch.randn(100, 100, device="cuda")
             torch.matmul(x, x)
@@ -87,17 +97,20 @@ def test_local_e2e(
     dist_ctx_factory, tmp_path, period_steps, warmup_steps, active_steps, start_step, simulate_steps, will_write_at
 ):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())
-    profiler_wrapper = Profiler(
-        save_dir=tmp_path,
-        period_steps=period_steps,
-        warmup_steps=warmup_steps,
-        active_steps=active_steps,
-        record_shapes=True,
-        with_stack=True,
+    profiler_wrapper = JobProfiler(
         dist_context=dist_ctx,
+        config=ProfilingConfig(
+            traces_dir=tmp_path,
+            period_steps=period_steps,
+            warmup_steps=warmup_steps,
+            active_steps=active_steps,
+            record_shapes=True,
+            with_stack=True,
+        ),
+        schedule=_Schedule(current_step=start_step),
     )
 
-    with profiler_wrapper.open(start_step=start_step) as prof:
+    with profiler_wrapper.open() as prof:
         for _ in range(simulate_steps):
             # Simple workload
             x = torch.randn(10, 10, device="cuda")
@@ -130,21 +143,24 @@ def test_local_e2e(
 
 @pytest.mark.local
 def test_records_background_threads(dist_ctx_factory, tmp_path):
-    profiler_wrapper = Profiler(
-        save_dir=tmp_path,
-        period_steps=2,
-        warmup_steps=1,
-        active_steps=1,
-        record_shapes=True,
-        with_stack=True,
+    profiler_wrapper = JobProfiler(
         dist_context=dist_ctx_factory(DeviceMeshParameters()),
+        config=ProfilingConfig(
+            traces_dir=tmp_path,
+            period_steps=2,
+            warmup_steps=1,
+            active_steps=1,
+            record_shapes=True,
+            with_stack=True,
+        ),
+        schedule=_Schedule(current_step=0),
     )
 
     def background_work():
         with torch.profiler.record_function("background work"):
             torch.randn(10, 10).sum()
 
-    with profiler_wrapper.open(start_step=0) as prof:
+    with profiler_wrapper.open() as prof:
         for _ in range(2):
             worker = threading.Thread(target=background_work)
             worker.start()
@@ -164,17 +180,20 @@ def test_records_background_threads(dist_ctx_factory, tmp_path):
 @pytest.mark.local
 @pytest.mark.parametrize("enabled", [True, False])
 def test_records_shapes_and_stacks_only_when_enabled(dist_ctx_factory, tmp_path, enabled):
-    profiler_wrapper = Profiler(
-        save_dir=tmp_path,
-        period_steps=2,
-        warmup_steps=1,
-        active_steps=1,
-        record_shapes=enabled,
-        with_stack=enabled,
+    profiler_wrapper = JobProfiler(
         dist_context=dist_ctx_factory(DeviceMeshParameters()),
+        config=ProfilingConfig(
+            traces_dir=tmp_path,
+            period_steps=2,
+            warmup_steps=1,
+            active_steps=1,
+            record_shapes=enabled,
+            with_stack=enabled,
+        ),
+        schedule=_Schedule(current_step=0),
     )
 
-    with profiler_wrapper.open(start_step=0) as prof:
+    with profiler_wrapper.open() as prof:
         for _ in range(2):
             torch.matmul(torch.randn(10, 10), torch.randn(10, 10))
             prof.step()

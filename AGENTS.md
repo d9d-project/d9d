@@ -39,7 +39,7 @@ Top-level packages of the library.
 - `pytree/` - PyTree traversal and the `PyTree`/`TensorTree` aliases.
 - `autograd/` - extensions of the autograd engine: `split_backward` (separate backward passes for input and weight gradients, and the gradient context that custom autograd functions check).
 - `offload/` - moving GPU state to host memory and back (the base of sleep/wake).
-- `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`, `sleep`), and the `determinism` and `profiling` modules.
+- `loop/` - execution engine: the `Trainer`/`Inference` lifecycle, dependency injection, config schemas, and run/control/event machinery (`auto`, `component`, `config`, `control`, `event`, `run`, `sleep`), and the `determinism` module.
 - `nn/` - modeling building blocks: attention, MoE (with its expert parallelism), normalization, heads and other layers, and `ModuleLateInit`.
 - `parallel/` - horizontal parallelism: FSDP, HSDP and replicate, `style` (parallel styles), `grad_sync` (gradient reduction by placements) and `grad_norm` (global gradient norm and clipping).
 - `models/` - the model catalogue: the decoder backbone and heads, and one package per model with its Hugging Face mappers and its parallelization.

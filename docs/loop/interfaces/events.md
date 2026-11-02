@@ -26,8 +26,12 @@ Mark your methods with the `@subscribe` decorator. Then call `subscribe_annotate
 ```python
 from d9d.loop.control import RegisterTaskEventsContext, TrainTask
 from d9d.loop.event import subscribe, subscribe_annotated
-from d9d.loop.event.catalogue.common import EventModelStagesReadyContext, EventStepContext
-from d9d.loop.event.catalogue.train import EVENT_TRAIN_MODEL_STAGES_READY, EVENT_TRAIN_STEP_POST
+from d9d.loop.event.catalogue import (
+    EVENT_TRAIN_MODEL_STAGES_READY,
+    EVENT_TRAIN_STEP_POST,
+    EventModelStagesReadyContext,
+    EventStepContext,
+)
 
 
 class CustomTrainTask(TrainTask):
@@ -59,7 +63,7 @@ You can also call the `EventBus` directly. This is useful for simple lambda call
 
 ```python
 from d9d.loop.control import RegisterTaskEventsContext, TrainTask
-from d9d.loop.event.catalogue.train import EVENT_TRAIN_OPTIMIZER_READY
+from d9d.loop.event.catalogue import EVENT_TRAIN_OPTIMIZER_READY
 
 
 class CustomTrainTask(TrainTask):

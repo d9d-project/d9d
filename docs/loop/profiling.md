@@ -2,10 +2,10 @@
 
 ## About
 
-The `d9d.loop.profiling` module wraps the PyTorch profiler for distributed jobs.
+The `JobProfiler` component profiles the steps of the training and inference loops with the PyTorch profiler. The `profiling` section of the loop configuration enables it.
 
 !!! warning "Internal API"
-    If you use the standard d9d training loop, you do not need to call this module. d9d profiles the job based on its configuration. This page is for users who extend d9d.
+    If you use the standard d9d training loop, you do not need to create this component. d9d profiles the job based on its configuration. This page is for users who extend d9d.
 
 ## Problems It Solves
 
@@ -15,8 +15,8 @@ Profiling a large distributed job has three problems:
 2.  **Storage space**: Raw Chrome trace JSON files can grow to several GiB quickly.
 3.  **Synchronization**: All ranks must profile the same steps without manual work.
 
-The `Profiler` class solves them. It names each trace file after the `DeviceMesh` coordinates of the rank. It compresses each trace into a `.tar.gz` archive right after export. It runs the same periodic schedule (wait, warmup, active) on all ranks.
+`JobProfiler` solves them. It names each trace file after the `DeviceMesh` coordinates of the rank. It compresses each trace into a `.tar.gz` archive right after export. It runs the same periodic schedule (wait, warmup, active) on all ranks.
 
 ## API Reference
 
-::: d9d.loop.profiling
+::: d9d.loop.component.JobProfiler

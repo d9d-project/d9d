@@ -136,11 +136,12 @@ from torch.distributed.tensor import DTensor
 
 from d9d.loop.control import RegisterTaskEventsContext, TrainTask
 from d9d.loop.event import subscribe, subscribe_annotated
-from d9d.loop.event.catalogue.common import EventModelStagesReadyContext, EventStepContext
-from d9d.loop.event.catalogue.train import (
+from d9d.loop.event.catalogue import (
     EVENT_TRAIN_MODEL_STAGES_READY,
     EVENT_TRAIN_READY,
     EVENT_TRAIN_STEP_POST,
+    EventModelStagesReadyContext,
+    EventStepContext,
     EventTrainReadyContext,
 )
 from d9d.tracker import Histogram, TrackerWriter
