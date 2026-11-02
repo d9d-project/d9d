@@ -41,7 +41,7 @@ You write a few parts of a job, each behind an interface. d9d provides ready imp
 | Interface | What it decides | Who provides it |
 |:----------|:----------------|:----------------|
 | [Data provider](../loop/interfaces/data.md) | The microbatches of each step. | `AutoDataProvider` with your dataset and collate function, or you. |
-| [Model](../models/model_design.md) | The forward pass, from the model inputs to the outputs. | You, or the [Model Catalogue](../models/model_catalogue/index.md). The model provider builds it. |
+| [Model](../models/model_design.md) | The forward pass, from the model inputs to the outputs. | You, or the [Model Catalogue](../models/index.md). The model provider builds it. |
 | [Task](../loop/interfaces/task.md) | The model inputs, the loss and the metrics. | You. |
 | [Model provider](../loop/interfaces/model.md) | The construction, distribution, loading and export of the model. | You. |
 | [Optimizer](../loop/interfaces/optimizer.md) and [LR scheduler](../loop/interfaces/lr_scheduler.md) providers | The update of the parameters. | `AutoOptimizerProvider` and `AutoLRSchedulerProvider`, or you. |

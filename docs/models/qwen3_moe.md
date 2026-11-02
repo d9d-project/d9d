@@ -2,11 +2,11 @@
 
 ## About
 
-The `d9d.models.qwen3_moe` package implements the [Qwen3](https://arxiv.org/abs/2505.09388) Mixture-of-Experts (MoE) backbone. The `d9d.models.qwen3_moe.parallelize` package applies the default horizontal parallelism to it: HSDP for the dense modules and expert parallelism for the MoE layers. Tensor parallelism and context parallelism are not supported yet.
+The `d9d.models.qwen3_moe` package implements the [Qwen3](https://arxiv.org/abs/2505.09388) Mixture-of-Experts (MoE) backbone. `parallelize_qwen3_moe_model()` applies the default horizontal parallelism to it: HSDP for the dense modules and expert parallelism for the MoE layers. Tensor parallelism and context parallelism are not supported yet.
 
 ## Hugging Face Compatibility
 
-The package provides state mappers that convert Hugging Face checkpoints to the d9d layout and back. They use the graph-based [State Mapping](../../model_state/mapper.md) engine, so you can pass them to your [Model Provider](../../loop/interfaces/model.md).
+The package provides state mappers that convert Hugging Face checkpoints to the d9d layout and back. They use the graph-based [State Mapping](../model_state/mapper.md) engine, so you can pass them to your [Model Provider](../loop/interfaces/model.md).
 
 There is one mapper pair for the bare backbone and one for each head type (causal LM, classification and embedding). Pass `Qwen3MoEExpertsFormat` to choose the expert layout of the checkpoint: `MODULE_LIST` for Transformers v4.x or `FUSED` for Transformers v5.x.
 
@@ -15,15 +15,14 @@ An embedding model cannot be exported to Hugging Face if its embedding head has 
 ## Usage
 
 ```python
-from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.models import DecoderForCausalLM
+from d9d.models import DecoderForCausalLM, parallelize_causal_lm_head
 from d9d.models.qwen3_moe import (
     Qwen3MoEExpertsFormat,
     Qwen3MoEModel,
     mapper_from_huggingface_qwen3_moe_for_causal_lm,
+    parallelize_qwen3_moe_model,
 )
-from d9d.models import parallelize_causal_lm_head
-from d9d.models.qwen3_moe import parallelize_qwen3_moe_model
+from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
 
 # In ModelProvider.initialize_model_stage.
 backbone = Qwen3MoEModel(

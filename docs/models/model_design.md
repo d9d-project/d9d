@@ -38,7 +38,7 @@ The `Trainer` initializes a model stage in this order:
 
 ## Reference Implementations
 
-See [Qwen3 MoE](./model_catalogue/qwen3_moe.md) for a reference implementation.
+See [Qwen3 MoE](./qwen3_moe.md) for a reference implementation.
 
 ## API Reference
 

@@ -2,22 +2,24 @@
 
 ## About
 
-The `d9d.models.qwen3_dense` package implements the dense [Qwen3](https://arxiv.org/abs/2505.09388) backbone. The `d9d.models.qwen3_dense.parallelize` package applies the default horizontal parallelism to it: HSDP for all modules. Tensor parallelism and context parallelism are not supported yet.
+The `d9d.models.qwen3_dense` package implements the dense [Qwen3](https://arxiv.org/abs/2505.09388) backbone. `parallelize_qwen3_dense_model()` applies the default horizontal parallelism to it: HSDP for all modules. Tensor parallelism and context parallelism are not supported yet.
 
 ## Hugging Face Compatibility
 
-The package provides state mappers that convert Hugging Face checkpoints to the d9d layout and back. They use the graph-based [State Mapping](../../model_state/mapper.md) engine, so you can pass them to your [Model Provider](../../loop/interfaces/model.md).
+The package provides state mappers that convert Hugging Face checkpoints to the d9d layout and back. They use the graph-based [State Mapping](../model_state/mapper.md) engine, so you can pass them to your [Model Provider](../loop/interfaces/model.md).
 
 There is one mapper pair for the bare backbone and one for each head type (causal LM, classification and embedding). An embedding model cannot be exported to Hugging Face if its embedding head has a projection.
 
 ## Usage
 
 ```python
+from d9d.models import DecoderForCausalLM, parallelize_causal_lm_head
+from d9d.models.qwen3_dense import (
+    Qwen3DenseModel,
+    mapper_from_huggingface_qwen3_dense_for_causal_lm,
+    parallelize_qwen3_dense_model,
+)
 from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.models import DecoderForCausalLM
-from d9d.models.qwen3_dense import Qwen3DenseModel, mapper_from_huggingface_qwen3_dense_for_causal_lm
-from d9d.models import parallelize_causal_lm_head
-from d9d.models.qwen3_dense import parallelize_qwen3_dense_model
 
 # In ModelProvider.initialize_model_stage.
 backbone = Qwen3DenseModel(

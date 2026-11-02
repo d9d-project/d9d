@@ -148,7 +148,7 @@ The script reuses the dataset and the model provider of `finetune.py`. Its task 
 
 ## More GPUs
 
-`parallelize_model_stage()` applies the default Qwen3 strategy: HSDP over the data-parallel dimensions. Set `data_parallel_replicate` or `data_parallel_shard` in `mesh` and launch with `torchrun`, as described in [Running Jobs](./running.md). See [Qwen3 Dense](../models/model_catalogue/qwen3_dense.md) for the supported parallelism.
+`parallelize_model_stage()` applies the default Qwen3 strategy: HSDP over the data-parallel dimensions. Set `data_parallel_replicate` or `data_parallel_shard` in `mesh` and launch with `torchrun`, as described in [Running Jobs](./running.md). See [Qwen3 Dense](../models/qwen3_dense.md) for the supported parallelism.
 
 ## The Code
 

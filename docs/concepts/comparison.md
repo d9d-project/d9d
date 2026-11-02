@@ -136,7 +136,7 @@ This matters more when an AI coding agent writes the change. An agent writes cod
 
 d9d makes choices that cost something:
 
-*   **A Transformers model does not run as it is**: For a model outside the [catalogue](../models/model_catalogue/index.md), you must write a d9d model, a state mapper and a model provider. Accelerate and Halo train Transformers models without this step.
+*   **A Transformers model does not run as it is**: For a model outside the [catalogue](../models/index.md), you must write a d9d model, a state mapper and a model provider. Accelerate and Halo train Transformers models without this step.
 *   **Pipeline parallelism needs model support**: The model builds only the layers of its stage and describes the tensors it sends to the next stage. You write this code for every model.
 *   **The step order is fixed**: Providers, tasks and events change what a step does, but not the order of its parts. A training method with a different step order, e.g. several optimizer steps per batch, requires changes in d9d.
 

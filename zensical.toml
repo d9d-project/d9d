@@ -55,11 +55,10 @@ nav = [
         "model_state/mapper.md",
     ] },
     { "Models" = [
-        { "Model Catalogue" = [
-            "models/model_catalogue/index.md",
-            "models/model_catalogue/qwen3_moe.md",
-            "models/model_catalogue/qwen3_dense.md"
-        ] },
+        "models/index.md",
+        "models/decoder.md",
+        "models/qwen3_moe.md",
+        "models/qwen3_dense.md",
         "models/model_design.md",
     ] },
     { "Modules" = [

@@ -8,7 +8,7 @@ The `ModelProvider` controls the lifecycle of the `nn.Module`. In distributed tr
 
 ### Choose a Model
 
-Choose a model from the d9d [catalogue](../../models/model_catalogue/index.md), or [create your own](../../models/model_design.md).
+Choose a model from the d9d [catalogue](../../models/index.md), or [create your own](../../models/model_design.md).
 
 ### Implement `initialize_model_stage(...)`
 
@@ -22,7 +22,7 @@ You can also apply [PEFT](../../peft/overview.md) methods and other architecture
 
 This method applies a [horizontal parallelism](../../parallel/index.md) strategy to the model in place. The loop calls it only for distributed runs.
 
-For d9d models, you can use the default strategies. For example, apply `parallelize_qwen3_moe_model` to the backbone and the routine for each head type, such as `parallelize_causal_lm_head` ([reference](../../models/model_catalogue/qwen3_moe.md)).
+For d9d models, you can use the default strategies. For example, apply `parallelize_qwen3_moe_model` to the backbone and the routine for each head type, such as `parallelize_causal_lm_head` ([reference](../../models/qwen3_moe.md)).
 
 For a custom model, see the [horizontal parallelism](../../parallel/index.md) docs and the reference implementations.
 

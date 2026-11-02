@@ -54,7 +54,8 @@ Managing data loading and model checkpoints.
 ## 🧠 Modeling and Architecture
 Building blocks for LLMs.
 
-*   **[Model Catalogue](./models/model_catalogue/index.md)**: Models available directly in d9d.
+*   **[Model Catalogue](./models/index.md)**: Models available directly in d9d.
+*   **[Decoder with Heads](./models/decoder.md)**: A decoder backbone composed with task heads, and the pipeline I/O types.
 *   **[Model Design](./models/model_design.md)**: Principles for creating compatible models.
 *   **[Modules](./nn/index.md)**: Building blocks for implementing compatible models.
 
