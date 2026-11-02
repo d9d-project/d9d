@@ -1,7 +1,7 @@
 import dataclasses
 
 import torch
-from d9d.autograd.split_backward import GLOBAL_GRAD_CONTEXT, GradDirection
+from d9d.autograd.split_backward import GradDirection, needs_input_grad
 from d9d.pipelining.api import ModuleSupportsPipelining, StageBoundary, TensorSpec
 from torch import nn
 
@@ -18,10 +18,8 @@ class _Shared:
 
 class CustomMatmul(torch.autograd.Function):
     @staticmethod
-    def forward(ctx, a, b, a_grad_direction, b_grad_direction):
+    def forward(ctx, a, b):
         ctx.save_for_backward(a, b)
-        ctx.a_grad_direction = a_grad_direction
-        ctx.b_grad_direction = b_grad_direction
         return torch.matmul(a, b)
 
     @staticmethod
@@ -30,15 +28,12 @@ class CustomMatmul(torch.autograd.Function):
 
         grad_a = grad_b = None
 
-        compute_a = GLOBAL_GRAD_CONTEXT.check_direction(ctx.a_grad_direction)
-        compute_b = GLOBAL_GRAD_CONTEXT.check_direction(ctx.b_grad_direction)
-
-        if ctx.needs_input_grad[0] and compute_a:
+        if needs_input_grad(ctx, 0, GradDirection.inputs):
             grad_a = torch.matmul(grad_output, b.transpose(-1, -2))
-        if ctx.needs_input_grad[1] and compute_b:
+        if needs_input_grad(ctx, 1, GradDirection.weight):
             grad_b = torch.matmul(a.transpose(-1, -2), grad_output)
 
-        return grad_a, grad_b, None, None
+        return grad_a, grad_b
 
 
 class PipelineModel(nn.Module, ModuleSupportsPipelining):
@@ -50,11 +45,11 @@ class PipelineModel(nn.Module, ModuleSupportsPipelining):
         self.act = nn.GELU()
 
     def forward(self, inputs: _Transfer, shared: _Shared) -> _Transfer:
-        r = CustomMatmul.apply(inputs.x, self.w1, GradDirection.inputs, GradDirection.weight)
+        r = CustomMatmul.apply(inputs.x, self.w1)
         r = r * 1.05
         r = r @ self.w2
         r = self.act(r) + shared.y
-        r = CustomMatmul.apply(r, self.w3, GradDirection.inputs, GradDirection.weight)
+        r = CustomMatmul.apply(r, self.w3)
         return _Transfer(x=r)
 
     def stage_transfer_spec(self, pipeline_input: _Transfer, boundary: StageBoundary) -> _Transfer:
