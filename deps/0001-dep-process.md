@@ -25,7 +25,7 @@ The DEP process is designed to force the **think before you do**, i.e. force the
 The process for a feature to land in `d9d` is strictly sequential.
 
 ### 1. Proposal Phase
-1.  **Draft:** The author copies `deps/TEMPLATE.md` to `deps/XXXX-my-feature.md`.
+1.  **Draft:** The author copies `deps/TEMPLATE.md` to `deps/<number>-dep-<name>.md`.
 2.  **Pull Request:** A PR is opened with the design document.
 3.  **Review:** The proposal is discussed.
 4.  **Acceptance:** Once approved by maintainers, the PR acts as a "green light". Merging the document into the main branch accepts it.
