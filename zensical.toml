@@ -29,19 +29,19 @@ nav = [
         "guides/troubleshooting.md",
     ] },
     { "Table of Contents" = "toc.md" },
-    { "Distributed Context" = [
-        "dist_context/index.md"
+    { "Distributed Core" = [
+        { "Distributed Context" = [
+            "dist_context/index.md",
+        ] },
+        { "State Offloading" = [
+            "offload/index.md",
+        ] },
     ] },
-    { "State Offloading" = [
-        "offload/index.md"
-    ] },
-    { "Training and Inference" = [
+    { "Execution Engine" = [
         "loop/train.md",
         "loop/inference.md",
         "loop/checkpointing.md",
         "loop/config.md",
-        "loop/determinism.md",
-        "loop/profiling.md",
         { "Interfaces" = [
             "loop/interfaces/index.md",
             "loop/interfaces/task.md",
@@ -50,75 +50,79 @@ nav = [
             "loop/interfaces/events.md",
             "loop/interfaces/optimizer.md",
             "loop/interfaces/lr_scheduler.md",
-        ] }
+        ] },
+        "loop/determinism.md",
+        "loop/profiling.md",
     ] },
-    { "Model State" = [
-        "model_state/io.md",
-        "model_state/mapper.md",
+    { "Data and State" = [
+        { "Model State" = [
+            "model_state/mapper.md",
+            "model_state/io.md",
+        ] },
+        { "Data" = [
+            "data/index.md",
+        ] },
+        { "PyTree" = [
+            "pytree/index.md",
+        ] },
     ] },
-    { "Models" = [
-        "models/index.md",
-        "models/decoder.md",
-        "models/qwen3_moe.md",
-        "models/qwen3_dense.md",
-        "models/model_design.md",
+    { "Modeling and Architecture" = [
+        { "Models" = [
+            "models/index.md",
+            "models/decoder.md",
+            "models/qwen3_moe.md",
+            "models/qwen3_dense.md",
+            "models/model_design.md",
+        ] },
+        { "Modules" = [
+            "nn/index.md",
+            "nn/embedding.md",
+            "nn/head.md",
+            "nn/attention.md",
+            "nn/ffn.md",
+            "nn/moe.md",
+            "nn/positional.md",
+            "nn/normalization.md",
+            "nn/hidden_states_aggregator.md",
+        ] },
     ] },
-    { "Modules" = [
-        "nn/index.md",
-        "nn/embedding.md",
-        "nn/head.md",
-        "nn/attention.md",
-        "nn/ffn.md",
-        "nn/moe.md",
-        "nn/positional.md",
-        "nn/normalization.md",
-        "nn/hidden_states_aggregator.md",
+    { "Parallelism" = [
+        { "Horizontal Parallelism" = [
+            "parallel/index.md",
+            "parallel/grad_sync.md",
+            "parallel/grad_norm.md",
+        ] },
+        { "Pipeline Parallelism" = [
+            "pipelining/index.md",
+            "pipelining/internals.md",
+        ] },
+        { "Split Backward" = "autograd/split_backward.md" },
     ] },
-    { "Horizontal Parallelism" = [
-        "parallel/index.md",
-        "parallel/grad_sync.md",
-        "parallel/grad_norm.md",
-    ] },
-    { "Pipelining" = [
-        "pipelining/index.md",
-        "pipelining/internals.md",
-    ] },
-    { "Data" = [
-        "data/index.md"
-    ] },
-    { "PyTree" = [
-        "pytree/index.md"
-    ] },
-    { "Autograd" = [
-        "autograd/split_backward.md"
-    ] },
-    { "Parameter-Efficient Fine-Tuning (PEFT)" = [
+    { "Fine-Tuning (PEFT)" = [
         "peft/overview.md",
         "peft/lora.md",
         "peft/full_tune.md",
         "peft/stack.md",
     ] },
-    { "Metrics" = [
-        "metric/overview.md",
-        { "Metric Catalogue" = [
-            "metric/catalogue/index.md",
-            "metric/catalogue/aggregation.md",
-            "metric/catalogue/classification.md",
-            "metric/catalogue/container.md",
+    { "Optimization and Metrics" = [
+        { "Metrics" = [
+            "metric/overview.md",
+            { "Metric Catalogue" = [
+                "metric/catalogue/index.md",
+                "metric/catalogue/aggregation.md",
+                "metric/catalogue/classification.md",
+                "metric/catalogue/container.md",
+            ] },
+            "metric/custom.md",
+            "metric/collector.md",
         ] },
-        "metric/custom.md",
-        "metric/collector.md",
-    ] },
-    { "Experiment Tracking" = [
-        "tracker/index.md",
-    ] },
-    { "Optimizers" = [
-        "optim/stochastic.md",
         { "Learning Rate Schedulers" = [
             "optim/lr_scheduler/piecewise.md",
             "optim/lr_scheduler/visualization.md",
         ] },
+        { "Optimizers" = "optim/stochastic.md" },
     ] },
+    { "Experiment Tracking" = "tracker/index.md" },
 ]
 
 

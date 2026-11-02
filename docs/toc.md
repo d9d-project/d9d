@@ -39,9 +39,9 @@ How to configure and run jobs.
 *   **[Inference Loop](./loop/inference.md)**: The lifecycle of distributed `Inference` and forward-only execution.
 *   **[Checkpointing](./loop/checkpointing.md)**: What a checkpoint holds, when the job saves, how it resumes and where it must be stored.
 *   **[Configuration](./loop/config.md)**: Pydantic schemas for configuring jobs, scheduling, and logging.
+*   **[Interfaces](./loop/interfaces/index.md)**: How to inject your custom Model, Data, and Step logic (Train & Infer).
 *   **[Determinism](./loop/determinism.md)**: RNG seeding across distributed processes.
 *   **[Profiling](./loop/profiling.md)**: Profiling the loop steps with the PyTorch profiler, with one trace file per rank.
-*   **[Interfaces](./loop/interfaces/index.md)**: How to inject your custom Model, Data, and Step logic (Train & Infer).
 
 
 ## 💾 Data and State
