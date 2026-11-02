@@ -137,3 +137,11 @@ You can leave out the fields and sections that have defaults. An unknown key fai
 ::: d9d.loop.config.StepActionSpecial
     options:
       heading_level: 4
+
+::: d9d.loop.config.DtypeName
+    options:
+      heading_level: 4
+
+::: d9d.loop.config.dtype_from_name
+    options:
+      heading_level: 4

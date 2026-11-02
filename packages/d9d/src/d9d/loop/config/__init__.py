@@ -16,12 +16,13 @@ from .config import (
     TimeoutConfig,
     TrainerConfig,
 )
-from .types import StepActionPeriod, StepActionSpecial
+from .types import DtypeName, StepActionPeriod, StepActionSpecial, dtype_from_name
 
 __all__ = [
     "CheckpointingConfig",
     "DataPrefetchConfig",
     "DeterminismConfig",
+    "DtypeName",
     "GarbageCollectionConfig",
     "GradientClippingConfig",
     "GradientManagerConfig",
@@ -35,4 +36,5 @@ __all__ = [
     "StepActionSpecial",
     "TimeoutConfig",
     "TrainerConfig",
+    "dtype_from_name",
 ]

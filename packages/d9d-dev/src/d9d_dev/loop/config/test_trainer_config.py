@@ -39,3 +39,11 @@ def test_fills_defaults_for_optional_sections():
 def test_rejects_unknown_keys(config):
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         TrainerConfig.model_validate(config)
+
+
+@pytest.mark.local
+def test_rejects_unknown_grad_dtype():
+    config = {**_REQUIRED, "gradient_manager": {"grad_dtype": "nn"}}
+
+    with pytest.raises(ValidationError, match="grad_dtype"):
+        TrainerConfig.model_validate(config)

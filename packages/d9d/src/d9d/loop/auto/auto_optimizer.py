@@ -2,12 +2,12 @@
 
 from typing import Annotated, Literal
 
-import torch
 from pydantic import BaseModel, ConfigDict, Field
 from torch.optim import SGD, Adam, AdamW, Optimizer
 
 from d9d.optim.stochastic import StochasticAdamW
 
+from ..config import DtypeName, dtype_from_name
 from ..control import InitializeOptimizerStageContext, OptimizerProvider
 
 
@@ -20,7 +20,7 @@ class StochasticAdamWOptimizerConfig(BaseModel):
         betas: Coefficients used for computing running averages of gradient and its square.
         eps: Term added to the denominator to improve numerical stability.
         weight_decay: Weight decay coefficient.
-        state_dtype: The name of the ``torch`` dtype for the optimizer states, e.g. ``"bfloat16"``.
+        state_dtype: The dtype of the optimizer states.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -31,7 +31,7 @@ class StochasticAdamWOptimizerConfig(BaseModel):
     betas: tuple[float, float] = (0.9, 0.999)
     eps: float = 1e-8
     weight_decay: float = 1e-2
-    state_dtype: str
+    state_dtype: Literal[DtypeName.float32, DtypeName.bfloat16]
 
 
 class AdamWOptimizerConfig(BaseModel):
@@ -138,7 +138,7 @@ class AutoOptimizerProvider(OptimizerProvider):
                     betas=self._config.betas,
                     eps=self._config.eps,
                     weight_decay=self._config.weight_decay,
-                    state_dtype=getattr(torch, self._config.state_dtype),
+                    state_dtype=dtype_from_name(self._config.state_dtype),
                 )
             case AdamWOptimizerConfig():
                 return AdamW(
