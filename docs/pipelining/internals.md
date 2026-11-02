@@ -2,7 +2,7 @@
 
 ## About
 
-This page explains the internals of the `d9d.pipelining` module. It is for developers who want to add new stage layouts or schedules, or change the execution engine.
+This page explains the internals of the `d9d.pipelining` package. It is for developers who want to add new stage layouts or schedules, or change the execution engine.
 
 !!! warning "Internal API"
     If you use the standard d9d training loop, you do not need to call this package. d9d sets up pipelining from its configuration. This page is for users who extend d9d.

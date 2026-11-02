@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.optim.lr_scheduler.piecewise` module builds piecewise learning rate schedules, such as "warmup, hold, decay". You chain phases together instead of writing an `LRScheduler` subclass or a `LambdaLR` function for each schedule.
+The `d9d.optim.lr_scheduler.piecewise` package builds piecewise learning rate schedules, such as "warmup, hold, decay". You chain phases together instead of writing an `LRScheduler` subclass or a `LambdaLR` function for each schedule.
 
 ## Phases
 
