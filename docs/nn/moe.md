@@ -6,7 +6,7 @@ The `d9d.nn.moe` package implements sparse Mixture-of-Experts layers. `MoELayer`
 
 ## Expert Parallelism
 
-To set up expert parallelism, see [Horizontal Parallelism](../../parallel/index.md). Expert parallelism requires the `d9d[backend-expert-parallel-deepep]` extra. You must build and install [DeepEP](https://github.com/deepseek-ai/DeepEP) manually first.
+To set up expert parallelism, see [Horizontal Parallelism](../parallel/index.md). Expert parallelism requires the `d9d[backend-expert-parallel-deepep]` extra. You must build and install [DeepEP](https://github.com/deepseek-ai/DeepEP) manually first.
 
 ## Components
 
