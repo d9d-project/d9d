@@ -1,5 +1,3 @@
-from typing import cast
-
 import torch
 from torch.distributed.tensor import DTensor
 from torch.optim import Optimizer
@@ -42,8 +40,8 @@ class StochasticAdamW(Optimizer):
 
     Parameters must be bf16. Gradients can be bf16 or fp32. Parameters can be ``DTensor``s.
 
-    The optimizer owns its random number generator and saves the generator state in ``state_dict``. A
-    resumed run therefore gets the same rounding noise.
+    The optimizer seeds its own random number generator from ``seed`` and saves the generator state in
+    ``state_dict``. A resumed run therefore gets the same rounding noise.
     """
 
     def __init__(
@@ -53,7 +51,7 @@ class StochasticAdamW(Optimizer):
         betas: tuple[float, float] = (0.9, 0.999),
         eps: float = 1e-8,
         weight_decay: float = 1e-2,
-        generator: torch.Generator | None = None,
+        seed: int = 0,
         state_dtype: torch.dtype = torch.float32,
     ):
         """Constructs the ``StochasticAdamW`` object.
@@ -64,8 +62,8 @@ class StochasticAdamW(Optimizer):
             betas: Decay rates of the first and second moments.
             eps: Term added to the denominator for numerical stability.
             weight_decay: Decoupled weight decay coefficient.
-            generator: Random number generator for stochastic rounding. If ``None``, a new CPU generator is
-                seeded from the default PyTorch generator.
+            seed: The seed of the stochastic rounding. All replicas of a parameter, e.g. on all data-parallel ranks,
+                must use the same seed, so that they round the same way.
             state_dtype: Dtype of the optimizer states. Can be ``torch.float32`` or ``torch.bfloat16``.
 
         Raises:
@@ -82,13 +80,7 @@ class StochasticAdamW(Optimizer):
         if weight_decay < 0:
             raise ValueError(f"weight_decay ({weight_decay}) must be non-negative.")
 
-        if generator is None:
-            generator = torch.Generator(device="cpu")
-            # Seed from the default generator, so torch.manual_seed also fixes the rounding noise.
-            seed = cast(int, torch.randint(0, 2**32, (1,)).item())
-            generator.manual_seed(seed)
-
-        self._generator = generator
+        self._generator = torch.Generator(device="cpu").manual_seed(seed)
 
         defaults = {
             "lr": lr,

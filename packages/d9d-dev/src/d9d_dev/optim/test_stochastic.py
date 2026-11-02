@@ -101,4 +101,24 @@ def test_convergence_bf16(state_dtype):
     final_loss = torch.nn.functional.mse_loss(input_val * weight, target).item()
 
     assert final_loss < initial_loss
-    assert final_loss <= 1e-3
+    # Stochastic rounding keeps the weight jumping between the bf16 neighbors of the optimum, 2**-6 apart above 2.0.
+    assert abs(weight.item() - 2.0) <= 2 * 2**-6
+
+
+@pytest.mark.local
+def test_rounding_noise_ignores_default_generator():
+    device = torch.device("cuda")
+    start = torch.randn(64, 64, device=device, dtype=torch.bfloat16)
+    grad = torch.randn(64, 64, device=device, dtype=torch.float32)
+
+    # Ranks draw different amounts from the default generator, but their replicas must round the same way.
+    results = []
+    for default_seed in (1, 2):
+        torch.manual_seed(default_seed)
+        param = start.clone().requires_grad_(True)
+        param.grad_dtype = torch.float32
+        param.grad = grad.clone()
+        StochasticAdamW([param], lr=1e-3).step()
+        results.append(param.detach())
+
+    assert torch.equal(results[0], results[1])
