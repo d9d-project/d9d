@@ -7,8 +7,7 @@ from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import PipelineScheduleGPipeConfig, build_program_builder, build_schedule
 from torch import nn
 
-from d9d_dev.models.meshes import MESHES_FOR_MODEL_TESTS
-from d9d_dev.models.sequence.catalogue import ModelCatalogue, parallelize_decoder
+from d9d_dev.models.sequence.catalogue import D9D_MODEL_MESHES, ModelCatalogue, parallelize_decoder
 from d9d_dev.models.sequence.embedding.batch import build_embedding_batch, shard_embedding_batch
 from d9d_dev.models.sequence.embedding.catalogue import D9D_MODEL_FACTORIES_EMBEDDING
 from d9d_dev.nn.helper import (
@@ -24,17 +23,19 @@ _N_MICROBATCHES = 2
 
 @pytest.mark.distributed
 @pytest.mark.parametrize(
-    ("model_type", "model_factory_d9d"),
+    ("mesh", "model_type", "model_factory_d9d"),
     [
         pytest.param(
+            mesh,
             model_type,
             model_factory,
+            id=f"{model_type}-{mesh_name}-factory{factory_index}",
         )
         for model_type, factories in D9D_MODEL_FACTORIES_EMBEDDING.items()
-        for model_factory in factories
+        for mesh_name, mesh in D9D_MODEL_MESHES[model_type].items()
+        for factory_index, model_factory in enumerate(factories)
     ],
 )
-@pytest.mark.parametrize("mesh", MESHES_FOR_MODEL_TESTS)
 def test_consistent_to_itself_dist(
     mesh: DeviceMeshParameters, model_type: ModelCatalogue, model_factory_d9d, dist_ctx_factory
 ) -> None:
