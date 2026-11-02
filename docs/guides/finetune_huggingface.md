@@ -56,7 +56,7 @@ The job streams the weights into the model through the state mapper that `initia
 --8<-- "example/guide/finetune_qwen3/finetune.py:provider"
 ```
 
-See [Model State Mapper](../model_states/mapper.md).
+See [Model State Mapper](../model_state/mapper.md).
 
 ## Optimizer
 

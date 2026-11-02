@@ -6,7 +6,7 @@ The `d9d.models.qwen3_dense` package implements the dense [Qwen3](https://arxiv.
 
 ## Hugging Face Compatibility
 
-The package provides state mappers that convert Hugging Face checkpoints to the d9d layout and back. They use the graph-based [State Mapping](../../model_states/mapper.md) engine, so you can pass them to your [Model Provider](../../loop/interfaces/model.md).
+The package provides state mappers that convert Hugging Face checkpoints to the d9d layout and back. They use the graph-based [State Mapping](../../model_state/mapper.md) engine, so you can pass them to your [Model Provider](../../loop/interfaces/model.md).
 
 There is one mapper pair for the bare backbone and one for each head type (causal LM, classification and embedding). An embedding model cannot be exported to Hugging Face if its embedding head has a projection.
 

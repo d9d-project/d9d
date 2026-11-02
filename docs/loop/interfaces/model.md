@@ -14,7 +14,7 @@ Choose a model from the d9d [catalogue](../../models/model_catalogue/index.md), 
 
 This method builds the `nn.Module` for one [pipeline parallel](../../pipelining/index.md) stage, in the target `torch.dtype`.
 
-The loop calls it on the meta device, so you must not load model weights here. Instead, return a [state mapper](../../model_states/mapper.md) that maps the weights on disk to the weights in memory.
+The loop calls it on the meta device, so you must not load model weights here. Instead, return a [state mapper](../../model_state/mapper.md) that maps the weights on disk to the weights in memory.
 
 You can also apply [PEFT](../../peft/overview.md) methods and other architecture patches here. The returned state mapper must reflect the changes they make.
 
@@ -30,7 +30,7 @@ For a custom model, see the [horizontal parallelism](../../parallel/index.md) do
 
 You must implement this method if the job calls `Trainer.export()`. Other jobs can skip it. Without it, `export()` raises a `NotImplementedError`.
 
-This method returns a [state mapper](../../model_states/mapper.md) for the final export. It converts the in-memory model state to the state saved on disk.
+This method returns a [state mapper](../../model_state/mapper.md) for the final export. It converts the in-memory model state to the state saved on disk.
 
 It usually reverses the state mapper returned by `initialize_model_stage(...)`.
 

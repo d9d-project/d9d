@@ -248,7 +248,7 @@ mapper = ModelStateMapperParallel([
 
 Each mapper declares groups: sets of input tensors and the output tensors that they produce. The **reader** streams a model state through a mapper, one file at a time. It reads only the tensors that the mapper needs and frees them once their group is done. Memory holds the needed tensors of the current file, plus the inputs of groups that still wait for tensors in later files.
 
-The model provider returns the loading mapper from `initialize_model_stage()`. It returns the export mapper from `prepare_export_model_stage()`. A PEFT method, such as LoRA, returns a mapper for the layers that it changes. See [Model State Mapper](../model_states/mapper.md) and [Model State I/O](../model_states/io.md).
+The model provider returns the loading mapper from `initialize_model_stage()`. It returns the export mapper from `prepare_export_model_stage()`. A PEFT method, such as LoRA, returns a mapper for the layers that it changes. See [Model State Mapper](../model_state/mapper.md) and [Model State I/O](../model_state/io.md).
 
 ## Events
 

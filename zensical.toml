@@ -50,9 +50,9 @@ nav = [
             "loop/interfaces/lr_scheduler.md",
         ] }
     ] },
-    { "Model States" = [
-        "model_states/io.md",
-        "model_states/mapper.md",
+    { "Model State" = [
+        "model_state/io.md",
+        "model_state/mapper.md",
     ] },
     { "Models" = [
         { "Model Catalogue" = [

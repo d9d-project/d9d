@@ -201,7 +201,7 @@ d9d is a package that you install, not a repository that you fork. Every part of
 | A new loss or training method | A `TrainTask`. | [User Tasks](./loop/interfaces/task.md) |
 | A new data pipeline | A `DataProvider`. | [Data Loading](./loop/interfaces/data.md) |
 | A new optimizer or LR schedule | An `OptimizerProvider` or an `LRSchedulerProvider`. | [Optimizer](./loop/interfaces/optimizer.md) |
-| A new checkpoint format | A state mapper. | [Model State Mapper](./model_states/mapper.md) |
+| A new checkpoint format | A state mapper. | [Model State Mapper](./model_state/mapper.md) |
 | A change to the loop | An event handler, e.g. one that runs RL rollouts between steps. | [Event Bus and Hooks](./loop/interfaces/events.md) |
 
 Updating d9d is then a version bump, not a rebase of your changes.

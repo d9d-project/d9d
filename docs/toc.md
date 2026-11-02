@@ -45,8 +45,8 @@ How to configure and run jobs.
 ## 💾 Data and State
 Managing data loading and model checkpoints.
 
-*   **[Model State Mapper](./model_states/mapper.md)**: The graph-based transformation engine for checkpoints (transform architectures on-the-fly).
-*   **[Model State I/O](./model_states/io.md)**: Streaming reader/writers for checkpoints.
+*   **[Model State Mapper](./model_state/mapper.md)**: The graph-based transformation engine for checkpoints (transform architectures on-the-fly).
+*   **[Model State I/O](./model_state/io.md)**: Streaming reader/writers for checkpoints.
 *   **[Datasets](./dataset/index.md)**: Distributed-aware dataset wrappers and length bucketing.
 *   **[PyTree Traversal](./pytree/index.md)**: Dataclass-aware recursive mapping and flattening over nested tensor structures.
 

@@ -6,7 +6,7 @@ The `d9d.models.qwen3_moe` package implements the [Qwen3](https://arxiv.org/abs/
 
 ## Hugging Face Compatibility
 
-The package provides state mappers that convert Hugging Face checkpoints to the d9d layout and back. They use the graph-based [State Mapping](../../model_states/mapper.md) engine, so you can pass them to your [Model Provider](../../loop/interfaces/model.md).
+The package provides state mappers that convert Hugging Face checkpoints to the d9d layout and back. They use the graph-based [State Mapping](../../model_state/mapper.md) engine, so you can pass them to your [Model Provider](../../loop/interfaces/model.md).
 
 There is one mapper pair for the bare backbone and one for each head type (causal LM, classification and embedding). Pass `Qwen3MoEExpertsFormat` to choose the expert layout of the checkpoint: `MODULE_LIST` for Transformers v4.x or `FUSED` for Transformers v5.x.
 

@@ -6,7 +6,7 @@ The `d9d.peft` package fine-tunes models with parameter-efficient methods, such 
 
 ## Apply Before State Loading
 
-This package is built on the [model state mapping](../model_states/mapper.md) framework.
+This package is built on the [model state mapping](../model_state/mapper.md) framework.
 
 Methods like LoRA change the model structure. For example, an `nn.Linear` layer becomes a `LoRALinear` wrapper. The keys in the original checkpoint (e.g. `layers.0.linear.weight`) then no longer match the model keys (e.g. `layers.0.linear.base.weight`). `d9d.peft` returns a `ModelStateMapper` that renames only the keys the method changes. Chain it after your checkpoint mapper with `ModelStateMapperSequential`, so all other keys load unchanged.
 

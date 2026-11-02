@@ -63,7 +63,7 @@ To start from a Hugging Face checkpoint, a framework maps its tensors to the par
 *   **An offline converter**: DeepSpeed merges its per-rank files into one Hugging Face checkpoint with an offline script. OLMo-core converts a Hugging Face checkpoint with a script that loads the whole model into memory.
 *   **A map per model, applied while loading**: Megatron Bridge and torchtitan keep a map for each model. Megatron Bridge streams the weights parameter by parameter. torchtitan reads the Hugging Face checkpoint through PyTorch Distributed Checkpoint (DCP), so each rank reads only its shards.
 *   **The Hugging Face format as the training checkpoint**: Halo saves standard Hugging Face SafeTensors, so it needs no map.
-*   **A mapper from your model provider**: In d9d, your model provider returns a graph of [state mappers](../model_states/mapper.md) for the model it builds, and another one for export. d9d streams the checkpoint through the graph one file at a time.
+*   **A mapper from your model provider**: In d9d, your model provider returns a graph of [state mappers](../model_state/mapper.md) for the model it builds, and another one for export. d9d streams the checkpoint through the graph one file at a time.
 
 ### Who Owns the Loop
 

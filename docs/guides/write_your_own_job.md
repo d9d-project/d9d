@@ -144,7 +144,7 @@ class ProjectConfig(BaseModel):
 model_provider = ResidualMLPProvider(config.model)
 ```
 
-To start from pretrained weights, set `trainer.model_stage_factory.source_checkpoint`. The loop then loads the checkpoint through the [state mapper](../model_states/mapper.md) of `initialize_model_stage()`, which translates its keys into the keys of your model. The [Qwen3 fine-tuning example](./finetune_huggingface.md#loading-the-checkpoint) loads a Hugging Face checkpoint this way. See [Model Definition](../loop/interfaces/model.md).
+To start from pretrained weights, set `trainer.model_stage_factory.source_checkpoint`. The loop then loads the checkpoint through the [state mapper](../model_state/mapper.md) of `initialize_model_stage()`, which translates its keys into the keys of your model. The [Qwen3 fine-tuning example](./finetune_huggingface.md#loading-the-checkpoint) loads a Hugging Face checkpoint this way. See [Model Definition](../loop/interfaces/model.md).
 
 ## Write the Task
 
