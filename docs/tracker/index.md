@@ -243,11 +243,10 @@ class CometConfig(BaseModel):
 
 Implement `BaseTrackerRun`. Its `write()` gets a `TrackerPoint` with the name, the step and the context, and a value of one of the types in `TrackerValue`. The tensors of the value are already on the CPU. End the `match` with `case _:` that raises a `ValueError`, so that a value type that your tracker does not handle yet, e.g. after an update of d9d, fails loudly. A tracker that writes only some types on purpose, such as the log tracker, can skip the others with `case _: pass`.
 
-If the tracker has no tags, build the name of the series with `series_key()` from `d9d.tracker.provider.flat`. It puts the context before the name, e.g. `train/loss`, as the W&B, TensorBoard and MLflow trackers do.
+If the tracker has no tags, build the name of the series with `series_key()` from `d9d.tracker`. It puts the context before the name, e.g. `train/loss`, as the W&B, TensorBoard and MLflow trackers do.
 
 ```python
-from d9d.tracker import BaseTrackerRun, Scalar, TrackerPoint, TrackerValue
-from d9d.tracker.provider.flat import series_key
+from d9d.tracker import BaseTrackerRun, Scalar, TrackerPoint, TrackerValue, series_key
 
 
 class CometRun(BaseTrackerRun):

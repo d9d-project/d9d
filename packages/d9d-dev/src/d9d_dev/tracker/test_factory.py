@@ -2,8 +2,7 @@ import sys
 from unittest.mock import patch
 
 import pytest
-from d9d.tracker import tracker_from_config
-from d9d.tracker.provider.wandb.config import WandbConfig
+from d9d.tracker import WandbConfig, tracker_from_config
 
 
 @pytest.mark.local

@@ -4,9 +4,8 @@ from typing import Any, Self, TypedDict, cast
 
 from aim import Distribution, Run
 
-from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig, TrackerPoint
-from d9d.tracker.value import Histogram, Scalar, TrackerValue
-
+from ...base import BaseTracker, BaseTrackerRun, RunConfig, TrackerPoint
+from ...value import Histogram, Scalar, TrackerValue
 from .config import AimConfig
 
 

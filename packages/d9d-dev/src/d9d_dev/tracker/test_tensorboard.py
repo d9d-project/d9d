@@ -1,7 +1,6 @@
 import pytest
 import torch
-from d9d.tracker import Histogram, RunConfig, Scalar, TrackerPoint, tracker_from_config
-from d9d.tracker.provider.tensorboard.config import TensorBoardConfig
+from d9d.tracker import Histogram, RunConfig, Scalar, TensorBoardConfig, TrackerPoint, tracker_from_config
 from d9d.tracker.provider.tensorboard.tracker import TensorBoardTracker
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 

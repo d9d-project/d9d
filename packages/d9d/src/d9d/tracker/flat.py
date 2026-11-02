@@ -1,7 +1,8 @@
 from typing import Any
 
 from d9d import pytree
-from d9d.tracker import TrackerPoint
+
+from .base import TrackerPoint
 
 
 def series_key(point: TrackerPoint) -> str:

@@ -5,10 +5,9 @@ from typing import Any, Self, TypedDict, cast
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from d9d.tracker import BaseTracker, BaseTrackerRun, RunConfig, TrackerPoint
-from d9d.tracker.provider.flat import flatten_hparams, series_key
-from d9d.tracker.value import Histogram, Scalar, TrackerValue
-
+from ...base import BaseTracker, BaseTrackerRun, RunConfig, TrackerPoint
+from ...flat import flatten_hparams, series_key
+from ...value import Histogram, Scalar, TrackerValue
 from .config import TensorBoardConfig
 
 
