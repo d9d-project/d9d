@@ -4,7 +4,7 @@ from typing import Generic, TypeVar
 import torch
 from torch import nn
 
-from d9d.nn import ModuleLateInit
+from ..late_init import ModuleLateInit
 
 THeadShared = TypeVar("THeadShared")
 THeadOutput = TypeVar("THeadOutput")

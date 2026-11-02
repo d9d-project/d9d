@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from d9d.nn import ModuleLateInit
+from ..late_init import ModuleLateInit
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)

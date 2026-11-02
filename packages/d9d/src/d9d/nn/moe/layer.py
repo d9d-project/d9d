@@ -2,8 +2,7 @@ import torch
 from torch import nn
 from torch.distributed import ProcessGroup
 
-from d9d.nn import ModuleLateInit
-
+from ..late_init import ModuleLateInit
 from .communications import (
     ExpertCommunicationHandler,
     NoCommunicationHandler,

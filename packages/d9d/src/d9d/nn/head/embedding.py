@@ -2,8 +2,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from d9d.nn.head.base import TaskHead
-from d9d.nn.head.io import SequenceEmbeddingOutput, SequencePoolingHeadShared
+from .base import TaskHead
+from .io import SequenceEmbeddingOutput, SequencePoolingHeadShared
 
 
 class EmbeddingHead(TaskHead[SequencePoolingHeadShared, SequenceEmbeddingOutput]):

@@ -2,7 +2,8 @@ import torch
 from torch import nn
 
 from d9d.kernel.rms_norm import rms_norm
-from d9d.nn import ModuleLateInit
+
+from ..late_init import ModuleLateInit
 
 
 class RMSNorm(nn.Module, ModuleLateInit):

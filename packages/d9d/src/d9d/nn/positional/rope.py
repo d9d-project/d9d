@@ -3,8 +3,8 @@ from enum import StrEnum
 import torch
 from torch import nn
 
-from d9d.nn import ModuleLateInit
-from d9d.nn.positional.rope_scaling import NoRopeScaling, RopeScaling
+from ..late_init import ModuleLateInit
+from .rope_scaling import NoRopeScaling, RopeScaling
 
 
 class RotaryEmbeddingStyle(StrEnum):

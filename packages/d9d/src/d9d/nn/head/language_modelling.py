@@ -5,8 +5,9 @@ import torch
 from torch import nn
 
 from d9d.kernel.cce import linear_cross_entropy
-from d9d.nn.head.base import TaskHead
-from d9d.nn.head.io import SequenceCausalLMHeadShared, SequenceCausalLMOutput
+
+from .base import TaskHead
+from .io import SequenceCausalLMHeadShared, SequenceCausalLMOutput
 
 LM_IGNORE_INDEX = -100
 """Label index that the LM head ignores when computing the loss."""

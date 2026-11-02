@@ -1,8 +1,8 @@
 import torch
 from torch import nn
 
-from d9d.nn.head.base import TaskHead
-from d9d.nn.head.io import SequenceClassificationOutput, SequencePoolingHeadShared
+from .base import TaskHead
+from .io import SequenceClassificationOutput, SequencePoolingHeadShared
 
 
 class ClassificationHead(TaskHead[SequencePoolingHeadShared, SequenceClassificationOutput]):

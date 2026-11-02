@@ -4,8 +4,7 @@ import torch
 from torch import nn
 from torch.distributed.tensor import DTensor
 
-from d9d.nn import ModuleLateInit
-
+from ..late_init import ModuleLateInit
 from .grouped_mm import (
     AnyGroupedMmBackendConfig,
     ExpertTokenGroups,

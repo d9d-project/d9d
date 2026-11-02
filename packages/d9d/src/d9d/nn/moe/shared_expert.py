@@ -2,8 +2,8 @@ import torch
 from pydantic import BaseModel, ConfigDict
 from torch import nn
 
-from d9d.nn import ModuleLateInit
-from d9d.nn.ffn import SwiGLU
+from ..ffn import SwiGLU
+from ..late_init import ModuleLateInit
 
 
 class SharedExpertParameters(BaseModel):

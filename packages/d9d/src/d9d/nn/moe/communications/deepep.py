@@ -6,8 +6,9 @@ from torch.autograd.function import FunctionCtx
 
 from d9d.kernel.moe.indices_to_multihot import fused_indices_to_multihot
 from d9d.kernel.moe.permute_with_probs import moe_permute_with_probs, moe_unpermute_mask
-from d9d.nn.moe.communications import ExpertCommunicationHandler
-from d9d.nn.moe.grouped_mm import ExpertTokenGroups
+
+from ..grouped_mm import ExpertTokenGroups
+from .base import ExpertCommunicationHandler
 
 _buffer: Buffer | None = None
 

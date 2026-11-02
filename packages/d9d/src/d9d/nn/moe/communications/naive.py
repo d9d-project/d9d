@@ -6,8 +6,9 @@ from d9d.kernel.moe import (
     moe_permute_with_probs,
     moe_unpermute_mask,
 )
-from d9d.nn.moe.communications import ExpertCommunicationHandler
-from d9d.nn.moe.grouped_mm import ExpertTokenGroups
+
+from ..grouped_mm import ExpertTokenGroups
+from .base import ExpertCommunicationHandler
 
 
 class NoCommunicationHandler(ExpertCommunicationHandler):

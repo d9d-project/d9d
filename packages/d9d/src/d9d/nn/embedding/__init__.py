@@ -1,6 +1,6 @@
 """Embedding layers."""
 
-from .shard_token_embedding import SplitTokenEmbeddings
+from .split_token_embedding import SplitTokenEmbeddings
 
 __all__ = [
     "SplitTokenEmbeddings",

@@ -2,7 +2,7 @@ import abc
 
 import torch
 
-from d9d.nn.moe.grouped_mm import ExpertTokenGroups
+from ..grouped_mm import ExpertTokenGroups
 
 
 class ExpertCommunicationHandler(abc.ABC):

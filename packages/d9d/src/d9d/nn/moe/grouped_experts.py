@@ -2,8 +2,8 @@ import torch
 from torch import nn
 
 from d9d.kernel.silu_mul import silu_mul
-from d9d.nn import ModuleLateInit
 
+from ..late_init import ModuleLateInit
 from .grouped_linear import GroupedLinear
 from .grouped_mm import AnyGroupedMmBackendConfig, ExpertTokenGroups
 

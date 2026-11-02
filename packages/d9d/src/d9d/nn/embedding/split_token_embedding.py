@@ -4,7 +4,7 @@ from typing import cast
 import torch
 from torch import nn
 
-from d9d.nn import ModuleLateInit
+from ..late_init import ModuleLateInit
 
 
 def _build_token_start_end_indices(

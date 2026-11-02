@@ -1,10 +1,10 @@
 import torch
 from torch import nn
 
-from d9d.nn import ModuleLateInit
-from d9d.nn.attention.sdpa import AnySdpaBackendConfig, SdpaBackend, SdpaParameters, build_sdpa_backend
-from d9d.nn.normalization import RMSNorm
-from d9d.nn.positional import RotaryEmbeddingApplicator, RotaryEmbeddingStyle
+from ..late_init import ModuleLateInit
+from ..normalization import RMSNorm
+from ..positional import RotaryEmbeddingApplicator, RotaryEmbeddingStyle
+from .sdpa import AnySdpaBackendConfig, SdpaBackend, SdpaParameters, build_sdpa_backend
 
 
 class GroupedQueryAttention(nn.Module, ModuleLateInit):
