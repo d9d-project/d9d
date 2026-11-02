@@ -55,15 +55,17 @@ We provide a `Makefile` to automate common development tasks.
 **d9d** is a foundational tool; architectural mistakes are expensive. Therefore, we follow the **D9D Enhancement Proposal (DEP)** process for significant changes.
 
 **You need a DEP if:**
-*   You are making breaking changes to the public API.
-*   You are introducing a major new distributed strategy or base module.
+*   You are introducing a new public abstraction, a base module or a major distributed strategy.
+*   You are making breaking changes to the public API, once d9d reaches 1.0.
 
 **You DO NOT need a DEP if:**
 *   You are fixing bugs.
 *   You are adding a new model implementation using existing APIs.
 *   You are improving documentation or internal performance (without API changes).
+*   You are making a breaking change that introduces no new abstraction, while d9d is on 0.x. Describe the break in the PR description.
 
 👉 **[Read DEP-0001: The DEP Process](./deps/0001-dep-process.md)** for details on how to draft, propose, and implement a DEP.
+Start from [`deps/TEMPLATE.md`](./deps/TEMPLATE.md). It says what goes into each section.
 
 ## Code Quality Standards
 
@@ -138,8 +140,8 @@ test-only dependencies to their `pyproject.toml`.
 
 ## Writing
 
-These rules apply to everything we write: code comments, docstrings, documentation pages, commit messages and
-PR descriptions.
+These rules apply to everything we write: code comments, docstrings, documentation pages, DEPs, commit messages
+and PR descriptions.
 
 ### General Rules
 
@@ -344,7 +346,7 @@ change; a tool credit only blurs who is accountable for the code.
 
 Before submitting a PR, ensure you have:
 
-1.  [ ] Created a DEP (if the change is major).
+1.  [ ] Created a DEP (if the change is major). If the PR implements a DEP, added `Implemented: #<PR>` to its header.
 2.  [ ] Added tests for your change.
 3.  [ ] Ran `make lint` to fix formatting, imports and check for typing issues.
 4.  [ ] Ran `make test` to ensure no regressions.

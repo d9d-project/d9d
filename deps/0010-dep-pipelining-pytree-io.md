@@ -2,9 +2,8 @@
 DEP: 0010
 Title: Typed PyTree IO for Pipelining and Tasks
 Author: Maksim Afanasev @mrapplexz
-Status: Draft
 Type: Feature
-Created: 2026-07-10
+Implemented: #41
 ---
 
 # Typed PyTree IO for Pipelining and Tasks

@@ -2,9 +2,8 @@
 DEP: 0007
 Title: Multi-Head Model Protocol
 Author: Daniil Sergeev @DaniilSergeev17
-Status: Draft
 Type: Feature
-Created: 2026-06-04
+Implemented: #31
 ---
 
 # DEP-0007: Multi-Head Model Protocol

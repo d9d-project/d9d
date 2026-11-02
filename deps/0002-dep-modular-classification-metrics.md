@@ -2,9 +2,8 @@
 DEP: 0002
 Title: Modular Classification Metrics Architecture
 Author: Daniil Sergeev @DaniilSergeev17
-Status: Implemented
 Type: Feature
-Created: 2026-02-13
+Implemented: 5c4062b
 ---
 
 # DEP-0002: Modular Classification Metrics Architecture
