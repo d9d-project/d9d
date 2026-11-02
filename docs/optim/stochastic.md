@@ -39,7 +39,7 @@ optimizer = StochasticAdamW(
 )
 ```
 
-`StochasticAdamW` saves the state of its random number generator in `state_dict()`. A resumed run gets the same rounding noise.
+`StochasticAdamW` seeds its random number generator from `seed` and saves the generator state in `state_dict()`. A resumed run gets the same rounding noise. All replicas of a parameter must use the same `seed`, so that they round the same way.
 
 ## Benchmarks
 
