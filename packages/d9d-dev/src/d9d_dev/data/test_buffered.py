@@ -51,7 +51,7 @@ def test_buffer_sorted_dataset_coverage_and_len(dataset_len: int, buffer_size: i
     random.shuffle(raw_data)
 
     base_dataset = MockSortableDataset(raw_data)
-    dataset = BufferSortedDataset(base_dataset, buffer_size=buffer_size, pack_size=pack_size, init_seed=42)
+    dataset = BufferSortedDataset(base_dataset, buffer_size=buffer_size, pack_size=pack_size, seed=42)
 
     assert len(dataset) == dataset_len
 
@@ -73,7 +73,7 @@ def test_buffer_sorted_dataset_sorting_logic():
     # Buffer=4 covers all data. Pack=2 creates two groups:
     # Sorted Items: [10, 20, 100, 200]
     # Expected Packs: {10, 20} and {100, 200}
-    dataset = BufferSortedDataset(base_dataset, buffer_size=4, pack_size=2, init_seed=42)
+    dataset = BufferSortedDataset(base_dataset, buffer_size=4, pack_size=2, seed=42)
 
     outputs = [dataset[i] for i in range(4)]
 
@@ -97,7 +97,7 @@ def test_buffer_sorted_dataset_insufficient_last_buffer():
     raw_data = [50, 40, 30, 20, 10]
     base_dataset = MockSortableDataset(raw_data)
 
-    dataset = BufferSortedDataset(base_dataset, buffer_size=4, pack_size=2, init_seed=123)
+    dataset = BufferSortedDataset(base_dataset, buffer_size=4, pack_size=2, seed=123)
 
     output = [dataset[i] for i in range(5)]
 
@@ -123,7 +123,7 @@ def test_buffer_sorted_dataset_stateful_checkpointing():
 
     # Setup
     base_dataset = MockSortableDataset(raw_data)
-    dataset_orig = BufferSortedDataset(base_dataset, buffer_size=10, pack_size=2, init_seed=999)
+    dataset_orig = BufferSortedDataset(base_dataset, buffer_size=10, pack_size=2, seed=999)
 
     # Parameters
     steps_before_save = 35  # Stop in the middle of a buffer (Buffer 0..9, 10..19, 20..29, 30..39)
@@ -144,7 +144,7 @@ def test_buffer_sorted_dataset_stateful_checkpointing():
 
     # Restore into new dataset
     base_dataset_new = MockSortableDataset(raw_data)  # Fresh base
-    dataset_restored = BufferSortedDataset(base_dataset_new, buffer_size=10, pack_size=2, init_seed=999)
+    dataset_restored = BufferSortedDataset(base_dataset_new, buffer_size=10, pack_size=2, seed=999)
     dataset_restored.load_state_dict(state_dict)
 
     # Verify sub-component state loading
@@ -156,3 +156,18 @@ def test_buffer_sorted_dataset_stateful_checkpointing():
         output_part_2_actual.append(dataset_restored[i])
 
     assert output_part_2_actual == output_part_2_expected
+
+
+@pytest.mark.local
+def test_buffer_sorted_dataset_order_independent_of_access_order():
+    raw_data = list(range(100))
+    random.shuffle(raw_data)
+
+    forward = BufferSortedDataset(MockSortableDataset(raw_data), buffer_size=10, pack_size=2, seed=7)
+    backward = BufferSortedDataset(MockSortableDataset(raw_data), buffer_size=10, pack_size=2, seed=7)
+
+    # Copies on other ranks or in other workers read the buffers in another order, but must serve the same items.
+    expected = [forward[i] for i in range(100)]
+    actual = [backward[i] for i in reversed(range(100))][::-1]
+
+    assert actual == expected
