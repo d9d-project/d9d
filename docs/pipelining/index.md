@@ -32,7 +32,7 @@ A pipelined model moves data across stage boundaries as four explicitly named, g
 |------------------|-------------------------------------------------------------|--------------|
 | `PipelineInput`  | Input to the **first** stage (built by the task)            | no           |
 | `StageTransfer`  | Payload between adjacent stages (out of *N* == in of *N+1*) | **yes**      |
-| `PipelineOutput` | Output of the **last** stage (to loss / result callback)    | no           |
+| `PipelineOutput` | Output of the **last** stage (to the step handler)         | no           |
 | `SharedInput`    | Value passed to **every** stage, rebuilt locally per rank   | no           |
 
 Only `StageTransfer` crosses the network, so it is the only role that needs a `TensorSpec`.
@@ -192,16 +192,18 @@ import torch.nn.functional as F
 from torch import Tensor
 from torch.distributed import DeviceMesh
 
+from d9d.pipelining.api import PipelineStepHandler
 from d9d.pipelining.factory import PipelineSchedule1F1BConfig, build_program_builder, build_schedule
 
 
-# 0. Define an object that computes the loss per microbatch. It receives the PipelineOutput
-#    produced by the last stage and reads its fields by attribute.
-class MyLossHandler:
+# 0. Define the step handler. It computes the loss per microbatch from the PipelineOutput of the
+#    last stage. It can also override compute_context() to open a context around each forward and
+#    backward pass of a stage.
+class MyStepHandler(PipelineStepHandler[MyOutput]):
     def __init__(self, targets_microbatches: list[Tensor]):
         self._targets = targets_microbatches
 
-    def compute_loss(self, outputs: MyOutput, microbatch_idx: int):
+    def process_outputs(self, outputs: MyOutput, microbatch_idx: int) -> Tensor:
         # Implement any custom logic here.
         current_target = self._targets[microbatch_idx]
         return F.cross_entropy(outputs.logits.view(-1, outputs.logits.shape[-1]), current_target.view(-1))
@@ -221,8 +223,8 @@ inputs_microbatches = tuple(MyInput(input_ids=mb) for mb in my_input_microbatche
 shared_microbatches = tuple(MyShared(position_ids=pos) for pos in my_position_microbatches)
 targets_microbatches = [...]  # One target tensor per microbatch
 
-# 3. Build the schedule and the model stages (the callback is passed per step, not here).
-loss_handler = MyLossHandler(targets_microbatches)
+# 3. Build the schedule and the model stages (the handler is passed per step, not here).
+step_handler = MyStepHandler(targets_microbatches)
 schedule_info, modules = build_schedule(
     pp_mesh=pp_mesh,
     program_builder=build_program_builder(schedule_config),
@@ -230,11 +232,11 @@ schedule_info, modules = build_schedule(
 )
 
 # 4. Run the step.
-# The callback is passed to each step, so it can use per-step data (here, the targets).
+# The handler is passed to each step, so it can use per-step data (here, the targets).
 schedule_info.schedule.step(
     inputs_microbatches=inputs_microbatches,
     shared_microbatches=shared_microbatches,
-    callback=loss_handler.compute_loss,
+    handler=step_handler,
 )
 ```
 

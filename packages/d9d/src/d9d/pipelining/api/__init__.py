@@ -9,8 +9,8 @@ from .module import (
 )
 from .schedule import PipelineSchedule
 from .types import (
-    PipelineLossFn,
-    PipelineResultFn,
+    PipelineComputeKind,
+    PipelineStepHandler,
     TPipelineInput,
     TPipelineOutput,
     TSharedInput,
@@ -19,10 +19,10 @@ from .types import (
 
 __all__ = [
     "ModuleSupportsPipelining",
-    "PipelineLossFn",
-    "PipelineResultFn",
+    "PipelineComputeKind",
     "PipelineSchedule",
     "PipelineStageInfo",
+    "PipelineStepHandler",
     "StageBoundary",
     "TPipelineInput",
     "TPipelineOutput",

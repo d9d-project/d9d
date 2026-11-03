@@ -55,7 +55,7 @@ A program depends only on the microbatch count and the fixed pipeline topology. 
 
 The `PipelineScheduleExecutor` is the runtime engine.
 
-Each step, it receives a **pack** (a sequence of ready per-microbatch inputs) and a callback for the outputs of each microbatch. Then it:
+Each step, it receives a **pack** (a sequence of ready per-microbatch inputs) and a step handler. The handler opens a context around each forward and backward pass of a stage and processes the outputs of each microbatch. Then it:
 
 1.  Gets the program for the pack length from the `PipelineProgramCache`.
 2.  Configures the stage buffers for the pack. It sizes the P2P buffers of each microbatch separately, so microbatches can differ in shape. It skips this step when the shapes match the previous step.

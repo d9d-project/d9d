@@ -316,7 +316,7 @@ class Trainer:
                 with self._state.event_bus.bounded(
                     EVENT_TRAIN_FORWARD_BACKWARD_PRE, EVENT_TRAIN_FORWARD_BACKWARD_POST, step_ctx
                 ):
-                    # The installed GradientManager overlaps gradient sync with compute. The loss callback
+                    # The installed GradientManager overlaps gradient sync with compute. The step handler
                     # accumulates the loss and its weight per microbatch.
                     self._state.task_operator.forward_backward(device_pack)
 

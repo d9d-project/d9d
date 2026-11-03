@@ -6,6 +6,7 @@ from torch.profiler import record_function
 from d9d.data import MicrobatchPack
 from d9d.dist_context import DistributedContext
 from d9d.metric.catalogue.container import ComposeMetric
+from d9d.pipelining.api import PipelineStepHandler
 from d9d.pipelining.factory import PipelineScheduleInfo
 from d9d.pytree import PyTree
 
@@ -22,10 +23,10 @@ TPipelineOutput = typing.TypeVar("TPipelineOutput")
 TState = typing.TypeVar("TState", bound=PyTree)
 
 
-class LossComputer(typing.Generic[TPipelineOutput, TState]):
-    """Component that computes and accumulates the training loss for each microbatch of a step.
+class TrainStepHandler(PipelineStepHandler[TPipelineOutput], typing.Generic[TPipelineOutput, TState]):
+    """The step handler that computes and accumulates the training loss for each microbatch of a step.
 
-    This component bridges the raw outputs of the model pipeline and the user-defined training task.
+    It bridges the raw outputs of the model pipeline and the user-defined training task.
     """
 
     def __init__(
@@ -36,7 +37,7 @@ class LossComputer(typing.Generic[TPipelineOutput, TState]):
         gradient_manager: GradientManager,
         metrics: ComposeMetric,
     ):
-        """Constructs the ``LossComputer`` object.
+        """Constructs the ``TrainStepHandler`` object.
 
         Args:
             state: Handler for the per-microbatch pipeline state.
@@ -51,11 +52,11 @@ class LossComputer(typing.Generic[TPipelineOutput, TState]):
         self._gradient_manager = gradient_manager
         self._metrics = metrics
 
-    def __call__(self, pipeline_outputs: TPipelineOutput, microbatch_idx: int) -> torch.Tensor:
+    def process_outputs(self, outputs: TPipelineOutput, microbatch_idx: int) -> torch.Tensor:
         """Computes the weighted loss for a microbatch and accumulates its loss/weight and metrics.
 
         Args:
-            pipeline_outputs: The ``PipelineOutput`` produced by the last stage.
+            outputs: The ``PipelineOutput`` produced by the last stage.
             microbatch_idx: Index of the current microbatch within the step's pack.
 
         Returns:
@@ -64,7 +65,7 @@ class LossComputer(typing.Generic[TPipelineOutput, TState]):
         with self._state.scope(microbatch_idx) as state:
             with record_function("Compute Loss"):
                 computation = self._task.compute_loss(
-                    ComputeLossContext(pipeline_results=pipeline_outputs, state=state, schedule=self._schedule)
+                    ComputeLossContext(pipeline_results=outputs, state=state, schedule=self._schedule)
                 )
 
             loss = computation.loss
@@ -83,7 +84,7 @@ class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPi
     """Operator that orchestrates the forward and backward passes for a training task over one pack.
 
     It builds the per-microbatch inputs, reconfigures the pipeline schedule for the pack length, and
-    drives execution. Loss/weight and metrics accumulate per microbatch through the loss callback.
+    drives execution. Loss/weight and metrics accumulate per microbatch through the step handler.
     """
 
     def __init__(
@@ -130,7 +131,7 @@ class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPi
                 self._pipeline.schedule.step(
                     inputs_microbatches=inputs_microbatches,
                     shared_microbatches=shared_microbatches,
-                    callback=LossComputer(
+                    handler=TrainStepHandler(
                         state=self._pipeline_state,
                         task=self._task,
                         schedule=self._job_schedule,
