@@ -23,8 +23,8 @@ It returns a `Trainer` that holds a prepared `TrainJobState`.
 1.  **Distributed Context Initialization**:
     *   Builds the global [DistributedContext](../dist_context/index.md). This creates the NCCL process groups and `DeviceMesh` objects.
 
-2.  **Seeding**:
-    *   Seeds Python, NumPy, PyTorch and the `DTensor` RNG from the configured `base_seed`. Model initialization and other initial states are then deterministic. Ranks in different pipeline stages get different seeds, and ranks along the other mesh dimensions share a seed.
+2.  **Seed Scopes**:
+    *   Derives the root seed scope from `determinism.base_seed`. From here on, each call of user code runs with the global generators seeded from its own scope. See [Random Numbers in the Loop](./determinism.md).
 
 3.  **Task Instantiation**:
     *   Creates the `TrainTask` with the `TrainTaskProvider`.

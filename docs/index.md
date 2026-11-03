@@ -162,7 +162,7 @@ You write four parts: the data, the model, the task with the loss, and the model
         model_provider=MLPProvider(),
         task_provider=lambda ctx: RegressionTask(),
         data_provider=AutoDataProvider(
-            dataset_factory=lambda dist_context: RegressionDataset(num_samples=65536, num_features=16),
+            dataset_factory=lambda context: RegressionDataset(num_samples=65536, num_features=16),
             collator=RegressionDataset.collate,
             config=config.data,
         ),

@@ -18,8 +18,10 @@ You can use the shipped `AutoDataProvider` for the common case, or write your ow
 
 `AutoDataProvider` shards the dataset across data-parallel ranks for you. It also builds the loader, derives the gradient accumulation factor and returns the stream. So your factory returns the *unsharded* dataset.
 
-*   The `dataset_factory` receives the `DistributedContext`, so it can guard data preparation. For example, `dist_context.main_process_first()` lets rank 0 fill the cache before the other ranks read it.
+*   The `dataset_factory` receives the `InitializeDataProviderContext`. Its `dist_context` can guard data preparation. For example, `context.dist_context.main_process_first()` lets rank 0 fill the cache before the other ranks read it. Its `seed_scope` gives the seeds of a dataset that draws random numbers.
 *   The `collator` collates a list of samples into one microbatch.
+
+The loader takes its own generator, seeded from `shard_seed_scope` of the context. It shuffles with this generator if `shuffle` is set, and seeds its workers from it. So all ranks of one data-parallel shard read the same samples in the same order. See [Random Numbers in the Loop](../determinism.md).
 
 ```python
 import dataclasses
@@ -28,13 +30,14 @@ import datasets
 import torch
 
 from d9d.loop.auto import AutoDataConfig, AutoDataProvider
+from d9d.loop.control import InitializeDataProviderContext
 from d9d.loop.run import TrainingConfigurator
 
 
-def build_dataset(dist_context):
+def build_dataset(context: InitializeDataProviderContext) -> datasets.Dataset:
     # Rank 0 downloads and processes the data first. The other ranks load from its cache.
     # Return the dataset unsharded: AutoDataProvider shards it across data-parallel ranks.
-    with dist_context.main_process_first():
+    with context.dist_context.main_process_first():
         return datasets.load_dataset("my/dataset", split="train")
 
 
@@ -87,6 +90,8 @@ A custom provider builds the same default stack by hand. It has two layers:
 Wrap the packer in a `PinMemoryMicrobatchPackStream` to pin the packs, so the loop copies them to the device asynchronously. The packer and the pinning stream live in `d9d.data.batch_iterator`.
 
 Unlike with `AutoDataProvider`, you own the data-parallel sharding. Shard the dataset yourself before you build the loader, e.g. with `shard_dataset_data_parallel`. See [Data](../../data/index.md).
+
+You also own the seeds. Take seeds for code before sharding from `context.seed_scope`, which is equal on all ranks. Give the loader a generator seeded from `context.shard_seed_scope`, which is equal on the ranks of one data-parallel shard. See [Random Numbers in the Loop](../determinism.md).
 
 ```python
 import dataclasses
@@ -162,23 +167,26 @@ class ProjectDataProvider(DataProvider):
 
         dataset = ProjectDataset(data, tokenizer)
 
-        # Length-bucketing buffer, which minimizes padding.
+        # Length-bucketing buffer, which minimizes padding. All ranks must shuffle it with the same seed.
         dataset_buf = BufferSortedDataset(
             dataset,
             buffer_size=self._config.presort_buffer_size,
             pack_size=self._config.global_batch_size,
+            seed=context.seed_scope.child("presort").seed,
         )
 
         # Shard across data-parallel ranks (a custom DataProvider owns sharding).
         dataset_shard = shard_dataset_data_parallel(dataset_buf, context.dist_context)
 
         # Loader (layer 1): yields one collated microbatch at a time.
+        # Without its own generator, the loader would draw from the global generators on the prefetch thread.
         loader = StatefulDataLoader(
             dataset_shard,
             batch_size=self._config.microbatch_size,
             collate_fn=ProjectDataset.collate,
             num_workers=self._config.num_workers,
             drop_last=True,
+            generator=torch.Generator().manual_seed(context.shard_seed_scope.child("loader").seed),
         )
 
         # Packer (layer 2): groups microbatches into one pack per step.

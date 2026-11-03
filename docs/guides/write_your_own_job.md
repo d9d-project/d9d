@@ -8,7 +8,9 @@ This page turns the [Quickstart](../getting_started/quickstart.md) script into a
 
 Replace `RegressionDataset` with your `Dataset` and its `collate()` with a function that stacks samples into one microbatch. The task receives the microbatch as `ctx.batch`.
 
-`dataset_factory` runs on every rank. Return the whole dataset from it: `AutoDataProvider` shards it across the data-parallel ranks. Wrap downloads in `dist_context.main_process_first()`, so that only rank 0 fills the cache. See [Data Loading](../loop/interfaces/data.md#using-autodataprovider).
+`dataset_factory` runs on every rank and receives an `InitializeDataProviderContext`. Return the whole dataset from it: `AutoDataProvider` shards it across the data-parallel ranks. Wrap downloads in `context.dist_context.main_process_first()`, so that only rank 0 fills the cache. See [Data Loading](../loop/interfaces/data.md#using-autodataprovider).
+
+A dataset that draws random numbers, e.g. for augmentation, must not use the global generators, because it can run on the prefetch thread. Seed a generator per sample from `context.seed_scope` and the sample index (see [Random Numbers in the Loop](../loop/determinism.md#rules-for-user-code)).
 
 If samples differ in length, pad them in `collate()` with [`pad_stack_1d`](../data/index.md#padding) and mark the padding in the labels. The task then weights the loss by the number of real tokens (see [Write the Task](#write-the-task)). The [Qwen3 fine-tuning example](./finetune_huggingface.md) does both:
 
@@ -45,7 +47,7 @@ def build_dataset(config: DataConfig, dist_context: DistributedContext) -> Datas
 # The data provider of TrainingConfigurator. It calls build_dataset() once on every rank
 # and TextDataset.collate() for every microbatch.
 data_provider = AutoDataProvider(
-    dataset_factory=lambda dist_context: build_dataset(config.data, dist_context),
+    dataset_factory=lambda context: build_dataset(config.data, context.dist_context),
     collator=TextDataset.collate,
     config=config.auto_data,
 )

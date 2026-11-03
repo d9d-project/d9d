@@ -10,7 +10,7 @@ The `d9d.loop.auto` package builds standard optimizers from a Pydantic configura
 
 ## Custom Optimizer
 
-For a custom optimizer, implement the `OptimizerProvider` protocol. It receives the model stage and returns a PyTorch optimizer.
+For a custom optimizer, implement the `OptimizerProvider` protocol. It receives the model stage and returns a PyTorch optimizer. Each optimizer step runs with the global generators seeded per step and stage, so an optimizer can draw from them. See [Random Numbers in the Loop](../determinism.md).
 
 ## Usage
 

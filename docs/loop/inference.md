@@ -15,8 +15,8 @@ You build the `Inference` engine with the `InferenceConfigurator`. It combines t
 1.  **Distributed Context Initialization**:
     *   Builds the global [DistributedContext](../dist_context/index.md).
 
-2.  **Seeding**:
-    *   Sets distributed seeds, e.g. for reproducible sampling or validation splits.
+2.  **Seed Scopes**:
+    *   Derives the root seed scope from `determinism.base_seed`. From here on, each call of user code runs with the global generators seeded from its own scope. See [Random Numbers in the Loop](./determinism.md).
 
 3.  **Task Instantiation**:
     *   Creates the `InferenceTask`. It defines how inputs are built and what happens to the outputs, e.g. writing them to a JSONL file.
