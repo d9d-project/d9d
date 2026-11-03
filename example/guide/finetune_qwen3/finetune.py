@@ -208,7 +208,7 @@ def main():
         task_provider=lambda ctx: CausalLMTask(),
         model_provider=Qwen3Provider(config.model, config.lora),
         data_provider=AutoDataProvider(
-            dataset_factory=lambda dist_context: build_dataset(config.data, dist_context),
+            dataset_factory=lambda context: build_dataset(config.data, context.dist_context),
             collator=TextDataset.collate,
             config=config.auto_data,
         ),

@@ -9,6 +9,7 @@ from d9d.data import (
 from d9d.dist_context import DeviceMeshParameters
 from d9d.loop.auto import AutoDataConfig, AutoDataProvider
 from d9d.loop.control import InitializeDataProviderContext
+from d9d.rng import SeedScope
 from torch.utils.data import Dataset, SequentialSampler
 from torchdata.stateful_dataloader import StatefulDataLoader
 from torchdata.stateful_dataloader.sampler import RandomSampler
@@ -29,17 +30,23 @@ def simple_collate(batch):
     return torch.stack(batch)
 
 
+def _build_context(dist_context, shard_seed_scope):
+    return InitializeDataProviderContext(
+        dist_context=dist_context, seed_scope=SeedScope.root(0).child("data"), shard_seed_scope=shard_seed_scope
+    )
+
+
 @pytest.fixture
 def context(dist_ctx_factory):
-    return InitializeDataProviderContext(dist_context=dist_ctx_factory(DeviceMeshParameters()))
+    return _build_context(dist_ctx_factory(DeviceMeshParameters()), SeedScope.root(0).child("data", "shard", 0))
 
 
 @pytest.mark.local
-def test_auto_data_provider_passes_dist_context_to_factory(context):
+def test_auto_data_provider_passes_context_to_factory(context):
     seen = []
 
-    def dataset_factory(dist_context):
-        seen.append(dist_context)
+    def dataset_factory(factory_context):
+        seen.append(factory_context)
         return SimpleDataset(12)
 
     config = AutoDataConfig(global_batch_size=6, microbatch_size=2, num_workers=0, pin_memory=False)
@@ -47,7 +54,26 @@ def test_auto_data_provider_passes_dist_context_to_factory(context):
 
     provider(context)
 
-    assert seen == [context.dist_context]
+    assert seen == [context]
+
+
+@pytest.mark.local
+def test_auto_data_provider_shuffles_by_shard_seed_scope(dist_ctx_factory):
+    dist_context = dist_ctx_factory(DeviceMeshParameters())
+    config = AutoDataConfig(global_batch_size=32, microbatch_size=32, shuffle=True, num_workers=0, pin_memory=False)
+    provider = AutoDataProvider(dataset_factory=lambda _ctx: SimpleDataset(32), collator=simple_collate, config=config)
+
+    def read_order(shard_seed_scope, global_seed):
+        # The loader must not depend on the global generator.
+        torch.manual_seed(global_seed)
+        (pack,) = provider(_build_context(dist_context, shard_seed_scope))
+        return pack[0].tolist()
+
+    scope = SeedScope.root(0).child("data", "shard", 0)
+    other_scope = SeedScope.root(0).child("data", "shard", 1)
+
+    assert read_order(scope, global_seed=1) == read_order(scope, global_seed=2)
+    assert read_order(scope, global_seed=1) != read_order(other_scope, global_seed=1)
 
 
 @pytest.mark.local
