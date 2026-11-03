@@ -5,6 +5,7 @@ from torch.profiler import record_function
 
 from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 from d9d.optim import OptimizerProtocol
+from d9d.rng import fork_rng_child
 
 
 class PipelinedOptimizer(OptimizerProtocol, Offloadable):
@@ -34,8 +35,9 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
 
     def step(self) -> None:
         with record_function("Optimizer Step"):
-            for optimizer in self._optimizers.values():
-                optimizer.step()
+            for stage_index, optimizer in self._optimizers.items():
+                with fork_rng_child("optimizer_step", stage_index):
+                    optimizer.step()
 
     def zero_grad(self) -> None:
         for optimizer in self._optimizers.values():

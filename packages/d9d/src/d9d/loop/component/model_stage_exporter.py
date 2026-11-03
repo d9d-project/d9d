@@ -3,6 +3,7 @@ from pathlib import Path
 from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
 from d9d.model_state.io import save_model_state, save_model_state_pipeline_parallel
 from d9d.model_state.mapper.compose import ModelStateMapperParallel
+from d9d.rng import fork_rng_child
 
 from ..control import ModelProvider, PrepareExportModelStageContext
 from .model_stage_factory import TrackedModules
@@ -39,10 +40,11 @@ class ModelStageExporter:
             raise ValueError(f"The model stage count ({len(stages)}) must be 1 in a run without parallelism.")
 
         mappers = []
-        for stage in stages:
-            result = self._model_provider.prepare_export_model_stage(
-                PrepareExportModelStageContext(model=stage, dist_context=self._dist_context)
-            )
+        for stage_index, stage in self._modules.modules.items():
+            with fork_rng_child("prepare_export_model_stage", stage_index):
+                result = self._model_provider.prepare_export_model_stage(
+                    PrepareExportModelStageContext(model=stage, dist_context=self._dist_context)
+                )
             mappers.append(result.state_mapper)
         mapper = ModelStateMapperParallel(mappers)
 

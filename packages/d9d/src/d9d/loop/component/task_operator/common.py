@@ -4,6 +4,7 @@ from torch.profiler import record_function
 
 from d9d.data import MicrobatchPack
 from d9d.pytree import PyTree
+from d9d.rng import fork_rng_child
 
 from ...control import BaseTask, BuildForwardInputsContext
 from ..pipeline_state import PipelineStateHandler
@@ -33,7 +34,10 @@ def build_pipeline_microbatch_inputs(
     shared_microbatches = []
 
     for microbatch_idx, microbatch in enumerate(pack):
-        with record_function("Build Forward Inputs"):
+        with (
+            record_function("Build Forward Inputs"),
+            fork_rng_child("build_forward_inputs", microbatch_idx),
+        ):
             model_inputs = task.build_forward_inputs(BuildForwardInputsContext(batch=microbatch))
         pipeline_state.store(microbatch_idx, model_inputs.state)
         inputs_microbatches.append(model_inputs.input)

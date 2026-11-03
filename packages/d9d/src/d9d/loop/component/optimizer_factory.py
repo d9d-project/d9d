@@ -1,5 +1,6 @@
 from d9d.dist_context import DistributedContext
 from d9d.optim import LRSchedulerProtocol, OptimizerProtocol
+from d9d.rng import fork_rng_child
 
 from ..control import (
     InitializeLRSchedulerContext,
@@ -51,16 +52,18 @@ class OptimizerFactory:
         optimizers: dict[int, OptimizerProtocol] = {}
         lr_schedulers: dict[int, LRSchedulerProtocol] = {}
         for stage_index, module in self._tracked_modules.modules.items():
-            optimizer = self._optimizer_provider(
-                InitializeOptimizerStageContext(dist_context=self._dist_context, model=module)
-            )
+            with fork_rng_child("optimizer_provider", stage_index):
+                optimizer = self._optimizer_provider(
+                    InitializeOptimizerStageContext(dist_context=self._dist_context, model=module)
+                )
             optimizers[stage_index] = optimizer
 
-            scheduler = self._lr_scheduler_provider(
-                InitializeLRSchedulerContext(
-                    dist_context=self._dist_context, total_steps=self._schedule.total_steps, optimizer=optimizer
+            with fork_rng_child("lr_scheduler_provider", stage_index):
+                scheduler = self._lr_scheduler_provider(
+                    InitializeLRSchedulerContext(
+                        dist_context=self._dist_context, total_steps=self._schedule.total_steps, optimizer=optimizer
+                    )
                 )
-            )
             lr_schedulers[stage_index] = scheduler
 
         pipe_optimizer = PipelinedOptimizer(optimizers=optimizers)

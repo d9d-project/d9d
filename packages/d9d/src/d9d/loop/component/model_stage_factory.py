@@ -12,6 +12,7 @@ from d9d.nn import ModuleLateInit
 from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import PipelineScheduleInfo, build_program_builder, build_schedule
+from d9d.rng import fork_rng_child
 
 from ..config import ModelStageFactoryConfig, PipeliningConfig
 from ..control import InitializeModelStageContext, ModelProvider, ParallelizeModelStageContext
@@ -207,8 +208,10 @@ class ModelStageFactory:
         self._config_pipelining = config_pipelining
 
     def _build_model_stage(self, stage: PipelineStageInfo) -> nn.Module:
+        stage_index = stage.current_stage
+
         # Build on the meta device, so no memory is allocated yet.
-        with torch.device("meta"):
+        with fork_rng_child("initialize_model_stage", stage_index), torch.device("meta"):
             factored = self._model_provider.initialize_model_stage(
                 InitializeModelStageContext(
                     dist_context=self._dist_context,
@@ -224,14 +227,15 @@ class ModelStageFactory:
             )
 
         if self._dist_context.mesh_params.is_distributed:
-            self._model_provider.parallelize_model_stage(
-                ParallelizeModelStageContext(model=model, stage=stage, dist_context=self._dist_context)
-            )
+            with fork_rng_child("parallelize_model_stage", stage_index):
+                self._model_provider.parallelize_model_stage(
+                    ParallelizeModelStageContext(model=model, stage=stage, dist_context=self._dist_context)
+                )
 
         model.to_empty(device=self._dist_context.current_device)
 
         # to_empty allocates uninitialized storage, so initialize the parameters.
-        with torch.no_grad():
+        with torch.no_grad(), fork_rng_child("reset_parameters", stage_index):
             model.reset_parameters()
 
         if self._config_model.source_checkpoint:
