@@ -2,19 +2,19 @@ from typing import Generic
 
 import torch
 
-from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, TPipelineOutput
+from d9d.pipelining.api import PipelineStepHandler, TPipelineOutput
 
 
 class PipelineResultHandler(Generic[TPipelineOutput]):
-    """Wrapper of a callback function that handles results from pipeline execution."""
+    """Passes the results of a pipeline step without the backward pass to the step handler."""
 
-    def __init__(self, callback_fn: PipelineResultFn[TPipelineOutput]):
+    def __init__(self, handler: PipelineStepHandler[TPipelineOutput]):
         """Constructs the ``PipelineResultHandler`` object.
 
         Args:
-            callback_fn: The function called with results.
+            handler: The step handler that processes the results.
         """
-        self._callback_fn = callback_fn
+        self._handler = handler
 
     def trigger(self, forward_result: TPipelineOutput, microbatch_index: int):
         """Invokes the underlying callback with the provided results.
@@ -23,19 +23,19 @@ class PipelineResultHandler(Generic[TPipelineOutput]):
             forward_result: The ``PipelineOutput`` produced by the last stage.
             microbatch_index: The index of the current microbatch.
         """
-        self._callback_fn(forward_result, microbatch_index)
+        self._handler.process_outputs(forward_result, microbatch_index)
 
 
 class PipelineLossHandler(Generic[TPipelineOutput]):
     """Manager of loss computation and state caching across forward and backward passes."""
 
-    def __init__(self, callback_fn: PipelineLossFn[TPipelineOutput]):
+    def __init__(self, handler: PipelineStepHandler[TPipelineOutput]):
         """Constructs the ``PipelineLossHandler`` object.
 
         Args:
-            callback_fn: The callable that computes loss from model outputs.
+            handler: The step handler that computes the loss from the model outputs.
         """
-        self._callback_fn = callback_fn
+        self._handler = handler
         self._cached_values: dict[int, torch.Tensor] = {}
 
     def trigger(self, forward_result: TPipelineOutput, microbatch_index: int):
@@ -44,8 +44,13 @@ class PipelineLossHandler(Generic[TPipelineOutput]):
         Args:
             forward_result: The ``PipelineOutput`` produced by the last stage.
             microbatch_index: The index of the microbatch being processed.
+
+        Raises:
+            ValueError: If the step handler returns no loss.
         """
-        result = self._callback_fn(forward_result, microbatch_index)
+        result = self._handler.process_outputs(forward_result, microbatch_index)
+        if result is None:
+            raise ValueError(f"The step handler must return a loss for microbatch_index ({microbatch_index}).")
         self._cached_values[microbatch_index] = result
 
     def acquire_loss(self, microbatch_index: int) -> torch.Tensor:

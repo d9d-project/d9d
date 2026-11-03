@@ -3,7 +3,14 @@ import dataclasses
 from enum import StrEnum
 from typing import Generic
 
-from d9d.pipelining.api import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
+from d9d.pipelining.api import (
+    PipelineComputeKind,
+    PipelineStepHandler,
+    TPipelineInput,
+    TPipelineOutput,
+    TSharedInput,
+    TStageTransfer,
+)
 from d9d.pipelining.stage import PipelineStage
 
 from .callback import PipelineLossHandler, PipelineResultHandler
@@ -19,6 +26,7 @@ class ActionContext(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         pipeline_shared_microbatches: Per-microbatch ``SharedInput``, indexed by microbatch.
         stages: A mapping of stage indices to the ``PipelineStage`` objects on this rank.
         communications: The handler for P2P communications.
+        handler: The step handler that gives the context of each model compute.
         callback: The handler for either loss computation or result processing.
     """
 
@@ -27,6 +35,7 @@ class ActionContext(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
 
     stages: dict[int, PipelineStage[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]]
     communications: PipelineCommunicationHandler
+    handler: PipelineStepHandler[TPipelineOutput]
     callback: PipelineLossHandler[TPipelineOutput] | PipelineResultHandler[TPipelineOutput]
 
 
@@ -202,11 +211,12 @@ class ForwardComputeAction(ActionBase):
         if not stage.info.is_current_stage_first and self.stage_idx - 1 not in ctx.stages:
             ctx.communications.wait_fwd_recv(self.stage_idx, self.microbatch_idx)
 
-        stage.forward_one_chunk(
-            microbatch_index=self.microbatch_idx,
-            pipeline_inputs=ctx.pipeline_inputs_microbatches[self.microbatch_idx],
-            pipeline_shared=ctx.pipeline_shared_microbatches[self.microbatch_idx],
-        )
+        with ctx.handler.compute_context(PipelineComputeKind.forward, self.stage_idx, self.microbatch_idx):
+            stage.forward_one_chunk(
+                microbatch_index=self.microbatch_idx,
+                pipeline_inputs=ctx.pipeline_inputs_microbatches[self.microbatch_idx],
+                pipeline_shared=ctx.pipeline_shared_microbatches[self.microbatch_idx],
+            )
 
         if stage.info.is_current_stage_last:
             ctx.callback.trigger(stage.get_pipeline_output(self.microbatch_idx), self.microbatch_idx)
@@ -254,7 +264,8 @@ class BackwardFullInputComputeAction(ActionBase):
         else:
             loss = None
 
-        stage.backward_one_chunk(microbatch_index=self.microbatch_idx, full_backward=self.full_backward, loss=loss)
+        with ctx.handler.compute_context(PipelineComputeKind.backward, self.stage_idx, self.microbatch_idx):
+            stage.backward_one_chunk(microbatch_index=self.microbatch_idx, full_backward=self.full_backward, loss=loss)
 
         if not stage.info.is_current_stage_first and self.stage_idx - 1 in ctx.stages:
             ctx.stages[self.stage_idx - 1].set_local_bwd_input(
@@ -289,7 +300,8 @@ class BackwardWeightComputeAction(ActionBase):
     def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         stage = ctx.stages[self.stage_idx]
 
-        stage.backward_weight_one_chunk(microbatch_index=self.microbatch_idx)
+        with ctx.handler.compute_context(PipelineComputeKind.backward_weight, self.stage_idx, self.microbatch_idx):
+            stage.backward_weight_one_chunk(microbatch_index=self.microbatch_idx)
 
     @property
     def work_type(self) -> ActionWorkType:

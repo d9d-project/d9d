@@ -6,7 +6,7 @@ from torch.autograd.profiler import record_function
 from torch.distributed import ProcessGroup
 
 from d9d import pytree
-from d9d.pipelining.api import PipelineLossFn, PipelineResultFn, PipelineSchedule
+from d9d.pipelining.api import PipelineSchedule, PipelineStepHandler
 from d9d.pipelining.api.tensor import TensorSpec
 from d9d.pipelining.stage import PipelineStage
 
@@ -107,7 +107,7 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
         self,
         inputs_microbatches: tuple[Any, ...],
         shared_microbatches: tuple[Any, ...],
-        callback: PipelineLossFn | PipelineResultFn,
+        handler: PipelineStepHandler[Any],
     ):
         num_microbatches = len(inputs_microbatches)
         if num_microbatches == 0:
@@ -125,7 +125,7 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
         program = self._programs.program_for(num_microbatches)
         self._configure_buffers(inputs_microbatches, program.has_backward)
 
-        callback_fn = PipelineLossHandler(callback) if program.has_backward else PipelineResultHandler(callback)
+        callback_fn = PipelineLossHandler(handler) if program.has_backward else PipelineResultHandler(handler)
 
         _logger.debug("Begin pipeline step")
 
@@ -138,6 +138,7 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
             communications=self._comm_handler,
             pipeline_inputs_microbatches=inputs_microbatches,
             pipeline_shared_microbatches=shared_microbatches,
+            handler=handler,
         )
 
         for action in program.program_this_rank:

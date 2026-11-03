@@ -1,13 +1,7 @@
 import abc
 import typing
 
-from .types import (
-    PipelineLossFn,
-    PipelineResultFn,
-    TPipelineInput,
-    TPipelineOutput,
-    TSharedInput,
-)
+from .types import PipelineStepHandler, TPipelineInput, TPipelineOutput, TSharedInput
 
 
 class PipelineSchedule(abc.ABC, typing.Generic[TPipelineInput, TSharedInput, TPipelineOutput]):
@@ -16,7 +10,7 @@ class PipelineSchedule(abc.ABC, typing.Generic[TPipelineInput, TSharedInput, TPi
     Type parameters:
         TPipelineInput: The ``PipelineInput`` fed to the first stage.
         TSharedInput: The ``SharedInput`` fed to every stage.
-        TPipelineOutput: The ``PipelineOutput`` produced by the last stage and handed to the output processing callback.
+        TPipelineOutput: The ``PipelineOutput`` produced by the last stage and handed to the step handler.
     """
 
     @abc.abstractmethod
@@ -24,7 +18,7 @@ class PipelineSchedule(abc.ABC, typing.Generic[TPipelineInput, TSharedInput, TPi
         self,
         inputs_microbatches: tuple[TPipelineInput, ...],
         shared_microbatches: tuple[TSharedInput, ...],
-        callback: PipelineLossFn[TPipelineOutput] | PipelineResultFn[TPipelineOutput],
+        handler: PipelineStepHandler[TPipelineOutput],
     ):
         """Executes a single pipeline step over one pack of microbatches.
 
@@ -33,6 +27,6 @@ class PipelineSchedule(abc.ABC, typing.Generic[TPipelineInput, TSharedInput, TPi
         Args:
             inputs_microbatches: Per-microbatch ``PipelineInput`` (fed to the first pipeline stage).
             shared_microbatches: Per-microbatch ``SharedInput`` (fed to every pipeline stage).
-            callback: Function to compute loss or process pipeline results.
+            handler: The code that the step runs around each model compute and on the outputs of the last stage.
         """
         ...

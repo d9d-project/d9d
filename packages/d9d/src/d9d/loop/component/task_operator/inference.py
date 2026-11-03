@@ -4,6 +4,7 @@ from torch.profiler import record_function
 
 from d9d.data import MicrobatchPack
 from d9d.dist_context import DistributedContext
+from d9d.pipelining.api import PipelineStepHandler
 from d9d.pipelining.factory import PipelineScheduleInfo
 from d9d.pytree import PyTree
 
@@ -18,10 +19,10 @@ TPipelineOutput = typing.TypeVar("TPipelineOutput")
 TState = typing.TypeVar("TState", bound=PyTree)
 
 
-class InferenceProcessor(typing.Generic[TPipelineOutput, TState]):
-    """Processor of model outputs during inference or evaluation.
+class InferenceStepHandler(PipelineStepHandler[TPipelineOutput], typing.Generic[TPipelineOutput, TState]):
+    """The step handler that processes model outputs during inference or evaluation.
 
-    This component retrieves the per-microbatch state and delegates the output processing logic to the
+    It retrieves the per-microbatch state and delegates the output processing logic to the
     user-defined inference task.
     """
 
@@ -30,7 +31,7 @@ class InferenceProcessor(typing.Generic[TPipelineOutput, TState]):
         state: PipelineStateHandler[TState],
         task: InferenceTask[typing.Any, typing.Any, typing.Any, TPipelineOutput, TState],
     ):
-        """Constructs the ``InferenceProcessor`` object.
+        """Constructs the ``InferenceStepHandler`` object.
 
         Args:
             state: Handler for the per-microbatch pipeline state.
@@ -39,15 +40,15 @@ class InferenceProcessor(typing.Generic[TPipelineOutput, TState]):
         self._state = state
         self._task = task
 
-    def __call__(self, pipeline_outputs: TPipelineOutput, microbatch_idx: int) -> None:
+    def process_outputs(self, outputs: TPipelineOutput, microbatch_idx: int) -> None:
         """Processes model outputs for a specific microbatch.
 
         Args:
-            pipeline_outputs: The ``PipelineOutput`` produced by the last stage.
+            outputs: The ``PipelineOutput`` produced by the last stage.
             microbatch_idx: Index of the current microbatch within the step's pack.
         """
         with record_function("Process Outputs"), self._state.scope(microbatch_idx) as state:
-            self._task.process_outputs(ProcessOutputsContext(pipeline_results=pipeline_outputs, state=state))
+            self._task.process_outputs(ProcessOutputsContext(pipeline_results=outputs, state=state))
 
 
 class InferenceTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPipelineOutput, TState]):
@@ -87,7 +88,7 @@ class InferenceTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput,
                 self._pipeline.schedule.step(
                     inputs_microbatches=inputs_microbatches,
                     shared_microbatches=shared_microbatches,
-                    callback=InferenceProcessor(task=self._task, state=self._pipeline_state),
+                    handler=InferenceStepHandler(task=self._task, state=self._pipeline_state),
                 )
             finally:
                 self._pipeline_state.reset()
