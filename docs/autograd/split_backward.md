@@ -12,7 +12,7 @@ A pipeline stage sends the gradients of its inputs to the previous stage. The we
 *   **`stage_backward_weight()`**: Replays the captured gradients and accumulates the weight gradients.
 *   **`stage_backward_full()`**: Runs both phases in one backward pass.
 
-The result of `stage_backward_input()` keeps the autograd graph alive. Keep it until you call `stage_backward_weight()`.
+The `PendingWeightBackward` from `stage_backward_input()` keeps the autograd graph alive. Keep it until you call `stage_backward_weight()`.
 
 ## The Global Grad Context
 
@@ -77,12 +77,11 @@ To split the backward pass in your own schedule, call the two phases. They set t
 ```python
 from d9d.autograd.split_backward import stage_backward_input, stage_backward_weight
 
-# Phase 1: the input gradients. Keep the result until phase 2, it holds the autograd graph.
-result = stage_backward_input(outputs, output_grads, inputs, weights=model.parameters())
-input_grads = result.input_grads  # Send them to the previous stage.
+# Phase 1: the input gradients. Send them to the previous stage, and keep `pending` until phase 2.
+input_grads, pending = stage_backward_input(outputs, output_grads, inputs, weights=model.parameters())
 
 # Phase 2, later in the schedule: the weight gradients.
-stage_backward_weight(model.parameters(), result.param_groups)
+stage_backward_weight(pending)
 ```
 
 If you run the backward pass without these functions, set the context yourself:

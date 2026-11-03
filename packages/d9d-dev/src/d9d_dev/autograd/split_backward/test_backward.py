@@ -60,7 +60,7 @@ def test_split_backward_correctness():
 
     hook_state = register_pp_hooks(model)
 
-    results = stage_backward_input(
+    input_grads, pending = stage_backward_input(
         outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x, y], weights=model.parameters()
     )
 
@@ -71,8 +71,8 @@ def test_split_backward_correctness():
     assert y.grad is None
 
     # Check input gradients immediately
-    assert torch.allclose(results.input_grads[0], orig_snapshot["x"]), "Input gradients mismatch in split phase"
-    assert results.input_grads[1] is None
+    assert torch.allclose(input_grads[0], orig_snapshot["x"]), "Input gradients mismatch in split phase"
+    assert input_grads[1] is None
 
     # Check weights are NOT updated yet
     assert model.w1.grad is None
@@ -80,11 +80,11 @@ def test_split_backward_correctness():
     assert model.w3.grad is None
 
     # trigger GC to simulate cleaning up unused objects
-    results.input_grads = None
+    input_grads = None
     gc.collect()
 
     # B. Backward Weight Phase
-    stage_backward_weight(weights=model.parameters(), param_groups=results.param_groups)
+    stage_backward_weight(pending)
 
     check_pp_hooks_ran(hook_state, 1)
 
@@ -97,7 +97,7 @@ def test_split_backward_correctness():
     assert torch.allclose(model.w2.grad, orig_snapshot["w2"])
     assert torch.allclose(model.w3.grad, orig_snapshot["w3"])
 
-    for group in results.param_groups:
+    for group in pending.param_groups:
         # Check cleanup happens inside `stage_backward_weight` (it sets grads/intermediates to None)
         assert group.grads is None
         assert group.intermediates is None
@@ -160,10 +160,12 @@ def test_split_backward_multi_output_node(loss_fn):
     x.grad, w.grad = None, None
 
     loss = loss_fn(x, w)
-    results = stage_backward_input(outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x], weights=iter([w]))
-    stage_backward_weight(weights=iter([w]), param_groups=results.param_groups)
+    input_grads, pending = stage_backward_input(
+        outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x], weights=[w]
+    )
+    stage_backward_weight(pending)
 
-    assert torch.allclose(results.input_grads[0], expected_x_grad)
+    assert torch.allclose(input_grads[0], expected_x_grad)
     assert torch.allclose(w.grad, expected_w_grad)
 
 
@@ -188,11 +190,13 @@ def test_split_backward_weight_reused_downstream(loss_fn, num_uses):
     x.grad, w.grad = None, None
 
     loss = loss_fn(x, w)
-    results = stage_backward_input(outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x], weights=iter([w]))
-    assert [len(group.intermediates) for group in results.param_groups] == [num_uses]
-    stage_backward_weight(weights=iter([w]), param_groups=results.param_groups)
+    input_grads, pending = stage_backward_input(
+        outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x], weights=[w]
+    )
+    assert [len(group.intermediates) for group in pending.param_groups] == [num_uses]
+    stage_backward_weight(pending)
 
-    assert torch.allclose(results.input_grads[0], expected_x_grad)
+    assert torch.allclose(input_grads[0], expected_x_grad)
     assert torch.allclose(w.grad, expected_w_grad)
 
 
@@ -213,12 +217,67 @@ def test_split_backward_weight_reused_around_another_weight():
     x.grad, wa.grad, wb.grad = None, None, None
 
     loss = loss_fn()
-    results = stage_backward_input(
-        outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x], weights=iter([wa, wb])
+    input_grads, pending = stage_backward_input(
+        outputs=[loss], output_grads=[torch.ones_like(loss)], inputs=[x], weights=[wa, wb]
     )
-    assert sorted(len(group.intermediates) for group in results.param_groups) == [1, 2]
-    stage_backward_weight(weights=iter([wa, wb]), param_groups=results.param_groups)
+    assert sorted(len(group.intermediates) for group in pending.param_groups) == [1, 2]
+    stage_backward_weight(pending)
 
-    assert torch.allclose(results.input_grads[0], expected_x_grad)
+    assert torch.allclose(input_grads[0], expected_x_grad)
     assert torch.allclose(wa.grad, expected_wa_grad)
     assert torch.allclose(wb.grad, expected_wb_grad)
+
+
+def _independent_output(shared_weight: bool):
+    # The second output does not depend on the inputs, so the input backward never reaches it.
+    weight = torch.nn.Parameter(torch.randn(4, 4))
+    independent = torch.nn.Parameter(torch.randn(4, 4))
+    inputs = torch.randn(2, 4, requires_grad=True)
+
+    def forward():
+        transformed = weight.square()
+        return [inputs @ transformed, (transformed if shared_weight else independent).square()]
+
+    return forward, [torch.randn(2, 4), torch.randn(4, 4)], [inputs], [weight, independent]
+
+
+def _overlapping_groups():
+    # ``shared`` joins the groups of ``first`` and ``second``, so all three end up in one group.
+    first = torch.nn.Parameter(torch.randn(4))
+    second = torch.nn.Parameter(torch.randn(4))
+    shared = torch.nn.Parameter(torch.randn(4))
+    inputs = [torch.randn(4, requires_grad=True), torch.randn(4, requires_grad=True)]
+
+    def forward():
+        return [(inputs[0] * (first + shared) + inputs[1] * (second + shared)).sum()]
+
+    return forward, None, inputs, [first, second, shared]
+
+
+@pytest.mark.local
+@pytest.mark.parametrize(
+    "case",
+    [
+        pytest.param(lambda: _independent_output(shared_weight=False), id="independent_output"),
+        pytest.param(lambda: _independent_output(shared_weight=True), id="independent_output_shared_weight"),
+        pytest.param(_overlapping_groups, id="overlapping_groups"),
+    ],
+)
+def test_split_backward_matches_full_backward(case):
+    forward, output_grads, inputs, weights = case()
+    torch.autograd.backward(forward(), output_grads)
+    expected_inputs = [value.grad for value in inputs]
+    expected_weights = [weight.grad for weight in weights]
+    for value in (*inputs, *weights):
+        value.grad = None
+
+    input_grads, pending = stage_backward_input(forward(), output_grads, inputs, weights)
+    assert all(weight.grad is None for weight in weights)
+    stage_backward_weight(pending)
+    with pytest.raises(ValueError, match="already ran"):
+        stage_backward_weight(pending)
+
+    for actual, expected in zip(input_grads, expected_inputs, strict=True):
+        torch.testing.assert_close(actual, expected)
+    for weight, expected in zip(weights, expected_weights, strict=True):
+        torch.testing.assert_close(weight.grad, expected)

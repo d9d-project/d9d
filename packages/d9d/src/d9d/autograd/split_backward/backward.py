@@ -1,11 +1,11 @@
 from collections import defaultdict, deque
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
-from typing import Any, cast
+from typing import cast
 
 import torch
 from torch import nn
-from torch.autograd.graph import GradientEdge, Node
+from torch.autograd.graph import GradientEdge, Node, get_gradient_edge
 
 from .context import GLOBAL_GRAD_CONTEXT, GradDirection
 
@@ -137,7 +137,7 @@ def _reverse_closure(
 
 
 def _get_param_groups(
-    inputs: list[Node], params: list[Node], reverse_edges_dict: dict[Node, list[Node]]
+    inputs_closure: set[Node], params: list[Node], reverse_edges_dict: dict[Node, list[Node]]
 ) -> list[ParamGroup]:
     """Clusters parameters based on their dependencies on inputs.
 
@@ -145,47 +145,39 @@ def _get_param_groups(
     Parameters that share intermediates go into one group.
 
     Args:
-        inputs: Gradient functions of the input tensors.
+        inputs_closure: The nodes that the gradient functions of the input tensors reach in the reverse graph.
         params: Gradient functions of the parameter tensors.
         reverse_edges_dict: The reverse autograd graph.
 
     Returns:
         A list of distinct parameter groups.
     """
-    inputs_closure, _ = _reverse_closure(inputs, set(), reverse_edges_dict)
-
-    node_to_group_map: dict[Node, dict[str, set[Node]]] = {}
+    groups_by_intermediate: dict[Node, dict[str, set[Node]]] = {}
 
     for param in params:
         _, intersected_inputs = _reverse_closure([param], inputs_closure, reverse_edges_dict)
 
-        current_dict = {"params": {param}, "intermediates": intersected_inputs}
+        merged_group = {"params": {param}, "intermediates": intersected_inputs}
 
-        target_dict = None
-        for intermediate_node in intersected_inputs:
-            if intermediate_node in node_to_group_map:
-                target_dict = node_to_group_map[intermediate_node]
-                break
+        # A parameter can connect several earlier groups, so it merges all of them into one.
+        overlapping_groups: dict[int, dict[str, set[Node]]] = {}
+        for node in intersected_inputs:
+            group = groups_by_intermediate.get(node)
+            if group is not None:
+                overlapping_groups[id(group)] = group
+        for group in overlapping_groups.values():
+            merged_group["params"].update(group["params"])
+            merged_group["intermediates"].update(group["intermediates"])
 
-        if target_dict is not None:
-            target_dict["params"].update(current_dict["params"])
-            target_dict["intermediates"].update(current_dict["intermediates"])
-            current_dict = target_dict
+        for intermediate_node in merged_group["intermediates"]:
+            groups_by_intermediate[intermediate_node] = merged_group
 
-        for intermediate_node in current_dict["intermediates"]:
-            node_to_group_map[intermediate_node] = current_dict
-
-    # Several intermediates map to the same group dict, so deduplicate by identity.
-    unique_groups = []
-    seen_ids = set()
-    for group_dict in node_to_group_map.values():
-        if id(group_dict) not in seen_ids:
-            seen_ids.add(id(group_dict))
-            unique_groups.append(
-                ParamGroup(params=group_dict["params"], intermediates=list(group_dict["intermediates"]))
-            )
-
-    return unique_groups
+    # Several intermediates map to the same group, so deduplicate by identity.
+    unique_groups = {id(group): group for group in groups_by_intermediate.values()}
+    return [
+        ParamGroup(params=group["params"], intermediates=list(group["intermediates"]))
+        for group in unique_groups.values()
+    ]
 
 
 def _make_capture_hook(group: ParamGroup, idx: int) -> Callable[[tuple[torch.Tensor | None, ...]], None]:
@@ -208,28 +200,34 @@ def _make_clamp_hook(
     return _hook
 
 
-@dataclass
-class BackwardInputResult:
-    """The results of the input backward phase.
+@dataclass(kw_only=True, slots=True)
+class PendingWeightBackward:
+    """The weight backward pass that ``stage_backward_input`` deferred.
+
+    Pass it to ``stage_backward_weight`` once. It keeps the autograd graph alive until then.
 
     Attributes:
-        input_grads: The gradients computed for the input tensors.
+        weights: The weights to accumulate the gradients into.
         param_groups: The parameter groups with the gradients captured for the weight backward.
-        grad_ownership_tokens: References that keep the autograd graph alive for the weight
-            backward.
+        independent_output_grads: The gradient edges and the gradients of the outputs that do not depend on the
+            inputs.
+        outputs: The outputs of the forward pass.
+        done: Whether ``stage_backward_weight`` already ran it.
     """
 
-    input_grads: list[torch.Tensor | None]
+    weights: list[nn.Parameter]
     param_groups: list[ParamGroup]
-    grad_ownership_tokens: list[Any]
+    independent_output_grads: list[tuple[GradientEdge, torch.Tensor]]
+    outputs: list[torch.Tensor]
+    done: bool = False
 
 
 def stage_backward_input(
     outputs: list[torch.Tensor],
     output_grads: list[torch.Tensor] | None,
     inputs: list[torch.Tensor],
-    weights: Iterator[nn.Parameter],
-) -> BackwardInputResult:
+    weights: Iterable[nn.Parameter],
+) -> tuple[list[torch.Tensor | None], PendingWeightBackward]:
     """Runs the first phase of a split backward pass: the input gradients.
 
     This function computes the gradients of ``inputs`` and defers the gradients of ``weights``. It
@@ -240,18 +238,29 @@ def stage_backward_input(
         outputs: The output tensors of the forward pass.
         output_grads: The gradients arriving for the outputs.
         inputs: The input tensors from the forward pass.
-        weights: An iterator over the model parameters (weights).
+        weights: The model parameters (weights).
 
     Returns:
-        The input gradients, the parameter groups with captured gradients, and the tokens that keep
-        the graph alive.
+        The gradients of ``inputs``, in order, and the deferred weight backward pass. The entry is ``None`` for an
+        input that got no gradient.
     """
     outputs_grad_fn = [grad_fn for x in outputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
     inputs_grad_fn = [grad_fn for x in inputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
+    weights = list(weights)
     weights_grad_fn = [grad_fn for x in weights if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
 
     reverse_edges = _construct_reverse_graph(outputs_grad_fn)
-    param_groups = _get_param_groups(inputs_grad_fn, weights_grad_fn, reverse_edges)
+    inputs_closure, _ = _reverse_closure(inputs_grad_fn, set(), reverse_edges)
+    param_groups = _get_param_groups(inputs_closure, weights_grad_fn, reverse_edges)
+
+    if output_grads is None:
+        output_grads = [torch.ones_like(o) for o in outputs]
+
+    independent_output_grads = [
+        (get_gradient_edge(output), grad)
+        for output, grad in zip(outputs, output_grads, strict=True)
+        if output.requires_grad and _get_grad_fn_or_grad_acc(output) not in inputs_closure
+    ]
 
     hook_handles = []
 
@@ -259,9 +268,6 @@ def stage_backward_input(
         if group.intermediates:
             for i, node in enumerate(group.intermediates):
                 hook_handles.append(node.register_prehook(_make_capture_hook(group, i)))
-
-    if output_grads is None:
-        output_grads = [torch.ones_like(o) for o in outputs]
 
     inputs_requiring_grad = [inp for inp in inputs if inp.requires_grad]
 
@@ -281,38 +287,35 @@ def stage_backward_input(
     for handle in hook_handles:
         handle.remove()
 
-    return BackwardInputResult(
-        input_grads=final_input_grads,
+    return final_input_grads, PendingWeightBackward(
+        weights=weights,
         param_groups=param_groups,
-        grad_ownership_tokens=outputs,
+        independent_output_grads=independent_output_grads,
+        outputs=outputs,
     )
 
 
 def stage_backward_weight(  # noqa: C901 - edge collection and the single backward pass share the clamp hooks
-    weights: Iterator[nn.Parameter], param_groups: list[ParamGroup], retain_graph: bool = False
-) -> tuple[torch.Tensor | None, ...]:
+    pending: PendingWeightBackward,
+):
     """Runs the second phase of a split backward pass: the weight gradients.
 
-    This function replays the gradients that ``stage_backward_input`` captured in the param groups.
-    It runs one backward pass from all intermediate nodes and accumulates the weight gradients. The
-    param groups are consumed.
+    It accumulates the gradients of the weights that ``stage_backward_input`` deferred.
 
     Args:
-        weights: An iterator over the model parameters to extract gradients for.
-        param_groups: The list of groups containing captured intermediate gradients.
-        retain_graph: Whether to retain the graph after this backward pass.
-
-    Returns:
-        The gradients of ``weights``, in order.
+        pending: The weight backward pass from ``stage_backward_input``.
 
     Raises:
-        ValueError: If no gradient was captured for an intermediate node of a group.
+        ValueError: If ``pending`` already ran, or if no gradient was captured for an intermediate node of a group.
     """
-    grad_acc_to_weight = {}
-    all_weights = []  # Keep order
+    if pending.done:
+        raise ValueError("The weight backward pass already ran. Call stage_backward_input() again for a new one.")
+    pending.done = True
+    independent_output_grads, pending.independent_output_grads = pending.independent_output_grads, []
+    pending.outputs = []
 
-    for weight in weights:
-        all_weights.append(weight)
+    grad_acc_to_weight = {}
+    for weight in pending.weights:
         grad_acc = _get_grad_fn_or_grad_acc(weight)
         if grad_acc is not None:
             grad_acc_to_weight[grad_acc] = weight
@@ -322,7 +325,7 @@ def stage_backward_weight(  # noqa: C901 - edge collection and the single backwa
     captured: list[tuple[Node, tuple[torch.Tensor | None, ...]]] = []
     inputs_for_backward = []
 
-    for group in param_groups:
+    for group in pending.param_groups:
         if group.grads and group.intermediates:
             for grads_tuple, intermediate in zip(group.grads, group.intermediates, strict=True):
                 if grads_tuple is None:
@@ -342,8 +345,9 @@ def stage_backward_weight(  # noqa: C901 - edge collection and the single backwa
         group.intermediates = None
         group.grads = None
 
-    if not valid_edges or not inputs_for_backward:
-        return tuple(w.grad for w in all_weights)
+    run_groups = bool(valid_edges) and bool(inputs_for_backward)
+    if not run_groups and not independent_output_grads:
+        return
 
     # Run all groups in one backward pass. A path from one intermediate to a weight can cross nodes of
     # another group, so separate passes would free the graph under each other. Such a path also adds
@@ -354,15 +358,23 @@ def stage_backward_weight(  # noqa: C901 - edge collection and the single backwa
         for intermediate, grads_tuple in captured:
             clamp_handles.append(intermediate.register_prehook(_make_clamp_hook(grads_tuple)))
     try:
-        with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.weight):
-            torch.autograd.backward(
-                tensors=valid_edges,
-                grad_tensors=valid_grad_outputs,
-                retain_graph=retain_graph,
-                inputs=inputs_for_backward,
-            )
+        if run_groups:
+            with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.weight):
+                # The outputs that do not depend on the inputs can share nodes with the groups.
+                torch.autograd.backward(
+                    tensors=valid_edges,
+                    grad_tensors=valid_grad_outputs,
+                    inputs=inputs_for_backward,
+                    retain_graph=bool(independent_output_grads),
+                )
+        if independent_output_grads:
+            # Such an output reaches no intermediate, but its graph can pass activation gradients between weights.
+            with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.inputs, GradDirection.weight):
+                torch.autograd.backward(
+                    tensors=[edge for edge, _ in independent_output_grads],
+                    grad_tensors=[grad for _, grad in independent_output_grads],
+                    inputs=list(grad_acc_to_weight.values()),
+                )
     finally:
         for handle in clamp_handles:
             handle.remove()
-
-    return tuple(w.grad for w in all_weights)

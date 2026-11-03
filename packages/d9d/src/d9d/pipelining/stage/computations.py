@@ -4,11 +4,10 @@ from typing import Generic, cast
 
 import torch
 from torch import nn
-from torch.autograd.graph import Node
 
 from d9d import pytree
 from d9d.autograd.split_backward import (
-    ParamGroup,
+    PendingWeightBackward,
     stage_backward_full,
     stage_backward_input,
     stage_backward_weight,
@@ -131,19 +130,6 @@ class _DeferredFullBackward:
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)
-class _DeferredWeightBackward:
-    """A weight-gradient-only backward pass to replay from saved param groups (the Zero Bubble split).
-
-    Attributes:
-        param_groups: The parameter groups whose weight gradients still need accumulating.
-        ownership_tokens: References that keep the pending gradient graph alive.
-    """
-
-    param_groups: list[ParamGroup]
-    ownership_tokens: list[Node]
-
-
-@dataclasses.dataclass(kw_only=True, slots=True)
 class _BackwardState:
     """Per-microbatch backward state carried between the backward phases.
 
@@ -156,7 +142,7 @@ class _BackwardState:
     """
 
     sendable_grads: _SendableInputGrads | None
-    pending_weight: _DeferredFullBackward | _DeferredWeightBackward | None
+    pending_weight: _DeferredFullBackward | PendingWeightBackward | None
 
 
 @dataclasses.dataclass(slots=True)
@@ -294,7 +280,7 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
         output_leaves, output_grad_leaves = self._seed_leaves(seed)
 
         if self._has_input_peer:
-            results = stage_backward_input(
+            input_grads, pending_weight = stage_backward_input(
                 outputs=output_leaves,
                 output_grads=output_grad_leaves,
                 inputs=input_leaves,
@@ -302,11 +288,8 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
             )
 
             self._cache[microbatch_index] = _BackwardState(
-                sendable_grads=_SendableInputGrads(leaves=results.input_grads, treespec=input_spec),
-                pending_weight=_DeferredWeightBackward(
-                    param_groups=results.param_groups,
-                    ownership_tokens=results.grad_ownership_tokens,
-                ),
+                sendable_grads=_SendableInputGrads(leaves=input_grads, treespec=input_spec),
+                pending_weight=pending_weight,
             )
         else:
             self._cache[microbatch_index] = _BackwardState(
@@ -346,8 +329,8 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
                     output_grads=pending.output_grads,
                     inputs=pending.inputs,
                 )
-            case _DeferredWeightBackward():
-                stage_backward_weight(weights=self._parameters_with_grad(), param_groups=pending.param_groups)
+            case PendingWeightBackward():
+                stage_backward_weight(pending)
             case None:
                 raise ValueError(
                     f"No weight backward is pending on stage ({self._stage_idx}) for microbatch_index "
