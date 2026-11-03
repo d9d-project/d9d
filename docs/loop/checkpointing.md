@@ -18,6 +18,8 @@ A training checkpoint also holds:
 *   The optimizer and the LR scheduler.
 *   The metrics and the experiment tracker.
 
+A checkpoint holds optimizer state for every trainable parameter, also for one that has not had a gradient yet. For such a parameter, the job creates placeholder state with an optimizer step on zero gradients at a zero learning rate. The optimizer itself keeps no placeholder state, also after a load, so its steps stay the same as without checkpoints. A custom optimizer must not change the parameters in such a step.
+
 With `model_stage_factory.checkpoint_only_trainable_parameters`, a checkpoint holds only the parameters that require gradients, e.g. the LoRA adapters. On resume, the job loads the frozen parameters again from the model state that `model_stage_factory.source_checkpoint` points to.
 
 A checkpoint holds no state of the global generators. The loop derives their seeds from `base_seed` and the position of each call, e.g. the step. So a resumed job draws the same random numbers as an uninterrupted one, if user code follows the [rules](./determinism.md#rules-for-user-code). See [Random Numbers in the Loop](./determinism.md).
