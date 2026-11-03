@@ -16,6 +16,7 @@ from d9d_dev.pipelining.definitions import (
     build_pp_inputs,
     build_pp_model,
 )
+from d9d_dev.pipelining.step_handler import FunctionStepHandler
 
 
 def _do_standard_forward(stages: list[PipelineModel], x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
@@ -79,7 +80,9 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
     shared_microbatches = tuple(_Shared(y=y) for y in microbatch_ys)
 
     schedule_info.schedule.step(
-        inputs_microbatches=inputs_microbatches, shared_microbatches=shared_microbatches, callback=_result_fn
+        inputs_microbatches=inputs_microbatches,
+        shared_microbatches=shared_microbatches,
+        handler=FunctionStepHandler(_result_fn),
     )
 
     if pp_mesh.get_local_rank() == pp_mesh.size() - 1:
@@ -121,7 +124,9 @@ def test_inference_e2e_local():
     assert isinstance(schedule_info.schedule, OfflinePipelineExecutor)
 
     schedule_info.schedule.step(
-        inputs_microbatches=(_Transfer(x=x),), shared_microbatches=(_Shared(y=y),), callback=_result_fn
+        inputs_microbatches=(_Transfer(x=x),),
+        shared_microbatches=(_Shared(y=y),),
+        handler=FunctionStepHandler(_result_fn),
     )
 
     # trace should have exactly one result at index 0 because OfflineExecutor does not shard

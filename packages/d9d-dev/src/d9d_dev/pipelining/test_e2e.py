@@ -25,6 +25,7 @@ from d9d_dev.pipelining.definitions import (
     extract_grad,
     register_pp_hooks,
 )
+from d9d_dev.pipelining.step_handler import FunctionStepHandler
 
 
 def _assert_no_live_buffers(stage_object: PipelineStage):
@@ -116,7 +117,9 @@ def test_e2e(
     shared_microbatches = tuple(_Shared(y=y_mb) for y_mb in torch.tensor_split(y, n_microbatches, dim=0))
 
     schedule_info.schedule.step(
-        inputs_microbatches=inputs_microbatches, shared_microbatches=shared_microbatches, callback=_loss_fn
+        inputs_microbatches=inputs_microbatches,
+        shared_microbatches=shared_microbatches,
+        handler=FunctionStepHandler(_loss_fn),
     )
 
     assert x.grad is None
@@ -185,7 +188,9 @@ def test_e2e_local(freeze_w1: bool):
     assert schedule_info.has_last_stage
 
     schedule_info.schedule.step(
-        inputs_microbatches=(_Transfer(x=x),), shared_microbatches=(_Shared(y=y),), callback=_loss_fn
+        inputs_microbatches=(_Transfer(x=x),),
+        shared_microbatches=(_Shared(y=y),),
+        handler=FunctionStepHandler(_loss_fn),
     )
 
     if freeze_w1:

@@ -17,6 +17,7 @@ from d9d_dev.nn.helper import (
     microbatch_slice,
     sync_grads_manually,
 )
+from d9d_dev.pipelining.step_handler import FunctionStepHandler
 
 _N_MICROBATCHES = 2
 
@@ -101,7 +102,7 @@ def test_consistent_to_itself_dist(
     schedule_info.schedule.step(
         inputs_microbatches=inputs_microbatches,
         shared_microbatches=shared_microbatches,
-        callback=_callback,
+        handler=FunctionStepHandler(_callback),
     )
 
     # Compare Loss & Grads
