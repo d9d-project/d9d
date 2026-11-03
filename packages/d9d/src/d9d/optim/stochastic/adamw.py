@@ -102,9 +102,20 @@ class StochasticAdamW(Optimizer):
     def load_state_dict(self, state_dict: StateDict) -> None:
         """Loads the optimizer state, including the state of ``generator`` if both are present."""
         generator_state = state_dict.pop(_GENERATOR_STATE_KEY, None)
+        super().load_state_dict(state_dict)
+
+        # Optimizer.load_state_dict() casts moments to the parameter dtype. Restore from the original values
+        # because converting those rounded moments back to fp32 cannot recover the checkpoint's precision.
+        for saved_group, group in zip(state_dict["param_groups"], self.param_groups, strict=True):
+            for saved_id, param in zip(saved_group["params"], group["params"], strict=True):
+                saved_state = state_dict["state"].get(saved_id)
+                if not saved_state:
+                    continue
+                for key in ("exp_avg", "exp_avg_sq"):
+                    self.state[param][key] = saved_state[key].to(device=param.device, dtype=group["state_dtype"])
+
         if self._generator is not None and generator_state is not None:
             self._generator.set_state(generator_state)
-        super().load_state_dict(state_dict)
 
     @torch.no_grad()
     def step(self, closure: None = None) -> None:  # ty: ignore[invalid-method-override] - closures are not supported
