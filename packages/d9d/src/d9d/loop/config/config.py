@@ -40,7 +40,8 @@ class DeterminismConfig(BaseModel):
     """Configuration for reproducibility and random number generation.
 
     Attributes:
-        base_seed: The base seed for the random number generators (Python, NumPy, PyTorch) on all ranks.
+        base_seed: The base seed of the job. The seeds of the global generators in all calls of user code are
+            derived from it.
     """
 
     model_config = ConfigDict(extra="forbid")

@@ -7,6 +7,7 @@ from d9d.data import DevicePackStream
 from d9d.dist_context import DistributedContext
 from d9d.metric.catalogue.container import ComposeMetric
 from d9d.optim import LRSchedulerProtocol, OptimizerProtocol
+from d9d.rng import SeedScope
 
 from .component import (
     GradientClipper,
@@ -35,6 +36,7 @@ class JobState(Stateful):
 
     Attributes:
         dist_context: The distributed context.
+        seed_scope: The root seed scope of the job.
         schedule: Component for tracking the current global step and total steps.
         garbage_collector: Component for manual control of Python garbage collection.
         checkpointer: Component responsible for saving and loading execution states.
@@ -45,6 +47,7 @@ class JobState(Stateful):
     """
 
     dist_context: DistributedContext
+    seed_scope: SeedScope
 
     schedule: JobSchedule
     garbage_collector: ManualGarbageCollector

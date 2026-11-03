@@ -6,6 +6,8 @@ from typing import Any, Generic, TypeVar
 
 from torch.profiler import record_function
 
+from d9d.rng import fork_rng_child
+
 TContext = TypeVar("TContext")
 
 
@@ -50,7 +52,7 @@ class EventBus:
         handlers = self._handlers[event]
         if not handlers:
             return
-        with record_function(f"Event {event.id}"):
+        with record_function(f"Event {event.id}"), fork_rng_child("event", event.id):
             for handler in handlers:
                 handler(context)
 
