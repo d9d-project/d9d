@@ -50,7 +50,7 @@ class EventModelStagesReadyContext:
     """Context provided when the model stages are initialized and parallelized.
 
     Attributes:
-        modules: The references to the model stages.
+        modules: The model stages of this rank, keyed by the global index of their pipeline stage.
     """
 
-    modules: list[nn.Module]
+    modules: dict[int, nn.Module]

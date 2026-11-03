@@ -11,7 +11,7 @@ from torch import nn
 def test_install_cleans_up_after_error(dist_ctx_factory):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())
     module = nn.Linear(4, 4)
-    tracked = TrackedModules(dist_ctx, [module], lambda _name, _tensor: True)
+    tracked = TrackedModules(dist_ctx, {0: module}, lambda _name, _tensor: True)
     manager = GradientManager(dist_ctx, tracked, GradientManagerConfig())
 
     with pytest.raises(RuntimeError, match="step failed"), manager.install():

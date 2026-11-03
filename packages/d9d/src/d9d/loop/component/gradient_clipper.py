@@ -32,7 +32,7 @@ class GradientClipper:
         self._parameter_groups: ParametersForNorm | None = None
 
     def _all_parameters(self):
-        for model in self._tracked_modules.modules:
+        for model in self._tracked_modules.modules.values():
             yield from model.parameters()
 
     @contextmanager

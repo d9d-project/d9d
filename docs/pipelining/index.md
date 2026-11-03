@@ -224,6 +224,7 @@ shared_microbatches = tuple(MyShared(position_ids=pos) for pos in my_position_mi
 targets_microbatches = [...]  # One target tensor per microbatch
 
 # 3. Build the schedule and the model stages (the handler is passed per step, not here).
+#    `modules` maps the global index of each stage on this rank to its module.
 step_handler = MyStepHandler(targets_microbatches)
 schedule_info, modules = build_schedule(
     pp_mesh=pp_mesh,

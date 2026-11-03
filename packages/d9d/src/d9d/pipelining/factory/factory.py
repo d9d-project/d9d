@@ -80,20 +80,20 @@ def build_program_builder(config: AnyPipelineScheduleConfig) -> PipelineProgramB
 def _build_schedule_local(
     program_builder: PipelineProgramBuilder,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
-) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
+) -> tuple[PipelineScheduleInfo, dict[int, nn.Module]]:
     stage_info = PipelineStageInfo(num_stages=1, current_stage=0)
 
     model = model_provider(stage_info)
     scheduler = OfflinePipelineExecutor(model=model, do_backward=program_builder.has_backward)
 
-    return PipelineScheduleInfo(schedule=scheduler, has_first_stage=True, has_last_stage=True), [model]
+    return PipelineScheduleInfo(schedule=scheduler, has_first_stage=True, has_last_stage=True), {0: model}
 
 
 def _build_schedule_distributed(
     pp_mesh: DeviceMesh,
     program_builder: PipelineProgramBuilder,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
-) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
+) -> tuple[PipelineScheduleInfo, dict[int, nn.Module]]:
     num_stages = program_builder.num_stages_per_rank * pp_mesh.size()
 
     stage_to_host = build_stage_to_host_rank_topology(
@@ -103,7 +103,7 @@ def _build_schedule_distributed(
     this_rank_stages = host_to_stage[pp_mesh.get_local_rank()]
 
     stages = []
-    modules = []
+    modules: dict[int, nn.Module] = {}
     has_first_stage = False
     has_last_stage = False
 
@@ -116,7 +116,7 @@ def _build_schedule_distributed(
             has_last_stage = True
 
         model = model_provider(stage_info)
-        modules.append(model)
+        modules[stage_idx] = model
         stage = PipelineStage(
             info=stage_info, module=model, group=pp_mesh.get_group(), stage_to_host_topology=stage_to_host
         )
@@ -137,7 +137,7 @@ def build_schedule(
     pp_mesh: DeviceMesh | None,
     program_builder: PipelineProgramBuilder,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
-) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
+) -> tuple[PipelineScheduleInfo, dict[int, nn.Module]]:
     """Constructs the pipeline schedule and instantiates model stages.
 
     With ``pp_mesh``, it builds a ``PipelineScheduleExecutor`` with the stages this rank hosts.
@@ -153,7 +153,8 @@ def build_schedule(
             for that stage.
 
     Returns:
-        A tuple of the schedule info and the list of modules created on this rank.
+        A tuple of the schedule info and the modules created on this rank, keyed by the global index of
+        their pipeline stage.
 
     Raises:
         ValueError: If ``pp_mesh`` has more than one dimension.

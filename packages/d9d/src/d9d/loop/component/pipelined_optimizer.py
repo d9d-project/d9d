@@ -1,7 +1,6 @@
 from typing import Any, cast
 
 import torch
-from torch.distributed import DeviceMesh
 from torch.profiler import record_function
 
 from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
@@ -15,35 +14,31 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
     optimizer. This class exposes them as one optimizer.
     """
 
-    def __init__(self, mesh_pp: DeviceMesh | None, optimizers: list[OptimizerProtocol]):
+    def __init__(self, optimizers: dict[int, OptimizerProtocol]):
         """Constructs the ``PipelinedOptimizer`` object.
 
         Args:
-            mesh_pp: The pipeline-parallel mesh, or ``None`` without pipeline parallelism.
-            optimizers: One optimizer per stage hosted on this rank.
+            optimizers: One optimizer per stage hosted on this rank, keyed by the global index of the stage.
         """
         super().__init__()
 
-        self._pp_rank = mesh_pp.get_local_rank() if mesh_pp is not None else 0
         self._optimizers = optimizers
         self._offload_mirror: dict[tuple[int, int, str], OffloadedTensor] | None = None
 
     def state_dict(self) -> dict[str, Any]:
-        pp_rank = self._pp_rank
-        return {f"pp_{pp_rank}_stage_{i}": optimizer.state_dict() for i, optimizer in enumerate(self._optimizers)}
+        return {f"stage_{stage_index}": optimizer.state_dict() for stage_index, optimizer in self._optimizers.items()}
 
     def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        pp_rank = self._pp_rank
-        for i, optimizer in enumerate(self._optimizers):
-            optimizer.load_state_dict(state_dict[f"pp_{pp_rank}_stage_{i}"])
+        for stage_index, optimizer in self._optimizers.items():
+            optimizer.load_state_dict(state_dict[f"stage_{stage_index}"])
 
     def step(self) -> None:
         with record_function("Optimizer Step"):
-            for optimizer in self._optimizers:
+            for optimizer in self._optimizers.values():
                 optimizer.step()
 
     def zero_grad(self) -> None:
-        for optimizer in self._optimizers:
+        for optimizer in self._optimizers.values():
             optimizer.zero_grad()
 
     def offload(self, ctx: OffloadContext) -> None:
@@ -63,7 +58,7 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
             raise RuntimeError("PipelinedOptimizer is already offloaded.")
 
         mirror: dict[tuple[int, int, str], OffloadedTensor] = {}
-        for optimizer_index, optimizer in enumerate(self._optimizers):
+        for optimizer_index, optimizer in enumerate(self._optimizers.values()):
             for param, param_state in cast(torch.optim.Optimizer, optimizer).state.items():
                 for key, value in param_state.items():
                     if not torch.is_tensor(value):
@@ -87,7 +82,7 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
             raise RuntimeError("PipelinedOptimizer is not offloaded.")
 
         device = ctx.device
-        for optimizer_index, optimizer in enumerate(self._optimizers):
+        for optimizer_index, optimizer in enumerate(self._optimizers.values()):
             for param, param_state in cast(torch.optim.Optimizer, optimizer).state.items():
                 for key, value in param_state.items():
                     if not torch.is_tensor(value):

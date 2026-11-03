@@ -36,7 +36,7 @@ from d9d.loop.event.catalogue import (
 
 class CustomTrainTask(TrainTask):
     def __init__(self):
-        self._modules = []
+        self._modules = {}
 
     def register_events(self, context: RegisterTaskEventsContext) -> None:
         # Registers every method of this instance marked with @subscribe.

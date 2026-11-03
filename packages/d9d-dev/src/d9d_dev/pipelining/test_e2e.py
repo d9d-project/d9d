@@ -93,10 +93,8 @@ def test_e2e(
     snapshot = _do_standard_backward(full_stage_modules, x, y)
 
     hooks = [register_pp_hooks(x) for x in full_stage_modules]
-    this_rank_stages = []
 
     def _model_provider(stage_info: PipelineStageInfo):
-        this_rank_stages.append(stage_info.current_stage)
         return full_stage_modules[stage_info.current_stage]
 
     loss_seen_microbatches = []
@@ -105,11 +103,12 @@ def test_e2e(
         loss_seen_microbatches.append(microbatch_idx)
         return microbatch.x.sum()
 
-    schedule_info, _ = build_schedule(
+    schedule_info, modules = build_schedule(
         pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
         program_builder=build_program_builder(schedule_config),
         model_provider=_model_provider,
     )
+    this_rank_stages = list(modules)
 
     not_this_rank_stages = [i for i in range(len(full_stage_modules)) if i not in this_rank_stages]
 
@@ -182,8 +181,7 @@ def test_e2e_local(freeze_w1: bool):
     )
 
     assert isinstance(schedule_info.schedule, OfflinePipelineExecutor)
-    assert len(modules) == 1
-    assert modules[0] is model
+    assert modules == {0: model}
     assert schedule_info.has_first_stage
     assert schedule_info.has_last_stage
 

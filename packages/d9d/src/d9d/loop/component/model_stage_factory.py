@@ -39,35 +39,30 @@ def _stateful_predicate_always(key: str, value: torch.Tensor) -> bool:
 
 
 class TrackedModules(Stateful, Offloadable):
-    """Wrapper of a list of model stages that manages their state for distributed checkpointing.
+    """Wrapper of the model stages of a rank that manages their state for distributed checkpointing.
 
     It implements the PyTorch Distributed ``Stateful`` protocol over all pipeline stages of the current
-    rank. State keys are namespaced by pipeline rank and stage, so they are unique across ranks.
+    rank. State keys hold the global index of each stage, so they are unique across ranks.
     """
 
     def __init__(
-        self, dist_context: DistributedContext, modules: list[nn.Module], stateful_predicate: StatefulPredicate
+        self, dist_context: DistributedContext, modules: dict[int, nn.Module], stateful_predicate: StatefulPredicate
     ):
         """Constructs the ``TrackedModules`` object.
 
         Args:
             dist_context: The distributed context.
-            modules: The model stages held by the current rank.
+            modules: The model stages held by the current rank, keyed by the global index of their pipeline stage.
             stateful_predicate: Selects the parameters and buffers stored in the state dict.
         """
-        if dist_context.mesh_params.is_distributed:
-            self._pp_rank = dist_context.mesh_for(REGULAR_DOMAIN)["pp"].get_local_rank()
-        else:
-            self._pp_rank = 0
-
         self._dist_context = dist_context
         self._modules = modules
         self._stateful_predicate = stateful_predicate
         self._offload_mirror: dict[int, OffloadedTensor] | None = None
 
     @property
-    def modules(self) -> list[nn.Module]:
-        """The model stages held by the current rank."""
+    def modules(self) -> dict[int, nn.Module]:
+        """The model stages held by the current rank, keyed by the global index of their pipeline stage."""
         return self._modules
 
     def _tensors(self) -> Iterator[torch.Tensor]:
@@ -77,7 +72,7 @@ class TrackedModules(Stateful, Offloadable):
             An iterator over all tensors in the tracked modules.
         """
         return itertools.chain.from_iterable(
-            itertools.chain(module.parameters(), module.buffers()) for module in self._modules
+            itertools.chain(module.parameters(), module.buffers()) for module in self._modules.values()
         )
 
     def offload(self, ctx: OffloadContext) -> None:
@@ -147,16 +142,13 @@ class TrackedModules(Stateful, Offloadable):
     def state_dict(self) -> dict[str, Any]:
         """Generates the state dictionary for all tracked modules.
 
-        The keys are namespaced by the current pipeline rank and stage index, e.g. ``pp_0_stage_0``.
+        The keys hold the global index of the pipeline stage, e.g. ``stage_0``, not the pipeline rank that holds it.
         Only parameters and buffers accepted by ``stateful_predicate`` are included.
 
         Returns:
             A dictionary containing the states of all managed modules.
         """
-        ret = {
-            f"pp_{self._pp_rank}_stage_{i}": self._state_dict_stage(module) for i, module in enumerate(self._modules)
-        }
-        return ret
+        return {f"stage_{stage_index}": self._state_dict_stage(module) for stage_index, module in self._modules.items()}
 
     def _load_state_dict_stage(self, module: nn.Module, state_dict: dict[str, Any]):
         whitelist = self._whitelisted_params(module)
@@ -174,14 +166,13 @@ class TrackedModules(Stateful, Offloadable):
         """Loads the state dictionary into the tracked modules.
 
         Args:
-            state_dict: The state dictionary to load. Must contain keys corresponding
-                to the pipeline rank and stage indices managed by this instance.
+            state_dict: The state dictionary to load. Must contain the keys of the stages held by this instance.
 
         Raises:
             ValueError: If keys accepted by ``stateful_predicate`` are missing or unexpected keys are present.
         """
-        for i, module in enumerate(self._modules):
-            self._load_state_dict_stage(module, state_dict[f"pp_{self._pp_rank}_stage_{i}"])
+        for stage_index, module in self._modules.items():
+            self._load_state_dict_stage(module, state_dict[f"stage_{stage_index}"])
 
 
 class ModelStageFactory:

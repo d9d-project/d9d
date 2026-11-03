@@ -189,7 +189,7 @@ class Inference:
         self._state = state
 
     def _enable_eval_mode(self):
-        for module in self._state.tracked_modules.modules:
+        for module in self._state.tracked_modules.modules.values():
             module.eval()
 
     def infer(self):
