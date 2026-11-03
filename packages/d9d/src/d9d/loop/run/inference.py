@@ -1,11 +1,13 @@
 import contextlib
+from collections.abc import Iterator
 
 import torch
 from tqdm import tqdm
 
-from d9d.data import build_device_pack_stream
-from d9d.dist_context import DeviceMeshParameters
+from d9d.data import MicrobatchPack, build_device_pack_stream
+from d9d.dist_context import BATCH_DOMAIN, DeviceMeshParameters, DistributedContext
 from d9d.pipelining.factory import PipelineScheduleInferenceConfig
+from d9d.rng import SeedScope, fork_rng, fork_rng_child
 
 from ..component import (
     DataParallelMicrobatchPackStream,
@@ -29,10 +31,7 @@ from ..control import (
     RegisterModelEventsContext,
     RegisterTaskEventsContext,
 )
-from ..determinism import set_seeds
-from ..event import (
-    EventBus,
-)
+from ..event import EventBus
 from ..event.catalogue.common import (
     EventConfigurationStartedContext,
     EventDataStreamReadyContext,
@@ -85,25 +84,37 @@ class InferenceConfigurator:
         self._model_provider = model_provider
         self._data_provider = data_provider
 
-    def _build_new_state(self) -> InferenceJobState:
-        dist_context = self._mesh.build()
-
+    def _build_new_state(self, dist_context: DistributedContext, seed_scope: SeedScope) -> InferenceJobState:
         pipelining_config = PipeliningConfig(schedule=PipelineScheduleInferenceConfig())
-
-        set_seeds(dist_context, seed=self._parameters.determinism.base_seed)
 
         timeout_manager = TimeoutManager(dist_context=dist_context, config=self._parameters.timeout)
         timeout_manager.set_init()
 
-        task = self._task_provider(InferenceTaskProviderContext(dist_context=dist_context))
+        with fork_rng_child("task_provider"):
+            task = self._task_provider(InferenceTaskProviderContext(dist_context=dist_context))
 
         event_bus = EventBus()
-        self._model_provider.register_events(RegisterModelEventsContext(dist_context=dist_context, event_bus=event_bus))
-        task.register_events(RegisterTaskEventsContext(dist_context=dist_context, event_bus=event_bus))
+        with fork_rng_child("register_events", "model_provider"):
+            self._model_provider.register_events(
+                RegisterModelEventsContext(dist_context=dist_context, event_bus=event_bus)
+            )
+        with fork_rng_child("register_events", "task"):
+            task.register_events(RegisterTaskEventsContext(dist_context=dist_context, event_bus=event_bus))
 
         event_bus.trigger(EVENT_INFERENCE_CONFIG_STARTED, EventConfigurationStartedContext(dist_context=dist_context))
 
-        microbatch_pack_stream = self._data_provider(InitializeDataProviderContext(dist_context=dist_context))
+        dp_rank = (
+            dist_context.mesh_for(BATCH_DOMAIN)["dp"].get_local_rank() if dist_context.mesh_params.is_distributed else 0
+        )
+        data_seed_scope = seed_scope.child("data")
+        with fork_rng_child("data_provider"):
+            microbatch_pack_stream = self._data_provider(
+                InitializeDataProviderContext(
+                    dist_context=dist_context,
+                    seed_scope=data_seed_scope,
+                    shard_seed_scope=data_seed_scope.child("dp", dp_rank),
+                )
+            )
         event_bus.trigger(EVENT_INFERENCE_DATA_STREAM_READY, EventDataStreamReadyContext(stream=microbatch_pack_stream))
 
         checkpointable_stream = DataParallelMicrobatchPackStream(
@@ -133,7 +144,10 @@ class InferenceConfigurator:
         event_bus.trigger(EVENT_INFERENCE_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
 
         task_operator = InferenceTaskOperator(
-            dist_context=dist_context, task=task, pipeline=pipeline_schedule, pipeline_state=pipeline_state_handler
+            dist_context=dist_context,
+            task=task,
+            pipeline=pipeline_schedule,
+            pipeline_state=pipeline_state_handler,
         )
 
         gc = ManualGarbageCollector(dist_context=dist_context, config=self._parameters.gc, schedule=schedule)
@@ -146,6 +160,7 @@ class InferenceConfigurator:
 
         return InferenceJobState(
             dist_context=dist_context,
+            seed_scope=seed_scope,
             microbatch_pack_stream=device_pack_stream,
             schedule=schedule,
             tracked_modules=modules,
@@ -161,13 +176,17 @@ class InferenceConfigurator:
     def configure(self) -> "Inference":
         """Builds all inference components and returns a configured ``Inference`` object.
 
-        It creates the distributed context, sets seeds and builds the model, the data stream
-        and the auxiliary components.
+        It creates the distributed context and builds the model, the data stream and the auxiliary components.
 
         Returns:
             A ready-to-use inference engine that holds the job state.
         """
-        state = self._build_new_state()
+        # Build the mesh outside the fork: it sets the current CUDA device, whose generator the fork saves.
+        dist_context = self._mesh.build()
+        seed_scope = SeedScope.root(self._parameters.determinism.base_seed)
+
+        with fork_rng(seed_scope.child("configure")):
+            state = self._build_new_state(dist_context, seed_scope)
 
         return Inference(state)
 
@@ -207,65 +226,71 @@ class Inference:
         Raises:
             RuntimeError: If the data stream ends before ``total_steps``.
         """
-        with torch.inference_mode():
-            self._enable_eval_mode()
+        with torch.inference_mode(), fork_rng(self._state.seed_scope.child("infer")):
+            self._infer()
 
-            self._state.dist_context.wait_world()
-            self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
-            self._state.checkpointer.load_last_checkpoint(self._state)
+    def _infer(self):
+        self._enable_eval_mode()
 
-            if self._state.schedule.current_step >= self._state.schedule.total_steps:
-                self._state.dist_context.logger.info("Inference is already complete, nothing to do")
-                return
+        self._state.dist_context.wait_world()
+        self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
+        self._state.checkpointer.load_last_checkpoint(self._state)
 
-            self._state.dist_context.wait_world()
+        if self._state.schedule.current_step >= self._state.schedule.total_steps:
+            self._state.dist_context.logger.info("Inference is already complete, nothing to do")
+            return
 
-            step_ctx = EventStepContext(schedule=self._state.schedule)
+        self._state.dist_context.wait_world()
 
-            with (
-                tqdm(
-                    desc="Inference",
-                    total=self._state.schedule.total_steps,
-                    disable=not self._state.dist_context.is_local_main_process,
-                    initial=self._state.schedule.current_step,
-                ) as bar,
-                self._state.garbage_collector as gc,
-                self._state.profiler.open() as profiler,
-                contextlib.closing(iter(self._state.microbatch_pack_stream)) as packs,
-            ):
-                self._state.event_bus.trigger(EVENT_INFERENCE_READY, EventInferenceReadyContext())
+        step_ctx = EventStepContext(schedule=self._state.schedule)
 
-                while self._state.schedule.current_step < self._state.schedule.total_steps:
-                    self._state.event_bus.trigger(EVENT_INFERENCE_STEP_PRE, step_ctx)
+        with (
+            tqdm(
+                desc="Inference",
+                total=self._state.schedule.total_steps,
+                disable=not self._state.dist_context.is_local_main_process,
+                initial=self._state.schedule.current_step,
+            ) as bar,
+            self._state.garbage_collector,
+            self._state.profiler.open() as profiler,
+            contextlib.closing(iter(self._state.microbatch_pack_stream)) as packs,
+        ):
+            self._state.event_bus.trigger(EVENT_INFERENCE_READY, EventInferenceReadyContext())
 
-                    device_pack = next(packs, None)
-                    if device_pack is None:
-                        raise RuntimeError(
-                            f"The data stream ended at step ({self._state.schedule.current_step}) "
-                            f"before total_steps ({self._state.schedule.total_steps}). "
-                            "Lower total_steps or provide more data."
-                        )
+            while self._state.schedule.current_step < self._state.schedule.total_steps:
+                with fork_rng_child("step", self._state.schedule.current_step):
+                    self._infer_step(packs, step_ctx)
+                self._state.schedule.step()
 
-                    with self._state.event_bus.bounded(
-                        EVENT_INFERENCE_FORWARD_PRE, EVENT_INFERENCE_FORWARD_POST, step_ctx
-                    ):
-                        self._state.task_operator.forward(device_pack)
+                # Checkpoint after schedule.step(), so the saved step counter includes this step.
+                self._state.checkpointer.checkpoint_if_needed(self._state)
 
-                    gc.collect_periodic()
+                # End the profiled step only now, so that it covers the step post events and the checkpoint.
+                if profiler:
+                    profiler.step()
 
-                    self._state.timeout_manager.set_periodic()
+                bar.update()
 
-                    self._state.event_bus.trigger(EVENT_INFERENCE_STEP_POST, step_ctx)
-                    self._state.schedule.step()
-
-                    # Checkpoint after schedule.step(), so the saved step counter includes this step.
-                    self._state.checkpointer.checkpoint_if_needed(self._state)
-
-                    # End the profiled step only now, so that it covers the step post events and the checkpoint.
-                    if profiler:
-                        profiler.step()
-
-                    bar.update()
-
+            with fork_rng_child("finalize"):
                 self._state.task.finalize(FinalizeContext())
-                self._state.event_bus.trigger(EVENT_INFERENCE_FINISHED, EventInferenceFinishedContext())
+            self._state.event_bus.trigger(EVENT_INFERENCE_FINISHED, EventInferenceFinishedContext())
+
+    def _infer_step(self, packs: Iterator[MicrobatchPack], step_ctx: EventStepContext):
+        self._state.event_bus.trigger(EVENT_INFERENCE_STEP_PRE, step_ctx)
+
+        device_pack = next(packs, None)
+        if device_pack is None:
+            raise RuntimeError(
+                f"The data stream ended at step ({self._state.schedule.current_step}) "
+                f"before total_steps ({self._state.schedule.total_steps}). "
+                "Lower total_steps or provide more data."
+            )
+
+        with self._state.event_bus.bounded(EVENT_INFERENCE_FORWARD_PRE, EVENT_INFERENCE_FORWARD_POST, step_ctx):
+            self._state.task_operator.forward(device_pack)
+
+        self._state.garbage_collector.collect_periodic()
+
+        self._state.timeout_manager.set_periodic()
+
+        self._state.event_bus.trigger(EVENT_INFERENCE_STEP_POST, step_ctx)
