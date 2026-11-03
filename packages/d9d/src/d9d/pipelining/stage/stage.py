@@ -405,7 +405,8 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         backward_comp.backward_weight(microbatch_index=microbatch_index)
 
     def reset(self):
-        """Releases the live receive buffers of this stage."""
+        """Releases the forward cache and live receive buffers of this stage."""
+        self._forward_comp.reset()
         if self._forward_receiver is not None:
             self._forward_receiver.reset()
         if self._backward_receiver is not None:

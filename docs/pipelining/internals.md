@@ -61,6 +61,7 @@ Each step, it receives a **pack** (a sequence of ready per-microbatch inputs) an
 2.  Configures the stage buffers for the pack. It sizes the P2P buffers of each microbatch separately, so microbatches can differ in shape. It skips this step when the shapes match the previous step.
 3.  Iterates over the action list of this rank and applies each action.
 4.  Waits for all pending sends to complete.
+5.  Releases the forward cache and the receive buffers of every stage.
 
 ### Comparison with PyTorch
 

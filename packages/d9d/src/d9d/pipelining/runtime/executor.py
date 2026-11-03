@@ -129,9 +129,6 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
 
         _logger.debug("Begin pipeline step")
 
-        for stage in self._stages.values():
-            stage.reset()
-
         ctx = ActionContext(
             callback=callback_fn,
             stages=self._stages,
@@ -141,11 +138,16 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
             handler=handler,
         )
 
-        for action in program.program_this_rank:
-            with record_function(str(action)):
-                _logger.debug(f"Running pipeline action {action}")
-                action.apply(ctx)
+        try:
+            for action in program.program_this_rank:
+                with record_function(str(action)):
+                    _logger.debug(f"Running pipeline action {action}")
+                    action.apply(ctx)
 
-        _logger.debug("Waiting for pending PP send comms")
-        self._comm_handler.wait_send_all()
+            _logger.debug("Waiting for pending PP send comms")
+            self._comm_handler.wait_send_all()
+        finally:
+            # Without a backward pass, nothing pops the forward cache. The completed sends no longer need it either.
+            for stage in self._stages.values():
+                stage.reset()
         _logger.debug("End pipeline step")
