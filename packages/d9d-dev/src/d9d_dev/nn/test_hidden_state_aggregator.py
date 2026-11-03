@@ -49,10 +49,10 @@ def test_mean_aggregation_correctness(hidden_states_data, mask_data, expected_da
     expected = torch.tensor(expected_data)
 
     aggregator = HiddenStatesAggregatorMean(agg_mask=mask)
-    aggregator.add_hidden_states(hidden_states)
+    collected = aggregator.collect(hidden_states)
 
     # Pack returns (Num_Adds, Batch, Hidden). We added once, so index 0.
-    result = aggregator.pack_with_snapshot(None)
+    result = aggregator.pack(collected, None)
 
     assert result is not None
     assert result.shape[0] == 1
@@ -72,17 +72,18 @@ def test_mean_aggregator_lifecycle(batch_size, seq_len, hidden_dim, num_adds, sn
     aggregator = HiddenStatesAggregatorMean(agg_mask=mask)
 
     inputs = []
+    collected = ()
     for _ in range(num_adds):
         t = torch.randn(batch_size, seq_len, hidden_dim)
         inputs.append(t)
-        aggregator.add_hidden_states(t)
+        collected += aggregator.collect(t)
 
     if snapshot_len > 0:
         snapshot = torch.randn(snapshot_len, batch_size, hidden_dim)
     else:
         snapshot = None
 
-    result = aggregator.pack_with_snapshot(snapshot)
+    result = aggregator.pack(collected, snapshot)
 
     expected_len = snapshot_len + num_adds
     assert result is not None
@@ -96,8 +97,7 @@ def test_mean_aggregator_lifecycle(batch_size, seq_len, hidden_dim, num_adds, sn
         expected_mean = t_in.mean(dim=1)  # Simple mean because mask is all ones
         assert torch.allclose(accumulated_result[i], expected_mean)
 
-    res_cleared = aggregator.pack_with_snapshot(snapshot)
-    assert res_cleared is snapshot
+    assert aggregator.pack((), snapshot) is snapshot
 
 
 @pytest.mark.local
@@ -105,12 +105,12 @@ def test_noop_aggregator():
     agg = HiddenStatesAggregatorNoOp()
 
     t = torch.randn(10, 10, 10)
-    agg.add_hidden_states(t)
+    assert agg.collect(t) == ()
 
-    res = agg.pack_with_snapshot(None)
+    res = agg.pack((), None)
     assert res is None
 
-    res_snap = agg.pack_with_snapshot(torch.randn(1, 1))
+    res_snap = agg.pack((), torch.randn(1, 1))
     assert res_snap is None
 
 

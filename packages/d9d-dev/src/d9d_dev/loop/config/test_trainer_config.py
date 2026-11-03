@@ -25,7 +25,8 @@ def test_fills_defaults_for_optional_sections():
     assert config.checkpointing.num_to_keep is None
     assert config.profiling is None
     assert config.gradient_manager.grad_dtype is None
-    assert config.gradient_manager.bucket_size_mb == 32
+    assert config.parameter_runtime.bucket_size_mb == 32
+    assert config.parameter_runtime.compute_dtype is None
 
 
 @pytest.mark.local

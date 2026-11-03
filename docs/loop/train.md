@@ -71,7 +71,7 @@ Before the loop starts:
     *   **Logging**: Starts a new run in the experiment tracker and logs the run hyperparameters. [More info](../tracker/index.md).
     *   **Garbage Collector**: Disables automatic Python garbage collection.
     *   **Profiler**: Starts the `torch.profiler` hooks (see [Profiling](#profiling)).
-    *   **Gradient Manager**: Installs the backward hooks that all-reduce gradients.
+    *   **Gradient Manager**: Binds the [Parameter Runtime](../parallel/runtime.md), which allocates the gradient buffers.
     *   **Gradient Clipper**: Groups the parameters for global gradient norm computation.
     *   **Metric Collector**: Binds the async metric collector to the device.
 4.  **Ready Hook Trigger**: Triggers the `EVENT_TRAIN_READY` event. Its context holds the `TrackerWriter`, so event handlers can log their own values. [More info](../tracker/index.md#logging-your-own-values).
@@ -87,7 +87,7 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
     *   The `TrainTask` maps each microbatch to model inputs.
     *   The [pipeline program](../pipelining/internals.md) runs the forward and backward passes over all microbatches of the pack. Without pipeline parallelism, the program has a single stage.
     *   Gradients accumulate locally. Between the forward and backward passes, the `TrainTask` computes the loss.
-    *   The last accumulation of each gradient bucket starts its all-reduce, which overlaps with the remaining backward work.
+    *   The program reduces the gradients of each segment after its backward pass, which overlaps with the remaining backward work.
     *   The `TrainTask` updates the local metrics (e.g. token counts, accuracy) for each microbatch.
     *   Triggers the `EVENT_TRAIN_FORWARD_BACKWARD_POST` event.
 
@@ -95,7 +95,7 @@ The loop runs until it reaches `JobSchedule.total_steps` (see [Data Loading](./i
     *   `JobLogger` starts an async reduction of all metrics across the ranks. [More info](../metric/overview.md).
 
 4.  **Gradient Synchronization**
-    *   **Wait & Scale**: The `GradientManager` waits for all backward hooks to finish. It then sums the loss weights across the ranks and divides all gradients by this total. This gives a correct average when the number of tokens varies, e.g. due to masking or packing. [More info](../parallel/grad_sync.md).
+    *   **Wait & Scale**: The `GradientManager` waits for the reductions of the program. It then sums the loss weights across the ranks and divides all gradients by this total. This gives a correct average when the number of tokens varies, e.g. due to masking or packing. [More info](../parallel/runtime.md).
 
 5.  **Gradient Clipping**
     *   The `GradientClipper` computes the global L2 norm of all gradients.
@@ -157,7 +157,7 @@ trainer.wake()                  # Restore the training state, resume stepping
 
 *   **Model** parameters and buffers (`TrackedModules`),
 *   **Optimizer** state (`PipelinedOptimizer`),
-*   **Gradient** buckets and the residual loss accumulator (`GradientManager`).
+*   **Gradient** and gathered weight buffers of the parameter runtime, and the residual loss accumulator (`GradientManager`).
 
 Data packs are not offloaded. The pack of the finished step and up to `prefetch_factor` [prefetched](#data-prefetching) packs stay on the device.
 

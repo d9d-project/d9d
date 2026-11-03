@@ -17,6 +17,7 @@ from ..component import (
     PipelineStateHandler,
     StateCheckpointer,
     TimeoutManager,
+    build_parameter_runtime,
 )
 from ..config import InferenceConfig, PipeliningConfig
 from ..control import (
@@ -124,12 +125,15 @@ class InferenceConfigurator:
 
         pipeline_state_handler = PipelineStateHandler()
 
+        parameter_runtime = build_parameter_runtime(self._parameters.parameter_runtime)
         pipeline_schedule, modules = ModelStageFactory(
             model_provider=self._model_provider,
             dist_context=dist_context,
             config_model=self._parameters.model_stage_factory,
             config_pipelining=pipelining_config,
+            parameter_runtime=parameter_runtime,
         ).build_pipeline_and_modules()
+        parameter_runtime.bind(training=False)
         event_bus.trigger(EVENT_INFERENCE_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
 
         task_operator = InferenceTaskOperator(

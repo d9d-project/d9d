@@ -1,13 +1,19 @@
+from __future__ import annotations
+
 import abc
 import dataclasses
+from collections.abc import Mapping
 from enum import StrEnum
-from typing import Generic
+from typing import TYPE_CHECKING, Generic, cast
 
 from d9d.pipelining.api import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
 from d9d.pipelining.stage import PipelineStage
 
 from .callback import PipelineLossHandler, PipelineResultHandler
 from .communications import PipelineCommunicationHandler
+
+if TYPE_CHECKING:
+    from d9d.parallel.runtime import ReductionPlan
 
 
 @dataclasses.dataclass(kw_only=True, slots=True)
@@ -20,6 +26,7 @@ class ActionContext(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         stages: A mapping of stage indices to the ``PipelineStage`` objects on this rank.
         communications: The handler for P2P communications.
         callback: The handler for either loss computation or result processing.
+        reductions: The reductions of each backward pass, by stage and microbatch.
     """
 
     pipeline_inputs_microbatches: tuple[TPipelineInput, ...]
@@ -28,6 +35,7 @@ class ActionContext(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
     stages: dict[int, PipelineStage[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]]
     communications: PipelineCommunicationHandler
     callback: PipelineLossHandler[TPipelineOutput] | PipelineResultHandler[TPipelineOutput]
+    reductions: Mapping[tuple[int, int], ReductionPlan] = dataclasses.field(default_factory=dict)
 
 
 class ActionWorkType(StrEnum):
@@ -254,7 +262,12 @@ class BackwardFullInputComputeAction(ActionBase):
         else:
             loss = None
 
-        stage.backward_one_chunk(microbatch_index=self.microbatch_idx, full_backward=self.full_backward, loss=loss)
+        stage.backward_one_chunk(
+            microbatch_index=self.microbatch_idx,
+            full_backward=self.full_backward,
+            loss=loss,
+            reductions=ctx.reductions.get((self.stage_idx, self.microbatch_idx)),
+        )
 
         if not stage.info.is_current_stage_first and self.stage_idx - 1 in ctx.stages:
             ctx.stages[self.stage_idx - 1].set_local_bwd_input(
@@ -289,7 +302,10 @@ class BackwardWeightComputeAction(ActionBase):
     def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
         stage = ctx.stages[self.stage_idx]
 
-        stage.backward_weight_one_chunk(microbatch_index=self.microbatch_idx)
+        stage.backward_weight_one_chunk(
+            microbatch_index=self.microbatch_idx,
+            reductions=ctx.reductions.get((self.stage_idx, self.microbatch_idx)),
+        )
 
     @property
     def work_type(self) -> ActionWorkType:
@@ -301,6 +317,70 @@ class BackwardWeightComputeAction(ActionBase):
 
     def __str__(self) -> str:
         return f"{self.stage_idx}W{self.microbatch_idx}"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class ForwardWindowComputeAction(ActionBase):
+    """Action that runs the forward pass of several microbatches of the only stage, segment by segment.
+
+    Attributes:
+        stage_idx: The index of the pipeline stage.
+        microbatches: The indices of the microbatches, in order.
+    """
+
+    stage_idx: int
+    microbatches: tuple[int, ...]
+
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
+        stage = ctx.stages[self.stage_idx]
+        stage.forward_window(
+            list(self.microbatches),
+            [ctx.pipeline_inputs_microbatches[x] for x in self.microbatches],
+            [ctx.pipeline_shared_microbatches[x] for x in self.microbatches],
+        )
+        for microbatch in self.microbatches:
+            ctx.callback.trigger(stage.get_pipeline_output(microbatch), microbatch)
+
+    @property
+    def work_type(self) -> ActionWorkType:
+        return ActionWorkType.compute
+
+    @property
+    def has_backward_work(self) -> bool:
+        return False
+
+    def __str__(self) -> str:
+        return f"{self.stage_idx}F{list(self.microbatches)}"
+
+
+@dataclasses.dataclass(frozen=True, slots=True)
+class BackwardWindowComputeAction(ActionBase):
+    """Action that runs the full backward pass of several microbatches of the only stage, segment by segment.
+
+    Attributes:
+        stage_idx: The index of the pipeline stage.
+        microbatches: The indices of the microbatches, in order.
+    """
+
+    stage_idx: int
+    microbatches: tuple[int, ...]
+
+    def apply(self, ctx: ActionContext[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
+        callback = cast(PipelineLossHandler, ctx.callback)
+        losses = [callback.acquire_loss(microbatch) for microbatch in self.microbatches]
+        reductions = ctx.reductions.get((self.stage_idx, self.microbatches[-1]))
+        ctx.stages[self.stage_idx].backward_window(list(self.microbatches), losses, reductions)
+
+    @property
+    def work_type(self) -> ActionWorkType:
+        return ActionWorkType.compute
+
+    @property
+    def has_backward_work(self) -> bool:
+        return True
+
+    def __str__(self) -> str:
+        return f"{self.stage_idx}B{list(self.microbatches)}"
 
 
 @dataclasses.dataclass(frozen=True, slots=True)

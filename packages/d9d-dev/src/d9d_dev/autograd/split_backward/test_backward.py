@@ -222,3 +222,59 @@ def test_split_backward_weight_reused_around_another_weight():
     assert torch.allclose(results.input_grads[0], expected_x_grad)
     assert torch.allclose(wa.grad, expected_wa_grad)
     assert torch.allclose(wb.grad, expected_wb_grad)
+
+
+@pytest.mark.local
+@pytest.mark.parametrize("shared_weight", [False, True])
+def test_split_backward_keeps_output_branches_without_input_dependencies(shared_weight):
+    torch.manual_seed(0)
+    weight = torch.nn.Parameter(torch.randn(4, 4))
+    independent = torch.nn.Parameter(torch.randn(4, 4))
+    inputs = torch.randn(2, 4, requires_grad=True)
+
+    def outputs():
+        transformed = weight.square()
+        return [inputs @ transformed, (transformed if shared_weight else independent).square()]
+
+    gradients = [torch.randn(2, 4), torch.randn(4, 4)]
+    torch.autograd.backward(outputs(), gradients)
+    expected_input, expected_weight, expected_independent = inputs.grad, weight.grad, independent.grad
+    inputs.grad, weight.grad, independent.grad = None, None, None
+
+    result = stage_backward_input(outputs(), gradients, [inputs], iter([weight, independent]))
+    torch.testing.assert_close(result.input_grads[0], expected_input)
+    assert weight.grad is None
+    assert independent.grad is None
+    stage_backward_weight(iter([weight, independent]), result.param_groups)
+
+    torch.testing.assert_close(weight.grad, expected_weight)
+    torch.testing.assert_close(independent.grad, expected_independent)
+    assert all(group.seeds is None for group in result.param_groups)
+
+
+@pytest.mark.local
+def test_split_backward_merges_all_overlapping_parameter_groups():
+    torch.manual_seed(0)
+    first = torch.nn.Parameter(torch.randn(4))
+    second = torch.nn.Parameter(torch.randn(4))
+    shared = torch.nn.Parameter(torch.randn(4))
+    inputs = [torch.randn(4, requires_grad=True), torch.randn(4, requires_grad=True)]
+
+    def loss():
+        return (inputs[0] * (first + shared) + inputs[1] * (second + shared)).sum()
+
+    loss().backward()
+    expected = [parameter.grad for parameter in (first, second, shared)]
+    expected_inputs = [value.grad for value in inputs]
+    for value in (*inputs, first, second, shared):
+        value.grad = None
+
+    result = stage_backward_input([loss()], None, inputs, iter([first, second, shared]))
+    assert len(result.param_groups) == 1
+    assert len(result.param_groups[0].params) == 3
+    stage_backward_weight(iter([first, second, shared]), result.param_groups)
+
+    for actual, gradient in zip(result.input_grads, expected_inputs, strict=True):
+        torch.testing.assert_close(actual, gradient)
+    for parameter, gradient in zip((first, second, shared), expected, strict=True):
+        torch.testing.assert_close(parameter.grad, gradient)

@@ -6,17 +6,17 @@ from torch.profiler import record_function
 from d9d.dist_context import FLAT_DOMAIN, DistributedContext
 from d9d.metric.catalogue.aggregation import WeightedMeanMetric
 from d9d.offload import Offloadable, OffloadContext, OnloadContext
-from d9d.parallel.grad_sync import GradientSynchronizer
+from d9d.parallel.runtime import ParameterRuntime
 
 from ..config import GradientManagerConfig, dtype_from_name
-from .model_stage_factory import TrackedModules
+from .tracked_modules import TrackedModules
 
 
 class GradientManager(Offloadable):
     """Lifecycle manager for gradients during the training loop.
 
-    It synchronizes gradients across ranks through a ``GradientSynchronizer``, sets the gradient dtype
-    and divides gradients by the accumulated loss weight before the optimizer step.
+    It sets the gradient dtype, binds the ``ParameterRuntime`` that reduces gradients across ranks, and divides
+    the gradients by the accumulated loss weight before the optimizer step.
     """
 
     def __init__(
@@ -24,6 +24,7 @@ class GradientManager(Offloadable):
         dist_context: DistributedContext,
         tracked_modules: TrackedModules,
         config: GradientManagerConfig,
+        parameter_runtime: ParameterRuntime,
     ):
         """Constructs the ``GradientManager`` object.
 
@@ -31,6 +32,7 @@ class GradientManager(Offloadable):
             dist_context: The distributed context.
             tracked_modules: The model stages whose gradients are managed.
             config: The gradient handling configuration.
+            parameter_runtime: The runtime that holds the gradients and reduces them from the pipeline program.
         """
         self._dist_context = dist_context
         self._tracked_modules = tracked_modules
@@ -38,37 +40,26 @@ class GradientManager(Offloadable):
         self._loss = WeightedMeanMetric()
         self._loss.to("cuda")
 
-        self._grad_sync = GradientSynchronizer(
-            [list(module.parameters()) for module in self._tracked_modules.modules],
-            bucket_size_mb=self._config.bucket_size_mb,
-        )
+        self._runtime = parameter_runtime
 
         self._installed = False
         self._offloaded = False
         self._in_flight_count = 0
 
-    def _setup_grad_dtype(self):
-        if self._config.grad_dtype is None:
-            return
-
-        grad_dtype = dtype_from_name(self._config.grad_dtype)
-        for mod in self._tracked_modules.modules:
-            for param in mod.parameters():
-                if param.requires_grad:
-                    param.grad_dtype = grad_dtype
-
     def _bind(self):
-        self._setup_grad_dtype()
-        self._grad_sync.bind()
-
-    def _unbind(self):
-        self._grad_sync.unbind()
+        if self._config.grad_dtype is not None:
+            grad_dtype = dtype_from_name(self._config.grad_dtype)
+            for module in self._tracked_modules.modules:
+                for parameter in module.parameters():
+                    if parameter.requires_grad:
+                        parameter.grad_dtype = grad_dtype
+        self._runtime.bind()
 
     @contextmanager
     def install(self):
         """Activates gradient handling while the context is open.
 
-        It sets the gradient dtype and installs the backward hooks that synchronize gradients.
+        It sets the gradient dtype and binds the ``ParameterRuntime``, which allocates the gradient buffers.
         """
         self._bind()
         self._installed = True
@@ -76,18 +67,7 @@ class GradientManager(Offloadable):
             yield
         finally:
             self._installed = False
-            self._unbind()
-
-    def set_required_accumulations(self, require_accumulations: int):
-        """Sets how many backward passes are accumulated before gradients are reduced this step.
-
-        It must be called before the backward passes of each step, because the pack length (and so the
-        number of accumulations) can vary between steps.
-
-        Args:
-            require_accumulations: Number of backward passes in the current step.
-        """
-        self._grad_sync.set_required_accumulations(require_accumulations)
+            self._runtime.unbind()
 
     def add_loss_with_weight(self, loss: torch.Tensor, loss_weight: torch.Tensor):
         """Accumulates a loss value and its corresponding weight into the internal metric.
@@ -104,17 +84,17 @@ class GradientManager(Offloadable):
 
         This method performs the following operations:
 
-        1.  Waits for all gradient synchronization hooks to complete.
+        1.  Waits for the gradient reductions of the pipeline program.
         2.  Synchronizes the accumulated loss/weights across the distributed context.
         3.  Scales the gradients by the inverse of the total accumulated weight to
             normalize them.
         """
         with record_function("Wait & Scale Gradients"):
-            self._grad_sync.wait()
+            self._runtime.wait()
 
             if self._dist_context.mesh_params.is_distributed:
                 self._loss.sync(self._dist_context.mesh_for(FLAT_DOMAIN).get_group())
-            self._grad_sync.scale_grads(1.0 / self._loss.accumulated_weight)
+            self._runtime.scale_grads(1.0 / self._loss.accumulated_weight)
 
     def compute_global_loss(self) -> torch.Tensor:
         """Calculates the final weighted mean loss.
@@ -127,10 +107,9 @@ class GradientManager(Offloadable):
     def zero_grad(self):
         """Resets the internal state for the next training step.
 
-        This clears the accumulated gradients in the synchronizer and resets the
-        loss metrics.
+        This clears the gradients in the runtime and resets the loss metrics.
         """
-        self._grad_sync.zero_grad()
+        self._runtime.zero_grad()
         self._loss.reset()
         self._in_flight_count = 0
 
@@ -139,14 +118,14 @@ class GradientManager(Offloadable):
         """Whether a gradient accumulation is in flight.
 
         It becomes ``True`` after ``add_loss_with_weight`` and ``False`` after ``zero_grad``. During an
-        accumulation, partial gradients live in the synchronizer buckets, so offloading would lose them.
+        accumulation, partial gradients live in the runtime buffers, so offloading would lose them.
         """
         return self._in_flight_count > 0
 
     def offload(self, ctx: OffloadContext) -> None:
         """Releases the GPU memory held by the gradient state.
 
-        The synchronizer bucket buffers are released and the residual loss accumulator is reset.
+        The runtime buffers are released and the residual loss accumulator is reset.
 
         Args:
             ctx: Context for this operation.
@@ -159,7 +138,7 @@ class GradientManager(Offloadable):
         if not self._installed:
             raise RuntimeError("GradientManager must be installed before it can be offloaded.")
 
-        self._unbind()
+        self._runtime.unbind()
         self._loss.reset()
         self._offloaded = True
 

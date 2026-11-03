@@ -27,7 +27,7 @@ Wraps a user `nn.Module`. It does not decide *when* to run. It gives the actions
 It consists of:
 
 *   **Computation handlers**:
-    *   `ForwardComputeHandler`: Runs the forward pass and caches inputs and outputs for the backward pass.
+    *   `ForwardComputeHandler`: Runs the forward pass and caches inputs and outputs for the backward pass. With a [`ParameterRuntime`](../parallel/runtime.md), it runs the stage as a `SegmentChain`, segment by segment.
     *   `BackwardComputeHandler`: Runs the backward pass. It can split the backward pass into `backward_input` (dI) and `backward_weight` (dW) for Zero Bubble schedules.
 *   **Communication handlers**: Own the P2P buffers for the forward and backward passes. Buffer sizes are inferred per microbatch, so the microbatches in a pack can differ in shape.
 
@@ -39,6 +39,7 @@ The atomic instructions for the pipeline virtual machine.
 *   `BackwardFullInputComputeAction`: Runs the backward pass. It computes gradients for the inputs only, or for the inputs and the weights.
 *   `BackwardWeightComputeAction`: Computes the deferred weight gradients (used in Zero Bubble schedules).
 *   `ForwardSendAction` / `ForwardReceiveAction` / `BackwardSendAction` / `BackwardReceiveAction`: Network I/O.
+*   `ForwardWindowComputeAction` / `BackwardWindowComputeAction`: Run the forward pass, or the full backward pass, of several microbatches segment by segment, so each segment gathers its weights once. The program cache creates them only with a `ParameterRuntime` and without pipeline parallelism.
 *   `ComposeAction`: Groups several actions into one. Schedules such as DualPipeV use it to pair a forward action and a backward action for overlap. The executor currently runs the grouped actions in order.
 
 Actions are declarative and immutable.
@@ -49,7 +50,7 @@ A program is a `dict[int, list[ActionBase]]`: it maps each rank to its sequentia
 
 The `d9d.pipelining.program.builder` package holds the `PipelineProgramBuilder` base class and the passes that help to build programs. The `d9d.pipelining.program.catalogue` package holds the ready programs: looped BFS (also used for GPipe and inference), interleaved 1F1B, Zero Bubble V and DualPipeV.
 
-A program depends only on the microbatch count and the fixed pipeline topology. The `PipelineProgramCache` composes a program once per microbatch count and reuses it across steps. For each program, it keeps the action list of this rank and whether the program contains backward work.
+A program depends only on the microbatch count and the fixed pipeline topology. The `PipelineProgramCache` composes a program once per microbatch count and reuses it across steps. For each program, it keeps the action list of this rank and whether the program contains backward work. With a `ParameterRuntime`, it also keeps the gradient reductions of every action that writes weight gradients. [Parameter Runtime Internals](../parallel/runtime_internals.md#pipeline-program) describes them.
 
 #### Executor (`runtime/executor.py`)
 

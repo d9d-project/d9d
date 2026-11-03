@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import typing
 from collections.abc import Callable
@@ -29,6 +31,9 @@ from .config import (
     PipelineScheduleLoopedBFSConfig,
     PipelineScheduleZeroBubbleVConfig,
 )
+
+if typing.TYPE_CHECKING:
+    from d9d.parallel.runtime import ParameterRuntime
 
 
 @dataclasses.dataclass(kw_only=True)
@@ -80,11 +85,14 @@ def build_program_builder(config: AnyPipelineScheduleConfig) -> PipelineProgramB
 def _build_schedule_local(
     program_builder: PipelineProgramBuilder,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
+    runtime: ParameterRuntime | None,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     stage_info = PipelineStageInfo(num_stages=1, current_stage=0)
 
     model = model_provider(stage_info)
-    scheduler = OfflinePipelineExecutor(model=model, do_backward=program_builder.has_backward)
+    scheduler = OfflinePipelineExecutor(model=model, do_backward=program_builder.has_backward, runtime=runtime)
+    if runtime is not None:
+        runtime.register_stage(stage_info.current_stage, model)
 
     return PipelineScheduleInfo(schedule=scheduler, has_first_stage=True, has_last_stage=True), [model]
 
@@ -93,6 +101,7 @@ def _build_schedule_distributed(
     pp_mesh: DeviceMesh,
     program_builder: PipelineProgramBuilder,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
+    runtime: ParameterRuntime | None,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     num_stages = program_builder.num_stages_per_rank * pp_mesh.size()
 
@@ -118,7 +127,11 @@ def _build_schedule_distributed(
         model = model_provider(stage_info)
         modules.append(model)
         stage = PipelineStage(
-            info=stage_info, module=model, group=pp_mesh.get_group(), stage_to_host_topology=stage_to_host
+            info=stage_info,
+            module=model,
+            group=pp_mesh.get_group(),
+            stage_to_host_topology=stage_to_host,
+            runtime=runtime,
         )
         stages.append(stage)
 
@@ -126,10 +139,13 @@ def _build_schedule_distributed(
         pp_group=pp_mesh.get_group(),
         stages=stages,
         program_builder=program_builder,
+        runtime=runtime,
     )
 
     return PipelineScheduleInfo(
-        schedule=schedule, has_first_stage=has_first_stage, has_last_stage=has_last_stage
+        schedule=schedule,
+        has_first_stage=has_first_stage,
+        has_last_stage=has_last_stage,
     ), modules
 
 
@@ -137,6 +153,7 @@ def build_schedule(
     pp_mesh: DeviceMesh | None,
     program_builder: PipelineProgramBuilder,
     model_provider: Callable[[PipelineStageInfo], nn.Module],
+    runtime: ParameterRuntime | None = None,
 ) -> tuple[PipelineScheduleInfo, list[nn.Module]]:
     """Constructs the pipeline schedule and instantiates model stages.
 
@@ -151,6 +168,8 @@ def build_schedule(
             schedule, or pass your own ``PipelineProgramBuilder``.
         model_provider: A factory function that accepts stage info and returns the ``nn.Module``
             for that stage.
+        runtime: The ``ParameterRuntime`` that owns the unsharded parameters, or ``None`` to run each stage as one
+            autograd graph.
 
     Returns:
         A tuple of the schedule info and the list of modules created on this rank.
@@ -159,7 +178,7 @@ def build_schedule(
         ValueError: If ``pp_mesh`` has more than one dimension.
     """
     if pp_mesh is None:
-        return _build_schedule_local(program_builder=program_builder, model_provider=model_provider)
+        return _build_schedule_local(program_builder=program_builder, model_provider=model_provider, runtime=runtime)
 
     if pp_mesh.ndim != 1:
         raise ValueError(
@@ -171,4 +190,5 @@ def build_schedule(
         pp_mesh=pp_mesh,
         program_builder=program_builder,
         model_provider=model_provider,
+        runtime=runtime,
     )

@@ -202,3 +202,10 @@ ALL_DOMAIN_PROVIDERS: list[DeviceMeshDomain] = [
     BatchDomain(),
     FlatDomain(),
 ]
+
+DATA_SHARD_DIMS = frozenset({"dp_shard", "dp_cp_shard"})
+"""The mesh dimensions over which data parallelism shards parameters.
+
+The ``ParameterRuntime`` gathers a parameter along these dimensions before use. A parameter sharded along any other
+dimension, such as ``ep_shard``, stays sharded: its layer communicates by itself.
+"""

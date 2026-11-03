@@ -1,4 +1,7 @@
-from typing import Generic, cast
+from __future__ import annotations
+
+import dataclasses
+from typing import TYPE_CHECKING, Generic, cast
 
 import torch
 import torch.distributed as dist
@@ -9,6 +12,7 @@ from d9d.pipelining.api import (
     ModuleSupportsPipelining,
     PipelineStageInfo,
     StageBoundary,
+    TensorSpec,
     TPipelineInput,
     TPipelineOutput,
     TSharedInput,
@@ -23,6 +27,10 @@ from .computations import (
     BackwardSeedTransfer,
     ForwardComputeHandler,
 )
+from .segments import SegmentChain
+
+if TYPE_CHECKING:
+    from d9d.parallel.runtime import ParameterRuntime, ReductionPlan
 
 
 class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
@@ -39,6 +47,7 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         module: nn.Module,
         group: dist.ProcessGroup,
         stage_to_host_topology: dict[int, int],
+        runtime: ParameterRuntime | None = None,
     ):
         """Constructs the ``PipelineStage`` object.
 
@@ -47,6 +56,8 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
             module: The module that runs this stage.
             group: The pipeline-parallel process group.
             stage_to_host_topology: Mapping from stage index to the pipeline-parallel rank that hosts it.
+            runtime: The ``ParameterRuntime`` that owns the unsharded parameters, or ``None`` if the stage runs as one
+                autograd graph.
 
         Raises:
             TypeError: If the pipeline has more than one stage and the module does not implement
@@ -70,10 +81,13 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         self._backward_receiver: StageReceiver[TStageTransfer] | None = None
         self._backward_sender: StageSender[TStageTransfer] | None = None
 
+        self._runtime = runtime
         self._forward_comp: ForwardComputeHandler[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput] = (
-            ForwardComputeHandler(stage_index=info.current_stage, module=module)
+            ForwardComputeHandler(stage_index=info.current_stage, module=module, runtime=runtime)
         )
         self._backward_comp: BackwardComputeHandler[TPipelineInput, TStageTransfer] | None = None
+        if runtime is not None:
+            runtime.register_stage(info.current_stage, module)
 
     @property
     def info(self) -> PipelineStageInfo:
@@ -96,9 +110,22 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         # __init__ has already checked the protocol.
         module = cast(ModuleSupportsPipelining, self._module)
 
+        specs = tuple(module.stage_transfer_spec(microbatch, boundary) for microbatch in inputs)
+        compute_dtype = None if self._runtime is None else self._runtime.compute_dtype
+        if compute_dtype is not None:
+            # A module reports the dtype of its sharded parameters, but the unsharded parameters run the stage.
+            leaves, spec_tree = pytree.tree_flatten(specs, is_leaf=lambda x: isinstance(x, TensorSpec))
+            specs = cast(
+                tuple[pytree.PyTree[TensorSpec], ...],
+                pytree.tree_unflatten(
+                    spec_tree,
+                    [dataclasses.replace(x, dtype=compute_dtype) if x.dtype.is_floating_point else x for x in leaves],
+                ),
+            )
+
         return StageReceiver(
             peer_global_rank=self._peer_global_rank(from_stage),
-            spec_per_microbatch=tuple(module.stage_transfer_spec(microbatch, boundary) for microbatch in inputs),
+            spec_per_microbatch=specs,
             group=self._group,
             requires_grad=requires_grad,
         )
@@ -135,6 +162,7 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
                 stage_index=self._info.current_stage,
                 module=self._module,
                 has_input_peer=not self._info.is_current_stage_first,
+                runtime=self._runtime,
             )
             self._backward_receiver = self._make_receiver(
                 pipeline_inputs_per_microbatch,
@@ -345,7 +373,49 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
 
         self._forward_comp.run(microbatch_index=microbatch_index, inputs=inputs, shared=pipeline_shared)
 
-    def backward_one_chunk(self, microbatch_index: int, loss: torch.Tensor | None = None, full_backward: bool = True):
+    def forward_window(
+        self,
+        microbatches: list[int],
+        pipeline_inputs: list[TPipelineInput],
+        pipeline_shared: list[TSharedInput],
+    ):
+        """Runs the forward pass of several microbatches of the only stage, segment by segment.
+
+        Args:
+            microbatches: The microbatch indices.
+            pipeline_inputs: The ``PipelineInput`` of each microbatch.
+            pipeline_shared: The ``SharedInput`` of each microbatch.
+        """
+        self._require_configured()
+        self._forward_comp.run_window(microbatches, pipeline_inputs, pipeline_shared)
+
+    def backward_window(
+        self, microbatches: list[int], losses: list[torch.Tensor], reductions: ReductionPlan | None = None
+    ):
+        """Runs the full backward pass of several microbatches of the only stage, segment by segment.
+
+        Args:
+            microbatches: The microbatch indices.
+            losses: The loss of each microbatch.
+            reductions: The reductions of this backward pass, or ``None``.
+        """
+        self._require_configured()
+        backward_comp = self._require_backward()
+        chains = [self._forward_comp.pop_inputs_outputs(microbatch)[2] for microbatch in microbatches]
+        backward_comp.backward_window(
+            microbatches,
+            [BackwardSeedLoss(loss=loss) for loss in losses],
+            cast(list[SegmentChain], chains),
+            reductions,
+        )
+
+    def backward_one_chunk(
+        self,
+        microbatch_index: int,
+        loss: torch.Tensor | None = None,
+        full_backward: bool = True,
+        reductions: ReductionPlan | None = None,
+    ):
         """Runs the backward pass for one microbatch.
 
         Args:
@@ -354,6 +424,7 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
             full_backward: If ``True``, computes gradients for the inputs and the weights. If
                 ``False``, computes only the input gradients; ``backward_weight_one_chunk`` computes
                 the weight gradients later.
+            reductions: The reductions of a full backward pass, or ``None``.
 
         Raises:
             ValueError: If the stage is not configured for backward passes, or if ``loss`` is
@@ -362,7 +433,7 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         self._require_configured()
         backward_comp = self._require_backward()
 
-        inputs, fwd_outputs = self._forward_comp.pop_inputs_outputs(microbatch_index)
+        inputs, fwd_outputs, chain = self._forward_comp.pop_inputs_outputs(microbatch_index)
 
         seed: BackwardSeed[TStageTransfer]
         if self._backward_receiver is None:
@@ -377,9 +448,11 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
             )
 
         if full_backward:
-            backward_comp.backward_full(microbatch_index=microbatch_index, inputs=inputs, seed=seed)
+            backward_comp.backward_full(
+                microbatch_index=microbatch_index, inputs=inputs, seed=seed, chain=chain, reductions=reductions
+            )
         else:
-            backward_comp.backward_input(microbatch_index=microbatch_index, inputs=inputs, seed=seed)
+            backward_comp.backward_input(microbatch_index=microbatch_index, inputs=inputs, seed=seed, chain=chain)
 
         # The last stage no longer needs its outputs for the backward pass. Detaching them frees the
         # autograd graph early. Views cannot be detached in place. Mirrors torch/distributed/pipelining/stage.py.
@@ -388,13 +461,14 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
                 if not t._is_view():  # noqa: SLF001 - PyTorch has no public check for views
                     t.detach_()
 
-    def backward_weight_one_chunk(self, microbatch_index: int):
+    def backward_weight_one_chunk(self, microbatch_index: int, reductions: ReductionPlan | None = None):
         """Runs the deferred weight backward for one microbatch.
 
         ``backward_one_chunk(..., full_backward=False)`` must run first for this microbatch.
 
         Args:
             microbatch_index: The microbatch index.
+            reductions: The reductions of this backward pass, or ``None``.
 
         Raises:
             ValueError: If the stage is not configured for backward passes.
@@ -402,10 +476,11 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         self._require_configured()
         backward_comp = self._require_backward()
 
-        backward_comp.backward_weight(microbatch_index=microbatch_index)
+        backward_comp.backward_weight(microbatch_index=microbatch_index, reductions=reductions)
 
     def reset(self):
-        """Releases the live receive buffers of this stage."""
+        """Releases the forward cache and live receive buffers of this stage."""
+        self._forward_comp.reset()
         if self._forward_receiver is not None:
             self._forward_receiver.reset()
         if self._backward_receiver is not None:

@@ -6,10 +6,10 @@ from d9d.nn.moe import MoELayer, SharedExpertParameters, parallelize_expert_para
 from d9d_dev.nn.helper import (
     check_grad_distance_all_local_dist,
     copy_params_local_to_dist,
-    sync_grads_manually,
     torch_seed,
 )
 from d9d_dev.nn.moe.batch import MOE_HIDDEN_SIZE, build_moe_inputs, materialize_moe_inputs
+from d9d_dev.parallel.runtime_step import step_with_runtime
 
 _NUM_EXPERTS = 32
 _NUM_ACTIVATE_EXPERTS = 4
@@ -64,15 +64,21 @@ def test_consistent_to_itself_expert_parallel(dtype: torch.dtype, dist_ctx_facto
         mesh_experts=ctx.mesh_for(EXPERT_DOMAIN)["ep_replicate", "ep_shard"],
     )
     copy_params_local_to_dist(local, dist_model)
-    out_dist = dist_model(dist_inputs.hidden_states + dist_inputs.pre)
     dp_size = int(ctx.mesh_for(BATCH_DOMAIN)["dp"].size())
-    loss_dist = (out_dist.sum() / dist_inputs.hidden_states.shape[-1]) / dp_size
-    loss_dist.backward()
+    outputs = []
+
+    def _step():
+        out_dist = dist_model(dist_inputs.hidden_states + dist_inputs.pre)
+        loss_dist = (out_dist.sum() / dist_inputs.hidden_states.shape[-1]) / dp_size
+        loss_dist.backward()
+        outputs.append(out_dist)
+
+    # The runtime puts local weights into the layer and sums the gradients over the replicas.
+    runtime = step_with_runtime(dist_model, _step)
 
     # Check
-    torch.testing.assert_close(out_dist, out_local, atol=2e-3, rtol=1e-2)
-
-    sync_grads_manually(dist_model)
+    torch.testing.assert_close(outputs[0], out_local, atol=2e-3, rtol=1e-2)
     check_grad_distance_all_local_dist(local, dist_model)
+    runtime.unbind()
 
     torch.testing.assert_close(dist_inputs.pre.grad * dp_size, local_inputs.pre.grad, atol=1e-3, rtol=0.01)

@@ -8,7 +8,7 @@ from torch.distributed.tensor import (
 )
 from torch.distributed.tensor.parallel import ParallelStyle, parallelize_module
 
-from d9d.parallel.style import ToLocalParallel
+from d9d.parallel import distribute_parameters
 
 from .grouped_linear import GroupedLinear
 from .layer import MoELayer
@@ -60,10 +60,11 @@ class ShardMoESparseExpertsParallel(ParallelStyle):
 
 
 def parallelize_expert_parallel(module: MoELayer, mesh_experts: DeviceMesh, expert_shard_dim: str = "ep_shard"):
-    """Applies expert parallelism to an MoE layer.
+    """Places the parameters of an MoE layer for expert parallelism.
 
-    The sparse experts are sharded along ``expert_shard_dim`` and replicated along the other mesh
-    dimensions. The router and the shared expert (if any) are replicated across the whole mesh.
+    The sparse experts are sharded along ``expert_shard_dim`` and replicated along the other mesh dimensions. The
+    layer sends tokens to the experts by itself, so the ``ParameterRuntime`` never gathers the experts. The router
+    and the shared expert (if any) are replicated across the whole mesh.
 
     Args:
         module: The MoE layer to parallelize.
@@ -71,20 +72,7 @@ def parallelize_expert_parallel(module: MoELayer, mesh_experts: DeviceMesh, expe
         expert_shard_dim: The name of the mesh dimension to shard the experts along.
     """
     parallelize_module(module, mesh_experts, ShardMoESparseExpertsParallel(shard_dim_name=expert_shard_dim))
-    parallelize_module(
-        module.router,
-        mesh_experts,
-        ToLocalParallel(
-            param_placement=tuple(Replicate() for _ in range(mesh_experts.ndim)),
-            grad_placement=tuple(Replicate() for _ in range(mesh_experts.ndim)),
-        ),
-    )
+    replicated = tuple(Replicate() for _ in range(mesh_experts.ndim))
+    distribute_parameters(module.router, mesh_experts, replicated)
     if module.shared_expert is not None:
-        parallelize_module(
-            module.shared_expert,
-            mesh_experts,
-            ToLocalParallel(
-                param_placement=tuple(Replicate() for _ in range(mesh_experts.ndim)),
-                grad_placement=tuple(Replicate() for _ in range(mesh_experts.ndim)),
-            ),
-        )
+        distribute_parameters(module.shared_expert, mesh_experts, replicated)

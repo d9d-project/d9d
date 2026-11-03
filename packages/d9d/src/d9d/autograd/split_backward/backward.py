@@ -1,13 +1,12 @@
-from collections import defaultdict, deque
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
-from typing import Any, cast
 
 import torch
 from torch import nn
-from torch.autograd.graph import GradientEdge, Node
+from torch.autograd.graph import GradientEdge, Node, get_gradient_edge
 
 from .context import GLOBAL_GRAD_CONTEXT, GradDirection
+from .graph import ParamGroup, gradient_node, group_parameters, reverse_closure, reverse_graph
 
 
 def stage_backward_full(
@@ -35,157 +34,6 @@ def stage_backward_full(
         input_grads.append(input_item.grad)
         input_item.grad = None
     return input_grads
-
-
-@dataclass
-class ParamGroup:
-    """Group of parameters and their dependency intermediates in the autograd graph.
-
-    The split backward pass uses it to find the intermediate nodes through which gradients flow to
-    a set of parameters.
-
-    Attributes:
-        params: The gradient accumulator nodes of the parameters.
-        intermediates: The nodes through which gradients enter these parameters, or ``None`` after the
-            weight backward consumed them.
-        grads: The gradients captured at each intermediate node during the input backward. Each entry
-            holds one gradient per output of the node.
-    """
-
-    params: set[Node]
-    intermediates: list[Node] | None
-    grads: list[tuple[torch.Tensor | None, ...] | None] | None = None
-
-
-def _get_grad_fn_or_grad_acc(t: torch.Tensor) -> Node | None:
-    if t.requires_grad and t.grad_fn is None:
-        # A leaf's AccumulateGrad node is created lazily, and a dummy view creates it. Mirrors
-        # _get_grad_fn_or_grad_acc in torch/distributed/pipelining/_backward.py.
-        viewed_t = t.view_as(t)
-        grad_fn = viewed_t.grad_fn
-        grad_fn = cast(Node, grad_fn)
-        return grad_fn.next_functions[0][0]
-    else:
-        return t.grad_fn
-
-
-def _construct_reverse_graph(roots: list[Node]) -> dict[Node, list[Node]]:
-    """Builds a reverse adjacency list (input -> output) by BFS from the roots.
-
-    Autograd graphs point from output to input (``next_functions``). The reverse mapping serves the
-    dependency analysis.
-
-    Args:
-        roots: The starting nodes for the graph traversal.
-
-    Returns:
-        A dictionary mapping a node to a list of its dependent (child) nodes.
-    """
-    reverse_graph = defaultdict(list)
-    valid_roots = {x for x in roots if x is not None}
-    to_visit = deque(valid_roots)
-    visited = set(valid_roots)
-
-    while to_visit:
-        current_node = to_visit.popleft()
-        for parent_node, _ in current_node.next_functions:
-            if parent_node is None:
-                continue
-            reverse_graph[parent_node].append(current_node)
-            if parent_node not in visited:
-                visited.add(parent_node)
-                to_visit.append(parent_node)
-
-    return reverse_graph
-
-
-def _reverse_closure(
-    roots: list[Node], target_nodes: set[Node], reverse_edges_dict: dict[Node, list[Node]]
-) -> tuple[set[Node], set[Node]]:
-    """Computes a closure of nodes reachable from roots in the reverse graph.
-
-    Args:
-        roots: The starting nodes.
-        target_nodes: The nodes where the search stops. They are recorded but not expanded.
-        reverse_edges_dict: The reverse graph adjacency list.
-
-    Returns:
-        A tuple containing the set of all closure nodes and the set of visited target nodes.
-    """
-    closure: set[Node] = set()
-    visited_target_nodes = set()
-    to_visit: deque[Node] = deque()
-
-    for node in roots:
-        if node is not None and node not in closure:
-            closure.add(node)
-            to_visit.append(node)
-
-    while to_visit:
-        node = to_visit.popleft()
-        reverse_edges = reverse_edges_dict[node]
-        for fn in reverse_edges:
-            if fn in closure or fn is None:
-                continue
-            if fn in target_nodes:
-                visited_target_nodes.add(fn)
-                continue
-            closure.add(fn)
-            to_visit.append(fn)
-
-    return closure, visited_target_nodes
-
-
-def _get_param_groups(
-    inputs: list[Node], params: list[Node], reverse_edges_dict: dict[Node, list[Node]]
-) -> list[ParamGroup]:
-    """Clusters parameters based on their dependencies on inputs.
-
-    This function finds how gradients flow from the inputs through intermediates to the parameters.
-    Parameters that share intermediates go into one group.
-
-    Args:
-        inputs: Gradient functions of the input tensors.
-        params: Gradient functions of the parameter tensors.
-        reverse_edges_dict: The reverse autograd graph.
-
-    Returns:
-        A list of distinct parameter groups.
-    """
-    inputs_closure, _ = _reverse_closure(inputs, set(), reverse_edges_dict)
-
-    node_to_group_map: dict[Node, dict[str, set[Node]]] = {}
-
-    for param in params:
-        _, intersected_inputs = _reverse_closure([param], inputs_closure, reverse_edges_dict)
-
-        current_dict = {"params": {param}, "intermediates": intersected_inputs}
-
-        target_dict = None
-        for intermediate_node in intersected_inputs:
-            if intermediate_node in node_to_group_map:
-                target_dict = node_to_group_map[intermediate_node]
-                break
-
-        if target_dict is not None:
-            target_dict["params"].update(current_dict["params"])
-            target_dict["intermediates"].update(current_dict["intermediates"])
-            current_dict = target_dict
-
-        for intermediate_node in current_dict["intermediates"]:
-            node_to_group_map[intermediate_node] = current_dict
-
-    # Several intermediates map to the same group dict, so deduplicate by identity.
-    unique_groups = []
-    seen_ids = set()
-    for group_dict in node_to_group_map.values():
-        if id(group_dict) not in seen_ids:
-            seen_ids.add(id(group_dict))
-            unique_groups.append(
-                ParamGroup(params=group_dict["params"], intermediates=list(group_dict["intermediates"]))
-            )
-
-    return unique_groups
 
 
 def _make_capture_hook(group: ParamGroup, idx: int) -> Callable[[tuple[torch.Tensor | None, ...]], None]:
@@ -221,7 +69,7 @@ class BackwardInputResult:
 
     input_grads: list[torch.Tensor | None]
     param_groups: list[ParamGroup]
-    grad_ownership_tokens: list[Any]
+    grad_ownership_tokens: list[torch.Tensor]
 
 
 def stage_backward_input(
@@ -246,12 +94,24 @@ def stage_backward_input(
         The input gradients, the parameter groups with captured gradients, and the tokens that keep
         the graph alive.
     """
-    outputs_grad_fn = [grad_fn for x in outputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
-    inputs_grad_fn = [grad_fn for x in inputs if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
-    weights_grad_fn = [grad_fn for x in weights if (grad_fn := _get_grad_fn_or_grad_acc(x)) is not None]
+    outputs_grad_fn = [grad_fn for x in outputs if (grad_fn := gradient_node(x)) is not None]
+    inputs_grad_fn = [grad_fn for x in inputs if (grad_fn := gradient_node(x)) is not None]
+    weights_grad_fn = [grad_fn for x in weights if (grad_fn := gradient_node(x)) is not None]
 
-    reverse_edges = _construct_reverse_graph(outputs_grad_fn)
-    param_groups = _get_param_groups(inputs_grad_fn, weights_grad_fn, reverse_edges)
+    reverse_edges = reverse_graph(outputs_grad_fn)
+    param_groups = group_parameters(inputs_grad_fn, weights_grad_fn, reverse_edges)
+
+    if output_grads is None:
+        output_grads = [torch.ones_like(o) for o in outputs]
+    input_closure, _ = reverse_closure(inputs_grad_fn, set(), reverse_edges)
+    # Input backward never visits an independent output, so retain its explicit seed for the weight phase.
+    independent_seeds = [
+        (get_gradient_edge(output), grad)
+        for output, grad in zip(outputs, output_grads, strict=True)
+        if output.requires_grad and gradient_node(output) not in input_closure
+    ]
+    if independent_seeds:
+        param_groups.append(ParamGroup(params=set(weights_grad_fn), intermediates=None, seeds=independent_seeds))
 
     hook_handles = []
 
@@ -259,9 +119,6 @@ def stage_backward_input(
         if group.intermediates:
             for i, node in enumerate(group.intermediates):
                 hook_handles.append(node.register_prehook(_make_capture_hook(group, i)))
-
-    if output_grads is None:
-        output_grads = [torch.ones_like(o) for o in outputs]
 
     inputs_requiring_grad = [inp for inp in inputs if inp.requires_grad]
 
@@ -313,7 +170,7 @@ def stage_backward_weight(  # noqa: C901 - edge collection and the single backwa
 
     for weight in weights:
         all_weights.append(weight)
-        grad_acc = _get_grad_fn_or_grad_acc(weight)
+        grad_acc = gradient_node(weight)
         if grad_acc is not None:
             grad_acc_to_weight[grad_acc] = weight
 
@@ -321,8 +178,15 @@ def stage_backward_weight(  # noqa: C901 - edge collection and the single backwa
     valid_grad_outputs: list[torch.Tensor] = []
     captured: list[tuple[Node, tuple[torch.Tensor | None, ...]]] = []
     inputs_for_backward = []
+    has_independent_seeds = False
 
     for group in param_groups:
+        if group.seeds:
+            has_independent_seeds = True
+            for edge, grad in group.seeds:
+                valid_edges.append(edge)
+                valid_grad_outputs.append(grad)
+            inputs_for_backward.extend(grad_acc_to_weight[node] for node in group.params if node in grad_acc_to_weight)
         if group.grads and group.intermediates:
             for grads_tuple, intermediate in zip(group.grads, group.intermediates, strict=True):
                 if grads_tuple is None:
@@ -341,6 +205,7 @@ def stage_backward_weight(  # noqa: C901 - edge collection and the single backwa
         # The group is consumed: drop its nodes and captured gradients so they can be freed.
         group.intermediates = None
         group.grads = None
+        group.seeds = None
 
     if not valid_edges or not inputs_for_backward:
         return tuple(w.grad for w in all_weights)
@@ -354,7 +219,9 @@ def stage_backward_weight(  # noqa: C901 - edge collection and the single backwa
         for intermediate, grads_tuple in captured:
             clamp_handles.append(intermediate.register_prehook(_make_clamp_hook(grads_tuple)))
     try:
-        with GLOBAL_GRAD_CONTEXT.with_directions(GradDirection.weight):
+        # An independent branch can contain activation edges leading to a weight, so it needs both directions.
+        directions = (GradDirection.inputs, GradDirection.weight) if has_independent_seeds else (GradDirection.weight,)
+        with GLOBAL_GRAD_CONTEXT.with_directions(*directions):
             torch.autograd.backward(
                 tensors=valid_edges,
                 grad_tensors=valid_grad_outputs,

@@ -6,24 +6,26 @@ The `d9d.nn.hidden_states_aggregator` package collects and reduces model hidden 
 
 ## Snapshots
 
-`pack_with_snapshot` returns the collected states after an earlier "snapshot" tensor. The snapshot can hold data from earlier iterations or pipeline stages. This lets you build up states over iterative loops.
+`pack` returns the collected states after an earlier "snapshot" tensor. The snapshot can hold data from earlier iterations or pipeline stages. This lets you build up states over iterative loops.
 
 ## Modes
 
 ### `HiddenStatesAggregationMode.no`
 
-Collects nothing. `pack_with_snapshot` always returns `None`.
+Collects nothing. `pack` always returns `None`.
 
 ### `HiddenStatesAggregationMode.mean`
 
-Reduces the hidden states as soon as it receives them. It needs an aggregation mask with shape `(batch, seq_len)`. For each call to `add_hidden_states`, it:
+Reduces the hidden states as soon as it receives them. It needs an aggregation mask with shape `(batch, seq_len)`. For each call to `collect`, it:
 
 1.  Computes the masked mean of the hidden states over the sequence.
-2.  Stores only the result with shape `(batch, hidden_size)`, not the full `(batch, seq_len, hidden_size)` tensor.
+2.  Returns only the result with shape `(batch, hidden_size)`, not the full `(batch, seq_len, hidden_size)` tensor.
+
+The aggregator keeps no state. You keep the returned values and pass them to `pack`.
 
 This reduces memory use when you collect states over many iterations.
 
-If the aggregator collected nothing, `pack_with_snapshot` returns the snapshot unchanged.
+If you pass no collected values, `pack` returns the snapshot unchanged.
 
 ## Usage
 
@@ -38,11 +40,12 @@ from d9d.nn.hidden_states_aggregator import (
 attention_mask = torch.ones(2, 16)
 aggregator = create_hidden_states_aggregator(HiddenStatesAggregationMode.mean, agg_mask=attention_mask)
 
+collected = ()
 for _ in range(3):
     hidden_states = torch.randn(2, 16, 2048)
-    aggregator.add_hidden_states(hidden_states)
+    collected += aggregator.collect(hidden_states)
 
-snapshot = aggregator.pack_with_snapshot(None)  # (3, 2, 2048)
+snapshot = aggregator.pack(collected, None)  # (3, 2, 2048)
 ```
 
 ## API Reference
