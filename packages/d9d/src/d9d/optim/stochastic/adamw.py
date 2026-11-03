@@ -40,8 +40,8 @@ class StochasticAdamW(Optimizer):
 
     Parameters must be bf16. Gradients can be bf16 or fp32. Parameters can be ``DTensor``s.
 
-    The optimizer seeds its own random number generator from ``seed`` and saves the generator state in
-    ``state_dict``. A resumed run therefore gets the same rounding noise.
+    The rounding noise comes from ``generator``, or from the global generators if it is ``None``. A given
+    generator has its state saved in ``state_dict``, so a resumed run gets the same rounding noise.
     """
 
     def __init__(
@@ -51,7 +51,7 @@ class StochasticAdamW(Optimizer):
         betas: tuple[float, float] = (0.9, 0.999),
         eps: float = 1e-8,
         weight_decay: float = 1e-2,
-        seed: int = 0,
+        generator: torch.Generator | None = None,
         state_dtype: torch.dtype = torch.float32,
     ):
         """Constructs the ``StochasticAdamW`` object.
@@ -62,8 +62,9 @@ class StochasticAdamW(Optimizer):
             betas: Decay rates of the first and second moments.
             eps: Term added to the denominator for numerical stability.
             weight_decay: Decoupled weight decay coefficient.
-            seed: The seed of the stochastic rounding. All replicas of a parameter, e.g. on all data-parallel ranks,
-                must use the same seed, so that they round the same way.
+            generator: The CPU generator of the stochastic rounding. If ``None``, each step draws from the global
+                generators. All replicas of a parameter, e.g. on all data-parallel ranks, must draw the same
+                numbers, so that they round the same way.
             state_dtype: Dtype of the optimizer states. Can be ``torch.float32`` or ``torch.bfloat16``.
 
         Raises:
@@ -80,7 +81,7 @@ class StochasticAdamW(Optimizer):
         if weight_decay < 0:
             raise ValueError(f"weight_decay ({weight_decay}) must be non-negative.")
 
-        self._generator = torch.Generator(device="cpu").manual_seed(seed)
+        self._generator = generator
 
         defaults = {
             "lr": lr,
@@ -92,15 +93,17 @@ class StochasticAdamW(Optimizer):
         super().__init__(params, defaults)
 
     def state_dict(self) -> StateDict:
-        """Returns the optimizer state, including the generator state."""
+        """Returns the optimizer state, including the state of ``generator`` if it is given."""
         state_dict = super().state_dict()
-        state_dict[_GENERATOR_STATE_KEY] = self._generator.get_state()
+        if self._generator is not None:
+            state_dict[_GENERATOR_STATE_KEY] = self._generator.get_state()
         return state_dict
 
     def load_state_dict(self, state_dict: StateDict) -> None:
-        """Loads the optimizer state, including the generator state if it is present."""
-        if _GENERATOR_STATE_KEY in state_dict:
-            self._generator.set_state(state_dict.pop(_GENERATOR_STATE_KEY))
+        """Loads the optimizer state, including the state of ``generator`` if both are present."""
+        generator_state = state_dict.pop(_GENERATOR_STATE_KEY, None)
+        if self._generator is not None and generator_state is not None:
+            self._generator.set_state(generator_state)
         super().load_state_dict(state_dict)
 
     @torch.no_grad()
