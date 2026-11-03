@@ -126,7 +126,7 @@ def test_pipelined_optimizer_round_trip(dist_ctx_factory):
     module(torch.randn(8, 64, device=device)).sum().backward()
     inner.step()
 
-    optimizer = PipelinedOptimizer(None, {0: inner})
+    optimizer = PipelinedOptimizer({0: inner})
     snapshots = {
         id(param): {key: value.detach().clone() for key, value in state.items() if torch.is_tensor(value)}
         for param, state in inner.state.items()

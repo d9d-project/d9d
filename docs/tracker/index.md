@@ -160,7 +160,7 @@ class WeightHistogramTask(TrainTask):
     @subscribe(EVENT_TRAIN_MODEL_STAGES_READY)
     def _on_model_ready(self, ctx: EventModelStagesReadyContext) -> None:
         self._weights = [
-            (name, param) for stage in ctx.modules for name, param in stage.named_parameters() if param.ndim == 2
+            (name, param) for stage in ctx.modules.values() for name, param in stage.named_parameters() if param.ndim == 2
         ]
 
     @subscribe(EVENT_TRAIN_READY)

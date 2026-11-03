@@ -130,9 +130,7 @@ class InferenceConfigurator:
             config_model=self._parameters.model_stage_factory,
             config_pipelining=pipelining_config,
         ).build_pipeline_and_modules()
-        event_bus.trigger(
-            EVENT_INFERENCE_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=list(modules.modules.values()))
-        )
+        event_bus.trigger(EVENT_INFERENCE_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
 
         task_operator = InferenceTaskOperator(
             dist_context=dist_context, task=task, pipeline=pipeline_schedule, pipeline_state=pipeline_state_handler
