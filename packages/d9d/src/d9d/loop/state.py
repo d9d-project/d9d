@@ -6,7 +6,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 from d9d.data import DevicePackStream
 from d9d.dist_context import DistributedContext
 from d9d.metric.catalogue.container import ComposeMetric
-from d9d.optim import LRSchedulerProtocol, OptimizerProtocol
+from d9d.optim import LRSchedulerProtocol
 
 from .component import (
     GradientClipper,
@@ -22,6 +22,7 @@ from .component import (
     TrackedModules,
     TrainTaskOperator,
 )
+from .component.pipelined_optimizer import PipelinedOptimizer
 from .control import InferenceTask, TrainTask
 from .event import EventBus
 
@@ -56,6 +57,9 @@ class JobState(Stateful):
     microbatch_pack_stream: DevicePackStream
 
     timeout_manager: TimeoutManager
+
+    def prepare_load(self) -> None:
+        """Creates the tensors that a checkpoint loads into."""
 
     def state_dict(self) -> dict[str, Any]:
         return {
@@ -96,11 +100,14 @@ class TrainJobState(JobState):
 
     logger: JobLogger
 
-    optimizer: OptimizerProtocol
+    optimizer: PipelinedOptimizer
     lr_scheduler: LRSchedulerProtocol
     gradient_clipper: GradientClipper
     exporter: ModelStageExporter
     event_bus: EventBus
+
+    def prepare_load(self) -> None:
+        self.optimizer.init_state()
 
     def state_dict(self) -> dict[str, Any]:
         return {

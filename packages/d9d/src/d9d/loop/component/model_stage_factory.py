@@ -1,187 +1,46 @@
-import itertools
-from collections.abc import Callable, Iterator
-from typing import Any
-
 import torch
 from torch import nn
-from torch.distributed.checkpoint.stateful import Stateful
 
 from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
 from d9d.model_state.io import load_model_state
 from d9d.nn import ModuleLateInit
-from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
+from d9d.parallel.runtime import ParameterRuntime
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import PipelineScheduleInfo, build_program_builder, build_schedule
 
 from ..config import ModelStageFactoryConfig, PipeliningConfig
 from ..control import InitializeModelStageContext, ModelProvider, ParallelizeModelStageContext
-
-StatefulPredicate = Callable[[str, torch.Tensor], bool]
-"""Determines if a specific parameter or buffer should be included in the state dictionary."""
+from .tracked_modules import StatefulPredicate, TrackedModules
 
 
 def _stateful_predicate_requires_grad(key: str, value: torch.Tensor) -> bool:
-    """Allows saving only tensors that require gradients.
-
-    Returns:
-        ``True`` if the tensor requires gradients, otherwise ``False``.
-    """
     return value.requires_grad
 
 
 def _stateful_predicate_always(key: str, value: torch.Tensor) -> bool:
-    """Always allows saving.
-
-    Returns:
-        Always ``True``.
-    """
     return True
 
 
-class TrackedModules(Stateful, Offloadable):
-    """Wrapper of a list of model stages that manages their state for distributed checkpointing.
+def _parameter_owners(model: nn.Module) -> list[list[tuple[str, nn.Module, str]]]:
+    # Each entry lists the qualified name, the module and the local name of every place that holds one parameter.
+    owners: dict[int, list[tuple[str, nn.Module, str]]] = {}
+    for prefix, module in model.named_modules(remove_duplicate=False):
+        for name, parameter in module.named_parameters(recurse=False, remove_duplicate=False):
+            qualified = f"{prefix}.{name}" if prefix else name
+            owners.setdefault(id(parameter), []).append((qualified, module, name))
+    return list(owners.values())
 
-    It implements the PyTorch Distributed ``Stateful`` protocol over all pipeline stages of the current
-    rank. State keys are namespaced by pipeline rank and stage, so they are unique across ranks.
-    """
 
-    def __init__(
-        self, dist_context: DistributedContext, modules: list[nn.Module], stateful_predicate: StatefulPredicate
-    ):
-        """Constructs the ``TrackedModules`` object.
-
-        Args:
-            dist_context: The distributed context.
-            modules: The model stages held by the current rank.
-            stateful_predicate: Selects the parameters and buffers stored in the state dict.
-        """
-        if dist_context.mesh_params.is_distributed:
-            self._pp_rank = dist_context.mesh_for(REGULAR_DOMAIN)["pp"].get_local_rank()
-        else:
-            self._pp_rank = 0
-
-        self._dist_context = dist_context
-        self._modules = modules
-        self._stateful_predicate = stateful_predicate
-        self._offload_mirror: dict[int, OffloadedTensor] | None = None
-
-    @property
-    def modules(self) -> list[nn.Module]:
-        """The model stages held by the current rank."""
-        return self._modules
-
-    def _tensors(self) -> Iterator[torch.Tensor]:
-        """Yields every parameter and buffer (persistent and non-persistent) of all tracked modules.
-
-        Returns:
-            An iterator over all tensors in the tracked modules.
-        """
-        return itertools.chain.from_iterable(
-            itertools.chain(module.parameters(), module.buffers()) for module in self._modules
-        )
-
-    def offload(self, ctx: OffloadContext) -> None:
-        """Releases the GPU memory of all model parameters and buffers, moving them to host memory.
-
-        Each tensor's local storage is swapped in place for a host copy. The parameter and buffer
-        objects, including ``DTensor`` wrappers, are kept. So optimizer state keys, gradient hooks and
-        external references (e.g. a frozen reference model held by a task) stay valid.
-
-        Args:
-            ctx: Context for this operation.
-
-        Raises:
-            RuntimeError: If the modules are already offloaded.
-        """
-        if self._offload_mirror is not None:
-            raise RuntimeError("TrackedModules is already offloaded.")
-
-        mirror: dict[int, OffloadedTensor] = {}
-        for tensor in self._tensors():
-            mirror[id(tensor)] = offload_tensor(tensor, pin_memory=ctx.pin_memory)
-
-        # Drain the pending non-blocking device-to-host copies before the device storage is released.
-        torch.cuda.synchronize(ctx.device)
-        self._offload_mirror = mirror
-
-    def onload(self, ctx: OnloadContext) -> None:
-        """Restores all model parameters and buffers released by ``offload`` to the GPU.
-
-        Args:
-            ctx: Context for this operation.
-
-        Raises:
-            RuntimeError: If the modules are not offloaded.
-        """
-        if self._offload_mirror is None:
-            raise RuntimeError("TrackedModules is not offloaded.")
-
-        device = ctx.device
-        for tensor in self._tensors():
-            onload_tensor(tensor, self._offload_mirror[id(tensor)], device=device)
-
-        # Drain pending host-to-device copies before the host mirror buffers are released.
-        torch.cuda.synchronize(device)
-        self._offload_mirror = None
-
-    def is_offloaded(self) -> bool:
-        """Reports whether the model parameters and buffers are offloaded to host memory.
-
-        Returns:
-            ``True`` if the model is offloaded, otherwise ``False``.
-        """
-        return self._offload_mirror is not None
-
-    def _whitelisted_params(self, module: nn.Module) -> set[str]:
-        allow_saving = set()
-        for param_name, param in itertools.chain(module.named_parameters(), module.named_buffers()):
-            if self._stateful_predicate(param_name, param):
-                allow_saving.add(param_name)
-        return allow_saving
-
-    def _state_dict_stage(self, module: nn.Module) -> dict[str, Any]:
-        whitelist = self._whitelisted_params(module)
-        result = {k: v for k, v in module.state_dict().items() if k in whitelist}
-        return result
-
-    def state_dict(self) -> dict[str, Any]:
-        """Generates the state dictionary for all tracked modules.
-
-        The keys are namespaced by the current pipeline rank and stage index, e.g. ``pp_0_stage_0``.
-        Only parameters and buffers accepted by ``stateful_predicate`` are included.
-
-        Returns:
-            A dictionary containing the states of all managed modules.
-        """
-        ret = {
-            f"pp_{self._pp_rank}_stage_{i}": self._state_dict_stage(module) for i, module in enumerate(self._modules)
-        }
-        return ret
-
-    def _load_state_dict_stage(self, module: nn.Module, state_dict: dict[str, Any]):
-        whitelist = self._whitelisted_params(module)
-
-        loading_result = module.load_state_dict(state_dict, strict=False)
-        missing_keys = set(loading_result.missing_keys)
-        extra_keys = set(loading_result.unexpected_keys)
-
-        if len(whitelist.intersection(missing_keys)) > 0:
-            raise ValueError(f"The state dict is missing keys ({whitelist.intersection(missing_keys)}).")
-        if len(extra_keys) > 0:
-            raise ValueError(f"The state dict has unexpected keys ({extra_keys}).")
-
-    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        """Loads the state dictionary into the tracked modules.
-
-        Args:
-            state_dict: The state dictionary to load. Must contain keys corresponding
-                to the pipeline rank and stage indices managed by this instance.
-
-        Raises:
-            ValueError: If keys accepted by ``stateful_predicate`` are missing or unexpected keys are present.
-        """
-        for i, module in enumerate(self._modules):
-            self._load_state_dict_stage(module, state_dict[f"pp_{self._pp_rank}_stage_{i}"])
+def _check_ties_kept(ties: list[list[tuple[str, nn.Module, str]]]):
+    for places in ties:
+        _, first_module, first_name = places[0]
+        first = first_module.get_parameter(first_name)
+        if any(module.get_parameter(name) is not first for _, module, name in places[1:]):
+            names = [qualified for qualified, _, _ in places]
+            raise ValueError(
+                f"The parallelization split the tied parameter ({names}) into separate parameters. "
+                "Distribute the modules that share it with one parallelize_*() call."
+            )
 
 
 class ModelStageFactory:
@@ -201,6 +60,7 @@ class ModelStageFactory:
         dist_context: DistributedContext,
         config_model: ModelStageFactoryConfig,
         config_pipelining: PipeliningConfig,
+        parameter_runtime: ParameterRuntime,
     ):
         """Constructs the ``ModelStageFactory`` object.
 
@@ -209,11 +69,13 @@ class ModelStageFactory:
             dist_context: The distributed context.
             config_model: The model initialization configuration.
             config_pipelining: The pipeline parallelism configuration.
+            parameter_runtime: The runtime that runs the stages.
         """
         self._model_provider = model_provider
         self._dist_context = dist_context
         self._config_model = config_model
         self._config_pipelining = config_pipelining
+        self._runtime = parameter_runtime
 
     def _build_model_stage(self, stage: PipelineStageInfo) -> nn.Module:
         # Build on the meta device, so no memory is allocated yet.
@@ -233,11 +95,19 @@ class ModelStageFactory:
             )
 
         if self._dist_context.mesh_params.is_distributed:
+            ties = [places for places in _parameter_owners(model) if len(places) > 1]
             self._model_provider.parallelize_model_stage(
                 ParallelizeModelStageContext(model=model, stage=stage, dist_context=self._dist_context)
             )
+            # A parallelize_*() call replaces a parameter only in the modules it gets, so separate calls split a tie.
+            _check_ties_kept(ties)
 
+        # Moving ordinary meta parameters replaces them, so restore the ties before initialization.
+        ties = [places for places in _parameter_owners(model) if len(places) > 1]
         model.to_empty(device=self._dist_context.current_device)
+        for (_, owner, owner_name), *aliases in ties:
+            for _, module, name in aliases:
+                module.register_parameter(name, owner.get_parameter(owner_name))
 
         # to_empty allocates uninitialized storage, so initialize the parameters.
         with torch.no_grad():
@@ -263,7 +133,7 @@ class ModelStageFactory:
             A tuple of the pipeline schedule info and the ``TrackedModules`` that wrap the model stages.
         """
         if self._config_model.checkpoint_only_trainable_parameters:
-            stateful_predicate = _stateful_predicate_requires_grad
+            stateful_predicate: StatefulPredicate = _stateful_predicate_requires_grad
         else:
             stateful_predicate = _stateful_predicate_always
 
@@ -274,6 +144,9 @@ class ModelStageFactory:
             pp_mesh=pp_mesh,
             program_builder=build_program_builder(self._config_pipelining.schedule),
             model_provider=self._build_model_stage,
+            runtime=self._runtime,
         )
 
-        return schedule, TrackedModules(self._dist_context, modules, stateful_predicate)
+        return schedule, TrackedModules(
+            self._dist_context, modules, stateful_predicate, parameter_runtime=self._runtime
+        )

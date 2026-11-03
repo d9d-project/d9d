@@ -1,3 +1,5 @@
+from collections.abc import Sequence
+
 import torch
 
 from .base import BaseHiddenStatesAggregator
@@ -9,17 +11,22 @@ class HiddenStatesAggregatorNoOp(BaseHiddenStatesAggregator):
     Used when aggregation is disabled in the configuration.
     """
 
-    def add_hidden_states(self, hidden_states: torch.Tensor) -> None:
-        """Does nothing.
+    def collect(self, hidden_states: torch.Tensor) -> tuple[torch.Tensor, ...]:
+        """Keeps nothing.
 
         Args:
             hidden_states: Ignored.
-        """
 
-    def pack_with_snapshot(self, snapshot: torch.Tensor | None) -> torch.Tensor | None:
+        Returns:
+            An empty tuple.
+        """
+        return ()
+
+    def pack(self, collected: Sequence[torch.Tensor], snapshot: torch.Tensor | None) -> torch.Tensor | None:
         """Does nothing.
 
         Args:
+            collected: Ignored.
             snapshot: Ignored.
 
         Returns:

@@ -5,7 +5,7 @@ from d9d.model_state.io import save_model_state, save_model_state_pipeline_paral
 from d9d.model_state.mapper.compose import ModelStateMapperParallel
 
 from ..control import ModelProvider, PrepareExportModelStageContext
-from .model_stage_factory import TrackedModules
+from .tracked_modules import TrackedModules
 
 
 class ModelStageExporter:

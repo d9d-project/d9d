@@ -37,6 +37,37 @@ class PipelinedOptimizer(OptimizerProtocol, Offloadable):
         for i, optimizer in enumerate(self._optimizers):
             optimizer.load_state_dict(state_dict[f"pp_{pp_rank}_stage_{i}"])
 
+    def init_state(self) -> None:
+        """Creates the state tensors of a fresh optimizer, without changing the parameters.
+
+        The checkpoint reader loads only into tensors that exist, and an optimizer creates them on the first step.
+        """
+        for optimizer in self._optimizers:
+            match optimizer:
+                case torch.optim.Optimizer() if not optimizer.state:
+                    self._step_without_update(optimizer)
+                case _:
+                    pass
+
+    @staticmethod
+    def _step_without_update(optimizer: torch.optim.Optimizer) -> None:
+        created = []
+        for group in optimizer.param_groups:
+            for param in group["params"]:
+                if param.requires_grad and param.grad is None:
+                    param.grad = torch.zeros_like(param)
+                    created.append(param)
+        rates = [group["lr"] for group in optimizer.param_groups]
+        for group in optimizer.param_groups:
+            group["lr"] = 0.0
+        try:
+            optimizer.step()
+        finally:
+            for group, rate in zip(optimizer.param_groups, rates, strict=True):
+                group["lr"] = rate
+            for param in created:
+                param.grad = None
+
     def step(self) -> None:
         with record_function("Optimizer Step"):
             for optimizer in self._optimizers:

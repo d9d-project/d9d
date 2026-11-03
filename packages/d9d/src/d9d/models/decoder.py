@@ -1,5 +1,7 @@
-from collections.abc import Mapping
-from typing import Generic, TypeVar, cast
+import dataclasses
+from collections.abc import Callable, Mapping, Sequence
+from functools import partial
+from typing import Any, Generic, TypeVar, cast
 
 import torch
 from torch import nn
@@ -16,7 +18,15 @@ from d9d.nn.head import (
     SplitLanguageModellingHead,
     TaskHead,
 )
-from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo, StageBoundary, TensorSpec
+from d9d.pipelining.api import (
+    ModuleSupportsPipelining,
+    ModuleSupportsSegments,
+    PipelineStageInfo,
+    StageBoundary,
+    StageSegment,
+    TensorSpec,
+    run_segments,
+)
 
 from .backbone import DecoderBackbone
 from .head import (
@@ -30,6 +40,7 @@ from .io import (
     SequenceHeadsOutput,
     SequenceHeadsShared,
     SequenceInput,
+    SequenceShared,
     SequenceTransfer,
 )
 
@@ -40,6 +51,39 @@ THeadOutput = TypeVar("THeadOutput")
 
 SINGLE_HEAD_PREFIX = "head."
 """FQN prefix of the task head in a single-head decoder (any ``DecoderWithHead``)."""
+
+
+@dataclasses.dataclass
+class _DecoderSegmentConstants(Generic[THeadShared]):
+    backbone: Any
+    head: THeadShared
+
+
+def _prepare_backbone_constants(
+    backbone: DecoderBackbone, sequence: SequenceShared, head: THeadShared
+) -> _DecoderSegmentConstants[THeadShared]:
+    # A backbone without segments runs as one segment, and that segment needs the raw shared input.
+    constants = (
+        backbone.prepare_segment_constants(sequence) if isinstance(backbone, ModuleSupportsSegments) else sequence
+    )
+    return _DecoderSegmentConstants(backbone=constants, head=head)
+
+
+def _run_backbone_segment(
+    activations: Any, constants: _DecoderSegmentConstants[Any], *, call: Callable[[Any, Any], Any]
+) -> Any:
+    return call(activations, constants.backbone)
+
+
+def _backbone_segments(backbone: DecoderBackbone) -> list[StageSegment]:
+    if not isinstance(backbone, ModuleSupportsSegments):
+        module = cast(nn.Module, backbone)
+        return [StageSegment("backbone", (module,), partial(_run_backbone_segment, call=backbone))]
+
+    return [
+        StageSegment(segment.name, segment.modules, partial(_run_backbone_segment, call=segment.call))
+        for segment in backbone.stage_segments()
+    ]
 
 
 class DecoderWithHeads(
@@ -114,12 +158,34 @@ class DecoderWithHeads(
             The produced ``SequenceTransfer`` on non-last stages, or each head's output keyed by
                 head name on the last stage.
         """
-        model_outputs = self.model(inputs, shared.sequence)
+        return run_segments(self, inputs, shared)
 
-        if not self._stage.is_current_stage_last:
-            return model_outputs
+    def prepare_segment_constants(
+        self, shared: SequenceHeadsShared[THeadShared]
+    ) -> _DecoderSegmentConstants[Mapping[str, THeadShared]]:
+        """Builds the constants of one microbatch.
 
-        return {name: head(model_outputs.hidden_states, shared.heads[name]) for name, head in self.heads.items()}
+        Args:
+            shared: The backbone shared input plus the per-head shared inputs.
+
+        Returns:
+            The constants of the backbone segments and of the heads segment.
+        """
+        return _prepare_backbone_constants(self.model, shared.sequence, shared.heads)
+
+    def stage_segments(self) -> Sequence[StageSegment]:
+        """Returns the segments of the backbone and, on the last stage, one segment with all heads."""
+        segments = _backbone_segments(self.model)
+        if self._stage.is_current_stage_last:
+            segments.append(StageSegment("heads", tuple(self.heads.values()), self._run_heads))
+        return segments
+
+    def _run_heads(
+        self,
+        activations: SequenceTransfer[torch.Tensor],
+        constants: _DecoderSegmentConstants[Mapping[str, THeadShared]],
+    ) -> SequenceHeadsOutput[THeadOutput]:
+        return {name: head(activations.hidden_states, constants.head[name]) for name, head in self.heads.items()}
 
     def reset_parameters(self) -> None:
         """Resets the parameters of the backbone and of every head."""
@@ -208,12 +274,32 @@ class DecoderWithHead(
             The produced ``SequenceTransfer`` on non-last stages, or the head's output on the last
                 stage.
         """
-        model_outputs = self.model(inputs, shared.sequence)
+        return run_segments(self, inputs, shared)
 
-        if not self._stage.is_current_stage_last:
-            return model_outputs
+    def prepare_segment_constants(
+        self, shared: SequenceHeadShared[THeadShared]
+    ) -> _DecoderSegmentConstants[THeadShared]:
+        """Builds the constants of one microbatch.
 
-        return self.head(model_outputs.hidden_states, shared.head)
+        Args:
+            shared: The backbone shared input plus the head's shared input.
+
+        Returns:
+            The constants of the backbone segments and of the head segment.
+        """
+        return _prepare_backbone_constants(self.model, shared.sequence, shared.head)
+
+    def stage_segments(self) -> Sequence[StageSegment]:
+        """Returns the segments of the backbone and, on the last stage, the head segment."""
+        segments = _backbone_segments(self.model)
+        if self._stage.is_current_stage_last:
+            segments.append(StageSegment("head", (self.head,), self._run_head))
+        return segments
+
+    def _run_head(
+        self, activations: SequenceTransfer[torch.Tensor], constants: _DecoderSegmentConstants[THeadShared]
+    ) -> THeadOutput:
+        return self.head(activations.hidden_states, constants.head)
 
     def reset_parameters(self) -> None:
         """Resets the parameters of the backbone and of the head."""

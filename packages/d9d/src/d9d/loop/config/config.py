@@ -60,6 +60,25 @@ class PipeliningConfig(BaseModel):
     schedule: AnyPipelineScheduleConfig = Field(default_factory=PipelineScheduleGPipeConfig)
 
 
+class ParameterRuntimeConfig(BaseModel):
+    """Configuration for the ``ParameterRuntime``, which gathers weights and reduces gradients.
+
+    Attributes:
+        compute_dtype: The dtype of the gathered weights, e.g. ``bfloat16`` over ``float32`` storage. If ``None``,
+            the weights keep the dtype of the storage.
+        memory_budget_mib: The budget of gathered weights and gradients, in MiB. If ``None``, it is a quarter of the
+            GPU memory. Room above the minimum keeps weights gathered for the whole step.
+        bucket_size_mb: The size limit of a group of replicated parameters that reduces its gradients with one
+            all-reduce, in MiB.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    compute_dtype: DtypeName | None = None
+    memory_budget_mib: int | None = Field(default=None, gt=0)
+    bucket_size_mb: int = Field(default=32, gt=0)
+
+
 class GarbageCollectionConfig(BaseModel):
     """Configuration for manual Python garbage collection control.
 
@@ -169,17 +188,15 @@ class JobLoggerConfig(BaseModel):
 
 
 class GradientManagerConfig(BaseModel):
-    """Configuration for gradient synchronization.
+    """Configuration for gradient handling.
 
     Attributes:
         grad_dtype: The dtype of the gradients. If ``None``, gradients use the parameter dtype.
-        bucket_size_mb: The maximum size of a gradient communication bucket, in MiB.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     grad_dtype: DtypeName | None = None
-    bucket_size_mb: int = 32
 
 
 class TimeoutConfig(BaseModel):
@@ -205,13 +222,14 @@ class TrainerConfig(BaseModel):
         data_prefetch: Settings for copying data to the device ahead of time.
         logging: Experiment tracking settings.
         pipelining: Pipeline parallelism schedule and settings.
+        parameter_runtime: Weight gathering, gradient reduction and their memory.
         model_stage_factory: Model initialization and additional checkpointing logic.
         determinism: Random seed settings.
         gc: Garbage collection settings.
         checkpointing: Checkpoint saving settings.
         gradient_clipping: Gradient clipping settings.
         profiling: Profiler settings. If ``None``, profiling is disabled.
-        gradient_manager: Gradient synchronization settings.
+        gradient_manager: Gradient handling settings.
         timeout: Distributed timeout settings.
     """
 
@@ -222,6 +240,7 @@ class TrainerConfig(BaseModel):
     data_prefetch: DataPrefetchConfig = Field(default_factory=DataPrefetchConfig)
     logging: JobLoggerConfig
     pipelining: PipeliningConfig = Field(default_factory=PipeliningConfig)
+    parameter_runtime: ParameterRuntimeConfig = Field(default_factory=ParameterRuntimeConfig)
     model_stage_factory: ModelStageFactoryConfig = Field(default_factory=ModelStageFactoryConfig)
     determinism: DeterminismConfig
     gc: GarbageCollectionConfig
@@ -238,6 +257,7 @@ class InferenceConfig(BaseModel):
     Attributes:
         schedule: Job duration settings.
         data_prefetch: Settings for copying data to the device ahead of time.
+        parameter_runtime: Weight gathering and its memory.
         model_stage_factory: Model initialization logic.
         determinism: Random seed settings.
         gc: Garbage collection settings.
@@ -250,6 +270,7 @@ class InferenceConfig(BaseModel):
 
     schedule: JobScheduleConfig = Field(default_factory=JobScheduleConfig)
     data_prefetch: DataPrefetchConfig = Field(default_factory=DataPrefetchConfig)
+    parameter_runtime: ParameterRuntimeConfig = Field(default_factory=ParameterRuntimeConfig)
     model_stage_factory: ModelStageFactoryConfig = Field(default_factory=ModelStageFactoryConfig)
     determinism: DeterminismConfig
     gc: GarbageCollectionConfig

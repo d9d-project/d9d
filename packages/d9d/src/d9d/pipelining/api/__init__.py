@@ -8,6 +8,7 @@ from .module import (
     distribute_layers_for_pipeline_stage,
 )
 from .schedule import PipelineSchedule
+from .segments import ModuleSupportsSegments, StageSegment, as_segments, run_segments
 from .types import (
     PipelineLossFn,
     PipelineResultFn,
@@ -19,15 +20,19 @@ from .types import (
 
 __all__ = [
     "ModuleSupportsPipelining",
+    "ModuleSupportsSegments",
     "PipelineLossFn",
     "PipelineResultFn",
     "PipelineSchedule",
     "PipelineStageInfo",
     "StageBoundary",
+    "StageSegment",
     "TPipelineInput",
     "TPipelineOutput",
     "TSharedInput",
     "TStageTransfer",
     "TensorSpec",
+    "as_segments",
     "distribute_layers_for_pipeline_stage",
+    "run_segments",
 ]
