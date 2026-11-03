@@ -1,6 +1,7 @@
 import re
 import shutil
 from pathlib import Path
+from typing import Protocol
 
 import torch
 import torch.distributed.checkpoint as dcp
@@ -14,6 +15,13 @@ from .garbage_collector import ManualGarbageCollector
 from .job_schedule import JobSchedule
 
 _SAVE_RE = re.compile(r"^save-(\d+)$")
+
+
+class CheckpointedState(Stateful, Protocol):
+    """Protocol for a state that the ``StateCheckpointer`` saves and loads."""
+
+    def prepare_load(self) -> None:
+        """Creates the tensors that a checkpoint loads into."""
 
 
 def _save_iter_predicate(x: Path) -> int:
@@ -100,7 +108,9 @@ class StateCheckpointer:
             self._dist_context.logger.info(f"Saving checkpoint {next_checkpoint_id}")
 
             save_from = {"state": state}
-            dcp.save(state_dict=save_from, checkpoint_id=next_checkpoint_id)
+            # The inference loop saves inside inference mode, where state_dict() cannot detach a parameter.
+            with torch.inference_mode(mode=False):
+                dcp.save(state_dict=save_from, checkpoint_id=next_checkpoint_id)
 
             self._purge_old_checkpoints()
             self._free_memory()
@@ -126,7 +136,7 @@ class StateCheckpointer:
             return None
         return checkpoints[-1]
 
-    def _load(self, state: Stateful):
+    def _load(self, state: CheckpointedState):
         last_checkpoint = self._last_checkpoint_id()
 
         if last_checkpoint is None:
@@ -137,15 +147,18 @@ class StateCheckpointer:
         self._dist_context.wait_world()
         self._dist_context.logger.info(f"Loading checkpoint {last_checkpoint}")
 
-        load_into = {"state": state}
-        dcp.load(state_dict=load_into, checkpoint_id=last_checkpoint)
+        # Loading also calls state_dict(), which must detach ordinary parameters outside inference mode.
+        with torch.inference_mode(mode=False):
+            state.prepare_load()
+            load_into = {"state": state}
+            dcp.load(state_dict=load_into, checkpoint_id=last_checkpoint)
         self._free_memory()
 
         self._dist_context.logger.info("Waiting for world after loading checkpoint")
         self._dist_context.wait_world()
         self._dist_context.logger.info("Checkpoint successfully loaded across the world")
 
-    def load_last_checkpoint(self, state: Stateful):
+    def load_last_checkpoint(self, state: CheckpointedState):
         """Loads the latest checkpoint in the save directory.
 
         If no checkpoint is found, the state stays unchanged and the job starts from scratch.

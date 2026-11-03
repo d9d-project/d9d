@@ -39,7 +39,7 @@ class OptimizerFactory:
         self._lr_scheduler_provider = lr_scheduler_provider
         self._schedule = schedule
 
-    def build_optimizer_and_scheduler(self) -> tuple[OptimizerProtocol, LRSchedulerProtocol]:
+    def build_optimizer_and_scheduler(self) -> tuple[PipelinedOptimizer, LRSchedulerProtocol]:
         """Builds the optimizer and the learning rate scheduler.
 
         The providers create one optimizer and one scheduler per local model stage. They are combined

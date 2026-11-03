@@ -2,7 +2,9 @@ import copy
 
 import pytest
 import torch
+from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
 from d9d.optim.stochastic import StochasticAdamW
+from torch.distributed.tensor import Replicate, Shard, distribute_tensor
 
 
 @pytest.mark.local
@@ -69,6 +71,9 @@ def test_reproducibility_and_state_dict(state_dtype, grad_dtype):
     optim2.load_state_dict(state_dict)
 
     assert (optim1._generator.get_state() == optim2._generator.get_state()).all()
+    for key in ("exp_avg", "exp_avg_sq"):
+        assert optim2.state[param2][key].dtype == state_dtype
+        assert torch.equal(optim1.state[param1][key], optim2.state[param2][key])
 
     param1.grad = grad_step2.clone()
     param2.grad = grad_step2.clone()
@@ -122,3 +127,67 @@ def test_rounding_noise_ignores_default_generator():
         results.append(param.detach())
 
     assert torch.equal(results[0], results[1])
+
+
+@pytest.mark.local
+def test_load_preserves_mixed_state_dtypes_and_input_dictionary():
+    params = [torch.ones(4, dtype=torch.bfloat16) for _ in range(3)]
+    groups = [
+        {"params": params[:1], "state_dtype": torch.float32},
+        {"params": params[1:], "state_dtype": torch.bfloat16},
+    ]
+    optimizer = StochasticAdamW(groups, lr=1e-3)
+    for param, dtype in zip(params[:2], (torch.float32, torch.bfloat16), strict=True):
+        optimizer.state[param] = {
+            "step": 3,
+            "exp_avg": torch.full_like(param, 0.1234567, dtype=dtype),
+            "exp_avg_sq": torch.full_like(param, 0.01234567, dtype=dtype),
+        }
+    saved = copy.deepcopy(optimizer.state_dict())
+    expected_generator = optimizer._generator.get_state().clone()
+    optimizer._generator.manual_seed(999)
+
+    optimizer.load_state_dict(saved)
+    optimizer._generator.manual_seed(999)
+    # Loading must leave the checkpoint reusable, including its generator state.
+    optimizer.load_state_dict(saved)
+
+    assert torch.equal(optimizer._generator.get_state(), expected_generator)
+    for index, (param, dtype) in enumerate(zip(params[:2], (torch.float32, torch.bfloat16), strict=True)):
+        for key in ("exp_avg", "exp_avg_sq"):
+            assert optimizer.state[param][key].dtype == dtype
+            assert torch.equal(optimizer.state[param][key], saved["state"][index][key])
+    assert params[2] not in optimizer.state
+
+
+@pytest.mark.distributed
+@pytest.mark.parametrize(
+    "mesh_params",
+    [
+        DeviceMeshParameters(data_parallel_shard=8),
+        DeviceMeshParameters(data_parallel_replicate=8),
+        DeviceMeshParameters(data_parallel_replicate=2, data_parallel_shard=4),
+    ],
+)
+def test_load_preserves_fp32_distributed_moments(dist_ctx_factory, mesh_params):
+    context = dist_ctx_factory(mesh_params)
+    mesh = context.mesh_for(DENSE_DOMAIN)["dp_replicate", "dp_cp_shard", "cp_replicate"]
+    param = distribute_tensor(
+        torch.ones(16, device="cuda", dtype=torch.bfloat16), mesh, (Replicate(), Shard(0), Replicate())
+    )
+    optimizer = StochasticAdamW([param], lr=1e-3, state_dtype=torch.float32)
+    optimizer.state[param] = {
+        "step": 3,
+        "exp_avg": torch.full_like(param, 0.1234567, dtype=torch.float32),
+        "exp_avg_sq": torch.full_like(param, 0.01234567, dtype=torch.float32),
+    }
+    saved = copy.deepcopy(optimizer.state_dict())
+    restored = StochasticAdamW([param], lr=1e-3, state_dtype=torch.float32)
+
+    restored.load_state_dict(saved)
+
+    for key in ("exp_avg", "exp_avg_sq"):
+        moment = restored.state[param][key]
+        assert moment.dtype == torch.float32
+        assert moment.placements == param.placements
+        assert torch.equal(moment.to_local(), saved["state"][0][key].to_local())
