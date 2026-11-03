@@ -149,7 +149,9 @@ class TrainingConfigurator:
             config_model=self._parameters.model_stage_factory,
             config_pipelining=self._parameters.pipelining,
         ).build_pipeline_and_modules()
-        event_bus.trigger(EVENT_TRAIN_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
+        event_bus.trigger(
+            EVENT_TRAIN_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=list(modules.modules.values()))
+        )
 
         metrics = ComposeMetric(task.create_metrics(CreateMetricsContext()).metrics)
 

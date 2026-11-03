@@ -48,20 +48,20 @@ class OptimizerFactory:
         Returns:
             A tuple of the pipeline-aware optimizer and scheduler.
         """
-        optimizers: list[OptimizerProtocol] = []
-        lr_schedulers: list[LRSchedulerProtocol] = []
-        for module in self._tracked_modules.modules:
+        optimizers: dict[int, OptimizerProtocol] = {}
+        lr_schedulers: dict[int, LRSchedulerProtocol] = {}
+        for stage_index, module in self._tracked_modules.modules.items():
             optimizer = self._optimizer_provider(
                 InitializeOptimizerStageContext(dist_context=self._dist_context, model=module)
             )
-            optimizers.append(optimizer)
+            optimizers[stage_index] = optimizer
 
             scheduler = self._lr_scheduler_provider(
                 InitializeLRSchedulerContext(
                     dist_context=self._dist_context, total_steps=self._schedule.total_steps, optimizer=optimizer
                 )
             )
-            lr_schedulers.append(scheduler)
+            lr_schedulers[stage_index] = scheduler
 
         if self._dist_context.mesh_params.is_distributed:
             mesh_pp = self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"]

@@ -46,13 +46,13 @@ class TrackedModules(Stateful, Offloadable):
     """
 
     def __init__(
-        self, dist_context: DistributedContext, modules: list[nn.Module], stateful_predicate: StatefulPredicate
+        self, dist_context: DistributedContext, modules: dict[int, nn.Module], stateful_predicate: StatefulPredicate
     ):
         """Constructs the ``TrackedModules`` object.
 
         Args:
             dist_context: The distributed context.
-            modules: The model stages held by the current rank.
+            modules: The model stages held by the current rank, keyed by the global index of their pipeline stage.
             stateful_predicate: Selects the parameters and buffers stored in the state dict.
         """
         if dist_context.mesh_params.is_distributed:
@@ -66,8 +66,8 @@ class TrackedModules(Stateful, Offloadable):
         self._offload_mirror: dict[int, OffloadedTensor] | None = None
 
     @property
-    def modules(self) -> list[nn.Module]:
-        """The model stages held by the current rank."""
+    def modules(self) -> dict[int, nn.Module]:
+        """The model stages held by the current rank, keyed by the global index of their pipeline stage."""
         return self._modules
 
     def _tensors(self) -> Iterator[torch.Tensor]:
@@ -77,7 +77,7 @@ class TrackedModules(Stateful, Offloadable):
             An iterator over all tensors in the tracked modules.
         """
         return itertools.chain.from_iterable(
-            itertools.chain(module.parameters(), module.buffers()) for module in self._modules
+            itertools.chain(module.parameters(), module.buffers()) for module in self._modules.values()
         )
 
     def offload(self, ctx: OffloadContext) -> None:
@@ -154,7 +154,8 @@ class TrackedModules(Stateful, Offloadable):
             A dictionary containing the states of all managed modules.
         """
         ret = {
-            f"pp_{self._pp_rank}_stage_{i}": self._state_dict_stage(module) for i, module in enumerate(self._modules)
+            f"pp_{self._pp_rank}_stage_{i}": self._state_dict_stage(module)
+            for i, module in enumerate(self._modules.values())
         }
         return ret
 
@@ -180,7 +181,7 @@ class TrackedModules(Stateful, Offloadable):
         Raises:
             ValueError: If keys accepted by ``stateful_predicate`` are missing or unexpected keys are present.
         """
-        for i, module in enumerate(self._modules):
+        for i, module in enumerate(self._modules.values()):
             self._load_state_dict_stage(module, state_dict[f"pp_{self._pp_rank}_stage_{i}"])
 
 

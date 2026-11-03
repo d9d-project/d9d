@@ -34,7 +34,7 @@ class ModelStageExporter:
                 which stage writes the index.
         """
         alone = not self._dist_context.mesh_params.is_distributed
-        stages = self._modules.modules
+        stages = list(self._modules.modules.values())
         if alone and len(stages) != 1:
             raise ValueError(f"The model stage count ({len(stages)}) must be 1 in a run without parallelism.")
 

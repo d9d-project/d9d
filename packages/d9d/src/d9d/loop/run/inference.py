@@ -130,7 +130,9 @@ class InferenceConfigurator:
             config_model=self._parameters.model_stage_factory,
             config_pipelining=pipelining_config,
         ).build_pipeline_and_modules()
-        event_bus.trigger(EVENT_INFERENCE_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
+        event_bus.trigger(
+            EVENT_INFERENCE_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=list(modules.modules.values()))
+        )
 
         task_operator = InferenceTaskOperator(
             dist_context=dist_context, task=task, pipeline=pipeline_schedule, pipeline_state=pipeline_state_handler
@@ -189,7 +191,7 @@ class Inference:
         self._state = state
 
     def _enable_eval_mode(self):
-        for module in self._state.tracked_modules.modules:
+        for module in self._state.tracked_modules.modules.values():
             module.eval()
 
     def infer(self):

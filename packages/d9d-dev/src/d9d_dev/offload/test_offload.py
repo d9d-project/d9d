@@ -34,7 +34,7 @@ def test_offload_tensor_round_trip(dtype):
 @pytest.mark.local
 def test_tracked_modules_offload_guards(dist_ctx_factory):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())
-    tracked = TrackedModules(dist_ctx, [nn.Linear(8, 4)], lambda _name, _tensor: True)
+    tracked = TrackedModules(dist_ctx, {0: nn.Linear(8, 4)}, lambda _name, _tensor: True)
     offload_ctx = OffloadContext(device=dist_ctx.current_device, pin_memory=False)
 
     assert not tracked.is_offloaded()
@@ -89,7 +89,7 @@ def test_tracked_modules_round_trip(dist_ctx_factory):
     module = nn.Sequential(nn.Linear(2048, 2048), nn.Linear(2048, 2048), nn.Linear(2048, 2048)).to(device)
     param_bytes = sum(p.numel() * p.element_size() for p in module.parameters())
 
-    tracked = TrackedModules(dist_ctx, [module], lambda _name, _tensor: True)
+    tracked = TrackedModules(dist_ctx, {0: module}, lambda _name, _tensor: True)
     params = list(module.parameters())
     snapshots = [p.detach().clone() for p in params]
 
@@ -126,7 +126,7 @@ def test_pipelined_optimizer_round_trip(dist_ctx_factory):
     module(torch.randn(8, 64, device=device)).sum().backward()
     inner.step()
 
-    optimizer = PipelinedOptimizer(None, [inner])
+    optimizer = PipelinedOptimizer(None, {0: inner})
     snapshots = {
         id(param): {key: value.detach().clone() for key, value in state.items() if torch.is_tensor(value)}
         for param, state in inner.state.items()

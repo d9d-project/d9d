@@ -150,6 +150,6 @@ def test_multihead_consistent_to_itself_dist(
         all_reduce_over_mesh_groups(loss_dist, dist_ctx=dist_ctx)
         torch.testing.assert_close(loss_dist, loss_global, atol=1e-3, rtol=0.005)
 
-    for dist_model in models_dist:
+    for dist_model in models_dist.values():
         sync_grads_manually(dist_model)
         check_grad_distance_all_local_dist(model_global, dist_model)

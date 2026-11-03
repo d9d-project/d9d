@@ -39,7 +39,7 @@ class GradientManager(Offloadable):
         self._loss.to("cuda")
 
         self._grad_sync = GradientSynchronizer(
-            [list(module.parameters()) for module in self._tracked_modules.modules],
+            [list(module.parameters()) for module in self._tracked_modules.modules.values()],
             bucket_size_mb=self._config.bucket_size_mb,
         )
 
@@ -52,7 +52,7 @@ class GradientManager(Offloadable):
             return
 
         grad_dtype = dtype_from_name(self._config.grad_dtype)
-        for mod in self._tracked_modules.modules:
+        for mod in self._tracked_modules.modules.values():
             for param in mod.parameters():
                 if param.requires_grad:
                     param.grad_dtype = grad_dtype
