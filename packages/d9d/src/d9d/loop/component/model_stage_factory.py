@@ -1,3 +1,4 @@
+import dataclasses
 import itertools
 from collections.abc import Callable, Iterator
 from typing import Any
@@ -176,6 +177,53 @@ class TrackedModules(Stateful, Offloadable):
             self._load_state_dict_stage(module, state_dict[f"stage_{stage_index}"])
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _TensorSlot:
+    """A place that holds a parameter or a buffer: a module and the name of the tensor in it.
+
+    Attributes:
+        module: The module that holds the tensor.
+        name: The name of the tensor in the module.
+        is_buffer: Whether the tensor is a buffer rather than a parameter.
+    """
+
+    module: nn.Module
+    name: str
+    is_buffer: bool
+
+    def get(self) -> torch.Tensor:
+        """Returns the tensor that the slot holds now."""
+        return self.module.get_buffer(self.name) if self.is_buffer else self.module.get_parameter(self.name)
+
+
+def _tied_slots(model: nn.Module) -> list[list[_TensorSlot]]:
+    """Returns the slots of each parameter or buffer held in several places, one list per tensor."""
+    slots: dict[int, list[_TensorSlot]] = {}
+    for module in model.modules():
+        for name, parameter in module.named_parameters(recurse=False, remove_duplicate=False):
+            slots.setdefault(id(parameter), []).append(_TensorSlot(module, name, is_buffer=False))
+        for name, buffer in module.named_buffers(recurse=False, remove_duplicate=False):
+            slots.setdefault(id(buffer), []).append(_TensorSlot(module, name, is_buffer=True))
+    return [tensor_slots for tensor_slots in slots.values() if len(tensor_slots) > 1]
+
+
+def _to_empty_keeping_ties(model: nn.Module, device: torch.device):
+    """Moves the model to a device with uninitialized storage, like ``nn.Module.to_empty()``, and keeps its ties.
+
+    Args:
+        model: The model to move.
+        device: The device to allocate the parameters and buffers on.
+    """
+    # to_empty() replaces the tensors of each module on its own, so it unties a tensor that several modules hold.
+    ties = _tied_slots(model)
+    model.to_empty(device=device)
+    for first, *others in ties:
+        shared = first.get()
+        for slot in others:
+            # nn.Module.__setattr__() replaces a registered parameter or buffer and keeps the persistence of a buffer.
+            setattr(slot.module, slot.name, shared)
+
+
 class ModelStageFactory:
     """Factory that creates, initializes and parallelizes model stages.
 
@@ -232,7 +280,7 @@ class ModelStageFactory:
                     ParallelizeModelStageContext(model=model, stage=stage, dist_context=self._dist_context)
                 )
 
-        model.to_empty(device=self._dist_context.current_device)
+        _to_empty_keeping_ties(model, self._dist_context.current_device)
 
         # to_empty allocates uninitialized storage, so initialize the parameters.
         with torch.no_grad(), fork_rng_child("reset_parameters", stage_index):
