@@ -16,6 +16,8 @@ The **global generators** are the torch CPU generator and the CUDA generator of 
 
 `fork_rng(scope)` seeds the global generators from a scope while its context is open. On exit, it restores the states they had before, also on an exception. Forks nest. `fork_rng_child(*keys)` forks the child of the innermost open fork, so you need no scope at hand. Outside a fork, it raises an error.
 
+A fork can be entered again after it closes. Each entry continues the numbers where the previous one stopped, so a computation that runs in several parts draws the same numbers as when it runs in one go.
+
 The d9d loop runs every call of user code in a fork (see [Random Numbers in the Loop](../loop/determinism.md)). Inside such a call, `fork_rng_child()` makes a draw depend only on its keys, not on the draws before it.
 
 Forks have these limits:
