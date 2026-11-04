@@ -3,6 +3,7 @@ DEP: 0011
 Title: Scoped Random Number Generation
 Author: Maksim Afanasev @mrapplexz
 Type: Feature
+Implemented: #157
 ---
 
 # Scoped Random Number Generation
@@ -37,32 +38,27 @@ The first two defects are not fixed in separate PRs, because each fix needs a se
 
 PyTorch forces d9d to use the global generators. Dropout takes no generator, and activation checkpointing restores only the global generators during the recompute. Python `random` and NumPy have no such limit, so d9d does not seed them.
 
-### `SeedScope`
+### `d9d.rng`
 
-This DEP introduces `SeedScope` in `d9d.loop.determinism`. It is a node in a tree of seeds. The root holds a hash of `base_seed`, and a child holds a hash of the seed of its parent and its keys. So the same keys give the same seed in every process.
+This DEP introduces `SeedScope` in the new package `d9d.rng`, which depends on nothing else in d9d. So datasets and `d9d.data` can take it without depending on the loop. It is a node in a tree of seeds. The root holds a hash of `base_seed`, and a child holds a hash of the seed of its parent and its keys. So the same keys give the same seed in every process.
 
 ```python
-@dataclasses.dataclass(frozen=True)
 class SeedScope:
-    """A node in the tree of seeds derived from the base seed of a job.
+    """A node in the tree of seeds derived from the base seed of a job."""
 
-    Attributes:
-        seed: The seed of this scope, in ``[0, 2**64)``. APIs that take a 32-bit seed must use it modulo ``2**32``.
-    """
+    @property
+    def seed(self) -> int:
+        """The seed of this scope, in ``[0, 2**64)``. APIs that take a 32-bit seed must use it modulo ``2**32``."""
 
-    seed: int
-
-    @classmethod
-    def root(cls, base_seed: int) -> Self:
+    @staticmethod
+    def root(base_seed: int) -> "SeedScope":
         """Returns the root seed scope of a job, with a seed hashed from the base seed."""
 
-    def child(self, *keys: str | SupportsIndex) -> Self:
+    def child(self, *keys: str | int) -> "SeedScope":
         """Returns the seed scope below this one, with a seed hashed from this seed and the keys."""
 ```
 
-`d9d.data` and `d9d.optim` take plain `int` seeds since #138 and #139, so they do not depend on the loop.
-
-This DEP also introduces `fork_rng()` in `d9d.loop.determinism`. It replaces `set_seeds()`.
+This DEP also introduces `fork_rng()` and `fork_rng_child()` in `d9d.rng`. `fork_rng()` replaces `set_seeds()`. The loop uses both. User code can use `fork_rng_child()` to make one draw independent of the draws before it.
 
 ```python
 @contextmanager
@@ -70,27 +66,30 @@ def fork_rng(scope: SeedScope) -> Iterator[None]:
     """Seeds the global generators from a seed scope while the context is open.
 
     On exit, the global generators return to the states they had before the context.
+    """
 
-    Args:
-        scope: The seed scope to take the seed from.
+
+def fork_rng_child(*keys: str | int) -> AbstractContextManager[None]:
+    """Forks the global generators from a child of the seed scope of the innermost open ``fork_rng()``.
+
+    Raises:
+        RuntimeError: If no ``fork_rng()`` is open on this thread.
     """
 ```
 
-### Seed scopes of the job
+### Forks of the loop
 
-The loop runs each call of user code in `fork_rng(root.child(name, *coordinates))`, where `name` is the name of the call. The coordinates are:
+Forks nest: `fork_rng()` remembers its scope until it exits. The loop opens a fork of the root `SeedScope.root(base_seed)` for each phase: `configure()`, `train()`, `infer()` and `export()`. Inside it, each step and each call of user code forks the child `(name, *counters)` of the innermost open fork. The counters are the step, the stage and the microbatch, if the call repeats over them. Otherwise every repetition draws the same numbers. `stage` is the global index of the pipeline stage.
 
-*   **Counters**: The call takes each counter it repeats over: `stage`, `step` and `microbatch`. Otherwise every repetition draws the same numbers. `stage` is the global index of the pipeline stage.
-*   **Rank coordinates**: The call takes `pp`, `dp` or `cp` only if its numbers must differ along it. They are the rank coordinates in the batch domain, and `0` without a mesh.
+A call whose work differs across ranks adds the coordinate of the rank to its key. `dp` and `cp` are the rank coordinates in the batch domain, and `0` without a mesh. So every draw has the full path from the root, e.g. `("train",)`, `("step", step)`, `("dp", dp)`, `("compute_loss", microbatch)`, and two phases never share numbers.
 
 For example:
 
-*   `data_provider()` runs in `("data_provider",)`, because providers must build the same objects on all ranks.
-*   `reset_parameters()` runs in `("reset_parameters", stage)`, because the `DTensor` RNG keeps replicas equal only on equal generator states.
-*   `build_forward_inputs()` runs in `("build_forward_inputs", step, microbatch, dp)`. All ranks that hold a part of a sample must make the same decision about it, such as a mask.
-*   `schedule.step()` runs in `("pass", step, pp, dp, cp)`. Dropout needs other masks for other samples, parts of a sequence and layers, but the same masks across `tp`.
-
-`configure()`, `train()`, `infer()` and each step also run in forks, which cover the code between the calls, such as the saving of checkpoints. Handlers of one event share one fork and draw in the order of subscription.
+*   `data_provider()` runs in `("data_provider",)` of `configure()`, because providers must build the same objects on all ranks.
+*   `reset_parameters()` runs in `("reset_parameters", stage)` of `configure()` (see Initialization).
+*   `build_forward_inputs()` runs in `("build_forward_inputs", microbatch)` of `("dp", dp)` of the step. All ranks that hold a part of a sample must make the same decision about it, such as a mask.
+*   Each forward and backward pass of a stage runs in `("cp", cp, kind, stage, microbatch)` of `("dp", dp)` of the step. The `compute_context()` of the `PipelineStepHandler` opens this fork. Dropout needs other masks for other samples, parts of a sequence and layers, but the same masks across `tp`. The masks do not depend on the pipeline schedule.
+*   An event runs in `("event", event.id)` of the call that triggers it, so custom events run in a fork too. The handlers draw in the order of subscription. An event of the loop draws the same numbers on all ranks. A handler that needs other numbers per rank, e.g. for rollouts, adds its rank to the keys with `fork_rng_child()`.
 
 A random decision that must match across ranks, such as stochastic depth per sample, belongs in `build_forward_inputs()`. A random op on a parameter must not run in the model pass, because the seed of the pass differs across `dp` and `cp`. d9d does not detect code that breaks these rules.
 
@@ -98,22 +97,24 @@ A random decision that must match across ranks, such as stochastic depth per sam
 
 With one seed per stage, the `DTensor` RNG gives equal values on replicas and disjoint values on shards. The same `base_seed`, layout, GPU model and software give the same weights. To get the same weights on another layout, initialize once and load the result as `source_checkpoint`.
 
-The loop creates the `DTensor` RNG tracker with `run_state_sync=False` in the fork of `configure()`. Otherwise the first `DTensor` random op broadcasts the generator state of rank 0 and overwrites the seeds of the other stages. This is a stopgap, because PyTorch has no public API to create the tracker without the broadcast.
+`DistributedContext` creates the `DTensor` RNG tracker with `run_state_sync=False` when it builds the device meshes. Otherwise the first `DTensor` random op broadcasts the generator state of rank 0 and overwrites the seeds of the other stages. This is a stopgap, because PyTorch has no public API to create the tracker without the broadcast.
 
-### Data and optimizer
+### Seed scopes in contexts
+
+A context gets a seed scope only for code that a fork cannot cover.
 
 The iteration over data, i.e. `__iter__()`, `__getitem__()` and the collator, can run on the prefetch thread, in parallel with the forks of the main thread. So it must not draw from the global generators and must take its seeds from the context. `InitializeDataProviderContext` gets two fields:
 
-*   **`seed_scope`**: The seed scope `("data",)`, equal on all ranks for code before sharding.
-*   **`shard_seed_scope`**: The seed scope `("data", "shard", dp)`, equal on the ranks of one data-parallel shard.
+*   **`seed_scope`**: The child `("data",)` of the root, equal on all ranks for code before sharding.
+*   **`shard_seed_scope`**: The child `("dp", dp)` of `seed_scope`, equal on the ranks of one data-parallel shard.
 
-A data loader must take a generator seeded from `shard_seed_scope`. A dataset that draws per sample creates a generator from its seed and the sample index. `AutoDataProvider` passes its context to the dataset factory.
+`AutoDataProvider` passes its context to the dataset factory.
 
-`InitializeOptimizerStageContext` gets the field `seed_scope` with the seed scope `("optimizer", stage)`. `AutoOptimizerProvider` passes its seed to `StochasticAdamW`.
+`StochasticAdamW` takes an optional `generator`, as torch random ops do. Without it, each step draws from the global generators. In the loop, the optimizer steps in a fork, so `AutoOptimizerProvider` passes no generator and the optimizer context gets no seed scope.
 
 ### Checkpoint
 
-The checkpoint gets no new state. The seeds of the calls follow from their keys, and the loader and the optimizer save their own generators. The loop saves the loader per data-parallel rank and the optimizer per stage. The rules above make each generator equal on the ranks that share its key.
+The checkpoint gets no new state. The seeds of the calls follow from their keys, and the loader saves its own generator.
 
 ## Usage
 
@@ -129,23 +130,26 @@ def __call__(self, context: InitializeDataProviderContext) -> MicrobatchPackStre
     ...
 ```
 
-A task draws per-sample decisions in `build_forward_inputs()`, so all stages get the same mask:
+Code inside a call forks a child to give each item its own numbers, whatever was drawn before it:
 
 ```python
-def build_forward_inputs(self, ctx: BuildForwardInputsContext) -> BuildForwardInputsResult:
-    mask = torch.rand(ctx.batch.input_ids.shape, device=ctx.batch.input_ids.device) < 0.15
-    ...
+for prompt_idx, prompt in enumerate(prompts):
+    with fork_rng_child("rollout", prompt_idx):
+        completions.append(sample(model, prompt))
 ```
 
 The model code does not change.
 
 ## Backward Compatibility
 
-*   **Contexts**: Code that builds `InitializeDataProviderContext` or `InitializeOptimizerStageContext` itself must pass the new fields.
+*   **Contexts**: Code that builds `InitializeDataProviderContext` itself must pass the new fields.
+*   **`StochasticAdamW`**: An optional `generator` replaces the `seed` argument.
+*   **`EventBus`**: `trigger()` raises outside `fork_rng()`, like every `fork_rng_child()`. The loop always opens a fork. Code that uses an `EventBus` outside the loop opens one itself.
+*   **`DistributedContext`**: It replaces the `DTensor` RNG tracker of the process.
 *   **`AutoDataProvider`**: The dataset factory gets `InitializeDataProviderContext` instead of `DistributedContext`.
 *   **`set_seeds()`**: It no longer exists. d9d no longer seeds torch, Python `random` and NumPy at start and no longer sets `PYTHONHASHSEED`. Code outside the calls of d9d seeds what it uses itself.
 *   **Seeds in user code**: `torch.manual_seed()` in a provider, a hook or an event handler holds only until the call returns.
-*   **Random numbers**: The same `base_seed` gives other weights, data order and dropout masks. A job resumed from an old checkpoint keeps the saved loader and optimizer generators.
+*   **Random numbers**: The same `base_seed` gives other weights, data order and dropout masks.
 
 ## Alternatives Considered
 
@@ -173,6 +177,6 @@ Task hooks could take a generator from their context instead of a fork. But drop
 
 *   **Tensor parallelism**: Sharded regions need masks that differ across `tp`. This belongs to the tensor parallelism DEP (#108).
 *   **Context parallelism**: The seeds of the task hooks assume that every `cp` rank sees the whole sample. A split of the sample before the hooks belongs to the context parallelism design (#5).
-*   **Stateless stochastic rounding**: Derive the noise from the seed, the step and the element index. The optimizer then needs no generator state. It is not needed now, because the generator in `state_dict()` already gives an exact resume.
-*   **Per-sample randomness**: A dataset wrapper that passes `__getitem__()` a generator seeded by the sample index.
+*   **Global offsets in stochastic rounding**: The rounding noise of `StochasticAdamW` depends on the local element index, so the shards of one parameter round with the same noise. The kernel can take the global offset of the shard from its `DTensor` placements instead.
+*   **Per-sample randomness**: `AutoDataProvider` can run each sample and each collation in a fork keyed by the shard seed and the indices. This fork also seeds Python `random` and NumPy. It needs `num_workers` of at least 1, because a fork on the prefetch thread races with the forks of the main thread.
 *   **CUDA graphs**: A fork cannot run inside graph capture, because PyTorch forbids setting the generator state during capture. d9d does not capture graphs yet.
