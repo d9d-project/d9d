@@ -197,8 +197,8 @@ from d9d.pipelining.factory import PipelineSchedule1F1BConfig, build_program_bui
 
 
 # 0. Define the step handler. It computes the loss per microbatch from the PipelineOutput of the
-#    last stage. It can also override compute_context() to open a context around each forward and
-#    backward pass of a stage.
+#    last stage. It can also override compute_context() to open a reusable context around each
+#    forward and backward pass of a stage.
 class MyStepHandler(PipelineStepHandler[MyOutput]):
     def __init__(self, targets_microbatches: list[Tensor]):
         self._targets = targets_microbatches
