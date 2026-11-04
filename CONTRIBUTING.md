@@ -76,16 +76,20 @@ We enforce strict quality standards to keep the codebase maintainable.
 They are not enforced by tooling, but PRs that violate them may be asked to change.
 
 * **Composition over inheritance**: components are small single-responsibility classes wired together (see `packages/d9d/src/d9d/loop/component/`). Avoid "God classes" that accumulate unrelated responsibilities, avoid speculative base classes that exist only to hoard "common" code.
-* **Define contracts structurally.** Use a `typing.Protocol` for a *trait* - a secondary capability bolted onto a type that already has its own base class (e.g. `ModuleLateInit` on an `nn.Module`), where you want duck-typed conformance without forcing inheritance. Use an `abc.ABC` when the interface *is* the object's primary identity and the hierarchy is the "main" type (e.g. `PipelineSchedule`).
+* **Define contracts structurally.** Use a `typing.Protocol` for a *trait* - a secondary capability bolted onto a type that already has its own base class (e.g. `ModuleLateInit` on an `nn.Module`), where you want duck-typed conformance without forcing inheritance. Use an `abc.ABC` when the interface *is* the object's primary identity and the hierarchy is the "main" type (e.g. `PipelineSchedule`). A collaborator with several related operations or its own state is a protocol or an ABC, not a set of callables. A single operation, such as a provider or an event handler, can be a function. In public API, type it with a callable `Protocol` whose argument is a named context object, as the providers in `d9d.loop.control` do.
 * **No reflection where it can be avoided.** Avoid `getattr` / `hasattr` / `inspect` and string-name dispatch. Prefer an explicit `match`-`case`, a proper interface, or a factory. Reflection is acceptable *only* when introspection is intrinsic to the feature itself - i.e. declarative registration APIs that cannot work without it, such as a `@subscribe`/`@register` decorator wiring handlers by signature.
 * **Inject dependencies; don't reach for them.** Components receive their collaborators as constructor arguments and store them as private fields. Don't pull them from globals/singletons or construct them internally - wiring happens at the edges (`packages/d9d/src/d9d/loop/run/`).
-* **Reuse before reinventing.** If PyTorch or the stdlib already solves it, use it, rather than hand-rolling an equivalent.
+* **Take only what you use.** A function or a constructor takes only the values it reads. Do not pass a rank, a seed scope or a config through layers that only forward it. The code that needs a value reads it from a collaborator it already gets, e.g. a rank from the injected `DistributedContext`.
+* **Reuse before reinventing.** If PyTorch or the stdlib already solves it, use it, rather than hand-rolling an equivalent. Inside d9d, follow the pattern that similar code already uses.
 * **No needless indirection.** Don't add a wrapper that only forwards to another function/object without adding meaning. Inline it instead.
 * **Validate eagerly, fail fast.** Validate constructor args up front; raise if a method is called outside its required lifecycle scope rather than silently misbehaving.
 * **Decide behavior from explicit inputs, not inferred state.** Drive branching with an explicit parameter, not by sniffing the shape/dtype/contents of the data. Inferred checks silently encode invariants the caller and the next reader won't know are there - make them part of the signature instead.
 * **Validate at the boundary; trust within it**. Data crossing an untrusted boundary (user config, deserialized state) is validated once at the edge into a model that guarantees its own invariants — that's the validation layer, and we use `pydantic` for it. Pass trusted internal data as plain `dataclasses` and assume it is already valid. Don't re-validate trusted internal data, and don't pass unvalidated raw input deeper than the edge.
 * **Separate configuration from behavior.** Config objects describe; classes behave. Don't merge them into one dataclass that needs `__post_init__` magic.
 * **Polymorphism for configurable objects via discriminated unions.** When a configurable object has selectable behavior, model the choices as a Pydantic discriminated union and resolve them in a `build_*()` factory with an exhaustive `match (case _: raise)`.
+* **One owner per fact.** Keep each fact in one place. Merge duplicated fields into one object, and key per-stage collections by the stage index instead of keeping parallel lists.
+* **Respect the layers.** A module lives in the package of its layer, and a lower package never imports a higher one.
+* **Count the edits.** Adding a new variant should change few places. If it changes many, move the knowledge into one place.
 
 ### Linting and Formatting
 We use [Ruff](https://docs.astral.sh/ruff/) for both linting and formatting.
@@ -128,15 +132,41 @@ We use **[ty](https://github.com/astral-sh/ty)** to ensure type safety.
     *   **External Kernels:** External low-level kernels and wrappers (e.g., `packages/d9d/src/d9d/kernel/cce`, `deep_ep`) are explicitly ignored.
 
 ### Testing
-We have two tiers of tests:
-1.  **Local (`-m local`):** Standard logic tests that run in a single process.
-2.  **Distributed (`-m distributed`):** Tests that strictly require `torchrun`.
-
-**Requirement:** All PRs must pass `make test`. If you add a feature, you must add corresponding tests.
 
 The tests and benchmarks of each published package are a workspace package of their own: `packages/d9d-dev` and
 `packages/d9d-kernels-dev`. `uv sync` installs them, so IDEs and tools import them like any other package. Add
-test-only dependencies to their `pyproject.toml`.
+test-only dependencies to their `pyproject.toml`. A test package mirrors the layout of its package: the tests of
+`d9d/loop/component/` go to `d9d_dev/loop/component/test_<topic>.py`.
+
+Every test has one of two markers:
+
+*   **`local`**: The test runs in one process. It can use a GPU.
+*   **`distributed`**: The test runs under `torchrun` on 8 ranks. It gets its context from
+    `dist_ctx_factory(DeviceMeshParameters(...))`.
+
+All PRs must pass `make test`.
+
+#### What to Test
+
+*   **Test the changed contract.** A feature gets tests of what it promises. A fix gets a test that fails on
+    `main`. First coverage of an untested component is a separate PR.
+*   **Write few tests.** One test of the contract, parametrized over its cases, is better than many small tests
+    of one case each. Add a case to an existing test before you add a test.
+*   **Compare with a reference if one computes the same thing.** A kernel has an eager PyTorch version in
+    `reference_impl.py`, a model has its Hugging Face original, and a parallel layout has the same model on one
+    device. Take the tolerances from `d9d_dev/nn/helper/tolerances.py`. Other code, such as a schedule or a config,
+    gets direct assertions on its results.
+*   **Use the public API on real objects.** Replace a collaborator with a small fake that implements its protocol.
+    Mock only external services, such as trackers. Do not assert on private attributes.
+*   **Do not test what tooling enforces,** such as types, imports or package boundaries.
+
+#### How to Write a Test
+
+*   Check errors with `pytest.raises(..., match=...)`.
+*   Compare floats with `torch.testing.assert_close()` and exact values with `torch.equal()`. Do not write
+    `assert torch.allclose(...)`: it hides the difference.
+*   Do not seed: the autouse fixture `fixed_seed` already does.
+*   Put shared helpers into a module without the `test_` prefix in the same package.
 
 ## Writing
 
