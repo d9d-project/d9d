@@ -6,9 +6,10 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING
 
 import torch
+import torch.distributed.tensor._random
 from torch.distributed import DeviceMesh
 
-from .device_mesh_domains import ALL_DOMAIN_PROVIDERS, REGULAR_DOMAIN
+from .device_mesh_domains import ALL_DOMAIN_PROVIDERS, FLAT_DOMAIN, REGULAR_DOMAIN
 from .log import build_dist_logger
 
 if TYPE_CHECKING:
@@ -31,6 +32,17 @@ def _build_mesh_domains(params: "DeviceMeshParameters") -> dict[str, DeviceMesh]
     return {provider.name: provider.build_mesh(params) for provider in ALL_DOMAIN_PROVIDERS}
 
 
+def _create_dtensor_rng_tracker(mesh: DeviceMesh):
+    # Without this tracker, the first DTensor random op creates one that broadcasts the generator state of rank 0
+    # and overwrites the seeds of the other pipeline stages. Stopgap: PyTorch has no public API to create it without
+    # the broadcast. The tracker takes only the device type and the global rank from the mesh, so any mesh with all
+    # the ranks works.
+    dtensor_random = torch.distributed.tensor._random  # noqa: SLF001 - no public API
+    dtensor_random._rng_tracker = dtensor_random.OffsetBasedRNGTracker(  # noqa: SLF001 - no public API
+        mesh, run_state_sync=False
+    )
+
+
 class DistributedContext:
     """The single source of truth for the distributed execution environment.
 
@@ -40,6 +52,9 @@ class DistributedContext:
 
     def __init__(self, params: "DeviceMeshParameters", log_level: int):
         """Constructs the ``DistributedContext`` object and sets the current CUDA device to the local rank.
+
+        In a distributed run, it also creates the ``DTensor`` RNG tracker, which draws from the generators of each
+        rank as they are.
 
         Args:
             params: The parallelism degrees to build the device meshes from.
@@ -52,6 +67,7 @@ class DistributedContext:
             regular_mesh = meshes[REGULAR_DOMAIN]
 
             self._meshes = meshes
+            _create_dtensor_rng_tracker(meshes[FLAT_DOMAIN])
             self._num_nodes = regular_mesh.size() // torch.cuda.device_count()
             self._logger = build_dist_logger(
                 f"pp:{regular_mesh.get_local_rank('pp')}-"

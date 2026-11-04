@@ -33,6 +33,7 @@ nav = [
         "loop/train.md",
         "loop/inference.md",
         "loop/checkpointing.md",
+        "loop/determinism.md",
         "loop/config.md",
         { "Interfaces" = [
             "loop/interfaces/index.md",
@@ -119,6 +120,9 @@ nav = [
         ] },
         { "State Offloading" = [
             "offload/index.md",
+        ] },
+        { "Random Number Generation" = [
+            "rng/index.md",
         ] },
     ] },
 ]

@@ -48,7 +48,7 @@ def test_reproducibility_and_state_dict(state_dtype, grad_dtype):
 
     param1 = torch.randn(10, 10, device=device, dtype=torch.bfloat16, requires_grad=True)
     param1.grad_dtype = grad_dtype
-    optim1 = StochasticAdamW([param1], lr=1e-3, state_dtype=state_dtype)
+    optim1 = StochasticAdamW([param1], lr=1e-3, state_dtype=state_dtype, generator=torch.Generator().manual_seed(1))
 
     grad_step1 = torch.randn_like(param1, dtype=grad_dtype)
     grad_step2 = torch.randn_like(param1, dtype=grad_dtype)
@@ -65,7 +65,8 @@ def test_reproducibility_and_state_dict(state_dtype, grad_dtype):
     param2.grad_dtype = grad_dtype
     param2.requires_grad = True
 
-    optim2 = StochasticAdamW([param2], lr=1e-3, state_dtype=state_dtype)
+    # The generator of the resumed optimizer starts elsewhere, so only the loaded state can make it match.
+    optim2 = StochasticAdamW([param2], lr=1e-3, state_dtype=state_dtype, generator=torch.Generator().manual_seed(2))
     optim2.load_state_dict(state_dict)
 
     assert (optim1._generator.get_state() == optim2._generator.get_state()).all()
@@ -105,20 +106,37 @@ def test_convergence_bf16(state_dtype):
     assert abs(weight.item() - 2.0) <= 2 * 2**-6
 
 
+def _step_once(start: torch.Tensor, grad: torch.Tensor, generator: torch.Generator | None) -> torch.Tensor:
+    param = start.clone().requires_grad_(True)
+    param.grad_dtype = torch.float32
+    param.grad = grad.clone()
+    StochasticAdamW([param], lr=1e-3, generator=generator).step()
+    return param.detach()
+
+
 @pytest.mark.local
-def test_rounding_noise_ignores_default_generator():
-    device = torch.device("cuda")
-    start = torch.randn(64, 64, device=device, dtype=torch.bfloat16)
-    grad = torch.randn(64, 64, device=device, dtype=torch.float32)
+def test_rounding_noise_with_generator_ignores_default_generator():
+    start = torch.randn(64, 64, device="cuda", dtype=torch.bfloat16)
+    grad = torch.randn(64, 64, device="cuda", dtype=torch.float32)
 
     # Ranks draw different amounts from the default generator, but their replicas must round the same way.
     results = []
     for default_seed in (1, 2):
         torch.manual_seed(default_seed)
-        param = start.clone().requires_grad_(True)
-        param.grad_dtype = torch.float32
-        param.grad = grad.clone()
-        StochasticAdamW([param], lr=1e-3).step()
-        results.append(param.detach())
+        results.append(_step_once(start, grad, torch.Generator().manual_seed(0)))
 
     assert torch.equal(results[0], results[1])
+
+
+@pytest.mark.local
+def test_rounding_noise_without_generator_follows_default_generator():
+    start = torch.randn(64, 64, device="cuda", dtype=torch.bfloat16)
+    grad = torch.randn(64, 64, device="cuda", dtype=torch.float32)
+
+    results = []
+    for default_seed in (1, 1, 2):
+        torch.manual_seed(default_seed)
+        results.append(_step_once(start, grad, generator=None))
+
+    assert torch.equal(results[0], results[1])
+    assert not torch.equal(results[0], results[2])

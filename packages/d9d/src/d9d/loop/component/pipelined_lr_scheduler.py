@@ -1,6 +1,7 @@
 from typing import Any
 
 from d9d.optim import LRSchedulerProtocol
+from d9d.rng import fork_rng_child
 
 
 class PipelinedLRScheduler(LRSchedulerProtocol):
@@ -25,5 +26,6 @@ class PipelinedLRScheduler(LRSchedulerProtocol):
             scheduler.load_state_dict(state_dict[f"stage_{stage_index}"])
 
     def step(self) -> None:
-        for scheduler in self._schedulers.values():
-            scheduler.step()
+        for stage_index, scheduler in self._schedulers.items():
+            with fork_rng_child("lr_scheduler_step", stage_index):
+                scheduler.step()

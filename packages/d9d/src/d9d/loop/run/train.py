@@ -1,12 +1,13 @@
 import contextlib
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from tqdm import tqdm
 
-from d9d.data import build_device_pack_stream
-from d9d.dist_context import DeviceMeshParameters
+from d9d.data import MicrobatchPack, build_device_pack_stream
+from d9d.dist_context import BATCH_DOMAIN, DeviceMeshParameters, DistributedContext
 from d9d.metric.catalogue.container import ComposeMetric
+from d9d.rng import SeedScope, fork_rng, fork_rng_child
 
 from ..component import (
     DataParallelMicrobatchPackStream,
@@ -39,7 +40,6 @@ from ..control import (
     TrainTaskProvider,
     TrainTaskProviderContext,
 )
-from ..determinism import set_seeds
 from ..event import EventBus
 from ..event.catalogue.common import (
     EventConfigurationStartedContext,
@@ -106,23 +106,35 @@ class TrainingConfigurator:
         self._optimizer_provider = optimizer_provider
         self._lr_scheduler_provider = lr_scheduler_provider
 
-    def _build_new_training_state(self) -> TrainJobState:
-        dist_context = self._mesh.build()
-
-        set_seeds(dist_context, seed=self._parameters.determinism.base_seed)
-
+    def _build_new_training_state(self, dist_context: DistributedContext, seed_scope: SeedScope) -> TrainJobState:
         timeout_manager = TimeoutManager(dist_context=dist_context, config=self._parameters.timeout)
         timeout_manager.set_init()
 
-        task = self._task_provider(TrainTaskProviderContext(dist_context=dist_context))
+        with fork_rng_child("task_provider"):
+            task = self._task_provider(TrainTaskProviderContext(dist_context=dist_context))
 
         event_bus = EventBus()
-        self._model_provider.register_events(RegisterModelEventsContext(dist_context=dist_context, event_bus=event_bus))
-        task.register_events(RegisterTaskEventsContext(dist_context=dist_context, event_bus=event_bus))
+        with fork_rng_child("register_events", "model_provider"):
+            self._model_provider.register_events(
+                RegisterModelEventsContext(dist_context=dist_context, event_bus=event_bus)
+            )
+        with fork_rng_child("register_events", "task"):
+            task.register_events(RegisterTaskEventsContext(dist_context=dist_context, event_bus=event_bus))
 
         event_bus.trigger(EVENT_TRAIN_CONFIG_STARTED, EventConfigurationStartedContext(dist_context=dist_context))
 
-        microbatch_pack_stream = self._data_provider(InitializeDataProviderContext(dist_context=dist_context))
+        dp_rank = (
+            dist_context.mesh_for(BATCH_DOMAIN)["dp"].get_local_rank() if dist_context.mesh_params.is_distributed else 0
+        )
+        data_seed_scope = seed_scope.child("data")
+        with fork_rng_child("data_provider"):
+            microbatch_pack_stream = self._data_provider(
+                InitializeDataProviderContext(
+                    dist_context=dist_context,
+                    seed_scope=data_seed_scope,
+                    shard_seed_scope=data_seed_scope.child("dp", dp_rank),
+                )
+            )
         event_bus.trigger(EVENT_TRAIN_DATA_STREAM_READY, EventDataStreamReadyContext(stream=microbatch_pack_stream))
 
         checkpointable_stream = DataParallelMicrobatchPackStream(
@@ -151,7 +163,8 @@ class TrainingConfigurator:
         ).build_pipeline_and_modules()
         event_bus.trigger(EVENT_TRAIN_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
 
-        metrics = ComposeMetric(task.create_metrics(CreateMetricsContext()).metrics)
+        with fork_rng_child("create_metrics"):
+            metrics = ComposeMetric(task.create_metrics(CreateMetricsContext()).metrics)
 
         gradient_manager = GradientManager(
             dist_context=dist_context,
@@ -210,6 +223,7 @@ class TrainingConfigurator:
 
         return TrainJobState(
             dist_context=dist_context,
+            seed_scope=seed_scope,
             microbatch_pack_stream=device_pack_stream,
             schedule=schedule,
             tracked_modules=modules,
@@ -232,13 +246,18 @@ class TrainingConfigurator:
     def configure(self) -> "Trainer":
         """Builds all training components and returns a configured ``Trainer``.
 
-        It creates the distributed context, sets seeds and builds the model, the optimizer and the
-        data stream. It also builds the auxiliary components (logging, profiling, checkpointing).
+        It creates the distributed context and builds the model, the optimizer and the data stream. It also
+        builds the auxiliary components (logging, profiling, checkpointing).
 
         Returns:
             A ready-to-use trainer that holds the job state.
         """
-        state = self._build_new_training_state()
+        # Build the mesh outside the fork: it sets the current CUDA device, whose generator the fork saves.
+        dist_context = self._mesh.build()
+        seed_scope = SeedScope.root(self._parameters.determinism.base_seed)
+
+        with fork_rng(seed_scope.child("configure")):
+            state = self._build_new_training_state(dist_context, seed_scope)
 
         return Trainer(state)
 
@@ -272,6 +291,10 @@ class Trainer:
         Raises:
             RuntimeError: If the data stream ends before ``total_steps``.
         """
+        with fork_rng(self._state.seed_scope.child("train")):
+            self._train()
+
+    def _train(self):
         self._state.dist_context.wait_world()
         self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
         self._state.checkpointer.load_last_checkpoint(self._state)
@@ -292,7 +315,7 @@ class Trainer:
                 initial=self._state.schedule.current_step,
             ) as bar,
             self._state.logger.new_run(context={"stage": "train"}) as writer,
-            self._state.garbage_collector as gc,
+            self._state.garbage_collector,
             self._state.profiler.open() as profiler,
             self._state.gradient_manager.install(),
             self._state.gradient_clipper.install(),
@@ -303,48 +326,8 @@ class Trainer:
 
             # docs/concepts/how_d9d_works.md shows a trimmed copy of this loop. Update it when the loop changes.
             while self._state.schedule.current_step < self._state.schedule.total_steps:
-                self._state.event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
-
-                device_pack = next(packs, None)
-                if device_pack is None:
-                    raise RuntimeError(
-                        f"The data stream ended at step ({self._state.schedule.current_step}) "
-                        f"before total_steps ({self._state.schedule.total_steps}). "
-                        "Lower total_steps or provide more data."
-                    )
-
-                with self._state.event_bus.bounded(
-                    EVENT_TRAIN_FORWARD_BACKWARD_PRE, EVENT_TRAIN_FORWARD_BACKWARD_POST, step_ctx
-                ):
-                    # The installed GradientManager overlaps gradient sync with compute. The step handler
-                    # accumulates the loss and its weight per microbatch.
-                    self._state.task_operator.forward_backward(device_pack)
-
-                # Metrics are complete for this step, so their sync can start and overlap with the work below.
-                self._state.logger.trigger_sync()
-
-                self._state.gradient_manager.sync_and_scale()
-
-                # The norm must cover the synced gradients, so clip only after the sync.
-                grad_norm = self._state.gradient_clipper.clip()
-
-                # The optimizer does not sync gradients: they are already replicated.
-                with self._state.event_bus.bounded(
-                    EVENT_TRAIN_OPTIMIZER_STEP_PRE, EVENT_TRAIN_OPTIMIZER_STEP_POST, step_ctx
-                ):
-                    self._state.optimizer.step()
-
-                self._state.lr_scheduler.step()
-
-                self._state.logger.log(loss=self._state.gradient_manager.compute_global_loss(), grad_norm=grad_norm)
-
-                self._state.gradient_manager.zero_grad()
-
-                gc.collect_periodic()
-
-                self._state.timeout_manager.set_periodic()
-
-                self._state.event_bus.trigger(EVENT_TRAIN_STEP_POST, step_ctx)
+                with fork_rng_child("step", self._state.schedule.current_step):
+                    self._train_step(packs, step_ctx)
                 self._state.schedule.step()
 
                 # Checkpoint after schedule.step(), so the saved step counter includes this step.
@@ -356,8 +339,51 @@ class Trainer:
 
                 bar.update()
 
-            self._state.task.finalize(FinalizeContext())
+            with fork_rng_child("finalize"):
+                self._state.task.finalize(FinalizeContext())
             self._state.event_bus.trigger(EVENT_TRAIN_FINISHED, EventTrainFinishedContext())
+
+    def _train_step(self, packs: Iterator[MicrobatchPack], step_ctx: EventStepContext):
+        self._state.event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
+
+        device_pack = next(packs, None)
+        if device_pack is None:
+            raise RuntimeError(
+                f"The data stream ended at step ({self._state.schedule.current_step}) "
+                f"before total_steps ({self._state.schedule.total_steps}). "
+                "Lower total_steps or provide more data."
+            )
+
+        with self._state.event_bus.bounded(
+            EVENT_TRAIN_FORWARD_BACKWARD_PRE, EVENT_TRAIN_FORWARD_BACKWARD_POST, step_ctx
+        ):
+            # The installed GradientManager overlaps gradient sync with compute. The step handler
+            # accumulates the loss and its weight per microbatch.
+            self._state.task_operator.forward_backward(device_pack)
+
+        # Metrics are complete for this step, so their sync can start and overlap with the work below.
+        self._state.logger.trigger_sync()
+
+        self._state.gradient_manager.sync_and_scale()
+
+        # The norm must cover the synced gradients, so clip only after the sync.
+        grad_norm = self._state.gradient_clipper.clip()
+
+        # The optimizer does not sync gradients: they are already replicated.
+        with self._state.event_bus.bounded(EVENT_TRAIN_OPTIMIZER_STEP_PRE, EVENT_TRAIN_OPTIMIZER_STEP_POST, step_ctx):
+            self._state.optimizer.step()
+
+        self._state.lr_scheduler.step()
+
+        self._state.logger.log(loss=self._state.gradient_manager.compute_global_loss(), grad_norm=grad_norm)
+
+        self._state.gradient_manager.zero_grad()
+
+        self._state.garbage_collector.collect_periodic()
+
+        self._state.timeout_manager.set_periodic()
+
+        self._state.event_bus.trigger(EVENT_TRAIN_STEP_POST, step_ctx)
 
     def sleep(self, tags: Iterable[SleepTag] = DEFAULT_SLEEP_TAGS) -> None:
         """Releases the GPU-resident training state selected by ``tags`` to host memory.
@@ -415,4 +441,5 @@ class Trainer:
         if load_checkpoint:
             self._state.checkpointer.load_last_checkpoint(self._state)
 
-        self._state.exporter.export(export_to)
+        with fork_rng(self._state.seed_scope.child("export")):
+            self._state.exporter.export(export_to)

@@ -1,7 +1,9 @@
 import dataclasses
 
 import pytest
+import torch
 from d9d.loop.event import Event, EventBus
+from d9d.rng import SeedScope, fork_rng
 
 from d9d_dev.loop.event.common_events import EVENT_A, EVENT_B, EventTestContext
 
@@ -113,3 +115,23 @@ def test_bounded_exception_execution() -> None:
 
     # The exception aborts the context manager, so EVENT_B should not trigger.
     assert log == ["pre-10", "inside"]
+
+
+@pytest.mark.local
+def test_trigger_forks_from_current_seed_scope():
+    scope = SeedScope.root(0)
+    bus = EventBus()
+    draws = []
+    bus.subscribe(EVENT_A, lambda ctx: draws.append(torch.rand(4)))
+
+    with fork_rng(scope):
+        bus.trigger(EVENT_A, EventTestContext(step=0))
+        # The handlers must not shift the numbers of the code after the trigger.
+        after = torch.rand(4)
+    with fork_rng(scope.child("event", EVENT_A.id)):
+        expected = torch.rand(4)
+    with fork_rng(scope):
+        expected_after = torch.rand(4)
+
+    assert torch.equal(draws[0], expected)
+    assert torch.equal(after, expected_after)

@@ -20,7 +20,7 @@ The physical GPUs stay the same, but each domain arranges them into a different 
 ### Regular Domain (`regular`)
 
 *   **Identifier**: `REGULAR_DOMAIN` or `"regular"`
-*   **Purpose**: The most granular mesh, with every parallelism in its own dimension. d9d uses it for logging and seeding.
+*   **Purpose**: The most granular mesh, with every parallelism in its own dimension. d9d uses it for logging.
 *   **Dimensions**:
     1.  `pp`: Pipeline Parallel
     2.  `dp_replicate`: Data Parallel (DDP style)

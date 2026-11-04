@@ -98,7 +98,7 @@ def main():
         task_provider=lambda ctx: PerplexityTask(ctx.dist_context),
         model_provider=Qwen3Provider(config.model, lora=None),
         data_provider=AutoDataProvider(
-            dataset_factory=lambda dist_context: build_dataset(config.data, dist_context),
+            dataset_factory=lambda context: build_dataset(config.data, context.dist_context),
             collator=TextDataset.collate,
             config=config.auto_data,
         ),

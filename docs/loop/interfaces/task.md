@@ -37,6 +37,10 @@ An `InferenceTask` defines the logic of a single inference step. It handles the 
 
 **Events Registration**: `register_events(...)` links your methods to the [event bus](./events.md).
 
+## Random Numbers
+
+The loop runs each hook with the global generators seeded from its own seed scope. Draw random decisions that must match across ranks in `build_forward_inputs()`, e.g. an MLM mask. All ranks that hold a part of the sample, including all pipeline stages, draw the same numbers there. See [Random Numbers in the Loop](../determinism.md).
+
 ## Task State
 
 The raw `batch` is available only in `build_forward_inputs(...)`. The **state** carries side-data from `build_forward_inputs` to the later calls for the same microbatch. Use it for labels, masks, token counts or anything else the loss or the metrics need but the model does not return.

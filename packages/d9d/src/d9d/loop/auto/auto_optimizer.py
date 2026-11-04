@@ -121,7 +121,8 @@ AutoOptimizerConfig = Annotated[
 class AutoOptimizerProvider(OptimizerProvider):
     """Provider that builds a PyTorch optimizer from a configuration object.
 
-    The PyTorch optimizers (AdamW, Adam and SGD) are built with ``fused=True``.
+    The PyTorch optimizers (AdamW, Adam and SGD) are built with ``fused=True``. ``StochasticAdamW`` draws its
+    rounding noise from the global generators, which the loop seeds per step and stage.
     """
 
     def __init__(self, config: AutoOptimizerConfig):

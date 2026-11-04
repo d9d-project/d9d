@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+import torch
 from pydantic import BaseModel, ConfigDict
 from torch.utils.data import Dataset
 from torchdata.stateful_dataloader import StatefulDataLoader
@@ -15,14 +16,14 @@ from d9d.data import (
     num_microbatches_for_global_batch,
     shard_dataset_data_parallel,
 )
-from d9d.dist_context import DistributedContext
 
 from ..control import DataProvider, InitializeDataProviderContext
 
-DatasetFactory = Callable[[DistributedContext], Dataset]
-"""A callable that builds the (unsharded) dataset, given the distributed context.
+DatasetFactory = Callable[[InitializeDataProviderContext], Dataset]
+"""A callable that builds the (unsharded) dataset, given the context of the data provider.
 
-It receives the context so it can guard data preparation (e.g. with ``dist_context.main_process_first()``).
+The context can guard data preparation (e.g. with ``context.dist_context.main_process_first()``). A dataset that
+draws random numbers takes its seeds from ``context.seed_scope``.
 """
 
 
@@ -60,6 +61,7 @@ class AutoDataProvider(DataProvider):
     """Data provider for the default data stack, which shards the dataset, loads microbatches and packs them per step.
 
     The dataset is sharded across data-parallel ranks and loaded by a stateful loader at the microbatch size.
+    The loader shuffles with its own generator, seeded from ``shard_seed_scope`` of the context.
     The number of microbatches per step follows from the global batch size. A ``FixedCountMicrobatchPacker``
     groups the microbatches, and a ``PinMemoryMicrobatchPackStream`` pins the packs if enabled.
     For a different stack, write your own ``DataProvider``.
@@ -69,7 +71,7 @@ class AutoDataProvider(DataProvider):
         """Constructs the ``AutoDataProvider`` object.
 
         Args:
-            dataset_factory: Builds the unsharded dataset given the distributed context.
+            dataset_factory: Builds the unsharded dataset given the context of the data provider.
             collator: Collates individual samples into a microbatch.
             config: The serializable settings for the default stack.
         """
@@ -78,7 +80,7 @@ class AutoDataProvider(DataProvider):
         self._config = config
 
     def __call__(self, context: InitializeDataProviderContext) -> MicrobatchPackStream:
-        dataset = self._dataset_factory(context.dist_context)
+        dataset = self._dataset_factory(context)
         dataset = shard_dataset_data_parallel(
             dataset, context.dist_context, indexing_mode=self._config.shard_indexing_mode
         )
@@ -95,6 +97,7 @@ class AutoDataProvider(DataProvider):
             prefetch_factor=self._config.prefetch_factor,
             timeout=self._config.timeout,
             drop_last=self._config.drop_last,
+            generator=torch.Generator().manual_seed(context.shard_seed_scope.child("loader").seed),
         )
 
         microbatches_per_step = num_microbatches_for_global_batch(

@@ -31,6 +31,7 @@ How to configure and run jobs.
 *   **[Training Loop](./loop/train.md)**: How the `Trainer` builds a job and runs its steps, data prefetching, profiling, and sleep and wake.
 *   **[Inference Loop](./loop/inference.md)**: How the `Inference` engine runs forward passes over a dataset.
 *   **[Checkpointing](./loop/checkpointing.md)**: What a checkpoint holds, when the job saves, how it resumes and where it must be stored.
+*   **[Random Numbers in the Loop](./loop/determinism.md)**: How the loop seeds each call of user code, and the rules for random numbers in your code.
 *   **[Configuration](./loop/config.md)**: The Pydantic models of the training and inference configuration.
 *   **[Interfaces](./loop/interfaces/index.md)**: The providers and tasks that plug your model, data, loss and optimizer into the loop.
 
@@ -82,7 +83,8 @@ What the job measures and where it goes.
 *   **[Experiment Tracking](./tracker/index.md)**: The trackers (the log, W&B, TensorBoard, MLflow, Aim), what the loop logs and how to add a tracker.
 
 ## 🧰 Utilities
-Low-level helpers: nested tensor structures and moving GPU state to host memory.
+Low-level helpers: nested tensor structures, moving GPU state to host memory and seeds.
 
 *   **[PyTree Traversal](./pytree/index.md)**: Mapping and flattening nested tensor structures, including dataclasses.
 *   **[State Offloading](./offload/index.md)**: Moving GPU training state to host memory and back, the base of sleep and wake.
+*   **[Random Number Generation](./rng/index.md)**: Deriving seeds from a base seed and keys, equal in every process, and forking the global generators with them.

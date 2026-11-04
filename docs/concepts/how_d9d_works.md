@@ -176,27 +176,31 @@ The training loop only sets the order of the calls. `TrainingConfigurator` built
 
 ```python
 while schedule.current_step < schedule.total_steps:
-    event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
-    device_pack = next(packs)
+    with fork_rng_child("step", schedule.current_step):
+        event_bus.trigger(EVENT_TRAIN_STEP_PRE, step_ctx)
+        device_pack = next(packs)
 
-    with event_bus.bounded(EVENT_TRAIN_FORWARD_BACKWARD_PRE, EVENT_TRAIN_FORWARD_BACKWARD_POST, step_ctx):
-        task_operator.forward_backward(device_pack)
+        with event_bus.bounded(EVENT_TRAIN_FORWARD_BACKWARD_PRE, EVENT_TRAIN_FORWARD_BACKWARD_POST, step_ctx):
+            task_operator.forward_backward(device_pack)
 
-    logger.trigger_sync()
-    gradient_manager.sync_and_scale()
-    grad_norm = gradient_clipper.clip()
+        logger.trigger_sync()
+        gradient_manager.sync_and_scale()
+        grad_norm = gradient_clipper.clip()
 
-    with event_bus.bounded(EVENT_TRAIN_OPTIMIZER_STEP_PRE, EVENT_TRAIN_OPTIMIZER_STEP_POST, step_ctx):
-        optimizer.step()
+        with event_bus.bounded(EVENT_TRAIN_OPTIMIZER_STEP_PRE, EVENT_TRAIN_OPTIMIZER_STEP_POST, step_ctx):
+            optimizer.step()
 
-    lr_scheduler.step()
-    logger.log(loss=gradient_manager.compute_global_loss(), grad_norm=grad_norm)
-    gradient_manager.zero_grad()
+        lr_scheduler.step()
+        logger.log(loss=gradient_manager.compute_global_loss(), grad_norm=grad_norm)
+        gradient_manager.zero_grad()
 
-    event_bus.trigger(EVENT_TRAIN_STEP_POST, step_ctx)
+        event_bus.trigger(EVENT_TRAIN_STEP_POST, step_ctx)
+
     schedule.step()
     checkpointer.checkpoint_if_needed(state)
 ```
+
+The loop runs each step and each of its events in a fork of the global generators, seeded from `base_seed`, the step and the event. So code that ran before does not change their random numbers. See [Random Numbers in the Loop](../loop/determinism.md).
 
 Five components do the work of a step:
 

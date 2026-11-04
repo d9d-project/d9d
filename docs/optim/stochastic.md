@@ -39,7 +39,7 @@ optimizer = StochasticAdamW(
 )
 ```
 
-`StochasticAdamW` seeds its random number generator from `seed` and saves the generator state in `state_dict()`. A resumed run gets the same rounding noise. All replicas of a parameter must use the same `seed`, so that they round the same way.
+`StochasticAdamW` draws the rounding noise from `generator`, or from the global generators if you pass none. All replicas of a parameter must draw the same numbers, so that they round the same way. `StochasticAdamW` saves the state of a given generator in `state_dict()`, so a resumed run gets the same rounding noise. In the training loop, each optimizer step runs with the global generators seeded per step and stage. So `AutoOptimizerProvider` passes no generator (see [Random Numbers in the Loop](../loop/determinism.md)).
 
 ## Benchmarks
 

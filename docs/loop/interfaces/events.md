@@ -15,6 +15,8 @@ The system has three core concepts:
 !!! note
     The event bus does not catch exceptions. If a handler raises, the loop stops immediately.
 
+The `EventBus` runs the handlers of an event in a fork of the global generators. Its seed comes from the event and the seed scope of the code that triggers it. So the events of the loop draw other numbers at each step. Your own event in a task hook draws other numbers for each microbatch. See [Random Numbers in the Loop](../determinism.md).
+
 ## Registering Handlers
 
 `BaseTask` (and so `TrainTask` and `InferenceTask`) and `ModelProvider` have a `register_events` hook. The loop calls it during configuration and passes a context that holds the `EventBus`.

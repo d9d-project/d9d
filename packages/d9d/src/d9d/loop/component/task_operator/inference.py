@@ -1,12 +1,14 @@
 import typing
+from contextlib import AbstractContextManager
 
 from torch.profiler import record_function
 
 from d9d.data import MicrobatchPack
-from d9d.dist_context import DistributedContext
-from d9d.pipelining.api import PipelineStepHandler
+from d9d.dist_context import BATCH_DOMAIN, DistributedContext
+from d9d.pipelining.api import PipelineComputeKind, PipelineStepHandler
 from d9d.pipelining.factory import PipelineScheduleInfo
 from d9d.pytree import PyTree
+from d9d.rng import fork_rng_child
 
 from ...control import InferenceTask, ProcessOutputsContext
 from ..pipeline_state import PipelineStateHandler
@@ -28,17 +30,28 @@ class InferenceStepHandler(PipelineStepHandler[TPipelineOutput], typing.Generic[
 
     def __init__(
         self,
+        dist_context: DistributedContext,
         state: PipelineStateHandler[TState],
         task: InferenceTask[typing.Any, typing.Any, typing.Any, TPipelineOutput, TState],
     ):
         """Constructs the ``InferenceStepHandler`` object.
 
         Args:
+            dist_context: The distributed context.
             state: Handler for the per-microbatch pipeline state.
             task: The user-defined inference task containing processing logic.
         """
+        self._cp_rank = (
+            dist_context.mesh_for(BATCH_DOMAIN)["cp"].get_local_rank() if dist_context.mesh_params.is_distributed else 0
+        )
         self._state = state
         self._task = task
+
+    def compute_context(
+        self, kind: PipelineComputeKind, stage_idx: int, microbatch_idx: int
+    ) -> AbstractContextManager[None]:
+        # The model compute of the cp ranks works on other parts of the same samples, so it needs other numbers.
+        return fork_rng_child("cp", self._cp_rank, kind.value, stage_idx, microbatch_idx)
 
     def process_outputs(self, outputs: TPipelineOutput, microbatch_idx: int) -> None:
         """Processes model outputs for a specific microbatch.
@@ -47,7 +60,11 @@ class InferenceStepHandler(PipelineStepHandler[TPipelineOutput], typing.Generic[
             outputs: The ``PipelineOutput`` produced by the last stage.
             microbatch_idx: Index of the current microbatch within the step's pack.
         """
-        with record_function("Process Outputs"), self._state.scope(microbatch_idx) as state:
+        with (
+            record_function("Process Outputs"),
+            fork_rng_child("process_outputs", microbatch_idx),
+            self._state.scope(microbatch_idx) as state,
+        ):
             self._task.process_outputs(ProcessOutputsContext(pipeline_results=outputs, state=state))
 
 
@@ -69,10 +86,13 @@ class InferenceTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput,
             pipeline: Information about the pipeline schedule.
             pipeline_state: Handler for transient per-microbatch state during the step.
         """
-        self._dist_context = dist_context
+        self._dp_rank = (
+            dist_context.mesh_for(BATCH_DOMAIN)["dp"].get_local_rank() if dist_context.mesh_params.is_distributed else 0
+        )
         self._task = task
         self._pipeline = pipeline
         self._pipeline_state = pipeline_state
+        self._step_handler = InferenceStepHandler(dist_context=dist_context, state=pipeline_state, task=task)
 
     def forward(self, pack: MicrobatchPack[TBatch]) -> None:
         """Executes the forward pass for one pack of microbatches.
@@ -80,15 +100,16 @@ class InferenceTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput,
         Args:
             pack: The step's pack of raw microbatches.
         """
-        with record_function("Forward"):
+        # The dp ranks work on other samples, so the task hooks and the model need other numbers.
+        with record_function("Forward"), fork_rng_child("dp", self._dp_rank):
             try:
                 inputs_microbatches, shared_microbatches = build_pipeline_microbatch_inputs(
-                    self._task, self._pipeline_state, pack
+                    task=self._task, pipeline_state=self._pipeline_state, pack=pack
                 )
                 self._pipeline.schedule.step(
                     inputs_microbatches=inputs_microbatches,
                     shared_microbatches=shared_microbatches,
-                    handler=InferenceStepHandler(task=self._task, state=self._pipeline_state),
+                    handler=self._step_handler,
                 )
             finally:
                 self._pipeline_state.reset()
