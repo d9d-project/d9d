@@ -210,7 +210,7 @@ class MyStepHandler(PipelineStepHandler[MyOutput]):
 
 
 # 1. Define the configuration.
-pp_mesh: DeviceMesh = ...  # The pipeline-parallel mesh, e.g. dist_context.mesh_for(REGULAR_DOMAIN)["pp"]
+pp_mesh: DeviceMesh = ...  # The pipeline-parallel mesh, e.g. dist_context.mesh_for(BASE_DOMAIN)[BaseDim.PP]
 model_config = ...
 schedule_config = PipelineSchedule1F1BConfig(
     num_stages_per_rank=4,  # 4 virtual stages per rank

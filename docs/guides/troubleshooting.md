@@ -6,7 +6,7 @@ This page shows how to read the logs of a d9d job, the first step for any proble
 
 ## Reading the Logs
 
-d9d logs to standard output on every rank. Each line starts with `[d9d]` and the position of the rank in the device mesh, e.g. `[d9d] [pp:0-dpr:1-dps:0-cps:0-cpr:0-tp:0]`. A job without parallelism writes `[d9d] [local]`.
+d9d logs to standard output on every rank. Each line starts with `[d9d]` and the coordinates of the rank in the base domain, e.g. `[d9d] [pp:0-dp:3-cp:0-tp:0]`.
 
 `torchrun` can write the output of each rank to its own file. `--log-dir` sets the directory, and `--tee 3` also keeps the output in the console. `--local-ranks-filter 0` prints only local rank 0 to the console:
 

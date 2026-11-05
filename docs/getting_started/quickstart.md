@@ -19,14 +19,14 @@ A job without parallelism runs as a single process, so it does not need `torchru
 
 ```text
 ...
-[d9d] [local] ... - INFO - Starting job from scratch
-[d9d] [local] ... - INFO - step 0 (stage=train): loss=13.2302
-[d9d] [local] ... - INFO - step 0 (stage=train): l2_grad_norm_total=23.721
-[d9d] [local] ... - INFO - step 1 (stage=train): loss=15.0928
-[d9d] [local] ... - INFO - step 1 (stage=train): l2_grad_norm_total=23.8028
+[d9d] [pp:0-dp:0-cp:0-tp:0] ... - INFO - Starting job from scratch
+[d9d] [pp:0-dp:0-cp:0-tp:0] ... - INFO - step 0 (stage=train): loss=15.4595
+[d9d] [pp:0-dp:0-cp:0-tp:0] ... - INFO - step 0 (stage=train): l2_grad_norm_total=5.1186
+[d9d] [pp:0-dp:0-cp:0-tp:0] ... - INFO - step 1 (stage=train): loss=14.6085
+[d9d] [pp:0-dp:0-cp:0-tp:0] ... - INFO - step 1 (stage=train): l2_grad_norm_total=5.13615
 ...
-[d9d] [local] ... - INFO - step 255 (stage=train): loss=0.0134067
-[d9d] [local] ... - INFO - step 255 (stage=train): l2_grad_norm_total=0.484559
+[d9d] [pp:0-dp:0-cp:0-tp:0] ... - INFO - step 255 (stage=train): loss=0.0143911
+[d9d] [pp:0-dp:0-cp:0-tp:0] ... - INFO - step 255 (stage=train): l2_grad_norm_total=0.0940325
 Training: 100%|██████████| 256/256
 ```
 
@@ -49,9 +49,9 @@ The script has these parts:
 *   **`RegressionSample`, `RegressionBatch`, `RegressionInput` and `RegressionState`**: Dataclasses for one sample of the dataset, the microbatch that `collate()` builds, what the model receives and what `compute_loss()` needs besides the model output.
 *   **`RegressionDataset`**: A standard PyTorch `Dataset`. `AutoDataProvider` shards it across data-parallel ranks, batches it with the `collator` and groups the microbatches into steps. See [Data Loading](../loop/interfaces/data.md).
 *   **`MLP`**: A standard `nn.Module`. It implements `reset_parameters()`, because d9d builds the model on the `meta` device and initializes it on the GPU. Its `forward()` takes `inputs` and `shared`, like every [pipeline stage](../pipelining/index.md). See [Model Design](../models/model_design.md).
-*   **`MLPProvider`**: Builds the model, distributes it and returns the [state mappers](../model_state/mapper.md) for loading and export. `parallelize_hsdp()` shards the model along `dp_cp_shard` and replicates it along the other dimensions of the mesh slice. A job on one GPU does not call `parallelize_model_stage()`. See [Horizontal Parallelism](../parallel/index.md) and [Model Definition](../loop/interfaces/model.md).
+*   **`MLPProvider`**: Builds the model, distributes it and returns the [state mappers](../model_state/mapper.md) for loading and export. `parallelize_hsdp()` shards the model along `shard_dim` and replicates it along the other dimensions of the mesh slice. A job on one GPU does not call `parallelize_model_stage()`. See [Horizontal Parallelism](../parallel/index.md) and [Model Definition](../loop/interfaces/model.md).
 *   **`RegressionTask`**: Splits each microbatch into the model input and the state, and computes the loss. The five type parameters of `TrainTask` serve only type checking. See [User Tasks](../loop/interfaces/task.md).
-*   **`main()`**: `TrainingConfigurator` wires the parts together. `configure()` builds the job, `train()` runs it and `export()` saves the weights. `load_checkpoint=False` exports the weights that are in memory after training, without loading the latest checkpoint first. See [Training Loop](../loop/train.md).
+*   **`main()`**: `init_dist_context()` creates the [distributed context](../dist_context/index.md) from `mesh`, and the `with` block closes it. `TrainingConfigurator` wires the parts together. `configure()` builds the job, `train()` runs it and `export()` saves the weights. `load_checkpoint=False` exports the weights that are in memory after training, without loading the latest checkpoint first. See [Training Loop](../loop/train.md).
 
 ## The Configuration
 

@@ -12,8 +12,8 @@ You build the `Inference` engine with the `InferenceConfigurator`. It combines t
 
 `InferenceConfigurator.configure()` runs a setup sequence similar to training, but for forward-only execution:
 
-1.  **Distributed Context Initialization**:
-    *   Builds the global [DistributedContext](../dist_context/index.md).
+1.  **Logging**:
+    *   Configures the `d9d` logger. Each line starts with the coordinates of the rank in the base domain of the [DistributedContext](../dist_context/index.md).
 
 2.  **Seed Scopes**:
     *   Derives the root seed scope from `determinism.base_seed`. From here on, each call of user code runs with the global generators seeded from its own scope. See [Random Numbers in the Loop](./determinism.md).
@@ -87,18 +87,20 @@ The loop runs until it reaches `JobSchedule.total_steps`, as in [training](./tra
 Build the engine with an `InferenceConfigurator`, then call `infer()`:
 
 ```python
+from d9d.dist_context import init_dist_context
 from d9d.loop.run import InferenceConfigurator
 
-inference = InferenceConfigurator(
-    mesh=mesh_params,                  # Physical cluster layout
-    parameters=config,                 # InferenceConfig (schedule, checkpointing, ...)
+with init_dist_context(mesh_params) as dist_context:
+    inference = InferenceConfigurator(
+        dist_context=dist_context,         # Ranks, GPUs and device meshes
+        parameters=config,                 # InferenceConfig (schedule, checkpointing, ...)
 
-    model_provider=...,                # The same provider as in training
-    task_provider=...,                 # Inference-specific logic (e.g. generation)
-    data_provider=...,                 # Validation or test data
-).configure()
+        model_provider=...,                # The same provider as in training
+        task_provider=...,                 # Inference-specific logic (e.g. generation)
+        data_provider=...,                 # Validation or test data
+    ).configure()
 
-inference.infer()
+    inference.infer()
 ```
 
 ## API Reference

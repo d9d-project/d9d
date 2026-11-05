@@ -14,13 +14,13 @@ python train.py config.yaml
 
 ## Several GPUs
 
-Launch one process per GPU with [`torchrun`](https://docs.pytorch.org/docs/stable/elastic/run.html). The number of processes must equal the product of the parallelism degrees in `mesh`. Degrees that only regroup ranks that other degrees already count, such as `expert_parallel`, do not add to the product (see [Distributed Context](../dist_context/index.md)).
+Launch one process per rank with [`torchrun`](https://docs.pytorch.org/docs/stable/elastic/run.html). The number of processes must equal the product of the four parallelism degrees in `mesh`: `pipeline_parallel`, `data_parallel`, `context_parallel` and `tensor_parallel`. The `dense` and `expert` sections only regroup these ranks, so they do not add to the product (see [Distributed Context](../dist_context/index.md)).
 
 For example, this `mesh` replicates the model on 2 GPUs:
 
 ```yaml
 mesh:
-  data_parallel_replicate: 2
+  data_parallel: 2
 ```
 
 ```bash
@@ -31,7 +31,9 @@ This `mesh` shards the parameters, gradients and optimizer states over 2 GPUs (F
 
 ```yaml
 mesh:
-  data_parallel_shard: 2
+  data_parallel: 2
+  dense:
+    data_parallel_shard: 2
 ```
 
 With `AutoDataProvider`, as in the Quickstart, `global_batch_size` stays the same when you add data-parallel ranks. `AutoDataProvider` shards the dataset across the ranks and changes the number of microbatches per step, so that each step still processes `global_batch_size` samples. `global_batch_size` must be divisible by the number of data-parallel ranks × `microbatch_size`. A [custom data provider](../loop/interfaces/data.md#writing-a-custom-dataprovider) decides this itself.

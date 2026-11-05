@@ -46,34 +46,35 @@ You write a few parts of a job, each behind an interface. d9d provides ready imp
 | [Model provider](../loop/interfaces/model.md) | The construction, distribution, loading and export of the model. | You. |
 | [Optimizer](../loop/interfaces/optimizer.md) and [LR scheduler](../loop/interfaces/lr_scheduler.md) providers | The update of the parameters. | `AutoOptimizerProvider` and `AutoLRSchedulerProvider`, or you. |
 
-`TrainingConfigurator` takes these parts and two Pydantic configs:
+`TrainingConfigurator` takes these parts, the distributed context and a Pydantic config:
 
 ```python
-trainer = TrainingConfigurator(
-    mesh=config.mesh,  # Sets the parallelism degrees.
-    parameters=config.trainer,  # Sets the steps, checkpointing, logging and other loop settings.
-    data_provider=...,
-    model_provider=...,
-    task_provider=...,
-    optimizer_provider=...,
-    lr_scheduler_provider=...,
-).configure()
+with init_dist_context(config.mesh) as dist_context:  # The mesh config sets the parallelism degrees.
+    trainer = TrainingConfigurator(
+        dist_context=dist_context,
+        parameters=config.trainer,  # Sets the steps, checkpointing, logging and other loop settings.
+        data_provider=...,
+        model_provider=...,
+        task_provider=...,
+        optimizer_provider=...,
+        lr_scheduler_provider=...,
+    ).configure()
 
-trainer.train()
+    trainer.train()
 ```
 
 `configure()` builds the job and returns a `Trainer`, and `train()` runs the training loop. The `Auto*` providers take Pydantic configs too, so the common cases need no code.
 
 ## Device Mesh Domains
 
-The first component that `configure()` builds is the `DistributedContext`. It describes the topology of the job: the ranks (one process per GPU), the device meshes over them and the process groups. The configurator builds it once from the `mesh` config and passes it to every component that needs it. No component reads the device mesh from global state.
+The job script creates the `DistributedContext` with `init_dist_context()` before it builds the job. The context describes the topology of the job: the ranks, their GPUs, the device meshes over the ranks and the process groups. The configurator passes it to every component that needs it. No component reads the device mesh from global state.
 
 Different submodules need different parallelism:
 
 *   **Dense layers**: FSDP shards them across the data-parallel ranks.
 *   **MoE experts**: Expert parallelism shards them across the expert-parallel ranks.
 
-The context therefore arranges the same ranks into several device meshes, called **domains**. All domains contain the same ranks, and they differ only in how they group the ranks into named mesh dimensions. The model provider of the Quickstart takes the mesh of the dense domain:
+The context therefore arranges the same ranks into several device meshes, called **domains**. All domains contain the same ranks, and they differ only in how they group the ranks into named mesh dimensions. The base domain holds the four degrees of the work: pipeline, data, context and tensor parallelism. The other domains split the same ranks differently, e.g. the dense domain splits the data-parallel ranks into replicas and shards for FSDP. The model provider of the Quickstart takes the mesh of the dense domain:
 
 ```python
 mesh = context.dist_context.mesh_for(DENSE_DOMAIN)

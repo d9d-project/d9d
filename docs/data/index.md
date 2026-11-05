@@ -112,14 +112,13 @@ print(f"I see {len(sharded_ds)} items.")
 ```python
 import torch
 from torch.utils.data import TensorDataset
-from d9d.dist_context import DistributedContext, BATCH_DOMAIN
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext
 from d9d.data import ShardedDataset, ShardIndexingMode
 
-# Take the data-parallel size and rank from the DistributedContext.
+# Take the data-parallel size and rank from the DistributedContext. Without parallelism, they are 1 and 0.
 context: DistributedContext
-dp_mesh = context.mesh_for(BATCH_DOMAIN)["dp"]
-dp_size = dp_mesh.size()
-dp_rank = dp_mesh.get_local_rank()
+dp_size = context.dim_size(BASE_DOMAIN, BaseDim.DP)
+dp_rank = context.coordinate(BASE_DOMAIN, BaseDim.DP)
 
 base_ds = TensorDataset(torch.randn(100, 10))
 

@@ -128,7 +128,11 @@ class ResidualMLPProvider(ModelProvider[ResidualMLP]):
     # Distributes the model. The loop calls it only in a distributed run, not on one GPU.
     def parallelize_model_stage(self, context: ParallelizeModelStageContext[ResidualMLP]):
         mesh = context.dist_context.mesh_for(DENSE_DOMAIN)
-        parallelize_hsdp(context.model, mesh=mesh["dp_replicate", "dp_cp_shard", "cp_replicate"])
+        parallelize_hsdp(
+            context.model,
+            mesh=mesh[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE],
+            shard_dim=DenseDim.DP_CP_SHARD,
+        )
 
     # Returns the state mapper for export.
     def prepare_export_model_stage(
@@ -178,8 +182,8 @@ class RegressionTask(TrainTask[RegressionBatch, RegressionInput, None, torch.Ten
         return ComputeLossResult(loss=loss, loss_weight=None)
 
 
-# The task provider of TrainingConfigurator in main(). The loop calls it after it builds the distributed
-# context and passes the context in ctx.dist_context.
+# The task provider of TrainingConfigurator in main(). The loop passes the distributed context in
+# ctx.dist_context.
 task_provider = lambda ctx: RegressionTask()
 ```
 
