@@ -17,6 +17,7 @@ A DEP fixes a design before the code. Read `deps/0001-dep-process.md` for the pr
 1.  Find every consumer and every defect in the code. Reproduce each defect or point to the line that causes it.
 2.  Read how PyTorch and other frameworks solve the problem in their code, not in their docs. Compare designs, not features.
 3.  Note the constraints that PyTorch forces on the design.
+4.  Check each claim about PyTorch or the type checker with a small prototype before you write it. For example, build process groups with the `fake` backend, or run `ty` on a typing pattern.
 
 ## 3. Write the draft
 
