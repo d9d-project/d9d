@@ -349,22 +349,18 @@ We use [Semantic Release](https://python-semantic-release.readthedocs.io/en/late
 
 ### PR Descriptions
 
-The diff already says *what* changed - the description says *why*, and it should be as short as the
-change allows. A one-file fix gets two or three sentences; a new subsystem gets sections. When in
-doubt, cut.
+The diff already says *what* changed. The description says *why*, and it is as short as the change allows. When in doubt, cut.
 
-Write down, in this order, only the parts that apply:
+A fix of one file gets two or three sentences. A larger change gets these sections, in this order, and leaves out the sections that do not apply:
 
-*   **The problem.** What was broken, missing or slow, and under which configuration it showed up
-    (topology, parallelism degrees, hardware). Skip it only when the title is already the whole story.
-*   **The approach.** The decision a reviewer cannot read off the diff: why *this* solution, and what
-    you rejected. If a DEP covers it, link the DEP instead of re-arguing it here.
+*   **`## Problem`**: The root problem first, in its real scope, then its symptoms. Name the configuration where each symptom shows up, e.g. the topology, the parallelism degrees or the hardware. Skip the section only when the title is already the whole story.
+*   **`## Approach`**: The decisions a reviewer cannot read off the diff: why this solution, and what you rejected. The PR of a DEP lists the key decisions and leaves the arguments to the DEP. A PR that implements a DEP links the DEP instead.
+*   **`## Results`**: Only for a change that claims an effect on speed, memory or accuracy, e.g. a `perf` PR. The measurements go in one table, with the hardware and the dtype.
+*   **`## Breaking Changes`**: Every change that users must react to, e.g. a renamed config key, a new required argument or a dropped default. Include it even when everything else is obvious.
 
-Do not restate the diff file by file, do not paste `make lint` output, and do not describe code you
-did not write. Do not walk the reviewer through the behaviour you just wrote - on a small change the
-*why* is the entire description. Behaviour changes that users must react to (renamed config keys,
-new required arguments, dropped defaults) belong in the description even when everything else is
-obvious.
+Write the sections as labeled lists (see [Writing Pages](#writing-pages)).
+
+Do not restate the diff or the DEP, and do not walk the reviewer through the behavior you just wrote. Do not paste `make lint` output or the state of the tests, and do not list what you did not test. Do not describe code you did not write.
 
 ### Attribution
 
