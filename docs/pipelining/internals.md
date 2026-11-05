@@ -27,7 +27,7 @@ Wraps a user `nn.Module`. It does not decide *when* to run. It gives the actions
 It consists of:
 
 *   **Computation handlers**:
-    *   `ForwardComputeHandler`: Runs the forward pass and caches inputs and outputs for the backward pass. With a [`ParameterRuntime`](../parallel/runtime_internals.md), it runs the stage as a `SegmentChain`, segment by segment.
+    *   `ForwardComputeHandler`: Runs the forward pass and caches inputs and outputs for the backward pass. With a [`ParameterRuntime`](../parallel/runtime.md), it runs the stage as a `SegmentChain`, segment by segment.
     *   `BackwardComputeHandler`: Runs the backward pass. It can split the backward pass into `backward_input` (dI) and `backward_weight` (dW) for Zero Bubble schedules.
 *   **Communication handlers**: Own the P2P buffers for the forward and backward passes. Buffer sizes are inferred per microbatch, so the microbatches in a pack can differ in shape.
 

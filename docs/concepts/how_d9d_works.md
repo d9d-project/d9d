@@ -112,7 +112,7 @@ A distributed parameter records its own layout. It is a `DTensor`: a PyTorch ten
 *   **`Shard`**: The ranks along that dimension hold slices of the tensor.
 *   **`Replicate`**: Each rank along that dimension holds a full copy.
 
-The `parallelize_*` functions turn the parameters of a submodule into `DTensor`s. In `parallelize_model_stage()`, you call them on submodules, each call with the mesh of a domain. For example, `parallelize_hsdp()` shards a submodule with PyTorch FSDP along one mesh dimension and replicates it along the others.
+The `parallelize_*` functions turn the parameters of a submodule into `DTensor`s. In `parallelize_model_stage()`, you call them on submodules, each call with the mesh of a domain. For example, `parallelize_hsdp()` shards a submodule along one mesh dimension and replicates it along the others. The [Parameter Runtime](../parallel/runtime.md) then gathers the weights and reduces the gradients.
 
 To add a strategy, write a function that sets the placements you need. [Why the Loop Needs No Model or Parallelism Code](#why-the-loop-needs-no-model-or-parallelism-code) shows what the loop does with them. See [Horizontal Parallelism](../parallel/index.md).
 
@@ -216,7 +216,7 @@ The `event_bus` calls mark the points where your code can hook in (see [Events](
 
 Each distributed parameter records its placements. The loop components read these placements instead of asking the model. A new model or a new strategy therefore needs no change in the loop:
 
-*   **Gradient sync**: The gradient manager sums each gradient over the mesh dimensions where its parameter is replicated. FSDP sums the gradients over its shard dimension itself.
+*   **Gradient sync**: The parameter runtime reduce-scatters each gradient over its data shard dimension and sums it over the mesh dimensions where its parameter is replicated.
 *   **Gradient clipping**: The clipper sums the squared norms of sharded gradients over the dimensions they are sharded along. A replicated gradient is the same on every rank and counts once. With pipeline parallelism, the clipper also sums over the pipeline ranks.
 *   **Training checkpoints**: Every rank writes its own shards. A replicated tensor is written once.
 *   **Loading pretrained weights**: The job shards each loaded tensor to match the placements of its parameter.

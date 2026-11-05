@@ -31,8 +31,8 @@ from d9d_dev.nn.helper import (
     check_grad_distance_all_local_dist,
     copy_params_local_to_dist,
     microbatch_slice,
-    sync_grads_manually,
 )
+from d9d_dev.parallel.runtime_step import make_runtime
 from d9d_dev.pipelining.step_handler import FunctionStepHandler
 
 _N_MICROBATCHES = 2
@@ -112,11 +112,14 @@ def test_multihead_consistent_to_itself_dist(
         copy_params_local_to_dist(model_global, model_dist)
         return model_dist
 
+    runtime = make_runtime()
     schedule_info, models_dist = build_schedule(
         pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
         program_builder=build_program_builder(PipelineScheduleGPipeConfig()),
         model_provider=_model_provider,
+        runtime=runtime,
     )
+    runtime.bind()
 
     # Run Local Model. input_ids feed the first stage; the shared input reaches every stage and
     # routes position ids to the backbone and labels/pooling mask to their respective heads.
@@ -143,6 +146,8 @@ def test_multihead_consistent_to_itself_dist(
         shared_microbatches=shared_microbatches,
         handler=FunctionStepHandler(_callback),
     )
+    # The runtime sums the gradients across replicas and shards.
+    runtime.wait()
 
     # Compare Loss & Grads
     if schedule_info.has_last_stage:
@@ -151,5 +156,4 @@ def test_multihead_consistent_to_itself_dist(
         torch.testing.assert_close(loss_dist, loss_global, atol=1e-3, rtol=0.005)
 
     for dist_model in models_dist.values():
-        sync_grads_manually(dist_model)
         check_grad_distance_all_local_dist(model_global, dist_model)

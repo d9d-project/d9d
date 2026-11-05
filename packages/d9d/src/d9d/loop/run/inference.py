@@ -19,6 +19,7 @@ from ..component import (
     PipelineStateHandler,
     StateCheckpointer,
     TimeoutManager,
+    build_parameter_runtime,
 )
 from ..config import InferenceConfig, PipeliningConfig
 from ..control import (
@@ -135,11 +136,13 @@ class InferenceConfigurator:
 
         pipeline_state_handler = PipelineStateHandler()
 
+        parameter_runtime = build_parameter_runtime(self._parameters.parameter_runtime)
         pipeline_schedule, modules = ModelStageFactory(
             model_provider=self._model_provider,
             dist_context=dist_context,
             config_model=self._parameters.model_stage_factory,
             config_pipelining=pipelining_config,
+            parameter_runtime=parameter_runtime,
         ).build_pipeline_and_modules()
         event_bus.trigger(EVENT_INFERENCE_MODEL_STAGES_READY, EventModelStagesReadyContext(modules=modules.modules))
 
@@ -171,6 +174,7 @@ class InferenceConfigurator:
             timeout_manager=timeout_manager,
             task_operator=task_operator,
             event_bus=event_bus,
+            parameter_runtime=parameter_runtime,
         )
 
     def configure(self) -> "Inference":
@@ -244,6 +248,14 @@ class Inference:
 
         step_ctx = EventStepContext(schedule=self._state.schedule)
 
+        # Bound only around the loop, so that the model stages are final, as in training.
+        self._state.parameter_runtime.bind(training=False)
+        try:
+            self._run_loop(step_ctx)
+        finally:
+            self._state.parameter_runtime.unbind()
+
+    def _run_loop(self, step_ctx: EventStepContext):
         with (
             tqdm(
                 desc="Inference",

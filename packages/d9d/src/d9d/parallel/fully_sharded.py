@@ -1,40 +1,28 @@
-from typing import Any
-
 from torch import nn
 from torch.distributed import DeviceMesh
-from torch.distributed.fsdp import FSDPModule, fully_shard
+from torch.distributed.tensor import Shard
+
+from .placement import check_data_shard_dim, distribute_parameters
 
 
-def _force_fsdp_grad_reduction_policy(module: FSDPModule):
-    module.set_force_sum_reduction_for_comms(enable=True)
-    module.set_gradient_divide_factor(1.0)
-    module.set_requires_all_reduce(False)
+def parallelize_fsdp(module: nn.Module, mesh: DeviceMesh):
+    """Shards the parameters of a module for Fully Sharded Data Parallel (FSDP).
 
-
-def parallelize_fsdp(module: nn.Module, mesh: DeviceMesh, *args: Any, **kwargs: Any):
-    """Applies Fully Sharded Data Parallel (FSDP) with gradient summation.
-
-    The module is sharded with PyTorch's ``fully_shard`` over ``mesh``. Unlike default FSDP, gradients
-    are summed across the mesh instead of averaged, and FSDP does not all-reduce them across
-    replicas. d9d normalizes and reduces gradients across replicas itself.
+    Each parameter becomes a ``DTensor`` with ``Shard(0)`` over ``mesh``. The ``ParameterRuntime`` gathers the
+    parameters before the segments that use them and reduce-scatters their gradients.
 
     Args:
         module: The module to shard.
-        mesh: The device mesh over which to shard the module.
-        *args: Additional positional arguments passed to ``fully_shard``.
-        **kwargs: Additional keyword arguments passed to ``fully_shard``.
+        mesh: The device mesh to shard over. Its only dimension must be in ``DATA_SHARD_DIMS``.
 
     Raises:
-        ValueError: If the mesh does not have exactly one dimension.
-        RuntimeError: If ``fully_shard`` did not convert the module to an ``FSDPModule``.
+        ValueError: If the mesh does not have exactly one named dimension, or the dimension is not a data shard
+            dimension.
     """
-    if mesh.ndim != 1:
+    names = mesh.mesh_dim_names
+    if mesh.ndim != 1 or names is None:
         raise ValueError(
-            f"mesh.ndim ({mesh.ndim}) must be 1 for FSDP. "
-            f"For HSDP, use parallelize_hsdp() or apply parallelize_replicate() to the other dimensions first."
+            f"mesh.ndim ({mesh.ndim}) must be 1, with a named dimension, for FSDP. For HSDP, use parallelize_hsdp()."
         )
-
-    fully_shard(module, *args, mesh=mesh, **kwargs)
-    if not isinstance(module, FSDPModule):
-        raise RuntimeError(f"fully_shard() did not convert the module ({type(module).__name__}) to FSDPModule.")
-    _force_fsdp_grad_reduction_policy(module)
+    check_data_shard_dim(names[0])
+    distribute_parameters(module, mesh, (Shard(0),))

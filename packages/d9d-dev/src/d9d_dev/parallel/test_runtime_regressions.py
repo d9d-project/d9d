@@ -2,13 +2,13 @@ import pytest
 import torch
 import torch.distributed as dist
 from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
-from d9d.parallel import distribute_parameters
+from d9d.parallel import distribute_parameters, parallelize_hsdp
 from d9d.pipelining.api import StageSegment
 from torch import nn
 from torch.distributed.tensor import DTensor, Shard, distribute_tensor
 
 from d9d_dev.nn.helper.tolerances import forward_tolerance_for
-from d9d_dev.parallel.runtime_step import MESHES, make_runtime, place_hsdp
+from d9d_dev.parallel.runtime_step import MESHES, make_runtime
 
 
 class _MixedWeights(nn.Module):
@@ -26,7 +26,8 @@ def _inputs(rank):
 
 
 def _distribute(model, dist_ctx):
-    place_hsdp(model, dist_ctx)
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate", "dp_cp_shard", "cp_replicate"]
+    parallelize_hsdp(model, mesh=mesh)
 
 
 def _backward(runtime, model, inputs):
@@ -654,7 +655,7 @@ def test_segments_match_one_device(dist_ctx_factory, mesh, memory_budget_bytes):
     model = _TiedChain()
     reference = _TiedChain()
     reference.load_state_dict(model.state_dict())
-    place_hsdp(model, dist_ctx)
+    _distribute(model, dist_ctx)
     # Every rank draws the same inputs and runs its own slice of them.
     inputs = torch.randn(dist.get_world_size(), 2, 4, 64, device="cuda")
     runtime = make_runtime(memory_budget_bytes=memory_budget_bytes)

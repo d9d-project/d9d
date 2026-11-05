@@ -1,11 +1,17 @@
 import pytest
 import torch
 from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
-from d9d.loop.component import TrackedModules
+from d9d.loop.component import TrackedModules, build_parameter_runtime
 from d9d.loop.component.checkpointer import StateCheckpointer
 from d9d.loop.component.garbage_collector import ManualGarbageCollector
 from d9d.loop.component.job_schedule import JobSchedule
-from d9d.loop.config import CheckpointingConfig, GarbageCollectionConfig, JobScheduleConfig, StepActionSpecial
+from d9d.loop.config import (
+    CheckpointingConfig,
+    GarbageCollectionConfig,
+    JobScheduleConfig,
+    ParameterRuntimeConfig,
+    StepActionSpecial,
+)
 from d9d.parallel import parallelize_fsdp
 from torch import nn
 
@@ -31,7 +37,9 @@ def test_checkpoint_round_trip_inside_inference_mode(dist_ctx_factory, shared_tm
         gc=ManualGarbageCollector(dist_ctx, GarbageCollectionConfig(period_steps=StepActionSpecial.disable), schedule),
         run_name=None,
     )
-    state = TrackedModules(dist_ctx, {0: model}, lambda _name, _value: True)
+    state = TrackedModules(
+        dist_ctx, {0: model}, lambda _name, _value: True, build_parameter_runtime(ParameterRuntimeConfig())
+    )
 
     # The inference loop runs with its checkpoints inside inference mode.
     schedule.step()

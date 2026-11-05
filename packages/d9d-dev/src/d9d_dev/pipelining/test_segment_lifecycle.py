@@ -4,7 +4,8 @@ from weakref import ref
 import pytest
 import torch
 import torch.distributed as dist
-from d9d.dist_context import DATA_SHARD_DIMS, DeviceMeshParameters
+from d9d.dist_context import DATA_SHARD_DIMS, DENSE_DOMAIN, DeviceMeshParameters
+from d9d.parallel import parallelize_hsdp
 from d9d.parallel.runtime import BucketId, ParameterRuntime, ReductionPlan
 from d9d.parallel.runtime.plan import check_segments
 from d9d.pipelining.api import PipelineStageInfo, StageSegment, as_segments, run_segments
@@ -16,7 +17,6 @@ from torch.distributed.tensor import distribute_tensor
 from torch.utils.checkpoint import checkpoint
 
 from d9d_dev.nn.helper.tolerances import forward_tolerance_for
-from d9d_dev.parallel.runtime_step import place_hsdp
 from d9d_dev.pipelining.step_handler import FunctionStepHandler
 
 
@@ -234,7 +234,7 @@ def test_rank_dependent_unused_segments_reduce_like_one_model(dist_ctx_factory, 
         model.optional.weight = model.first.weight
         reference.optional.weight = reference.first.weight
     reference.load_state_dict(model.state_dict())
-    place_hsdp(model, dist_ctx)
+    parallelize_hsdp(model, dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate", "dp_cp_shard", "cp_replicate"])
     runtime = ParameterRuntime(gather_dims=DATA_SHARD_DIMS, bucket_size_mib=32, memory_budget_bytes=1)
     runtime.register_stage(0, model)
     runtime.bind()
