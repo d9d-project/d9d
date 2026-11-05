@@ -1,111 +1,71 @@
-import logging
 from typing import Self
 
-from pydantic import BaseModel, ConfigDict, model_validator
-
-from .configured import DistributedContext
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, model_validator
 
 
-class DeviceMeshParameters(BaseModel):
-    """Configuration for the parallelism degrees of the device meshes.
+class DenseDomainConfig(BaseModel):
+    """Configuration for the dense domain, which shards the parameters of dense layers.
 
     Attributes:
-        pipeline_parallel: Degree of pipeline parallelism (PP).
-        data_parallel_replicate: Degree of data-parallel replication (DDP).
-        data_parallel_shard: Degree of data-parallel sharding (FSDP).
-        context_parallel_replicate: Degree of context-parallel (CP) replication.
-        context_parallel_shard: Degree of context-parallel (CP) sharding.
-        tensor_parallel: Degree of tensor parallelism (TP).
-        expert_parallel: Degree of expert parallelism (EP) for MoE layers.
+        data_parallel_shard: The number of data-parallel ranks that shard a parameter.
+        context_parallel_shard: The number of context-parallel ranks that shard a parameter.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    pipeline_parallel: int = 1
+    data_parallel_shard: PositiveInt = 1
+    context_parallel_shard: PositiveInt = 1
 
-    data_parallel_replicate: int = 1
-    data_parallel_shard: int = 1
 
-    context_parallel_replicate: int = 1
-    context_parallel_shard: int = 1
+class ExpertDomainConfig(BaseModel):
+    """Configuration for the expert domain.
 
-    tensor_parallel: int = 1
+    Attributes:
+        expert_parallel: The number of ranks that split the experts of a layer.
+    """
 
-    expert_parallel: int = 1
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
-    @property
-    def has_pipeline_parallel(self) -> bool:
-        """Whether pipeline parallelism is enabled (degree > 1)."""
-        return self.pipeline_parallel > 1
+    expert_parallel: PositiveInt
 
-    @property
-    def has_data_parallel_replicate(self) -> bool:
-        """Whether data parallel replication is enabled (degree > 1)."""
-        return self.data_parallel_replicate > 1
 
-    @property
-    def has_data_parallel_shard(self) -> bool:
-        """Whether data parallel sharding is enabled (degree > 1)."""
-        return self.data_parallel_shard > 1
+class DeviceMeshParameters(BaseModel):
+    """Configuration for the parallelism degrees of a job.
 
-    @property
-    def has_context_parallel_replicate(self) -> bool:
-        """Whether context parallel replication is enabled (degree > 1)."""
-        return self.context_parallel_replicate > 1
+    Attributes:
+        pipeline_parallel: The degree of pipeline parallelism.
+        data_parallel: The degree of data parallelism.
+        context_parallel: The degree of context parallelism.
+        tensor_parallel: The degree of tensor parallelism.
+        dense: The configuration of the dense domain.
+        expert: The configuration of the expert domain. ``None`` means that the job builds no expert domain.
+    """
 
-    @property
-    def has_context_parallel_shard(self) -> bool:
-        """Whether context parallel sharding is enabled (degree > 1)."""
-        return self.context_parallel_shard > 1
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
-    @property
-    def has_tensor_parallel(self) -> bool:
-        """Whether tensor parallelism is enabled (degree > 1)."""
-        return self.tensor_parallel > 1
-
-    @property
-    def has_expert_parallel(self) -> bool:
-        """Whether expert parallelism is enabled (degree > 1)."""
-        return self.expert_parallel > 1
-
-    @property
-    def is_distributed(self) -> bool:
-        """Whether any form of parallelism is enabled."""
-        return (
-            self.has_pipeline_parallel
-            or self.has_data_parallel_replicate
-            or self.has_data_parallel_shard
-            or self.has_context_parallel_shard
-            or self.has_context_parallel_replicate
-            or self.has_expert_parallel
-            or self.has_tensor_parallel
-        )
+    pipeline_parallel: PositiveInt = 1
+    data_parallel: PositiveInt = 1
+    context_parallel: PositiveInt = 1
+    tensor_parallel: PositiveInt = 1
+    dense: DenseDomainConfig = Field(default_factory=DenseDomainConfig)
+    expert: ExpertDomainConfig | None = None
 
     @model_validator(mode="after")
-    def _check_ep_divisibility(self) -> Self:
-        dp_cp_tp_degree = (
-            self.data_parallel_shard
-            * self.data_parallel_replicate
-            * self.context_parallel_shard
-            * self.context_parallel_replicate
-            * self.tensor_parallel
-        )
-        ep_degree = self.expert_parallel
-
-        if dp_cp_tp_degree % ep_degree != 0:
+    def _check_divisibility(self) -> Self:
+        if self.data_parallel % self.dense.data_parallel_shard != 0:
             raise ValueError(
-                f"Total data/context/tensor parallelism degree ({dp_cp_tp_degree}) must be divisible by "
-                f"total expert parallelism degree ({ep_degree})."
+                f"The data-parallel shard size ({self.dense.data_parallel_shard}) must divide "
+                f"the data-parallel degree ({self.data_parallel})."
+            )
+        if self.context_parallel % self.dense.context_parallel_shard != 0:
+            raise ValueError(
+                f"The context-parallel shard size ({self.dense.context_parallel_shard}) must divide "
+                f"the context-parallel degree ({self.context_parallel})."
+            )
+        data_context_parallel = self.data_parallel * self.context_parallel
+        if self.expert is not None and data_context_parallel % self.expert.expert_parallel != 0:
+            raise ValueError(
+                f"The expert-parallel degree ({self.expert.expert_parallel}) must divide "
+                f"the product of the data-parallel and context-parallel degrees ({data_context_parallel})."
             )
         return self
-
-    def build(self, log_level: int = logging.INFO) -> "DistributedContext":
-        """Builds a ``DistributedContext`` from these parameters.
-
-        Args:
-            log_level: The log level of the ``d9d`` logger.
-
-        Returns:
-            A new ``DistributedContext`` with the built device meshes.
-        """
-        return DistributedContext(self, log_level)
