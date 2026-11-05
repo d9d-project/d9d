@@ -36,8 +36,8 @@ class PipelineStepHandler(abc.ABC, Generic[TPipelineOutput]):
         The context covers the stage module and its autograd graph, but not ``process_outputs()`` and not the
         communications. The default context does nothing.
 
-        A schedule can enter the returned context several times for one compute, e.g. once per segment when it runs
-        the segments of several microbatches in turn. The context must therefore be reusable, and each entry must
+        A schedule can enter the returned context several times for one compute, e.g. once per region when it runs
+        the regions of several microbatches in turn. The context must therefore be reusable, and each entry must
         continue where the previous one stopped, as the forks of ``d9d.rng`` do. A generator from
         ``contextlib.contextmanager`` can be entered only once, so it does not fit.
 
