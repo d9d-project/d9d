@@ -279,7 +279,7 @@ class DistributedContext:
             return
         # Destroying a group waits for the other ranks, which can wait in a collective with this rank, so the job
         # would hang until the timeout. The process exits with the error instead, and the launcher stops the other
-        # ranks. torchtitan also destroys its groups only after a successful run (torchtitan/train.py).
+        # ranks.
         self._closed = True
         self._meshes.clear()
         self._groups = []
