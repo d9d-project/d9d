@@ -221,9 +221,9 @@ The built-in domains:
 
 A domain is generic over a `StrEnum` of the names of its dimensions, e.g. `DeviceMeshDomain[BaseDim]`. Its `mesh_dims()`, `coordinate()`, `dim_size()` and all code that slices its mesh use the members. So the type checker catches a typo and a dimension of another domain, e.g. `coordinate(DENSE_DOMAIN, BaseDim.DP)`. A member is a `str`, so `DeviceMesh` takes it as a dimension name.
 
-*   **Validation**: The sizes of the dimensions of a domain must multiply to the world size, and the names of its dimensions must be unique. The names of the domains must be unique too.
+*   **Validation**: The sizes of the dimensions of a domain must be positive and multiply to the world size, and the names of its dimensions must be unique. The names of the domains must be unique too.
 *   **Groups**: Each dimension partitions the ranks into groups along it. The context creates the groups of each distinct partition once, across all domains of the context. So two domains with `pp` share its groups, and a dimension of all ranks uses the default group.
-*   **Size 1**: A dimension of size 1 never communicates. The context gives it groups of the `fake` backend, without NCCL communicators.
+*   **Size 1**: All dimensions of size 1 have the same partition, so they share one set of groups. NCCL creates the communicator of a group at its first collective, so a group that never communicates gets none. This holds unless the caller created the default group with `device_id`: then PyTorch splits every subgroup from it at creation. The `fake` backend of PyTorch would avoid even that, but it registers only through `torch.testing._internal`.
 *   **Meshes**: The context builds each mesh from its groups with `DeviceMesh.from_group()`.
 *   **Keys**: The context keeps each mesh under its domain object. A domain that does not equal a built domain gets a `ValueError` from `mesh_for()`, even if its name matches. The message asks to pass the domain in `extra_domains`.
 *   **Timeouts**: `set_timeout()` covers every group of the context, including those of the extra domains.
@@ -272,7 +272,7 @@ A context owns process groups, so it closes like a file. `DistributedContext` ge
 
 ### Logging
 
-`init_dist_context()` no longer touches the logging configuration. d9d modules log through `logging.getLogger(__name__)`, which are children of the `d9d` logger. `TrainingConfigurator` and `InferenceConfigurator` configure the `d9d` logger with `build_dist_logger()` in `configure()`. Each line shows the coordinates of the rank in the base domain.
+`init_dist_context()` no longer touches the logging configuration. d9d modules log through `logging.getLogger(__name__)`, which are children of the `d9d` logger. `TrainingConfigurator` and `InferenceConfigurator` configure the `d9d` logger with `build_dist_logger(dist_context, level)` of `d9d.dist_context` in `configure()`. Each line shows the coordinates of the rank in the base domain.
 
 ## Usage
 
@@ -350,7 +350,7 @@ CUDA_VISIBLE_DEVICES=0,1 NCCL_MULTI_RANK_GPU_ENABLE=1 torchrun --nproc-per-node 
 *   **Parameters**: `dist_context.mesh_params.is_distributed` becomes `dist_context.is_distributed`. `params.has_tensor_parallel` and the other `has_*` properties become `dist_context.dim_size(domain, dim) > 1` or a comparison of the degree.
 *   **`current_device`**: It returns the GPU with its index. Code that compares it with `torch.device("cuda")` gets another result.
 *   **Removed properties**: `master_addr` becomes `MASTER_ADDR` from the environment. `num_nodes` and `node_rank` become `WORLD_SIZE // LOCAL_WORLD_SIZE` and `GROUP_RANK` from [`torchrun`](https://docs.pytorch.org/docs/stable/elastic/run.html#environment-variables).
-*   **Logging**: `dist_context.logger` and the log level of the context no longer exist. Code logs through `logging.getLogger(__name__)`. Code that uses the context without a configurator calls `build_dist_logger()` itself.
+*   **Logging**: `dist_context.logger` and the log level of the context no longer exist. Code logs through `logging.getLogger(__name__)`. Code that uses the context without a configurator calls `build_dist_logger(dist_context, level)` itself.
 *   **Profiles**: The file name of a trace holds the 4 coordinates of the base domain instead of 6.
 *   **Tensor parallelism**: A job with its own tensor parallelism gets gradients and gradient norms `tp` times larger than before, i.e. correct ones.
 
