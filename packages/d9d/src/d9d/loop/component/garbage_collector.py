@@ -1,4 +1,5 @@
 import gc
+import logging
 import time
 from contextlib import AbstractContextManager
 from types import TracebackType
@@ -6,10 +7,10 @@ from typing import Self
 
 from torch.profiler import record_function
 
-from d9d.dist_context import DistributedContext
-
 from ..config import GarbageCollectionConfig
 from .job_schedule import JobSchedule
+
+logger = logging.getLogger(__name__)
 
 
 class ManualGarbageCollector(AbstractContextManager):
@@ -19,15 +20,13 @@ class ManualGarbageCollector(AbstractContextManager):
     latency spikes during steps. Collections then run only at configured intervals or when forced.
     """
 
-    def __init__(self, dist_context: DistributedContext, config: GarbageCollectionConfig, schedule: JobSchedule):
+    def __init__(self, config: GarbageCollectionConfig, schedule: JobSchedule):
         """Constructs the ``ManualGarbageCollector`` object.
 
         Args:
-            dist_context: The distributed context.
             config: The configuration that sets how often garbage collection runs.
             schedule: The job schedule that tracks the current step.
         """
-        self._dist_context = dist_context
         self._config = config
         self._schedule = schedule
 
@@ -69,6 +68,4 @@ class ManualGarbageCollector(AbstractContextManager):
             begin = time.monotonic()
             gc.collect(generation)
             end = time.monotonic()
-            self._dist_context.logger.info(
-                f"Garbage collection for generation {generation} took {end - begin:.2f} seconds"
-            )
+            logger.info(f"Garbage collection for generation {generation} took {end - begin:.2f} seconds")

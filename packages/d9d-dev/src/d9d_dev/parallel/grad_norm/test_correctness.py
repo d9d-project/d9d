@@ -2,7 +2,7 @@ import math
 
 import pytest
 import torch
-from d9d.dist_context import EXPERT_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import EXPERT_DOMAIN, DeviceMeshParameters, ExpertDim, ExpertDomainConfig
 from d9d.parallel.grad_norm import clip_grad_norm_distributed_, group_parameters_for_norm
 from torch import nn
 from torch.distributed.tensor import DTensor, Replicate, Shard, distribute_tensor
@@ -43,11 +43,13 @@ def test_local_equivalence(norm_type, max_norm):
 
 @pytest.mark.distributed
 def test_pp_ep_norm_calculation(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=4, expert_parallel=2, data_parallel_replicate=2))
+    dist_ctx = dist_ctx_factory(
+        DeviceMeshParameters(pipeline_parallel=4, data_parallel=2, expert=ExpertDomainConfig(expert_parallel=2))
+    )
 
     ep_mesh = dist_ctx.mesh_for(EXPERT_DOMAIN)
-    sub_mesh = ep_mesh[["ep_replicate", "ep_shard"]]
-    pp_mesh = ep_mesh["pp"]
+    sub_mesh = ep_mesh[ExpertDim.EP_REPLICATE, ExpertDim.EP_SHARD]
+    pp_mesh = ep_mesh[ExpertDim.PP]
     pp_rank = pp_mesh.get_local_rank()
 
     param_rep = nn.Parameter(

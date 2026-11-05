@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch
 import yaml
-from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DeviceMeshParameters, init_dist_context
 from d9d.loop.auto import (
     AutoDataConfig,
     AutoDataProvider,
@@ -117,7 +117,11 @@ class MLPProvider(ModelProvider[MLP]):
     def parallelize_model_stage(self, context: ParallelizeModelStageContext[MLP]):
         # HSDP: shards along dp_cp_shard and replicates along the other dimensions. Size-1 dimensions are skipped.
         mesh = context.dist_context.mesh_for(DENSE_DOMAIN)
-        parallelize_hsdp(context.model, mesh=mesh["dp_replicate", "dp_cp_shard", "cp_replicate"])
+        parallelize_hsdp(
+            context.model,
+            mesh=mesh[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE],
+            shard_dim=DenseDim.DP_CP_SHARD,
+        )
 
     def prepare_export_model_stage(self, context: PrepareExportModelStageContext[MLP]) -> PrepareExportModelStageResult:
         return PrepareExportModelStageResult(state_mapper=identity_mapper_from_module(context.model))
@@ -140,22 +144,24 @@ class RegressionTask(TrainTask[RegressionBatch, RegressionInput, None, torch.Ten
 def main():
     config = ProjectConfig.model_validate(yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8")))
 
-    trainer = TrainingConfigurator(
-        mesh=config.mesh,
-        parameters=config.trainer,
-        task_provider=lambda ctx: RegressionTask(),
-        model_provider=MLPProvider(),
-        data_provider=AutoDataProvider(
-            dataset_factory=lambda context: RegressionDataset(num_samples=65536, num_features=16),
-            collator=RegressionDataset.collate,
-            config=config.data,
-        ),
-        optimizer_provider=AutoOptimizerProvider(config.optimizer),
-        lr_scheduler_provider=AutoLRSchedulerProvider(config.lr_scheduler),
-    ).configure()
+    # The context sets the GPU of this process and creates the process groups. The with block closes them.
+    with init_dist_context(config.mesh) as dist_context:
+        trainer = TrainingConfigurator(
+            dist_context=dist_context,
+            parameters=config.trainer,
+            task_provider=lambda ctx: RegressionTask(),
+            model_provider=MLPProvider(),
+            data_provider=AutoDataProvider(
+                dataset_factory=lambda context: RegressionDataset(num_samples=65536, num_features=16),
+                collator=RegressionDataset.collate,
+                config=config.data,
+            ),
+            optimizer_provider=AutoOptimizerProvider(config.optimizer),
+            lr_scheduler_provider=AutoLRSchedulerProvider(config.lr_scheduler),
+        ).configure()
 
-    trainer.train()
-    trainer.export(config.export_to, load_checkpoint=False)
+        trainer.train()
+        trainer.export(config.export_to, load_checkpoint=False)
 
 
 if __name__ == "__main__":

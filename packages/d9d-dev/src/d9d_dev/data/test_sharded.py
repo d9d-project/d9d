@@ -2,7 +2,7 @@ from typing import Any, cast
 
 import pytest
 from d9d.data import ShardedDataset, ShardIndexingMode, shard_dataset_data_parallel
-from d9d.dist_context import DeviceMeshParameters
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DeviceMeshParameters
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.utils.data import Dataset
 
@@ -140,7 +140,7 @@ def test_shard_dataset_factory_non_distributed(dist_ctx_factory):
 
 @pytest.mark.distributed
 def test_shard_dataset_factory_distributed(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
     dataset = SimpleDataset(16)  # 16 items, 8 shards -> 2 items/shard
 
     sharded = shard_dataset_data_parallel(
@@ -151,7 +151,7 @@ def test_shard_dataset_factory_distributed(dist_ctx_factory):
 
     assert sharded._total_shards == 8
 
-    dp_mesh = dist_ctx.mesh_for("batch")["dp"]
+    dp_mesh = dist_ctx.mesh_for(BASE_DOMAIN)[BaseDim.DP]
     expected_rank = dp_mesh.get_local_rank()
 
     assert sharded._current_shard == expected_rank

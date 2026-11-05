@@ -5,7 +5,7 @@ import torch
 from torch.profiler import record_function
 
 from d9d.data import MicrobatchPack
-from d9d.dist_context import BATCH_DOMAIN, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext
 from d9d.metric.catalogue.container import ComposeMetric
 from d9d.pipelining.api import PipelineComputeKind, PipelineStepHandler
 from d9d.pipelining.factory import PipelineScheduleInfo
@@ -50,9 +50,7 @@ class TrainStepHandler(PipelineStepHandler[TPipelineOutput], typing.Generic[TPip
             gradient_manager: Accumulator of loss/weight for gradient reduction.
             metrics: Metric collection updated per microbatch.
         """
-        self._cp_rank = (
-            dist_context.mesh_for(BATCH_DOMAIN)["cp"].get_local_rank() if dist_context.mesh_params.is_distributed else 0
-        )
+        self._cp_rank = dist_context.coordinate(BASE_DOMAIN, BaseDim.CP)
         self._state = state
         self._task = task
         self._schedule = schedule
@@ -121,9 +119,7 @@ class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPi
             job_schedule: The job schedule that tracks the current step.
             metrics: Metric collection updated per microbatch.
         """
-        self._dp_rank = (
-            dist_context.mesh_for(BATCH_DOMAIN)["dp"].get_local_rank() if dist_context.mesh_params.is_distributed else 0
-        )
+        self._dp_rank = dist_context.coordinate(BASE_DOMAIN, BaseDim.DP)
         self._task = task
         self._pipeline = pipeline
         self._pipeline_state = pipeline_state

@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DeviceMeshParameters
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import (
     AnyPipelineScheduleConfig,
@@ -81,7 +81,7 @@ def test_e2e(
     freeze_w1: bool,
 ):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=8))
-    pp_mesh = dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"]
+    pp_mesh = dist_ctx.mesh_for(BASE_DOMAIN)[BaseDim.PP]
     n_stages = stages_per_rank * pp_mesh.size()
     if n_microbatches < n_stages and isinstance(schedule_config, PipelineScheduleDualPipeVConfig):
         pytest.skip("DualPipeV too small microbatch")
@@ -104,7 +104,7 @@ def test_e2e(
         return microbatch.x.sum()
 
     schedule_info, modules = build_schedule(
-        pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
+        pp_mesh=dist_ctx.mesh_for(BASE_DOMAIN)[BaseDim.PP],
         program_builder=build_program_builder(schedule_config),
         model_provider=_model_provider,
     )

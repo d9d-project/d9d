@@ -1,11 +1,12 @@
 import contextlib
+import logging
 from collections.abc import Iterable, Iterator
 from pathlib import Path
 
 from tqdm import tqdm
 
 from d9d.data import MicrobatchPack, build_device_pack_stream
-from d9d.dist_context import BATCH_DOMAIN, DeviceMeshParameters, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext, build_dist_logger
 from d9d.metric.catalogue.container import ComposeMetric
 from d9d.rng import SeedScope, fork_rng, fork_rng_child
 
@@ -69,17 +70,19 @@ from ..event.catalogue.train import (
 from ..sleep import DEFAULT_SLEEP_TAGS, SleepTag
 from ..state import TrainJobState
 
+logger = logging.getLogger(__name__)
+
 
 class TrainingConfigurator:
     """Configurator that assembles the distributed training environment.
 
-    It combines the device mesh parameters, the ``TrainerConfig`` and the user-defined providers
+    It combines the distributed context, the ``TrainerConfig`` and the user-defined providers
     into a ``Trainer`` that is ready to run the training loop.
     """
 
     def __init__(
         self,
-        mesh: DeviceMeshParameters,
+        dist_context: DistributedContext,
         parameters: TrainerConfig,
         task_provider: TrainTaskProvider,
         model_provider: ModelProvider,
@@ -90,7 +93,7 @@ class TrainingConfigurator:
         """Constructs the ``TrainingConfigurator`` object.
 
         Args:
-            mesh: Definition of the distributed device mesh topology.
+            dist_context: The distributed context of the job. The caller owns and closes it.
             parameters: The global configuration object for the trainer.
             task_provider: Factory for creating the training task logic.
             model_provider: Factory for defining and creating model stages.
@@ -98,7 +101,7 @@ class TrainingConfigurator:
             optimizer_provider: Factory for creating the optimizer.
             lr_scheduler_provider: Factory for creating the learning rate scheduler.
         """
-        self._mesh = mesh
+        self._dist_context = dist_context
         self._parameters = parameters
         self._task_provider = task_provider
         self._model_provider = model_provider
@@ -123,9 +126,7 @@ class TrainingConfigurator:
 
         event_bus.trigger(EVENT_TRAIN_CONFIG_STARTED, EventConfigurationStartedContext(dist_context=dist_context))
 
-        dp_rank = (
-            dist_context.mesh_for(BATCH_DOMAIN)["dp"].get_local_rank() if dist_context.mesh_params.is_distributed else 0
-        )
+        dp_rank = dist_context.coordinate(BASE_DOMAIN, BaseDim.DP)
         data_seed_scope = seed_scope.child("data")
         with fork_rng_child("data_provider"):
             microbatch_pack_stream = self._data_provider(
@@ -198,7 +199,7 @@ class TrainingConfigurator:
         event_bus.trigger(EVENT_TRAIN_OPTIMIZER_READY, EventOptimizerReadyContext(optimizer=optimizer))
         event_bus.trigger(EVENT_TRAIN_LR_SCHEDULER_READY, EventLRSchedulerReadyContext(lr_scheduler=scheduler))
 
-        gc = ManualGarbageCollector(dist_context=dist_context, config=self._parameters.gc, schedule=schedule)
+        gc = ManualGarbageCollector(config=self._parameters.gc, schedule=schedule)
 
         checkpointer = StateCheckpointer(
             dist_context=dist_context,
@@ -246,14 +247,14 @@ class TrainingConfigurator:
     def configure(self) -> "Trainer":
         """Builds all training components and returns a configured ``Trainer``.
 
-        It creates the distributed context and builds the model, the optimizer and the data stream. It also
+        It configures the ``d9d`` logger and builds the model, the optimizer and the data stream. It also
         builds the auxiliary components (logging, profiling, checkpointing).
 
         Returns:
             A ready-to-use trainer that holds the job state.
         """
-        # Build the mesh outside the fork: it sets the current CUDA device, whose generator the fork saves.
-        dist_context = self._mesh.build()
+        dist_context = self._dist_context
+        build_dist_logger(dist_context, level=logging.INFO)
         seed_scope = SeedScope.root(self._parameters.determinism.base_seed)
 
         with fork_rng(seed_scope.child("configure")):
@@ -296,11 +297,11 @@ class Trainer:
 
     def _train(self):
         self._state.dist_context.wait_world()
-        self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
+        logger.info("Trying to load last checkpoint before doing anything else")
         self._state.checkpointer.load_last_checkpoint(self._state)
 
         if self._state.schedule.current_step >= self._state.schedule.total_steps:
-            self._state.dist_context.logger.info("Training is already complete, nothing to do")
+            logger.info("Training is already complete, nothing to do")
             return
 
         self._state.dist_context.wait_world()

@@ -2,7 +2,7 @@ import weakref
 
 import pytest
 import torch
-from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DeviceMeshParameters
 from d9d.pipelining.api import PipelineStageInfo
 from d9d.pipelining.factory import (
     PipelineScheduleInferenceConfig,
@@ -46,7 +46,7 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
     # Each microbatch's P2P buffers are sized independently, so a pack whose microbatches differ in
     # shape exercises the per-microbatch buffer allocation.
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=8))
-    pp_mesh = dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"]
+    pp_mesh = dist_ctx.mesh_for(BASE_DOMAIN)[BaseDim.PP]
     n_stages = pp_mesh.size()
 
     torch.manual_seed(4242)
@@ -75,7 +75,7 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
         output_refs.append(weakref.ref(microbatch_outputs.x))
 
     schedule_info, _ = build_schedule(
-        pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
+        pp_mesh=dist_ctx.mesh_for(BASE_DOMAIN)[BaseDim.PP],
         program_builder=build_program_builder(PipelineScheduleInferenceConfig()),
         model_provider=_model_provider,
     )

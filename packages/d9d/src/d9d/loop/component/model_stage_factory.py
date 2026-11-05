@@ -7,7 +7,7 @@ import torch
 from torch import nn
 from torch.distributed.checkpoint.stateful import Stateful
 
-from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext
 from d9d.model_state.io import load_model_state
 from d9d.nn import ModuleLateInit
 from d9d.offload import Offloadable, OffloadContext, OffloadedTensor, OnloadContext, offload_tensor, onload_tensor
@@ -274,7 +274,7 @@ class ModelStageFactory:
                 f"Model stage ({type(model).__name__}) must be an nn.Module that implements ModuleLateInit."
             )
 
-        if self._dist_context.mesh_params.is_distributed:
+        if self._dist_context.is_distributed:
             with fork_rng_child("parallelize_model_stage", stage_index):
                 self._model_provider.parallelize_model_stage(
                     ParallelizeModelStageContext(model=model, stage=stage, dist_context=self._dist_context)
@@ -291,7 +291,7 @@ class ModelStageFactory:
                 src_dir=self._config_model.source_checkpoint,
                 model=model,
                 mapper=factored.state_mapper,
-                device=f"cuda:{torch.cuda.current_device()}",
+                device=str(self._dist_context.current_device),
                 position=self._dist_context.local_rank,  # Progress bar is displayed once per rank inside this node
             )
 
@@ -310,9 +310,7 @@ class ModelStageFactory:
         else:
             stateful_predicate = _stateful_predicate_always
 
-        pp_mesh = (
-            self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"] if self._dist_context.mesh_params.is_distributed else None
-        )
+        pp_mesh = self._dist_context.mesh_for(BASE_DOMAIN)[BaseDim.PP] if self._dist_context.is_distributed else None
         schedule, modules = build_schedule(
             pp_mesh=pp_mesh,
             program_builder=build_program_builder(self._config_pipelining.schedule),

@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DeviceMeshParameters
 from d9d.parallel.grad_sync.synchronizer import GradientSynchronizer
 from torch import nn
 from torch.distributed import DeviceMesh
@@ -25,8 +25,8 @@ def _assert_grad(param: nn.Parameter, value: float):
 
 @pytest.mark.distributed
 def test_failed_wait_keeps_buckets_unchanged(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE]
     rank = mesh.get_local_rank()
     world_size = mesh.size()
 
@@ -58,8 +58,8 @@ def test_failed_wait_keeps_buckets_unchanged(dist_ctx_factory):
 
 @pytest.mark.distributed
 def test_unused_parameter_raises_on_wait(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE]
 
     used = _make_replicated_param(mesh)
     unused = _make_replicated_param(mesh)
@@ -81,8 +81,8 @@ def test_unused_parameter_raises_on_wait(dist_ctx_factory):
 @pytest.mark.distributed
 @pytest.mark.parametrize("wait_before_extra_backward", [False, True], ids=["before_wait", "after_wait"])
 def test_extra_accumulation_raises(dist_ctx_factory, wait_before_extra_backward):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE]
 
     param = _make_replicated_param(mesh)
     sync = GradientSynchronizer(param_groups=[[param]], bucket_size_mb=1)
@@ -104,8 +104,8 @@ def test_extra_accumulation_raises(dist_ctx_factory, wait_before_extra_backward)
 
 @pytest.mark.distributed
 def test_gradient_set_to_none_outside_synchronizer_raises(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE]
 
     param = _make_replicated_param(mesh)
     sync = GradientSynchronizer(param_groups=[[param]], bucket_size_mb=1)

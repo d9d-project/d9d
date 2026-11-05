@@ -7,7 +7,7 @@ import datasets
 import torch
 import yaml
 from d9d.data import pad_stack_1d
-from d9d.dist_context import DeviceMeshParameters, DistributedContext
+from d9d.dist_context import DeviceMeshParameters, DistributedContext, init_dist_context
 from d9d.loop.auto import (
     AutoDataConfig,
     AutoDataProvider,
@@ -202,22 +202,23 @@ class CausalLMTask(
 def main():
     config = ProjectConfig.model_validate(yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8")))
 
-    trainer = TrainingConfigurator(
-        mesh=config.mesh,
-        parameters=config.trainer,
-        task_provider=lambda ctx: CausalLMTask(),
-        model_provider=Qwen3Provider(config.model, config.lora),
-        data_provider=AutoDataProvider(
-            dataset_factory=lambda context: build_dataset(config.data, context.dist_context),
-            collator=TextDataset.collate,
-            config=config.auto_data,
-        ),
-        optimizer_provider=AutoOptimizerProvider(config.optimizer),
-        lr_scheduler_provider=AutoLRSchedulerProvider(config.lr_scheduler),
-    ).configure()
+    with init_dist_context(config.mesh) as dist_context:
+        trainer = TrainingConfigurator(
+            dist_context=dist_context,
+            parameters=config.trainer,
+            task_provider=lambda ctx: CausalLMTask(),
+            model_provider=Qwen3Provider(config.model, config.lora),
+            data_provider=AutoDataProvider(
+                dataset_factory=lambda context: build_dataset(config.data, context.dist_context),
+                collator=TextDataset.collate,
+                config=config.auto_data,
+            ),
+            optimizer_provider=AutoOptimizerProvider(config.optimizer),
+            lr_scheduler_provider=AutoLRSchedulerProvider(config.lr_scheduler),
+        ).configure()
 
-    trainer.train()
-    trainer.export(config.export_to, load_checkpoint=False)
+        trainer.train()
+        trainer.export(config.export_to, load_checkpoint=False)
 
 
 if __name__ == "__main__":

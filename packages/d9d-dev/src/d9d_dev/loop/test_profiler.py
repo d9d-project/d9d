@@ -5,7 +5,7 @@ import threading
 
 import pytest
 import torch
-from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import BASE_DOMAIN, DeviceMeshParameters
 from d9d.loop.component import JobProfiler
 from d9d.loop.config import ProfilingConfig
 
@@ -34,7 +34,7 @@ def test_e2e(
     simulate_steps,
     will_write_at,
 ):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
     profiler_wrapper = JobProfiler(
         dist_context=dist_ctx,
         config=ProfilingConfig(
@@ -64,7 +64,7 @@ def test_e2e(
 
         assert step_dir.is_dir()
 
-        mesh = dist_ctx.mesh_for(REGULAR_DOMAIN)
+        mesh = dist_ctx.mesh_for(BASE_DOMAIN)
         coord_str = "-".join(map(str, mesh.get_coordinate()))
 
         expected_filename_base = f"rank-{mesh.get_rank()}-coord-{coord_str}-trace"

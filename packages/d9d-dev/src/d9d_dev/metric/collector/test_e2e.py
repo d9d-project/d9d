@@ -1,5 +1,5 @@
 import pytest
-from d9d.dist_context import FLAT_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import METRIC_DOMAIN, DeviceMeshParameters, MetricDim
 from d9d.metric import AsyncMetricCollector
 
 from d9d_dev.metric.collector.metric import MockMetric
@@ -33,7 +33,7 @@ def test_lifecycle_local():
 
 @pytest.mark.distributed
 def test_lifecycle_distributed(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
 
     metric = MockMetric()
     collector = AsyncMetricCollector(metric)
@@ -41,7 +41,7 @@ def test_lifecycle_distributed(dist_ctx_factory):
 
     metric.update(10.0)
 
-    collector.schedule_collection(dist_ctx.mesh_for(FLAT_DOMAIN).get_group())
+    collector.schedule_collection(dist_ctx.mesh_for(METRIC_DOMAIN)[MetricDim.PP_DP_CP].get_group())
 
     assert metric.sync_called
     assert metric.compute_called

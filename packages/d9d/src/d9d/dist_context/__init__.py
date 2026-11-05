@@ -1,17 +1,27 @@
 """The distributed context of a job and the device meshes of its domains."""
 
+from .builtin import BASE_DOMAIN, DENSE_DOMAIN, EXPERT_DOMAIN, METRIC_DOMAIN, BaseDim, DenseDim, ExpertDim, MetricDim
 from .configured import DistributedContext
-from .device_mesh_domains import BATCH_DOMAIN, DENSE_DOMAIN, EXPERT_DOMAIN, FLAT_DOMAIN, REGULAR_DOMAIN
+from .domain import DeviceMeshDomain, MeshDim
+from .init import init_dist_context
 from .log import build_dist_logger
-from .params import DeviceMeshParameters
+from .params import DenseDomainConfig, DeviceMeshParameters, ExpertDomainConfig
 
 __all__ = [
-    "BATCH_DOMAIN",
+    "BASE_DOMAIN",
     "DENSE_DOMAIN",
     "EXPERT_DOMAIN",
-    "FLAT_DOMAIN",
-    "REGULAR_DOMAIN",
+    "METRIC_DOMAIN",
+    "BaseDim",
+    "DenseDim",
+    "DenseDomainConfig",
+    "DeviceMeshDomain",
     "DeviceMeshParameters",
     "DistributedContext",
+    "ExpertDim",
+    "ExpertDomainConfig",
+    "MeshDim",
+    "MetricDim",
     "build_dist_logger",
+    "init_dist_context",
 ]

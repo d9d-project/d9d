@@ -6,7 +6,7 @@ from typing import Any, TypeVar
 from torch.distributed.checkpoint.stateful import Stateful
 from torch.utils.data import Dataset
 
-from d9d.dist_context import BATCH_DOMAIN, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext
 
 
 class ShardIndexingMode(StrEnum):
@@ -189,13 +189,8 @@ def shard_dataset_data_parallel(
     Returns:
         A dataset instance representing the local shard.
     """
-    if dist_context.mesh_params.is_distributed:
-        dp_mesh = dist_context.mesh_for(BATCH_DOMAIN)["dp"]
-        n_shards = dp_mesh.size()
-        current_shard = dp_mesh.get_local_rank()
-    else:
-        n_shards = 1
-        current_shard = 0
+    n_shards = dist_context.dim_size(BASE_DOMAIN, BaseDim.DP)
+    current_shard = dist_context.coordinate(BASE_DOMAIN, BaseDim.DP)
 
     return ShardedDataset(
         dataset=dataset,

@@ -1,3 +1,4 @@
+import logging
 import tarfile
 import time
 from collections.abc import Generator
@@ -6,10 +7,12 @@ from pathlib import Path
 
 import torch.profiler as tprof
 
-from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext
 
 from ..config import ProfilingConfig
 from .job_schedule import JobSchedule
+
+logger = logging.getLogger(__name__)
 
 
 class JobProfiler:
@@ -32,16 +35,10 @@ class JobProfiler:
         self._schedule = schedule
 
     def _get_save_file_name(self) -> str:
-        if self._dist_context.mesh_params.is_distributed:
-            mesh_regular = self._dist_context.mesh_for(REGULAR_DOMAIN)
-            coord = mesh_regular.get_coordinate()
-            if coord is None:
-                raise RuntimeError("The current rank is not part of the regular device mesh.")
-            coord_str = "-".join(str(x) for x in coord)
-            rank = mesh_regular.get_rank()
-            return f"rank-{rank}-coord-{coord_str}-trace.json"
-        else:
+        if not self._dist_context.is_distributed:
             return "trace.json"
+        coord_str = "-".join(str(self._dist_context.coordinate(BASE_DOMAIN, dim)) for dim in BaseDim)
+        return f"rank-{self._dist_context.rank}-coord-{coord_str}-trace.json"
 
     def _dump_trace(self, traces_dir: Path, prof: tprof.profile):
         save_dir = traces_dir / f"step_{prof.step_num}"
@@ -57,7 +54,7 @@ class JobProfiler:
 
         end = time.monotonic()
 
-        self._dist_context.logger.info(f"Finished dumping profiler traces in {end - begin:.2f} seconds")
+        logger.info(f"Finished dumping profiler traces in {end - begin:.2f} seconds")
 
     @contextmanager
     def open(self) -> Generator[tprof.profile | None]:

@@ -1,3 +1,4 @@
+import logging
 import re
 import shutil
 from pathlib import Path
@@ -12,6 +13,8 @@ from d9d.dist_context import DistributedContext
 from ..config import CheckpointingConfig
 from .garbage_collector import ManualGarbageCollector
 from .job_schedule import JobSchedule
+
+logger = logging.getLogger(__name__)
 
 _SAVE_RE = re.compile(r"^save-(\d+)$")
 
@@ -86,18 +89,18 @@ class StateCheckpointer:
         to_delete = self._get_sorted_checkpoint_dirs()[: -self._config.num_to_keep]
 
         for delete_dir in to_delete:
-            self._dist_context.logger.info(f"Purging checkpoint {delete_dir}")
+            logger.info(f"Purging checkpoint {delete_dir}")
             shutil.rmtree(delete_dir)
 
     def _checkpoint(self, state: Stateful):
         with record_function("Checkpoint Save"):
             next_checkpoint_id = self._next_checkpoint_id()
 
-            self._dist_context.logger.info("Freeing up memory before checkpointing")
+            logger.info("Freeing up memory before checkpointing")
             self._free_memory()
-            self._dist_context.logger.info("Waiting for world before saving checkpoint")
+            logger.info("Waiting for world before saving checkpoint")
             self._dist_context.wait_world()
-            self._dist_context.logger.info(f"Saving checkpoint {next_checkpoint_id}")
+            logger.info(f"Saving checkpoint {next_checkpoint_id}")
 
             save_from = {"state": state}
             dcp.save(state_dict=save_from, checkpoint_id=next_checkpoint_id)
@@ -105,9 +108,9 @@ class StateCheckpointer:
             self._purge_old_checkpoints()
             self._free_memory()
 
-            self._dist_context.logger.info("Waiting for world after saving checkpoint")
+            logger.info("Waiting for world after saving checkpoint")
             self._dist_context.wait_world()
-            self._dist_context.logger.info("Checkpoint successfully saved across the world")
+            logger.info("Checkpoint successfully saved across the world")
 
     def checkpoint_if_needed(self, state: Stateful):
         """Saves a checkpoint if the current step matches the configured period or is the last step.
@@ -130,20 +133,20 @@ class StateCheckpointer:
         last_checkpoint = self._last_checkpoint_id()
 
         if last_checkpoint is None:
-            self._dist_context.logger.info("Starting job from scratch")
+            logger.info("Starting job from scratch")
             return
 
-        self._dist_context.logger.info("Waiting for world before loading checkpoint")
+        logger.info("Waiting for world before loading checkpoint")
         self._dist_context.wait_world()
-        self._dist_context.logger.info(f"Loading checkpoint {last_checkpoint}")
+        logger.info(f"Loading checkpoint {last_checkpoint}")
 
         load_into = {"state": state}
         dcp.load(state_dict=load_into, checkpoint_id=last_checkpoint)
         self._free_memory()
 
-        self._dist_context.logger.info("Waiting for world after loading checkpoint")
+        logger.info("Waiting for world after loading checkpoint")
         self._dist_context.wait_world()
-        self._dist_context.logger.info("Checkpoint successfully loaded across the world")
+        logger.info("Checkpoint successfully loaded across the world")
 
     def load_last_checkpoint(self, state: Stateful):
         """Loads the latest checkpoint in the save directory.

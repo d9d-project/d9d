@@ -1,4 +1,5 @@
 import dataclasses
+import logging
 import math
 import sys
 from pathlib import Path
@@ -6,7 +7,7 @@ from pathlib import Path
 import torch
 import torch.distributed as dist
 import yaml
-from d9d.dist_context import FLAT_DOMAIN, DeviceMeshParameters, DistributedContext
+from d9d.dist_context import METRIC_DOMAIN, DeviceMeshParameters, DistributedContext, MetricDim, init_dist_context
 from d9d.loop.auto import AutoDataConfig, AutoDataProvider
 from d9d.loop.config import InferenceConfig
 from d9d.loop.control import (
@@ -22,6 +23,9 @@ from d9d.models.qwen3_dense import Qwen3DenseParameters
 from d9d.nn.head import LM_IGNORE_INDEX, SequenceCausalLMHeadShared, SequenceCausalLMOutput
 from finetune import DataConfig, Qwen3Provider, TextBatch, TextDataset, build_dataset
 from pydantic import BaseModel, ConfigDict
+
+# A child of the d9d logger, so its lines get the rank prefix that the configurator sets up.
+logger = logging.getLogger("d9d.evaluate")
 
 
 class EvaluationConfig(BaseModel):
@@ -73,15 +77,16 @@ class PerplexityTask(
         self._num_tokens += ctx.state.num_tokens
 
     def finalize(self, ctx: FinalizeContext) -> None:
-        # Ranks that host no last pipeline stage add zeros, so a sum over all ranks covers every batch once.
-        if self._dist_context.mesh_params.is_distributed:
-            group = self._dist_context.mesh_for(FLAT_DOMAIN).get_group()
+        # Ranks that host no last pipeline stage add zeros, so a sum over the ranks with their own tokens covers
+        # every batch once. Tensor-parallel ranks share their tokens, so the sum leaves them out.
+        if self._dist_context.is_distributed:
+            group = self._dist_context.mesh_for(METRIC_DOMAIN)[MetricDim.PP_DP_CP].get_group()
             dist.all_reduce(self._loss_sum, group=group)
             dist.all_reduce(self._num_tokens, group=group)
 
         mean_loss = (self._loss_sum / self._num_tokens).item()
         if self._dist_context.is_main_process:
-            self._dist_context.logger.info(f"Mean loss {mean_loss:.4f}, perplexity {math.exp(mean_loss):.2f}")
+            logger.info(f"Mean loss {mean_loss:.4f}, perplexity {math.exp(mean_loss):.2f}")
 
 
 # --8<-- [end:task]
@@ -92,19 +97,20 @@ def main():
     # The checkpoint to evaluate, e.g. the original model or the export of a fine-tuning run.
     config.inference.model_stage_factory.source_checkpoint = Path(sys.argv[2])
 
-    inference = InferenceConfigurator(
-        mesh=config.mesh,
-        parameters=config.inference,
-        task_provider=lambda ctx: PerplexityTask(ctx.dist_context),
-        model_provider=Qwen3Provider(config.model, lora=None),
-        data_provider=AutoDataProvider(
-            dataset_factory=lambda context: build_dataset(config.data, context.dist_context),
-            collator=TextDataset.collate,
-            config=config.auto_data,
-        ),
-    ).configure()
+    with init_dist_context(config.mesh) as dist_context:
+        inference = InferenceConfigurator(
+            dist_context=dist_context,
+            parameters=config.inference,
+            task_provider=lambda ctx: PerplexityTask(ctx.dist_context),
+            model_provider=Qwen3Provider(config.model, lora=None),
+            data_provider=AutoDataProvider(
+                dataset_factory=lambda context: build_dataset(config.data, context.dist_context),
+                collator=TextDataset.collate,
+                config=config.auto_data,
+            ),
+        ).configure()
 
-    inference.infer()
+        inference.infer()
 
 
 if __name__ == "__main__":

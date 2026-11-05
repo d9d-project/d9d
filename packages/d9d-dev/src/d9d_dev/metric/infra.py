@@ -2,7 +2,7 @@ import dataclasses
 from collections.abc import Callable
 from typing import Any
 
-from d9d.dist_context import FLAT_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import METRIC_DOMAIN, DeviceMeshParameters, MetricDim
 from d9d.metric import Metric
 from d9d.pytree import TensorTree, tree_map
 from torch.testing import assert_close
@@ -61,8 +61,8 @@ def assert_metric_local(case: MetricCase, device: str, atol: float | None = None
 
 
 def assert_metric_distributed(dist_ctx_factory, case: MetricCase, atol: float | None = None, rtol: float | None = None):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    this_rank = dist_ctx.mesh_for(FLAT_DOMAIN).get_rank()
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    this_rank = dist_ctx.rank
     # do 2 roundabouts to test reset works
     metric = case.factory_fn()
     metric.to("cuda")
@@ -87,7 +87,7 @@ def assert_metric_distributed(dist_ctx_factory, case: MetricCase, atol: float | 
                 metric.to("cuda")
                 metric.load_state_dict(state)
 
-            metric.sync(dist_ctx.mesh_for(FLAT_DOMAIN).get_group())
+            metric.sync(dist_ctx.mesh_for(METRIC_DOMAIN)[MetricDim.PP_DP_CP].get_group())
 
             expect = tree_map(lambda x: x.to("cuda"), step.expect)
             assert_close(metric.compute(), expect, equal_nan=True, atol=atol, rtol=rtol)

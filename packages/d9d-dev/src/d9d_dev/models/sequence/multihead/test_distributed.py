@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.nn.functional as F
-from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DeviceMeshParameters
 from d9d.models.io import (
     SequenceHeadsOutput,
     SequenceHeadsShared,
@@ -113,7 +113,7 @@ def test_multihead_consistent_to_itself_dist(
         return model_dist
 
     schedule_info, models_dist = build_schedule(
-        pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
+        pp_mesh=dist_ctx.mesh_for(BASE_DOMAIN)[BaseDim.PP],
         program_builder=build_program_builder(PipelineScheduleGPipeConfig()),
         model_provider=_model_provider,
     )

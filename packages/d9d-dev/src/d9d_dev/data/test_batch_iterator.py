@@ -47,7 +47,7 @@ def test_num_microbatches_for_global_batch_non_distributed(dist_ctx_factory):
 
 @pytest.mark.distributed
 def test_num_microbatches_for_global_batch_distributed(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
 
     assert num_microbatches_for_global_batch(dist_ctx, global_batch_size=128, microbatch_size=8) == 2
     assert num_microbatches_for_global_batch(dist_ctx, global_batch_size=64, microbatch_size=8) == 1
@@ -55,7 +55,7 @@ def test_num_microbatches_for_global_batch_distributed(dist_ctx_factory):
 
 @pytest.mark.distributed
 def test_num_microbatches_for_global_batch_indivisible_distributed(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
 
     with pytest.raises(ValueError, match="divisible"):  # 8 * 8 = 64 ; 32 < 64
         num_microbatches_for_global_batch(dist_ctx, global_batch_size=32, microbatch_size=8)

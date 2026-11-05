@@ -2,7 +2,7 @@ from collections.abc import Sequence
 
 import torch
 import torch.distributed as dist
-from d9d.dist_context import BATCH_DOMAIN, DENSE_DOMAIN, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, DENSE_DOMAIN, BaseDim, DenseDim, DeviceMeshDomain, DistributedContext
 from torch import nn
 from torch.distributed.tensor import DTensor, Replicate, Shard, distribute_tensor
 
@@ -11,10 +11,10 @@ from .tolerances import grad_tolerance_for
 
 _DEFAULT_DOMAIN = DENSE_DOMAIN
 _DEFAULT_DENSE_REDUCE_DIMS: tuple[str, ...] = (
-    "dp_replicate",
-    "dp_cp_shard",
-    "cp_replicate",
-    "tp",
+    DenseDim.DP_REPLICATE,
+    DenseDim.DP_CP_SHARD,
+    DenseDim.CP_REPLICATE,
+    DenseDim.TP,
 )
 
 
@@ -22,7 +22,7 @@ def shard_batch_dim(tensor: torch.Tensor, dist_ctx: DistributedContext) -> torch
     return (
         DTensor.from_local(
             tensor,
-            device_mesh=dist_ctx.mesh_for(BATCH_DOMAIN)["dp"],
+            device_mesh=dist_ctx.mesh_for(BASE_DOMAIN)[BaseDim.DP],
             placements=[Replicate()],
         )
         .redistribute(placements=(Shard(0),))
@@ -33,7 +33,7 @@ def shard_batch_dim(tensor: torch.Tensor, dist_ctx: DistributedContext) -> torch
 def all_reduce_over_mesh_groups(
     tensor: torch.Tensor,
     dist_ctx: DistributedContext,
-    domain: str = DENSE_DOMAIN,
+    domain: DeviceMeshDomain = DENSE_DOMAIN,
     dims: Sequence[str] = _DEFAULT_DENSE_REDUCE_DIMS,
     op: dist.ReduceOp = dist.ReduceOp.SUM,
 ) -> None:

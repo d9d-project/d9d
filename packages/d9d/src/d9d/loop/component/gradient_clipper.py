@@ -2,7 +2,7 @@ from contextlib import contextmanager
 
 import torch
 
-from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext
 from d9d.parallel.grad_norm import ParametersForNorm, clip_grad_norm_distributed_, group_parameters_for_norm
 
 from ..config import GradientClippingConfig
@@ -56,10 +56,7 @@ class GradientClipper:
         if self._parameter_groups is None:
             raise ValueError("clip() must be called inside the install() context.")
 
-        if self._dist_context.mesh_params.is_distributed:
-            pp_mesh = self._dist_context.mesh_for(REGULAR_DOMAIN)["pp"]
-        else:
-            pp_mesh = None
+        pp_mesh = self._dist_context.mesh_for(BASE_DOMAIN)[BaseDim.PP] if self._dist_context.is_distributed else None
 
         return clip_grad_norm_distributed_(
             parameter_groups=self._parameter_groups,

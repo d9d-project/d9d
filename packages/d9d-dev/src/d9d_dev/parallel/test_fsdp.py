@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.distributed as dist
-from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DenseDomainConfig, DeviceMeshParameters
 from d9d.parallel import parallelize_fsdp
 from torch import nn
 from torch.distributed.fsdp import FSDPModule
@@ -35,7 +35,13 @@ class SimpleLinear(nn.Module):
     ],
 )
 def test_parallelize_fsdp(dist_ctx_factory, mesh_dim):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_shard=4, context_parallel_shard=2))
+    dist_ctx = dist_ctx_factory(
+        DeviceMeshParameters(
+            data_parallel=4,
+            context_parallel=2,
+            dense=DenseDomainConfig(data_parallel_shard=4, context_parallel_shard=2),
+        )
+    )
     mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[mesh_dim]
 
     # Ensure divisibility. Mesh size 8 -> Params 16 -> 2 per Rank.

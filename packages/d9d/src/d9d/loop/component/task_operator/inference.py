@@ -4,7 +4,7 @@ from contextlib import AbstractContextManager
 from torch.profiler import record_function
 
 from d9d.data import MicrobatchPack
-from d9d.dist_context import BATCH_DOMAIN, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext
 from d9d.pipelining.api import PipelineComputeKind, PipelineStepHandler
 from d9d.pipelining.factory import PipelineScheduleInfo
 from d9d.pytree import PyTree
@@ -41,9 +41,7 @@ class InferenceStepHandler(PipelineStepHandler[TPipelineOutput], typing.Generic[
             state: Handler for the per-microbatch pipeline state.
             task: The user-defined inference task containing processing logic.
         """
-        self._cp_rank = (
-            dist_context.mesh_for(BATCH_DOMAIN)["cp"].get_local_rank() if dist_context.mesh_params.is_distributed else 0
-        )
+        self._cp_rank = dist_context.coordinate(BASE_DOMAIN, BaseDim.CP)
         self._state = state
         self._task = task
 
@@ -86,9 +84,7 @@ class InferenceTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput,
             pipeline: Information about the pipeline schedule.
             pipeline_state: Handler for transient per-microbatch state during the step.
         """
-        self._dp_rank = (
-            dist_context.mesh_for(BATCH_DOMAIN)["dp"].get_local_rank() if dist_context.mesh_params.is_distributed else 0
-        )
+        self._dp_rank = dist_context.coordinate(BASE_DOMAIN, BaseDim.DP)
         self._task = task
         self._pipeline = pipeline
         self._pipeline_state = pipeline_state
