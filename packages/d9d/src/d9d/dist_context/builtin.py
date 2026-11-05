@@ -38,6 +38,14 @@ class DenseDim(StrEnum):
     TP = "tp"
 
 
+DATA_SHARD_DIMS = frozenset({DenseDim.DP_CP_SHARD})
+"""The mesh dimensions over which data parallelism shards parameters.
+
+The ``ParameterRuntime`` gathers a parameter along these dimensions before use. A parameter sharded along any other
+dimension, such as ``ExpertDim.EP_SHARD``, stays sharded: its layer communicates by itself.
+"""
+
+
 class ExpertDim(StrEnum):
     """The dimensions of the mesh of ``EXPERT_DOMAIN``.
 
