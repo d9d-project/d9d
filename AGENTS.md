@@ -48,7 +48,7 @@ Top-level packages of the library.
 ## Working agreements for agents
 
 - Always run `make lint` before considering a change done. It formats, fixes imports, lints, and type-checks. Type errors are not acceptable in core code.
-- Add tests for any feature or fix. Match the existing tier (`local` vs `distributed`). Note: `make test` includes distributed tests that require an 8-GPU setup; run `make test-local` when GPUs are unavailable, and say so.
+- Add tests for any feature or fix. Match the existing tier (`local` vs `distributed`). Note: `make test` includes distributed tests on 8 ranks; with fewer GPUs, run `make test SHARED_GPUS=1`. Run `make test-local` when GPUs are unavailable, and say so.
 - Follow the Design Principles in CONTRIBUTING.md. PRs that violate them get rejected.
 - PR titles must be Conventional Commits. Versioning is automated via Semantic Release — a wrong `type` produces a wrong release.
 - Check "The DEP Process" in CONTRIBUTING.md before a change that adds public API. The `dep` skill writes the DEP.
