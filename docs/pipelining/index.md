@@ -46,6 +46,49 @@ To use pipeline parallelism, your model implements `d9d.pipelining.api.ModuleSup
 
 The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* have the same dataclass type. So `pytree.tree_flatten` gives the same leaf order on both ends. Sender and receiver agree on the order by construction, and they need no handshake.
 
+### Resumable Forwards
+
+`ModuleSupportsWindows` describes a forward that can suspend at explicit execution boundaries. Implement `forward_steps(steps, inputs, shared)` and delegate synchronous `forward()` to `run_steps()`:
+
+```python
+import torch
+from torch import nn
+
+from d9d.pipelining.api import WindowSteps, mark_window, run_steps
+
+
+class ResumableMLP(nn.Module):
+    def __init__(self, width: int):
+        super().__init__()
+        self.first = mark_window(nn.Sequential(nn.Linear(width, width), nn.Tanh()))
+        self.second = mark_window(nn.Linear(width, width))
+
+    async def forward_steps(self, steps: WindowSteps, inputs: torch.Tensor, shared: None) -> torch.Tensor:
+        hidden = await steps.call(self.first, inputs)
+        return await steps.call(self.second, hidden)
+
+    def forward(self, inputs: torch.Tensor, shared: None) -> torch.Tensor:
+        return run_steps(self, inputs, shared)
+```
+
+`mark_window()` declares a parameter group without wrapping the module or changing its checkpoint names. The stage root owns parameters outside marked descendants. `call()` requests an ordinary module's group before invoking it and finishes the region with its output. For a resumable module, it composes that module's `forward_steps()` and finishes its final region. In eager execution, nested modules use their normal calls and hooks. Differentiable operations stay inside these module calls. For arbitrary computation between boundaries, use the manual form:
+
+```python
+async def forward_steps(self, steps: WindowSteps, inputs: torch.Tensor, shared: None) -> torch.Tensor:
+    inputs = await steps.enter(self.first, inputs)
+    hidden = self.first(inputs)
+    hidden, skip = await steps.enter(self.second, (hidden, inputs))
+    return self.second(hidden) + skip
+```
+
+Manual boundaries expose every new differentiable value from the open region that later regions need, including residuals. The caller reassigns the returned state. Previously returned boundary tensors retain their producers and can be saved for later calls. Before switching from a manual region to `call()`, use `state = await steps.finish(state)`. A helper coroutine's return does not finish its region; only the executor's outer coroutine has that implicit finish.
+
+Each invocation receives a separate `WindowSteps`. Executors advance the coroutine to `WindowBoundary` events and resume it with the processed state. A boundary's `module` names the next parameter group; `None` finishes the current region without entering another one. User contexts such as `no_grad()` and autocast must not span suspension points, and the window executor raises an error if one does. Executors own compute contexts around each resume and coroutine cleanup. This protocol does not use an `asyncio` event loop.
+
+`run_steps()` immediately resumes boundaries without graph cuts or parameter management. The parameter runtime instead gathers groups on demand and interleaves microbatches at boundaries. The first pass learns the group order; later passes prefetch from that order. An explicit `prefetch=next_module` on `enter()` names the next group and must match the next request.
+
+Every forward while the runtime is bound must use the same group order, including repeated groups. Microbatches in a window and participating ranks must agree. A model without `forward_steps()` executes as one whole-stage group. Conditional token routing inside a group is supported; changing the group sequence is not.
+
 ### Example
 
 Below is a skeleton of a Transformer-like model that supports d9d pipelining.
