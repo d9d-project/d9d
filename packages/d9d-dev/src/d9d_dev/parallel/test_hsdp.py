@@ -4,8 +4,9 @@ import torch.distributed as dist
 from d9d.dist_context import DENSE_DOMAIN, DenseDim, DenseDomainConfig, DeviceMeshParameters
 from d9d.parallel import parallelize_hsdp
 from torch import nn
-from torch.distributed.fsdp import FSDPModule
 from torch.distributed.tensor import DTensor, Replicate, Shard
+
+from d9d_dev.parallel.runtime_step import step_with_runtime
 
 
 class NestedModule(nn.Module):
@@ -27,14 +28,6 @@ class SimpleLinear(nn.Module):
         return (x * self.w() + self.b()).sum()
 
 
-def _sum_peer_ranks(rank: int, shard_group_size: int, shard_group: int) -> int:
-    my_rank_tensor = torch.tensor([rank], device="cuda")
-    group_ranks = [torch.zeros_like(my_rank_tensor) for _ in range(shard_group_size)]
-    dist.all_gather(group_ranks, my_rank_tensor, group=shard_group)
-    sum_peer_ranks = sum(r.item() for r in group_ranks)
-    return sum_peer_ranks
-
-
 @pytest.mark.distributed
 def test_parallelize_hsdp(dist_ctx_factory):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8, dense=DenseDomainConfig(data_parallel_shard=4)))
@@ -47,30 +40,24 @@ def test_parallelize_hsdp(dist_ctx_factory):
 
     parallelize_hsdp(model, mesh, shard_dim="dp_cp_shard")
 
-    assert isinstance(model, FSDPModule)
     for param in model.parameters():
         assert isinstance(param, DTensor)
-        assert param.placements == (Shard(0), Replicate())
-        assert param.device_mesh.mesh_dim_names == ("dp_cp_shard", "dp_replicate")
+        assert param.placements == (Replicate(), Shard(0))
+        assert param.device_mesh.mesh_dim_names == ("dp_replicate", "dp_cp_shard")
 
     rank = dist.get_rank()
     x = torch.arange(param_size, device="cuda", dtype=torch.float) + rank
 
-    y = model(x)
-    y.backward()
+    runtime = step_with_runtime(model, lambda: model(x).backward())
 
-    shard_dim_idx = mesh.mesh_dim_names.index("dp_cp_shard")
-    shard_group = mesh.get_group(shard_dim_idx)
-    shard_group_size = mesh.size(shard_dim_idx)
-
-    sum_peer_ranks = _sum_peer_ranks(rank, shard_group_size, shard_group)
+    shard_group_size = mesh[DenseDim.DP_CP_SHARD].size()
+    world_size = dist.get_world_size()
 
     global_indices = torch.arange(param_size, device="cuda", dtype=torch.float)
 
-    # Expected Global W (16 elements)
-    exp_global_w = global_indices * shard_group_size + sum_peer_ranks
-    # Expected Global B (16 elements)
-    exp_global_b = torch.full((param_size,), float(shard_group_size), device="cuda")
+    # The final reduction also sums the replicas, so every rank of the world contributes.
+    exp_global_w = global_indices * world_size + sum(range(world_size))
+    exp_global_b = torch.full((param_size,), float(world_size), device="cuda")
 
     my_shard_rank = mesh.get_local_rank("dp_cp_shard")
 
@@ -88,8 +75,24 @@ def test_parallelize_hsdp(dist_ctx_factory):
     assert model.b.param.grad is not None
     assert isinstance(model.w.param.grad, DTensor)
     assert isinstance(model.b.param.grad, DTensor)
-    assert model.w.param.grad.placements == (Shard(0), Replicate())
-    assert model.b.param.grad.placements == (Shard(0), Replicate())
+    assert model.w.param.grad.placements == (Replicate(), Shard(0))
+    assert model.b.param.grad.placements == (Replicate(), Shard(0))
 
     assert torch.allclose(model.w.param.grad.to_local(), exp_local_w)
     assert torch.allclose(model.b.param.grad.to_local(), exp_local_b)
+    runtime.unbind()
+
+
+@pytest.mark.distributed
+def test_parallelize_hsdp_keeps_mesh_order(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(
+        DeviceMeshParameters(data_parallel=4, context_parallel=2, dense=DenseDomainConfig(data_parallel_shard=4))
+    )
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE]
+    model = SimpleLinear(16).cuda()
+
+    parallelize_hsdp(model, mesh, shard_dim=DenseDim.DP_CP_SHARD)
+
+    for param in model.parameters():
+        assert param.device_mesh.mesh_dim_names == ("dp_cp_shard", "cp_replicate")
+        assert param.placements == (Shard(0), Replicate())

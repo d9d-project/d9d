@@ -1,11 +1,12 @@
 import pytest
 import torch
 import torch.distributed as dist
-from d9d.dist_context import DENSE_DOMAIN, DenseDomainConfig, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DenseDomainConfig, DeviceMeshParameters
 from d9d.parallel import parallelize_fsdp
 from torch import nn
-from torch.distributed.fsdp import FSDPModule
 from torch.distributed.tensor import DTensor, Shard
+
+from d9d_dev.parallel.runtime_step import step_with_runtime
 
 
 class NestedModule(nn.Module):
@@ -52,7 +53,6 @@ def test_parallelize_fsdp(dist_ctx_factory, mesh_dim):
     parallelize_fsdp(model, mesh)
 
     # Check structure
-    assert isinstance(model, FSDPModule)
     for param in model.parameters():
         assert isinstance(param, DTensor)
         assert param.placements == (Shard(0),)
@@ -65,8 +65,7 @@ def test_parallelize_fsdp(dist_ctx_factory, mesh_dim):
     # This ensures grad_w varies per element.
     x = torch.arange(param_size, device="cuda", dtype=torch.float) + rank
 
-    y = model(x)
-    y.backward()
+    runtime = step_with_runtime(model, lambda: model(x).backward())
 
     # Calculate expected grads
     world_size = mesh.size()
@@ -103,3 +102,13 @@ def test_parallelize_fsdp(dist_ctx_factory, mesh_dim):
     assert torch.allclose(model.w.param.grad.to_local(), expected_grad_w_local)
 
     assert torch.allclose(model.b.param.grad.to_local(), expected_grad_b_local)
+    runtime.unbind()
+
+
+@pytest.mark.distributed
+def test_parallelize_fsdp_rejects_other_dims(dist_ctx_factory):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    model = SimpleLinear(16).cuda()
+
+    with pytest.raises(ValueError, match="not a data shard dimension"):
+        parallelize_fsdp(model, dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE])

@@ -6,6 +6,8 @@ from d9d.parallel import parallelize_replicate
 from torch import nn
 from torch.distributed.tensor import DTensor, Replicate
 
+from d9d_dev.parallel.runtime_step import step_with_runtime
+
 
 class NestedModule(nn.Module):
     def __init__(self, init_p: float):
@@ -45,14 +47,14 @@ def test_parallelize_replicate(dist_ctx_factory, mesh_dims):
     # Run
     rank = dist.get_rank()
     x = torch.tensor(float(rank)).cuda()
-    y = model(x)
+    runtime = step_with_runtime(model, lambda: model(x).backward())
 
-    # Calculate Expected Grads
-    expected_grad_w_local = x.clone()
-    expected_grad_b_local = torch.tensor(1.0, device="cuda")
-
-    # Run
-    y.backward()
+    # The gradients are summed over the ranks of the mesh.
+    replicas = torch.tensor([float(rank), 1.0], device="cuda")
+    for dim in range(mesh.ndim):
+        dist.all_reduce(replicas, group=mesh.get_group(dim))
+    expected_grad_w_local = replicas[0]
+    expected_grad_b_local = replicas[1]
 
     # Check grad structure
     assert model.w.param.grad is not None
@@ -66,3 +68,4 @@ def test_parallelize_replicate(dist_ctx_factory, mesh_dims):
 
     assert torch.allclose(model.w.param.grad.to_local(), expected_grad_w_local)
     assert torch.allclose(model.b.param.grad.to_local(), expected_grad_b_local)
+    runtime.unbind()

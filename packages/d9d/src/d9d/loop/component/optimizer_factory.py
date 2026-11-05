@@ -11,9 +11,9 @@ from ..control import (
     OptimizerProvider,
 )
 from .job_schedule import JobSchedule
-from .model_stage_factory import TrackedModules
 from .pipelined_lr_scheduler import PipelinedLRScheduler
 from .pipelined_optimizer import PipelinedOptimizer
+from .tracked_modules import TrackedModules
 
 
 class OptimizerFactory:

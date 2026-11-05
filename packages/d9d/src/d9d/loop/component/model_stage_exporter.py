@@ -6,7 +6,7 @@ from d9d.model_state.mapper.compose import ModelStateMapperParallel
 from d9d.rng import fork_rng_child
 
 from ..control import ModelProvider, PrepareExportModelStageContext
-from .model_stage_factory import TrackedModules
+from .tracked_modules import TrackedModules
 
 
 class ModelStageExporter:

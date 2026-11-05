@@ -60,9 +60,9 @@ Loading and exporting model weights, including Hugging Face checkpoints.
 Strategies for distributing computations.
 
 *   **[Distributed Context](./dist_context/index.md)**: The `DistributedContext`, the assignment of ranks to GPUs and the `DeviceMesh` domains (`base`, `dense`, `expert`, `metric` and your own).
-*   **[Horizontal Parallelism](./parallel/index.md)**: Replicate, FSDP, HSDP and expert parallelism over `DTensor` placements.
-*   **[Gradient Synchronization](./parallel/grad_sync.md)**: Gradient all-reduce in buckets, overlapped with the backward pass.
-*   **[Parameter Runtime Internals](./parallel/runtime_internals.md)**: Buckets, collectives and the memory budget of the parameter runtime.
+*   **[Horizontal Parallelism](./parallel/index.md)**: Replicate, FSDP, HSDP, expert parallelism and custom strategies over `DTensor` placements.
+*   **[Parameter Runtime](./parallel/runtime.md)**: DDP, FSDP and HSDP run from the pipeline program, without hooks.
+*   **[Parameter Runtime Internals](./parallel/runtime_internals.md)**: Buckets, collectives, the memory budget and the reductions of the pipeline program.
 *   **[Gradient Norm and Clipping](./parallel/grad_norm.md)**: The global gradient norm and clipping over parameters with mixed placements.
 *   **[Pipeline Parallelism](./pipelining/index.md)**: Pipeline stages, the schedules from GPipe to DualPipeV and how a model supports them.
 *   **[Pipelining Internals](./pipelining/internals.md)**: How the pipeline virtual machine runs programs, and how to write a new schedule.

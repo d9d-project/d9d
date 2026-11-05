@@ -1,4 +1,4 @@
-"""Horizontal parallelism: placing parameters as ``DTensor`` on a device mesh and keeping gradients consistent."""
+"""Horizontal parallelism: placing parameters as ``DTensor`` on a device mesh."""
 
 from .fully_sharded import parallelize_fsdp
 from .hybrid_sharded import parallelize_hsdp

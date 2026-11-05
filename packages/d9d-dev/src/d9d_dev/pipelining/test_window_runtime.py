@@ -3,13 +3,13 @@ from contextlib import nullcontext
 
 import pytest
 import torch
-from d9d.dist_context import DATA_SHARD_DIMS, DenseDomainConfig, DeviceMeshParameters
+from d9d.dist_context import DATA_SHARD_DIMS, DENSE_DOMAIN, DenseDim, DenseDomainConfig, DeviceMeshParameters
+from d9d.parallel import parallelize_hsdp
 from d9d.parallel.runtime import ParameterRuntime
 from d9d.pipelining.stage.windows import WindowChain, backward_chains, forward_chains
 from torch.distributed.tensor import distribute_tensor
 
 from d9d_dev.nn.helper.tolerances import forward_tolerance_for
-from d9d_dev.parallel.runtime_step import place_hsdp
 from d9d_dev.pipelining.window_models import _Revisited
 
 
@@ -22,7 +22,11 @@ def test_repeated_groups_match_global_gradients_after_rebinding(dist_ctx_factory
     )
     model = _Revisited().cuda().double()
     reference = copy.deepcopy(model)
-    place_hsdp(model, context)
+    parallelize_hsdp(
+        model,
+        context.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE],
+        shard_dim=DenseDim.DP_CP_SHARD,
+    )
     runtime = ParameterRuntime(gather_dims=DATA_SHARD_DIMS, bucket_size_mib=32)
     runtime.register_stage(0, model)
 

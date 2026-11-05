@@ -1,14 +1,17 @@
+from contextlib import nullcontext
+
 import pytest
 import torch
 import torch.distributed as dist
 from d9d.dist_context import DENSE_DOMAIN, DenseDim, DenseDomainConfig, DeviceMeshParameters
-from d9d.parallel import distribute_parameters
-from d9d.pipelining.api import mark_window
+from d9d.parallel import distribute_parameters, parallelize_hsdp
+from d9d.pipelining.api import mark_window, run_steps
+from d9d.pipelining.stage.windows import WindowChain, backward_chains, forward_chains
 from torch import nn
 from torch.distributed.tensor import DTensor, Shard, distribute_tensor
 
 from d9d_dev.nn.helper.tolerances import forward_tolerance_for
-from d9d_dev.parallel.runtime_step import MESHES, make_runtime, place_hsdp
+from d9d_dev.parallel.runtime_step import MESHES, make_runtime
 
 
 class _MixedWeights(nn.Module):
@@ -26,7 +29,8 @@ def _inputs(rank):
 
 
 def _distribute(model, dist_ctx):
-    place_hsdp(model, dist_ctx)
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE]
+    parallelize_hsdp(model, mesh=mesh, shard_dim=DenseDim.DP_CP_SHARD)
 
 
 def _backward(runtime, model, inputs):
@@ -575,6 +579,68 @@ def test_group_module_keeps_the_original_parameter_alias():
         runtime.unbind()
 
 
+class _TiedChain(nn.Module):
+    def __init__(self, hidden_size=64, num_layers=4):
+        super().__init__()
+        self.layers = nn.ModuleList(
+            nn.Linear(hidden_size, hidden_size, bias=False, device="cuda") for _ in range(num_layers)
+        )
+        self.head = nn.Linear(hidden_size, hidden_size, bias=False, device="cuda")
+        self.head.weight = self.layers[0].weight
+        for layer in self.layers:
+            mark_window(layer)
+        mark_window(self.head)
+
+    async def forward_steps(self, steps, inputs, shared):
+        for layer in self.layers:
+            inputs = await steps.enter(layer, inputs)
+            inputs = torch.tanh(layer(inputs))
+        inputs = await steps.enter(self.head, inputs)
+        return self.head(inputs)
+
+    def forward(self, inputs, shared=None):
+        return run_steps(self, inputs, shared)
+
+
+def _run_microbatches(runtime, model, microbatches):
+    for microbatch_index, inputs in enumerate(microbatches):
+        chain = WindowChain(model, 0, runtime)
+        chain.start_forward(inputs, None)
+        outputs = forward_chains([chain], runtime, 0, [nullcontext()])[0]
+        chain.start_backward([outputs.square().sum()], None)
+        backward_chains([chain], runtime, 0, microbatch_index == len(microbatches) - 1, [nullcontext()])
+    runtime.wait()
+
+
+@pytest.mark.distributed
+@pytest.mark.parametrize("mesh", MESHES)
+@pytest.mark.parametrize("memory_budget_bytes", [0, 2**30], ids=["floor", "kept"])
+def test_groups_match_one_device(dist_ctx_factory, mesh, memory_budget_bytes):
+    dist_ctx = dist_ctx_factory(mesh)
+    model = _TiedChain()
+    reference = _TiedChain()
+    reference.load_state_dict(model.state_dict())
+    _distribute(model, dist_ctx)
+    # Every rank draws the same inputs and runs its own slice of them.
+    inputs = torch.randn(dist.get_world_size(), 2, 4, 64, device="cuda")
+    runtime = make_runtime(memory_budget_bytes=memory_budget_bytes)
+    runtime.register_stage(0, model)
+    runtime.bind()
+    try:
+        runtime.zero_grad()
+        _run_microbatches(runtime, model, list(inputs[dist.get_rank()]))
+        for rank_inputs in inputs:
+            for microbatch in rank_inputs:
+                reference(microbatch).square().sum().backward()
+
+        tolerance = forward_tolerance_for(torch.float32)
+        for (name, param), expected in zip(model.named_parameters(), reference.parameters(), strict=True):
+            local = distribute_tensor(expected.grad, param.device_mesh, param.placements).to_local()
+            torch.testing.assert_close(param.grad.to_local(), local, atol=tolerance.atol, rtol=tolerance.rtol, msg=name)
+    finally:
+        runtime.unbind()
+
+
 @pytest.mark.distributed
 @pytest.mark.parametrize("mesh", MESHES)
 @pytest.mark.parametrize("after_reduction", [False, True])
@@ -610,5 +676,39 @@ def test_zero_grad_recovers_from_a_failed_backward(dist_ctx_factory, mesh, after
         weight = model.weight
         expected = distribute_tensor(reference.weight.grad, weight.device_mesh, weight.placements).to_local()
         torch.testing.assert_close(weight.grad.to_local(), expected)
+    finally:
+        runtime.unbind()
+
+
+@pytest.mark.distributed
+@pytest.mark.parametrize("training", [False, True])
+@pytest.mark.parametrize("prefetch", [False, True])
+def test_failed_region_releases_its_weights(dist_ctx_factory, training, prefetch):
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8, dense=DenseDomainConfig(data_parallel_shard=8)))
+    model = _TiedChain().requires_grad_(training)
+    _distribute(model, dist_ctx)
+    runtime = make_runtime()
+    runtime.register_stage(0, model)
+    runtime.bind(training=training)
+    try:
+        # Warm up the collective before measuring the memory of a region.
+        with runtime.group_weights(0, runtime.group_index(0, model.layers[0])):
+            pass
+        torch.cuda.synchronize()
+        before = torch.cuda.memory_allocated()
+
+        with (
+            pytest.raises(RuntimeError, match="Injected"),
+            runtime.group_weights(
+                0,
+                runtime.group_index(0, model.layers[0]),
+                next_group=runtime.group_index(0, model.layers[1]) if prefetch else None,
+            ),
+        ):
+            raise RuntimeError("Injected failure of a forward pass.")
+        if prefetch:
+            runtime.zero_grad()
+        torch.cuda.synchronize()
+        assert torch.cuda.memory_allocated() == before
     finally:
         runtime.unbind()

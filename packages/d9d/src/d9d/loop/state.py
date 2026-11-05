@@ -7,6 +7,7 @@ from d9d.data import DevicePackStream
 from d9d.dist_context import DistributedContext
 from d9d.metric.catalogue.container import ComposeMetric
 from d9d.optim import LRSchedulerProtocol, OptimizerProtocol
+from d9d.parallel.runtime import ParameterRuntime
 from d9d.rng import SeedScope
 
 from .component import (
@@ -133,11 +134,13 @@ class InferenceJobState(JobState):
         task: The specific inference task logic definition.
         task_operator: Executor for running forward passes.
         event_bus: The event bus for this inference job.
+        parameter_runtime: The runtime that gathers the weights of the model stages.
     """
 
     task: InferenceTask
     task_operator: InferenceTaskOperator
     event_bus: EventBus
+    parameter_runtime: ParameterRuntime
 
     def state_dict(self) -> dict[str, Any]:
         return {
