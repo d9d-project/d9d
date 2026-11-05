@@ -1,5 +1,6 @@
-from collections.abc import Mapping
-from typing import Generic, TypeVar, cast
+import dataclasses
+from collections.abc import Mapping, Sequence
+from typing import Any, Generic, TypeVar, cast
 
 import torch
 from torch import nn
@@ -16,7 +17,15 @@ from d9d.nn.head import (
     SplitLanguageModellingHead,
     TaskHead,
 )
-from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo, StageBoundary, TensorSpec
+from d9d.pipelining.api import (
+    ModuleSupportsPipelining,
+    ModuleSupportsSegments,
+    PipelineStageInfo,
+    StageBoundary,
+    StageSegment,
+    TensorSpec,
+    as_segments,
+)
 
 from .backbone import DecoderBackbone
 from .head import (
@@ -42,6 +51,53 @@ SINGLE_HEAD_PREFIX = "head."
 """FQN prefix of the task head in a single-head decoder (any ``DecoderWithHead``)."""
 
 
+@dataclasses.dataclass
+class _DecoderSegmentConstants(Generic[THeadShared]):
+    backbone: Any
+    head: THeadShared
+
+
+class _BackboneSegment(nn.Module):
+    def __init__(self, module: nn.Module):
+        """Constructs the ``_BackboneSegment`` object."""
+        super().__init__()
+        self._module = module
+
+    def forward(self, activations: Any, constants: _DecoderSegmentConstants[Any]) -> Any:
+        return self._module(activations, constants.backbone)
+
+
+class _HeadSegment(nn.Module):
+    def __init__(self, head: nn.Module):
+        """Constructs the ``_HeadSegment`` object."""
+        super().__init__()
+        self._head = head
+
+    def forward(self, activations: SequenceTransfer[torch.Tensor], constants: _DecoderSegmentConstants[Any]) -> Any:
+        return self._head(activations.hidden_states, constants.head)
+
+
+class _HeadsSegment(nn.Module):
+    def __init__(self, heads: Mapping[str, TaskHead]):
+        """Constructs the ``_HeadsSegment`` object."""
+        super().__init__()
+        self._heads = nn.ModuleDict(dict(heads))
+
+    def forward(
+        self,
+        activations: SequenceTransfer[torch.Tensor],
+        constants: _DecoderSegmentConstants[Mapping[str, Any]],
+    ) -> SequenceHeadsOutput[Any]:
+        return {name: head(activations.hidden_states, constants.head[name]) for name, head in self._heads.items()}
+
+
+def _backbone_segments(backbone: DecoderBackbone) -> list[StageSegment]:
+    return [
+        StageSegment(segment.name, _BackboneSegment(segment.module))
+        for segment in as_segments(cast(nn.Module, backbone)).stage_segments()
+    ]
+
+
 class DecoderWithHeads(
     nn.Module,
     ModuleLateInit,
@@ -51,6 +107,7 @@ class DecoderWithHeads(
         SequenceHeadsShared[THeadShared],
         SequenceHeadsOutput[THeadOutput],
     ],
+    ModuleSupportsSegments,
     Generic[TBackbone, THeadShared, THeadOutput],
 ):
     """Model that composes one decoder backbone with a mapping of prebuilt named task heads.
@@ -121,6 +178,27 @@ class DecoderWithHeads(
 
         return {name: head(model_outputs.hidden_states, shared.heads[name]) for name, head in self.heads.items()}
 
+    def prepare_segment_constants(
+        self, shared: SequenceHeadsShared[THeadShared]
+    ) -> _DecoderSegmentConstants[Mapping[str, THeadShared]]:
+        """Builds the constants of one microbatch.
+
+        Args:
+            shared: The backbone shared input plus the per-head shared inputs.
+
+        Returns:
+            The constants of the backbone segments and of the heads segment.
+        """
+        backbone = as_segments(cast(nn.Module, self.model)).prepare_segment_constants(shared.sequence)
+        return _DecoderSegmentConstants(backbone=backbone, head=shared.heads)
+
+    def stage_segments(self) -> Sequence[StageSegment]:
+        """Returns the segments of the backbone and, on the last stage, one segment with all heads."""
+        segments = _backbone_segments(self.model)
+        if self._stage.is_current_stage_last:
+            segments.append(StageSegment("heads", _HeadsSegment(self.heads)))
+        return segments
+
     def reset_parameters(self) -> None:
         """Resets the parameters of the backbone and of every head."""
         self.model.reset_parameters()
@@ -156,6 +234,7 @@ class DecoderWithHead(
         SequenceHeadShared[THeadShared],
         THeadOutput,
     ],
+    ModuleSupportsSegments,
     Generic[TBackbone, THead, THeadShared, THeadOutput],
 ):
     """Model that composes one decoder backbone with exactly one prebuilt task head.
@@ -214,6 +293,27 @@ class DecoderWithHead(
             return model_outputs
 
         return self.head(model_outputs.hidden_states, shared.head)
+
+    def prepare_segment_constants(
+        self, shared: SequenceHeadShared[THeadShared]
+    ) -> _DecoderSegmentConstants[THeadShared]:
+        """Builds the constants of one microbatch.
+
+        Args:
+            shared: The backbone shared input plus the head's shared input.
+
+        Returns:
+            The constants of the backbone segments and of the head segment.
+        """
+        backbone = as_segments(cast(nn.Module, self.model)).prepare_segment_constants(shared.sequence)
+        return _DecoderSegmentConstants(backbone=backbone, head=shared.head)
+
+    def stage_segments(self) -> Sequence[StageSegment]:
+        """Returns the segments of the backbone and, on the last stage, the head segment."""
+        segments = _backbone_segments(self.model)
+        if self._stage.is_current_stage_last:
+            segments.append(StageSegment("head", _HeadSegment(self.head)))
+        return segments
 
     def reset_parameters(self) -> None:
         """Resets the parameters of the backbone and of the head."""

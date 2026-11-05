@@ -3,7 +3,6 @@ from typing import cast
 
 import torch
 from torch import nn
-from torch.utils.checkpoint import checkpoint
 
 from d9d.nn import ModuleLateInit
 from d9d.nn.embedding import SplitTokenEmbeddings
@@ -12,13 +11,17 @@ from d9d.nn.normalization import RMSNorm
 from d9d.nn.positional import RotaryEmbeddingProvider, RotaryEmbeddingStyle
 from d9d.pipelining.api import (
     ModuleSupportsPipelining,
+    ModuleSupportsSegments,
     PipelineStageInfo,
     StageBoundary,
+    StageSegment,
     TensorSpec,
     distribute_layers_for_pipeline_stage,
+    run_segments,
 )
 
 from ..io import SequenceInput, SequenceShared, SequenceTransfer
+from ..segments import SequenceSegmentConstants, build_sequence_segments
 from .decoder_layer import Qwen3MoELayer
 from .params import Qwen3MoEParameters
 
@@ -29,6 +32,7 @@ class Qwen3MoEModel(
     ModuleSupportsPipelining[
         SequenceInput, SequenceTransfer[torch.Tensor], SequenceShared, SequenceTransfer[torch.Tensor]
     ],
+    ModuleSupportsSegments,
 ):
     """The Qwen3 Mixture-of-Experts (MoE) transformer decoder backbone.
 
@@ -132,41 +136,31 @@ class Qwen3MoEModel(
             The produced ``SequenceTransfer`` with the hidden states and, if enabled, the updated
                 snapshot.
         """
-        state_aggregator = create_hidden_states_aggregator(
-            self._hidden_states_snapshot_mode, shared.hidden_states_agg_mask
+        return run_segments(self, inputs, shared)
+
+    def prepare_segment_constants(self, shared: SequenceShared) -> SequenceSegmentConstants:
+        """Builds the constants of one microbatch.
+
+        Args:
+            shared: The backbone shared input.
+
+        Returns:
+            The RoPE embeddings and the snapshot aggregator.
+        """
+        return SequenceSegmentConstants(
+            position_embeddings=self.rope_provider(shared.position_ids),
+            aggregator=create_hidden_states_aggregator(
+                self._hidden_states_snapshot_mode, shared.hidden_states_agg_mask
+            ),
         )
 
-        if self._stage.is_current_stage_first:
-            first_inputs = cast(SequenceInput, inputs)
-            last_hidden_states = self.embed_tokens(first_inputs.input_ids)
-            hidden_states_snapshot = None
-            collected = state_aggregator.collect(last_hidden_states)
-        else:
-            transfer_inputs = cast(SequenceTransfer[torch.Tensor], inputs)
-            last_hidden_states = transfer_inputs.hidden_states
-            hidden_states_snapshot = transfer_inputs.hidden_states_snapshot
-            collected = ()
-
-        rope_params = self.rope_provider(shared.position_ids)
-
-        for decoder_layer_name in self._layers_iter:
-            decoder_layer = self.layers[decoder_layer_name]
-
-            if self._enable_checkpointing:
-                last_hidden_states = cast(
-                    torch.Tensor, checkpoint(decoder_layer, last_hidden_states, rope_params, use_reentrant=False)
-                )
-            else:
-                last_hidden_states = decoder_layer(last_hidden_states, rope_params)
-
-            collected += state_aggregator.collect(last_hidden_states)
-
-        if self._stage.is_current_stage_last:
-            last_hidden_states = self.norm(last_hidden_states)
-
-        return SequenceTransfer(
-            hidden_states=last_hidden_states,
-            hidden_states_snapshot=state_aggregator.pack(collected, hidden_states_snapshot),
+    def stage_segments(self) -> Sequence[StageSegment]:
+        """Returns the segments of this stage, in forward order."""
+        return build_sequence_segments(
+            embed_tokens=self.embed_tokens if self._stage.is_current_stage_first else None,
+            layers=[(name, self.layers[name]) for name in self._layers_iter],
+            norm=self.norm if self._stage.is_current_stage_last else None,
+            enable_checkpointing=self._enable_checkpointing,
         )
 
     def reset_parameters(self):

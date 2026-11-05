@@ -46,6 +46,17 @@ To use pipeline parallelism, your model implements `d9d.pipelining.api.ModuleSup
 
 The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* have the same dataclass type. So `pytree.tree_flatten` gives the same leaf order on both ends. Sender and receiver agree on the order by construction, and they need no handshake.
 
+### Segments
+
+A stage can also implement `ModuleSupportsSegments` and describe its forward pass as a chain of `StageSegment`s, e.g. one segment per decoder layer. Each segment has a name and an `nn.Module`. The module owns the parameters it uses and maps the previous activations and the microbatch constants to the next activations:
+
+*   **`prepare_segment_constants(shared)`**: Builds the constants of one microbatch that every segment receives, e.g. the position embeddings.
+*   **`stage_segments()`**: Returns the segments in forward order.
+
+A segment module can wrap the layers of the stage. The stage does not register it as a child, so checkpoint names stay the same. `stage_segments()` can return new segment modules on every call, but after materialization their names, order and parameters must stay the same.
+
+`run_segments(module, inputs, shared)` runs the segments in order, so a stage can use it as its `forward`. `as_segments(module)` treats a stage without segments as one segment. Code that runs a stage, such as a runtime that gathers the weights of each segment on its own, can cut the autograd graph between segments.
+
 ### Example
 
 Below is a skeleton of a Transformer-like model that supports d9d pipelining.

@@ -18,7 +18,7 @@ In d9d, you write standard `nn.Module` classes. You can use `nn.Linear`, `nn.RMS
 
 d9d avoids "uber-modules": large classes such as a `GenericTransformerBlock` that cover every architecture variant through dozens of flags. Examples of such variants are MoE vs. dense, pre-norm vs. post-norm and parallel attention.
 
-Instead, d9d composes each architecture explicitly, as Hugging Face Transformers does. The call stack of each model is distinct, so its logic is easy to trace.
+Instead, d9d composes each architecture explicitly, as Hugging Face Transformers does. Each model builds its own layers, so its logic is easy to trace. Models with the same chain of layers, such as Qwen3 Dense and Qwen3 MoE, share the code that describes this chain as [segments](../pipelining/index.md#segments).
 
 ### Pipelining-Aware Models
 
