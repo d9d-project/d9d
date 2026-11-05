@@ -3,6 +3,7 @@ DEP: 0012
 Title: Rework of DistributedContext
 Author: Maksim Afanasev @mrapplexz
 Type: Feature
+Implemented: #166
 ---
 
 # Rework of DistributedContext
