@@ -15,7 +15,10 @@ from d9d.pipelining.api import (
     PipelineStageInfo,
     StageBoundary,
     TensorSpec,
+    WindowSteps,
     distribute_layers_for_pipeline_stage,
+    mark_window,
+    run_steps,
 )
 
 from ..io import SequenceInput, SequenceShared, SequenceTransfer
@@ -87,6 +90,13 @@ class Qwen3MoEModel(
         self._hidden_states_snapshot_mode = hidden_states_snapshot_mode
         self._enable_checkpointing = enable_checkpointing
 
+        if stage.is_current_stage_first:
+            mark_window(self.embed_tokens)
+        for layer in self.layers.values():
+            mark_window(layer)
+        if stage.is_current_stage_last:
+            mark_window(self.norm)
+
         # Task heads read these dimensions from the backbone.
         self._hidden_size = params.layer.hidden_size
         self._split_vocab_size = params.split_vocab_size
@@ -132,41 +142,49 @@ class Qwen3MoEModel(
             The produced ``SequenceTransfer`` with the hidden states and, if enabled, the updated
                 snapshot.
         """
-        state_aggregator = create_hidden_states_aggregator(
-            self._hidden_states_snapshot_mode, shared.hidden_states_agg_mask
-        )
+        return run_steps(self, inputs, shared)
 
+    async def forward_steps(
+        self,
+        steps: WindowSteps,
+        inputs: SequenceInput | SequenceTransfer[torch.Tensor],
+        shared: SequenceShared,
+    ) -> SequenceTransfer[torch.Tensor]:
+        """Runs the backbone, exposing its live state before each parameter group.
+
+        Args:
+            steps: The execution boundaries of this forward.
+            inputs: Token ids on the first stage, or the incoming transfer.
+            shared: Position ids and the hidden-state aggregation mask.
+
+        Returns:
+            The stage output and its hidden-state snapshot.
+        """
+        rope = self.rope_provider(shared.position_ids)
+        aggregator = create_hidden_states_aggregator(self._hidden_states_snapshot_mode, shared.hidden_states_agg_mask)
         if self._stage.is_current_stage_first:
-            first_inputs = cast(SequenceInput, inputs)
-            last_hidden_states = self.embed_tokens(first_inputs.input_ids)
-            hidden_states_snapshot = None
-            collected = state_aggregator.collect(last_hidden_states)
+            tokens = await steps.enter(self.embed_tokens, cast(SequenceInput, inputs))
+            hidden = self.embed_tokens(tokens.input_ids)
+            snapshot = None
+            collected = aggregator.collect(hidden)
         else:
-            transfer_inputs = cast(SequenceTransfer[torch.Tensor], inputs)
-            last_hidden_states = transfer_inputs.hidden_states
-            hidden_states_snapshot = transfer_inputs.hidden_states_snapshot
-            collected = ()
+            transfer = cast(SequenceTransfer[torch.Tensor], inputs)
+            hidden, snapshot, collected = transfer.hidden_states, transfer.hidden_states_snapshot, ()
 
-        rope_params = self.rope_provider(shared.position_ids)
-
-        for decoder_layer_name in self._layers_iter:
-            decoder_layer = self.layers[decoder_layer_name]
-
+        for name in self._layers_iter:
+            layer = self.layers[name]
+            hidden, snapshot, collected = await steps.enter(layer, (hidden, snapshot, collected))
             if self._enable_checkpointing:
-                last_hidden_states = cast(
-                    torch.Tensor, checkpoint(decoder_layer, last_hidden_states, rope_params, use_reentrant=False)
-                )
+                hidden = cast(torch.Tensor, checkpoint(layer, hidden, rope, use_reentrant=False))
             else:
-                last_hidden_states = decoder_layer(last_hidden_states, rope_params)
-
-            collected += state_aggregator.collect(last_hidden_states)
+                hidden = layer(hidden, rope)
+            collected = collected + aggregator.collect(hidden)
 
         if self._stage.is_current_stage_last:
-            last_hidden_states = self.norm(last_hidden_states)
-
-        return SequenceTransfer(
-            hidden_states=last_hidden_states,
-            hidden_states_snapshot=state_aggregator.pack(collected, hidden_states_snapshot),
+            hidden, snapshot, collected = await steps.enter(self.norm, (hidden, snapshot, collected))
+            hidden = self.norm(hidden)
+        return await steps.finish(
+            SequenceTransfer(hidden_states=hidden, hidden_states_snapshot=aggregator.pack(collected, snapshot))
         )
 
     def reset_parameters(self):
