@@ -260,7 +260,7 @@ def dim_size(self, domain: DeviceMeshDomain[DimT], dim: DimT) -> int:
     """Returns the number of ranks along a dimension of the mesh of a domain, 1 in a job without parallelism."""
 ```
 
-The context computes both from the dimensions of the domain and the global rank, with the same row-major order as the mesh. So they need no process group and agree with `mesh_for()`. Code that only asks where the rank is uses them. Code that communicates checks `is_distributed` before it calls `mesh_for()`.
+`coordinate()` reads the coordinate from the mesh of the domain, and `dim_size()` reads the size from the dimensions of the domain. In a job without parallelism, they return 0 and 1, so code that only asks where the rank is uses them without branches. Code that communicates checks `is_distributed` before it calls `mesh_for()`.
 
 ### Closing
 
@@ -269,6 +269,7 @@ A context owns process groups, so it closes like a file. `DistributedContext` ge
 *   **What it closes**: `close()` destroys the groups that the context created. It destroys the default process group only if the context created it.
 *   **Once**: A second `close()` does nothing. After `close()`, the members that communicate raise a `RuntimeError`.
 *   **Owner**: The code that calls `init_dist_context()` closes the context. Jobs take the context and never close it.
+*   **On an error**: If the `with` block raises, the context marks itself closed but keeps its groups. Destroying a group waits for the other ranks, which can wait in a collective with this rank, so the job would hang until the timeout. The process exits with the error, and the launcher stops the other ranks. torchtitan also destroys its groups only after a successful run.
 
 ### Logging
 
