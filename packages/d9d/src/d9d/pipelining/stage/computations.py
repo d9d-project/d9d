@@ -70,6 +70,10 @@ class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput
 
         self._cache[microbatch_index] = ForwardCache(inputs=inputs, outputs=output)
 
+    def reset(self):
+        """Releases cached forward inputs and outputs."""
+        self._cache.clear()
+
     def get_outputs(self, microbatch_index: int) -> TStageTransfer | TPipelineOutput:
         """Retrieves cached outputs for a specific microbatch without removing them.
 

@@ -1,3 +1,5 @@
+import weakref
+
 import pytest
 import torch
 from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
@@ -55,7 +57,7 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
     for m in full_stage_modules:
         m.requires_grad_(False)
 
-    ref_outputs = [
+    expected_outputs = [
         _do_standard_forward(full_stage_modules, x, y) for x, y in zip(microbatch_xs, microbatch_ys, strict=True)
     ]
 
@@ -66,9 +68,11 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
         return full_stage_modules[stage_info.current_stage]
 
     collected_results: dict[int, torch.Tensor] = {}
+    output_refs: list[weakref.ref[torch.Tensor]] = []
 
     def _result_fn(microbatch_outputs: _Transfer, microbatch_idx: int):
         collected_results[microbatch_idx] = microbatch_outputs.x.detach().clone()
+        output_refs.append(weakref.ref(microbatch_outputs.x))
 
     schedule_info, _ = build_schedule(
         pp_mesh=dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"],
@@ -76,20 +80,23 @@ def test_inference_e2e(dist_ctx_factory, microbatch_sizes: list[int]):
         model_provider=_model_provider,
     )
 
-    inputs_microbatches = tuple(_Transfer(x=x) for x in microbatch_xs)
-    shared_microbatches = tuple(_Shared(y=y) for y in microbatch_ys)
+    # The second pack can be smaller, so it does not overwrite every cached microbatch of the first one.
+    for pack_size in (len(microbatch_sizes), 1):
+        collected_results.clear()
+        schedule_info.schedule.step(
+            inputs_microbatches=tuple(_Transfer(x=x) for x in microbatch_xs[:pack_size]),
+            shared_microbatches=tuple(_Shared(y=y) for y in microbatch_ys[:pack_size]),
+            handler=FunctionStepHandler(_result_fn),
+        )
 
-    schedule_info.schedule.step(
-        inputs_microbatches=inputs_microbatches,
-        shared_microbatches=shared_microbatches,
-        handler=FunctionStepHandler(_result_fn),
-    )
+        if pp_mesh.get_local_rank() == pp_mesh.size() - 1:
+            assert len(collected_results) == pack_size
+            for idx in range(pack_size):
+                assert collected_results[idx].shape[0] == microbatch_sizes[idx]
+                torch.testing.assert_close(collected_results[idx], expected_outputs[idx])
 
-    if pp_mesh.get_local_rank() == pp_mesh.size() - 1:
-        assert len(collected_results) == len(microbatch_sizes)
-        for idx, (ref, size) in enumerate(zip(ref_outputs, microbatch_sizes, strict=True)):
-            assert collected_results[idx].shape[0] == size
-            assert torch.allclose(collected_results[idx], ref)
+        # A step must not keep its outputs alive after it ends.
+        assert all(output_ref() is None for output_ref in output_refs)
 
     for this_stage_i in this_rank_stages:
         assert full_stage_modules[this_stage_i].w1.grad is None
