@@ -8,7 +8,9 @@ The `d9d.dist_context` package holds the distributed state of a process. Its `Di
 
 `init_dist_context()` creates the context from `DeviceMeshParameters`, once per process. In a distributed job, every rank calls it with the same arguments. It takes the world size and the rank from the default process group if one exists, and otherwise from `WORLD_SIZE` and `RANK` of the launcher. Without a launcher, the job has one rank and runs with `python`. The product of the four parallelism degrees must equal the world size.
 
-The context owns its process groups, so it closes like a file. The code that calls `init_dist_context()` closes the context, usually with a `with` block. `close()` destroys the groups that the context created, and the default process group only if the context created it. If the block raises, the context keeps its groups, so the job fails instead of hanging.
+`init_dist_context()` is a context manager, and the context is valid only inside its `with` block. On exit, it destroys the groups that it created, including the default process group. If the block raises, the groups stay, so the job fails instead of hanging.
+
+In a distributed job, the block also replaces the `DTensor` RNG tracker of the process. The default tracker of PyTorch broadcasts the generator state of rank 0, which would overwrite the seeds of the other pipeline stages. The previous tracker comes back on exit, also after an error.
 
 A job takes the context and never closes it. `TrainingConfigurator` and `InferenceConfigurator` take it as `dist_context`, so one context can serve several jobs of a process, e.g. training and then evaluation.
 

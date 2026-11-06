@@ -12,7 +12,7 @@ Implemented: #166
 
 `DistributedContext` binds each rank to its own GPU and builds a fixed set of domains, each with its own process groups. So a job cannot run several ranks on one GPU or add a domain.
 
-This DEP creates the context in a function, whose caller owns and closes it. The context can assign several ranks to one GPU. One base mesh holds the four degrees of parallelism, and every other domain declares how it splits the same ranks differently. The context creates the groups of each distinct partition once.
+This DEP creates the context in a context manager. The context can assign several ranks to one GPU. One base mesh holds the four degrees of parallelism, and every other domain declares how it splits the same ranks differently. The context creates the groups of each distinct partition once.
 
 ## Motivation
 
@@ -56,20 +56,24 @@ Issue [#107](https://github.com/d9d-project/d9d/issues/107) tracks this rework.
 This DEP introduces `init_dist_context()`. It replaces `DeviceMeshParameters.build()` and the public constructor of `DistributedContext`, because a configuration must not build runtime objects. Like `init_device_mesh()` of PyTorch, it initializes the distributed state of the process.
 
 ```python
+@contextmanager
 def init_dist_context(
     params: DeviceMeshParameters,
     extra_domains: Sequence[DeviceMeshDomain] = (),
-) -> DistributedContext:
-    """Builds the distributed context of this process and sets its current GPU.
+) -> Generator[DistributedContext, None, None]:
+    """Builds the distributed context of this process for the ``with`` block and sets its current GPU.
 
     In a distributed job, every rank must call it with the same ``params`` and the same ``extra_domains``.
+
+    On exit, it restores the ``DTensor`` RNG tracker. If the block did not raise, it also destroys the process groups
+    that it created, including the default one.
 
     Args:
         params: The parallelism degrees and the sections of the built-in domains.
         extra_domains: The domains to build after the built-in domains.
 
-    Returns:
-        The distributed context. The caller must close it.
+    Yields:
+        The distributed context.
 
     Raises:
         ValueError: If the degrees do not match the world size or the GPUs, if a domain is invalid, or if the
@@ -231,14 +235,13 @@ A domain is generic over a `StrEnum` of the names of its dimensions, e.g. `Devic
 
 ### The Contract of the Context
 
-`DistributedContext` answers four kinds of questions. Only communication needs process groups.
+`DistributedContext` answers three kinds of questions. Only communication needs process groups.
 
 | Kind | Members | In a single-process job |
 |:-----|:--------|:------------------------|
 | Rank | `rank`, `world_size`, `is_main_process`, `local_rank`, `is_local_main_process`, `current_device` | Rank 0 of 1 |
 | Coordinates | `coordinate()`, `dim_size()` | Coordinate 0, size 1 |
 | Communication | `is_distributed`, `mesh_for()`, `wait_world()`, `main_process_first()`, `local_main_process_first()`, `set_timeout()` | `is_distributed` is false, `mesh_for()` raises with a message that the job has no parallelism, `set_timeout()` does nothing, the others only wait for the GPU |
-| Lifecycle | `close()`, `__enter__()`, `__exit__()` | Nothing to destroy |
 
 `is_distributed` tells whether the job has more than one rank. This DEP introduces `coordinate()` and `dim_size()`:
 
@@ -265,12 +268,12 @@ def dim_size(self, domain: DeviceMeshDomain[DimT], dim: DimT) -> int:
 
 ### Closing
 
-A context owns process groups, so it closes like a file. `DistributedContext` gets `close()` and works as a context manager.
+`init_dist_context()` acquires process groups and the `DTensor` RNG tracker of the process, so it is a context manager. `DistributedContext` holds only data.
 
-*   **What it closes**: `close()` destroys the groups that the context created. It destroys the default process group only if the context created it.
-*   **Once**: A second `close()` does nothing. After `close()`, the members that communicate raise a `RuntimeError`.
-*   **Owner**: The code that calls `init_dist_context()` closes the context. Jobs take the context and never close it.
-*   **On an error**: If the `with` block raises, the context marks itself closed but keeps its groups. Destroying a group waits for the other ranks, which can wait in a collective with this rank, so the job would hang until the timeout. The process exits with the error, and the launcher stops the other ranks. torchtitan also destroys its groups only after a successful run.
+*   **On exit**: It destroys the groups that it created, including the default one, and restores the previous tracker.
+*   **Owner**: Jobs take the context and never close it. Code that keeps several contexts, such as a test fixture, enters them in an `ExitStack`.
+*   **On an error**: The tracker comes back, but the groups stay. Destroying a group waits for ranks that can hang in a collective with this rank. The process exits with the error, and the launcher stops the other ranks. torchtitan also destroys its groups only after a successful run.
+*   **After exit**: The context does not check that it is used inside its block. A collective on its destroyed groups fails in PyTorch.
 
 ### Logging
 
@@ -341,8 +344,8 @@ CUDA_VISIBLE_DEVICES=0,1 NCCL_MULTI_RANK_GPU_ENABLE=1 torchrun --nproc-per-node 
 ## Backward Compatibility
 
 *   **Configuration**: `data_parallel_replicate` and `data_parallel_shard` become `data_parallel` and `dense.data_parallel_shard`, e.g. HSDP with `data_parallel_replicate: 2` and `data_parallel_shard: 4` becomes `data_parallel: 8` with `dense.data_parallel_shard: 4`. Context parallelism changes the same way. Pure DDP with `data_parallel_replicate: 8` becomes `data_parallel: 8`. `expert_parallel` moves to `expert.expert_parallel`, and a job with experts must set it, e.g. to 1 for experts without sharding.
-*   **Building the context**: `params.build()` and `DistributedContext(params, log_level)` become `init_dist_context(params)`. The caller closes the context.
-*   **Jobs**: `TrainingConfigurator(mesh=..., ...)` becomes `TrainingConfigurator(dist_context=..., ...)`, and the same for `InferenceConfigurator`. A job script creates the context in a `with` block. A script that never closes its context keeps working, with the PyTorch warning at exit as before.
+*   **Building the context**: `params.build()` and `DistributedContext(params, log_level)` become `with init_dist_context(params) as dist_context:`.
+*   **Jobs**: `TrainingConfigurator(mesh=..., ...)` becomes `TrainingConfigurator(dist_context=..., ...)`, and the same for `InferenceConfigurator`. A job script creates the context in a `with` block.
 *   **Domain names**: `mesh_for("dense")` becomes `mesh_for(DENSE_DOMAIN)`. Code that passes the constants needs no change. A domain typed as `str` becomes `DeviceMeshDomain`.
 *   **Dimension names**: A string such as `mesh["dp_replicate"]` can stay, but `DenseDim.DP_REPLICATE` lets the type checker check it.
 *   **Regular and batch domains**: `REGULAR_DOMAIN` and `BATCH_DOMAIN` become `BASE_DOMAIN`. Code that slices `dp_replicate`, `dp_shard`, `cp_shard` or `cp_replicate` from the regular mesh slices the dense mesh instead.

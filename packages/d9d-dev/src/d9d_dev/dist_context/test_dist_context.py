@@ -1,3 +1,4 @@
+import contextlib
 from enum import StrEnum
 from pathlib import Path
 
@@ -108,10 +109,6 @@ def test_local_context():
         ctx.set_timeout(10.0)
         ctx.wait_world()
 
-    ctx.close()
-    with pytest.raises(RuntimeError, match="closed"):
-        ctx.wait_world()
-
 
 @pytest.fixture
 def restore_current_gpu():
@@ -144,8 +141,8 @@ def test_gpu_assignment(monkeypatch, restore_current_gpu, local_world_size, loca
         monkeypatch.setenv("LOCAL_WORLD_SIZE", str(local_world_size))
 
     if isinstance(expected, str):
-        with pytest.raises(ValueError, match=expected):
-            init_dist_context(DeviceMeshParameters())
+        with pytest.raises(ValueError, match=expected), init_dist_context(DeviceMeshParameters()):
+            pass
         return
     with init_dist_context(DeviceMeshParameters()) as ctx:
         assert ctx.local_rank == local_rank
@@ -169,8 +166,8 @@ def test_gpu_assignment(monkeypatch, restore_current_gpu, local_world_size, loca
     ],
 )
 def test_init_validation(params, extra_domains, match):
-    with pytest.raises(ValueError, match=match):
-        init_dist_context(params, extra_domains)
+    with pytest.raises(ValueError, match=match), init_dist_context(params, extra_domains):
+        pass
 
 
 @pytest.mark.distributed
@@ -261,23 +258,22 @@ def test_inconsistent_domains(dist_ctx_factory):
     extra_domains = (DP_CP_DOMAIN,) if ctx.is_main_process else ()
 
     # Every rank raises, none hangs in the group creation.
-    with pytest.raises(ValueError, match="other domains than rank 0"):
-        init_dist_context(DeviceMeshParameters(data_parallel=8), extra_domains)
+    with (
+        pytest.raises(ValueError, match="other domains than rank 0"),
+        init_dist_context(DeviceMeshParameters(data_parallel=8), extra_domains),
+    ):
+        pass
 
 
 @pytest.mark.distributed
-def test_close_keeps_foreign_default_group():
-    ctx = init_dist_context(DeviceMeshParameters(data_parallel=2, context_parallel=4))
-    group = ctx.mesh_for(BASE_DOMAIN).get_group(BaseDim.CP)
-    ctx.close()
-    ctx.close()
+def test_exit_keeps_foreign_default_group():
+    with init_dist_context(DeviceMeshParameters(data_parallel=2, context_parallel=4)) as ctx:
+        group = ctx.mesh_for(BASE_DOMAIN).get_group(BaseDim.CP)
 
     assert dist.is_initialized()
     # A destroyed group is no longer registered.
     with pytest.raises(KeyError):
         dist.get_process_group_ranks(group)
-    with pytest.raises(RuntimeError, match="closed"):
-        ctx.mesh_for(BASE_DOMAIN)
 
 
 @pytest.mark.distributed
@@ -293,9 +289,22 @@ def test_error_in_block_keeps_groups():
     value = torch.ones(1, device="cuda")
     dist.all_reduce(value, group=group)
     torch.testing.assert_close(value, torch.full((1,), 4.0, device="cuda"))
-    with pytest.raises(RuntimeError, match="closed"):
-        ctx.mesh_for(BASE_DOMAIN)
     dist.destroy_process_group(group)
+
+
+@pytest.mark.distributed
+@pytest.mark.parametrize("raises", [False, True])
+def test_exit_restores_dtensor_rng_tracker(raises):
+    dtensor_random = torch.distributed.tensor._random
+    previous = dtensor_random._rng_tracker
+
+    with contextlib.suppress(RuntimeError), init_dist_context(DeviceMeshParameters(data_parallel=8)):
+        assert isinstance(dtensor_random._rng_tracker, dtensor_random.OffsetBasedRNGTracker)
+        assert dtensor_random._rng_tracker is not previous
+        if raises:
+            raise RuntimeError("error in the block")
+
+    assert dtensor_random._rng_tracker is previous
 
 
 @pytest.mark.distributed

@@ -1,6 +1,7 @@
 import os
 import tempfile
 from collections.abc import Callable, Generator, Sequence
+from contextlib import ExitStack
 from pathlib import Path
 from typing import cast
 
@@ -32,18 +33,17 @@ DistContextFactory = Callable[..., DistributedContext]
 def dist_ctx_factory(default_process_group) -> Generator[DistContextFactory, None, None]:
     cache: dict[tuple[DeviceMeshParameters, tuple[DeviceMeshDomain, ...]], DistributedContext] = {}
 
-    def _get_context(
-        params: DeviceMeshParameters, extra_domains: Sequence[DeviceMeshDomain] = ()
-    ) -> DistributedContext:
-        key = (params, tuple(extra_domains))
-        if key not in cache:
-            cache[key] = init_dist_context(params, extra_domains)
-        return cache[key]
+    with ExitStack() as stack:
 
-    yield _get_context
+        def _get_context(
+            params: DeviceMeshParameters, extra_domains: Sequence[DeviceMeshDomain] = ()
+        ) -> DistributedContext:
+            key = (params, tuple(extra_domains))
+            if key not in cache:
+                cache[key] = stack.enter_context(init_dist_context(params, extra_domains))
+            return cache[key]
 
-    for context in cache.values():
-        context.close()
+        yield _get_context
 
 
 @pytest.fixture

@@ -1,6 +1,7 @@
 import math
 import os
-from collections.abc import Sequence
+from collections.abc import Generator, Sequence
+from contextlib import contextmanager, nullcontext
 from typing import cast
 
 import torch
@@ -101,15 +102,21 @@ def _create_group(key: _PartitionKey, world_size: int) -> dist.ProcessGroup:
     return group
 
 
-def _create_dtensor_rng_tracker(mesh: DeviceMesh):
+@contextmanager
+def _dtensor_rng_tracker(mesh: DeviceMesh) -> Generator[None, None, None]:
     # Without this tracker, the first DTensor random op creates one that broadcasts the generator state of rank 0
     # and overwrites the seeds of the other pipeline stages. Stopgap: PyTorch has no public API to create it without
     # the broadcast. The tracker takes only the device type and the global rank from the mesh, so any mesh with all
     # the ranks works.
     dtensor_random = torch.distributed.tensor._random  # noqa: SLF001 - no public API
+    previous = dtensor_random._rng_tracker  # noqa: SLF001 - no public API
     dtensor_random._rng_tracker = dtensor_random.OffsetBasedRNGTracker(  # noqa: SLF001 - no public API
         mesh, run_state_sync=False
     )
+    try:
+        yield
+    finally:
+        dtensor_random._rng_tracker = previous  # noqa: SLF001 - no public API
 
 
 def _build_meshes(
@@ -132,20 +139,24 @@ def _build_meshes(
     return meshes, created
 
 
+@contextmanager
 def init_dist_context(
     params: DeviceMeshParameters,
     extra_domains: Sequence[DeviceMeshDomain] = (),
-) -> DistributedContext:
-    """Builds the distributed context of this process and sets its current GPU.
+) -> Generator[DistributedContext, None, None]:
+    """Builds the distributed context of this process for the ``with`` block and sets its current GPU.
 
     In a distributed job, every rank must call it with the same ``params`` and the same ``extra_domains``.
+
+    On exit, it restores the ``DTensor`` RNG tracker. If the block did not raise, it also destroys the process groups
+    that it created, including the default one.
 
     Args:
         params: The parallelism degrees and the sections of the built-in domains.
         extra_domains: The domains to build after the built-in domains.
 
-    Returns:
-        The distributed context. The caller must close it.
+    Yields:
+        The distributed context.
 
     Raises:
         ValueError: If the degrees do not match the world size or the GPUs, if a domain is invalid, or if the
@@ -175,17 +186,26 @@ def init_dist_context(
 
     if is_distributed:
         meshes, groups = _build_meshes(domain_dims, world_size)
-        _create_dtensor_rng_tracker(meshes[BASE_DOMAIN])
     else:
         meshes, groups = {}, []
 
-    return DistributedContext(
-        rank=rank,
-        world_size=world_size,
-        local_rank=local_rank,
-        device=device,
-        domain_dims=domain_dims,
-        meshes=meshes,
-        groups=groups,
-        owns_default_group=owns_default_group,
-    )
+    with _dtensor_rng_tracker(meshes[BASE_DOMAIN]) if is_distributed else nullcontext():
+        yield DistributedContext(
+            rank=rank,
+            world_size=world_size,
+            local_rank=local_rank,
+            device=device,
+            domain_dims=domain_dims,
+            meshes=meshes,
+            groups=groups,
+        )
+
+    # Reached only if the block did not raise: destroying a group waits for ranks that can hang in a collective.
+    # The script can call destroy_process_group(), which destroys all groups.
+    if not dist.is_initialized():
+        return
+    # Reverse order, as destroy_process_group() does: ncclCommAbort() is collective in some NCCL versions.
+    for group in reversed(groups):
+        dist.destroy_process_group(group)
+    if owns_default_group:
+        dist.destroy_process_group()
