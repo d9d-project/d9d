@@ -23,32 +23,33 @@ class HiddenStatesAggregatorMean(BaseHiddenStatesAggregator):
                 Shape: ``(batch, seq_len)``.
         """
         self._agg_mask = agg_mask
-        self._collected_states: list[torch.Tensor] = []
 
-    def add_hidden_states(self, hidden_states: torch.Tensor) -> None:
-        """Computes the masked mean of the hidden states and stores it.
+    def collect(self, hidden_states: torch.Tensor) -> tuple[torch.Tensor, ...]:
+        """Computes the masked mean of the hidden states.
 
         Args:
             hidden_states: Hidden states to average. Shape: ``(batch, seq_len, hidden_size)``.
-        """
-        agg = _aggregate_hidden_states(hidden_states=hidden_states, agg_mask=self._agg_mask)
-        self._collected_states.append(agg)
 
-    def pack_with_snapshot(self, snapshot: torch.Tensor | None) -> torch.Tensor | None:
-        """Stacks the collected means after the snapshot and clears the collected means.
+        Returns:
+            A tuple with one tensor, the mean. Shape: ``(batch, hidden_size)``.
+        """
+        return (_aggregate_hidden_states(hidden_states=hidden_states, agg_mask=self._agg_mask),)
+
+    def pack(self, collected: tuple[torch.Tensor, ...], snapshot: torch.Tensor | None) -> torch.Tensor | None:
+        """Stacks the collected means after the snapshot.
 
         Args:
+            collected: The collected means, in order.
             snapshot: Previous means to prepend, or ``None``. Shape: ``(num_snapshot_means, batch, hidden_size)``.
 
         Returns:
             The snapshot followed by the stacked collected means, or only the snapshot if nothing was collected.
             Shape: ``(num_means, batch, hidden_size)``.
         """
-        if len(self._collected_states) == 0:
+        if len(collected) == 0:
             return snapshot
 
-        stacked = torch.stack(self._collected_states, dim=0)
-        self._collected_states.clear()
+        stacked = torch.stack(collected, dim=0)
         if snapshot is not None:
             stacked = torch.cat([snapshot, stacked], dim=0)
         return stacked
