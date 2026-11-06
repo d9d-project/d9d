@@ -2,12 +2,13 @@ import pytest
 import torch
 import torch.distributed as dist
 from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
-from d9d.models import DecoderForCausalLM
-from d9d.models.qwen3_dense import Qwen3DenseModel
+from d9d.models import DecoderForCausalLM, parallelize_causal_lm_head
+from d9d.models.qwen3_dense import Qwen3DenseModel, parallelize_qwen3_dense_model
 from d9d.models.qwen3_moe import (
     Qwen3MoELayerParameters,
     Qwen3MoEModel,
     Qwen3MoEParameters,
+    parallelize_qwen3_moe_model,
 )
 from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
 from d9d.pipelining.api import PipelineStageInfo
@@ -21,8 +22,8 @@ from d9d.pipelining.factory import (
     build_schedule,
 )
 
-from d9d_dev.nn.helper.tolerances import forward_tolerance_for
-from d9d_dev.parallel.runtime_step import PARAMS, batches, global_weight, local, make_runtime, place_hsdp, shard_of
+from d9d_dev.nn.helper.tolerances import BF16_REORDERED_SUM_TOLERANCE, forward_tolerance_for
+from d9d_dev.parallel.runtime_step import PARAMS, batches, global_weight, local, make_runtime, shard_of
 from d9d_dev.pipelining.step_handler import FunctionStepHandler
 
 _MOE_PARAMS = Qwen3MoEParameters(
@@ -79,7 +80,10 @@ def _run(dist_ctx, schedule_config, checkpointing, kind="dense"):
             model = DecoderForCausalLM(backbone, stage)
             # DeepEP supports bf16 hidden states only.
             model = model.bfloat16() if kind == "moe" else model
-        place_hsdp(model, dist_ctx)
+        parallelize = parallelize_qwen3_moe_model if kind == "moe" else parallelize_qwen3_dense_model
+        parallelize(dist_ctx, model.model, stage)
+        if stage.is_current_stage_last:
+            parallelize_causal_lm_head(model.head, dist_ctx)
         model.to_empty(device="cuda")
         with torch.no_grad():
             model.reset_parameters()
@@ -115,7 +119,8 @@ def _run(dist_ctx, schedule_config, checkpointing, kind="dense"):
 def _assert_matches_one_gpu(dist_ctx, models, kind, checkpointing, bf16):
     pipeline_ranks = dist_ctx.mesh_for(REGULAR_DOMAIN)["pp"].size()
     expected = _one_gpu_gradients(dist.get_world_size() // pipeline_ranks, kind, checkpointing, bf16=bf16)
-    tolerance = forward_tolerance_for(torch.bfloat16 if bf16 else torch.float32)
+    # bf16 sums the gradients of the ranks in another order than one GPU.
+    tolerance = BF16_REORDERED_SUM_TOLERANCE if bf16 else forward_tolerance_for(torch.float32)
     for model in models.values():
         for name, param in model.named_parameters():
             # The factor is the scale that _run() applies.
@@ -162,6 +167,23 @@ def test_runtime_matches_one_gpu(dist_ctx_factory, mesh, schedule_config, checkp
     _assert_matches_one_gpu(dist_ctx, models, "dense", checkpointing, bf16=False)
 
 
+@pytest.mark.distributed
+@pytest.mark.parametrize(
+    "mesh",
+    [
+        DeviceMeshParameters(data_parallel_replicate=8, expert_parallel=8),
+        DeviceMeshParameters(data_parallel_shard=8, expert_parallel=2),
+        DeviceMeshParameters(data_parallel_replicate=2, data_parallel_shard=4, expert_parallel=8),
+        DeviceMeshParameters(pipeline_parallel=2, data_parallel_shard=4, expert_parallel=4),
+    ],
+)
+@pytest.mark.parametrize("checkpointing", [False, True])
+def test_moe_matches_one_gpu(dist_ctx_factory, mesh, checkpointing):
+    dist_ctx = dist_ctx_factory(mesh)
+    models = _run(dist_ctx, PipelineScheduleGPipeConfig(), checkpointing, kind="moe")
+    _assert_matches_one_gpu(dist_ctx, models, "moe", checkpointing, bf16=True)
+
+
 def _two_steps(dist_ctx, runtime):
     """Runs a step with wrong weights, restores them, and runs the step to check."""
     models = {}
@@ -170,7 +192,9 @@ def _two_steps(dist_ctx, runtime):
         backbone = Qwen3DenseModel(PARAMS, stage, HiddenStatesAggregationMode.no, False)
         with torch.device("meta"):
             model = DecoderForCausalLM(backbone, stage)
-        place_hsdp(model, dist_ctx)
+        parallelize_qwen3_dense_model(dist_ctx, model.model, stage)
+        if stage.is_current_stage_last:
+            parallelize_causal_lm_head(model.head, dist_ctx)
         model.to_empty(device="cuda")
         with torch.no_grad():
             model.reset_parameters()

@@ -2,7 +2,9 @@ import copy
 
 import pytest
 import torch
+from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
 from d9d.optim.stochastic import StochasticAdamW
+from torch.distributed.tensor import Replicate, Shard, distribute_tensor
 
 
 @pytest.mark.local
@@ -70,6 +72,9 @@ def test_reproducibility_and_state_dict(state_dtype, grad_dtype):
     optim2.load_state_dict(state_dict)
 
     assert (optim1._generator.get_state() == optim2._generator.get_state()).all()
+    for key in ("exp_avg", "exp_avg_sq"):
+        assert optim2.state[param2][key].dtype == state_dtype
+        assert torch.equal(optim1.state[param1][key], optim2.state[param2][key])
 
     param1.grad = grad_step2.clone()
     param2.grad = grad_step2.clone()
@@ -140,3 +145,36 @@ def test_rounding_noise_without_generator_follows_default_generator():
 
     assert torch.equal(results[0], results[1])
     assert not torch.equal(results[0], results[2])
+
+
+@pytest.mark.distributed
+@pytest.mark.parametrize(
+    "mesh_params",
+    [
+        DeviceMeshParameters(data_parallel_shard=8),
+        DeviceMeshParameters(data_parallel_replicate=8),
+        DeviceMeshParameters(data_parallel_replicate=2, data_parallel_shard=4),
+    ],
+)
+def test_load_preserves_fp32_distributed_moments(dist_ctx_factory, mesh_params):
+    context = dist_ctx_factory(mesh_params)
+    mesh = context.mesh_for(DENSE_DOMAIN)["dp_replicate", "dp_cp_shard", "cp_replicate"]
+    param = distribute_tensor(
+        torch.ones(16, device="cuda", dtype=torch.bfloat16), mesh, (Replicate(), Shard(0), Replicate())
+    )
+    optimizer = StochasticAdamW([param], lr=1e-3, state_dtype=torch.float32)
+    optimizer.state[param] = {
+        "step": 3,
+        "exp_avg": torch.full_like(param, 0.1234567, dtype=torch.float32),
+        "exp_avg_sq": torch.full_like(param, 0.01234567, dtype=torch.float32),
+    }
+    saved = copy.deepcopy(optimizer.state_dict())
+    restored = StochasticAdamW([param], lr=1e-3, state_dtype=torch.float32)
+
+    restored.load_state_dict(saved)
+
+    for key in ("exp_avg", "exp_avg_sq"):
+        moment = restored.state[param][key]
+        assert moment.dtype == torch.float32
+        assert moment.placements == param.placements
+        assert torch.equal(moment.to_local(), saved["state"][0][key].to_local())

@@ -18,7 +18,7 @@ from ..event.catalogue.train import (
 )
 from ..sleep import DEFAULT_SLEEP_TAGS, SleepTag
 from .gradient_manager import GradientManager
-from .model_stage_factory import TrackedModules
+from .tracked_modules import TrackedModules
 
 
 class TrainSleeper:

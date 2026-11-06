@@ -1,40 +1,37 @@
-from typing import Any
-
 from torch import nn
 from torch.distributed import DeviceMesh
+from torch.distributed.tensor import Replicate, Shard
 
-from .fully_sharded import parallelize_fsdp
-from .replicate_parallel import parallelize_replicate
+from .placement import check_data_shard_dim, distribute_parameters
 
 
-def parallelize_hsdp(
-    module: nn.Module, mesh: DeviceMesh, shard_dim: str = "dp_cp_shard", *fsdp_args: Any, **fsdp_kwargs: Any
-):
-    """Applies Hybrid Sharded Data Parallel (HSDP) to a module.
+def parallelize_hsdp(module: nn.Module, mesh: DeviceMesh, shard_dim: str = "dp_cp_shard"):
+    """Places the parameters of a module for Hybrid Sharded Data Parallel (HSDP).
 
-    The module is sharded with FSDP along ``shard_dim`` and replicated along every other mesh
-    dimension. Dimensions of size 1 are skipped.
+    The parameters are sharded along ``shard_dim`` and replicated along every other mesh dimension. Dimensions of
+    size 1 are skipped. The ``ParameterRuntime`` gathers the shards and reduces the gradients.
 
     Args:
         module: The module to parallelize.
         mesh: The device mesh to distribute the module over.
-        shard_dim: The name of the mesh dimension to shard along. All other dimensions are
-            replication dimensions.
-        *fsdp_args: Positional arguments passed to the underlying FSDP parallelizer.
-        **fsdp_kwargs: Keyword arguments passed to the underlying FSDP parallelizer.
+        shard_dim: The name of the mesh dimension to shard along. It must be in ``DATA_SHARD_DIMS``. All other
+            dimensions are replication dimensions.
 
     Raises:
-        ValueError: If the device mesh has no dimension names.
+        ValueError: If the device mesh has no dimension names, if it has no ``shard_dim``, or if ``shard_dim`` is not a
+            data shard dimension.
     """
-    replicate_dims = mesh.mesh_dim_names
-
-    if replicate_dims is None:
+    names = mesh.mesh_dim_names
+    if names is None:
         raise ValueError("parallelize_hsdp() requires a device mesh with named dimensions.")
+    check_data_shard_dim(shard_dim)
+    if shard_dim not in names:
+        # Without the dimension, the parameters would silently become full replicas.
+        raise ValueError(f"The mesh ({names}) has no dimension ({shard_dim}). Pass the shard dimension of the mesh.")
 
-    replicate_dims = tuple(x for x in replicate_dims if x != shard_dim and mesh[x].size() > 1)
-
-    if len(replicate_dims) > 0:
-        parallelize_replicate(module, mesh[replicate_dims])
-
-    if mesh[shard_dim].size() != 1:
-        parallelize_fsdp(module, mesh[shard_dim], *fsdp_args, **fsdp_kwargs)
+    # A sub-mesh must keep the order of the mesh dimensions, so Shard(0) goes to the position of shard_dim.
+    dims = tuple(x for x in names if mesh[x].size() > 1)
+    if not dims:
+        return
+    placements = tuple(Shard(0) if x == shard_dim else Replicate() for x in dims)
+    distribute_parameters(module, mesh[dims], placements)

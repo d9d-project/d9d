@@ -4,6 +4,8 @@ from torch import nn
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor, Placement, Replicate, Shard, distribute_tensor
 
+from d9d.dist_context import DATA_SHARD_DIMS
+
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
 class PlacementDims:
@@ -66,3 +68,18 @@ def distribute_parameters(module: nn.Module, mesh: DeviceMesh, placements: tuple
                 data = distribute_tensor(param.data, mesh, placements)
                 distributed[id(param)] = nn.Parameter(data, requires_grad=param.requires_grad)
             submodule.register_parameter(name, distributed[id(param)])
+
+
+def check_data_shard_dim(name: str):
+    """Checks that data parallelism can shard parameters along a mesh dimension.
+
+    Args:
+        name: The name of the mesh dimension.
+
+    Raises:
+        ValueError: If the dimension is not in ``DATA_SHARD_DIMS``.
+    """
+    if name not in DATA_SHARD_DIMS:
+        raise ValueError(
+            f"The mesh dimension ({name}) is not a data shard dimension. Shard along one of {sorted(DATA_SHARD_DIMS)}."
+        )

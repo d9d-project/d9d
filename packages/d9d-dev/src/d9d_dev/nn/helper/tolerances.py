@@ -35,6 +35,11 @@ _GRAD_TOLERANCE_BY_DTYPE: Final[dict[torch.dtype, GradTolerance]] = {
 }
 
 
+# bf16 gradients that a distributed run sums in another order than one GPU, e.g. over experts or replicas, drift
+# by a few bf16 ulps of the largest values.
+BF16_REORDERED_SUM_TOLERANCE: Final[Tolerance] = Tolerance(atol=5e-3, rtol=1e-2)
+
+
 def forward_tolerance_for(dtype: torch.dtype) -> Tolerance:
     return _FORWARD_TOLERANCE_BY_DTYPE.get(dtype, Tolerance(atol=1e-5, rtol=1e-5))
 
