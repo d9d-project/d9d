@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DeviceMeshParameters
 from d9d.parallel.grad_sync.synchronizer import GradientSynchronizer
 from torch import nn
 from torch.distributed import DeviceMesh
@@ -41,8 +41,8 @@ def _accumulate_like_fsdp(param: nn.Parameter, value: float, stream: torch.cuda.
     ],
 )
 def test_reduction_waits_for_writes_on_all_streams(dist_ctx_factory, param_groups_layout):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE]
     rank = mesh.get_local_rank()
     world_size = mesh.size()
 

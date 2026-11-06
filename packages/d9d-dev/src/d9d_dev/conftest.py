@@ -1,12 +1,13 @@
+import os
 import tempfile
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
 from pathlib import Path
 from typing import cast
 
 import pytest
 import torch
-from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters, DistributedContext
-from torch.distributed import GroupMember, all_gather_object, destroy_process_group
+import torch.distributed as dist
+from d9d.dist_context import DeviceMeshDomain, DeviceMeshParameters, DistributedContext, init_dist_context
 
 
 @pytest.fixture(autouse=True)
@@ -15,38 +16,48 @@ def fixed_seed():
 
 
 @pytest.fixture(scope="session", autouse=True)
-def destroy_process_group_fixture():
+def default_process_group() -> Generator[None, None, None]:
+    # The harness owns the default group, so that closing a cached context never destroys it.
+    if "WORLD_SIZE" in os.environ and not dist.is_initialized():
+        dist.init_process_group()
     yield
-    if GroupMember.WORLD is not None:
-        destroy_process_group()
+    if dist.is_initialized():
+        dist.destroy_process_group()
+
+
+DistContextFactory = Callable[..., DistributedContext]
 
 
 @pytest.fixture(scope="session")
-def dist_ctx_factory() -> Callable[[DeviceMeshParameters], DistributedContext]:
-    cache: dict[DeviceMeshParameters, DistributedContext] = {}
+def dist_ctx_factory(default_process_group) -> Generator[DistContextFactory, None, None]:
+    cache: dict[tuple[DeviceMeshParameters, tuple[DeviceMeshDomain, ...]], DistributedContext] = {}
 
-    def _get_context(params: DeviceMeshParameters) -> DistributedContext:
-        if params not in cache:
-            cache[params] = params.build()
-        return cache[params]
+    def _get_context(
+        params: DeviceMeshParameters, extra_domains: Sequence[DeviceMeshDomain] = ()
+    ) -> DistributedContext:
+        key = (params, tuple(extra_domains))
+        if key not in cache:
+            cache[key] = init_dist_context(params, extra_domains)
+        return cache[key]
 
-    return _get_context
+    yield _get_context
+
+    for context in cache.values():
+        context.close()
 
 
 @pytest.fixture
 def shared_tmp_dir(dist_ctx_factory) -> Generator[Path, None, None]:
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    reg_domain = dist_ctx.mesh_for(REGULAR_DOMAIN)["dp_replicate"]
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    gathered: list[Path | None] = [None] * dist_ctx.world_size
     if dist_ctx.is_main_process:
         with tempfile.TemporaryDirectory() as tmp_dir_str:
             tmp_dir = Path(tmp_dir_str)
-            all_gather_object([None] * reg_domain.size(), tmp_dir, reg_domain.get_group())
+            dist.all_gather_object(gathered, tmp_dir)
             yield tmp_dir
             dist_ctx.wait_world()  # wait before destroying the directory
     else:
-        gathered = [None] * reg_domain.size()
-        all_gather_object(gathered, None, reg_domain.get_group())
-        tmp_dir = next(x for x in gathered if x is not None)
-        tmp_dir = cast(Path, tmp_dir)  # we know it is received
+        dist.all_gather_object(gathered, None)
+        tmp_dir = cast(Path, gathered[0])  # rank 0 sends the directory
         yield tmp_dir
         dist_ctx.wait_world()  # wait before destroying the directory

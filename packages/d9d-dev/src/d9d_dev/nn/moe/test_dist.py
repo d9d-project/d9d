@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.dist_context import BATCH_DOMAIN, EXPERT_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import BASE_DOMAIN, EXPERT_DOMAIN, BaseDim, DeviceMeshParameters, ExpertDim, ExpertDomainConfig
 from d9d.nn.moe import MoELayer, SharedExpertParameters, parallelize_expert_parallel
 
 from d9d_dev.nn.helper import (
@@ -46,7 +46,7 @@ def build_d9d_moe(dtype: torch.dtype, shared_expert_params: SharedExpertParamete
     ],
 )
 def test_consistent_to_itself_expert_parallel(dtype: torch.dtype, dist_ctx_factory, shared_expert_params):
-    ctx = dist_ctx_factory(DeviceMeshParameters(expert_parallel=8, data_parallel_replicate=8))
+    ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8, expert=ExpertDomainConfig(expert_parallel=8)))
     init = build_moe_inputs(dtype)
 
     # Run Local
@@ -61,11 +61,12 @@ def test_consistent_to_itself_expert_parallel(dtype: torch.dtype, dist_ctx_facto
     dist_model = build_d9d_moe(dtype, shared_expert_params)
     parallelize_expert_parallel(
         dist_model,
-        mesh_experts=ctx.mesh_for(EXPERT_DOMAIN)["ep_replicate", "ep_shard"],
+        mesh_experts=ctx.mesh_for(EXPERT_DOMAIN)[ExpertDim.EP_REPLICATE, ExpertDim.EP_SHARD],
+        expert_shard_dim=ExpertDim.EP_SHARD,
     )
     copy_params_local_to_dist(local, dist_model)
     out_dist = dist_model(dist_inputs.hidden_states + dist_inputs.pre)
-    dp_size = int(ctx.mesh_for(BATCH_DOMAIN)["dp"].size())
+    dp_size = int(ctx.mesh_for(BASE_DOMAIN)[BaseDim.DP].size())
     loss_dist = (out_dist.sum() / dist_inputs.hidden_states.shape[-1]) / dp_size
     loss_dist.backward()
 

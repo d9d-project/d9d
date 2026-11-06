@@ -2,7 +2,6 @@ import gc
 from unittest.mock import MagicMock
 
 import pytest
-from d9d.dist_context import DeviceMeshParameters
 from d9d.loop.component.garbage_collector import ManualGarbageCollector
 from d9d.loop.component.job_schedule import JobSchedule
 from d9d.loop.config import GarbageCollectionConfig, JobScheduleConfig, StepActionSpecial
@@ -40,10 +39,8 @@ def gc_config_disable():
 
 
 @pytest.mark.local
-def test_manual_gc_context_manager_lifecycle(mock_gc, dist_ctx_factory, gc_config_periodic):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters())
-
-    manager = ManualGarbageCollector(dist_ctx, gc_config_periodic, _schedule_at_step(0))
+def test_manual_gc_context_manager_lifecycle(mock_gc, gc_config_periodic):
+    manager = ManualGarbageCollector(gc_config_periodic, _schedule_at_step(0))
 
     with manager:
         mock_gc.disable.assert_called_once()
@@ -56,10 +53,8 @@ def test_manual_gc_context_manager_lifecycle(mock_gc, dist_ctx_factory, gc_confi
 
 
 @pytest.mark.local
-def test_manual_gc_collect_forced(mock_gc, dist_ctx_factory, gc_config_periodic):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters())
-
-    manager = ManualGarbageCollector(dist_ctx, gc_config_periodic, _schedule_at_step(5))
+def test_manual_gc_collect_forced(mock_gc, gc_config_periodic):
+    manager = ManualGarbageCollector(gc_config_periodic, _schedule_at_step(5))
 
     manager.collect_forced()
 
@@ -76,11 +71,9 @@ def test_manual_gc_collect_forced(mock_gc, dist_ctx_factory, gc_config_periodic)
         (19, 10, True),  # (19+1) % 10 = 0 → True
     ],
 )
-def test_manual_gc_collect_periodic(mock_gc, dist_ctx_factory, current_step, period, should_collect):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters())
-
+def test_manual_gc_collect_periodic(mock_gc, current_step, period, should_collect):
     config = GarbageCollectionConfig(period_steps=period)
-    manager = ManualGarbageCollector(dist_ctx, config, _schedule_at_step(current_step))
+    manager = ManualGarbageCollector(config, _schedule_at_step(current_step))
     manager.collect_periodic()
 
     if should_collect:
@@ -90,12 +83,10 @@ def test_manual_gc_collect_periodic(mock_gc, dist_ctx_factory, current_step, per
 
 
 @pytest.mark.local
-def test_manual_gc_disabled_config(mock_gc, dist_ctx_factory, gc_config_disable):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters())
-
+def test_manual_gc_disabled_config(mock_gc, gc_config_disable):
     schedule = _schedule_at_step(10)
 
-    manager = ManualGarbageCollector(dist_ctx, gc_config_disable, schedule)
+    manager = ManualGarbageCollector(gc_config_disable, schedule)
 
     manager.collect_periodic()
     mock_gc.collect.assert_not_called()

@@ -59,7 +59,7 @@ The examples below use the mesh domains of [Distributed Context](../dist_context
 ### Replicate Parallelism
 
 ```python
-from d9d.dist_context import DENSE_DOMAIN, DistributedContext
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DistributedContext
 from d9d.parallel import parallelize_replicate
 
 ctx: DistributedContext = ...
@@ -69,33 +69,33 @@ dense_mesh = ctx.mesh_for(DENSE_DOMAIN)
 
 model = MyCustomLayer(...)
 
-parallelize_replicate(model, dense_mesh["dp_replicate", "cp_replicate"])
+parallelize_replicate(model, dense_mesh[DenseDim.DP_REPLICATE, DenseDim.CP_REPLICATE])
 ```
 
 ### Expert Parallelism
 
 ```python
-from d9d.dist_context import EXPERT_DOMAIN, DistributedContext
+from d9d.dist_context import EXPERT_DOMAIN, DistributedContext, ExpertDim
 from d9d.nn.moe import MoELayer, parallelize_expert_parallel
 
 ctx: DistributedContext = ...
 
-# Dimensions: pp, ep_replicate, ep_shard.
+# Dimensions: pp, ep_replicate, ep_shard, tp. Needs the expert section of the mesh configuration.
 expert_mesh = ctx.mesh_for(EXPERT_DOMAIN)
 
 model = MoELayer(...)
 
 parallelize_expert_parallel(
     model,
-    mesh_experts=expert_mesh["ep_replicate", "ep_shard"],
-    expert_shard_dim="ep_shard",
+    mesh_experts=expert_mesh[ExpertDim.EP_REPLICATE, ExpertDim.EP_SHARD],
+    expert_shard_dim=ExpertDim.EP_SHARD,
 )
 ```
 
 ### FSDP
 
 ```python
-from d9d.dist_context import DENSE_DOMAIN, DistributedContext
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DistributedContext
 from d9d.parallel import parallelize_fsdp
 
 ctx: DistributedContext = ...
@@ -104,13 +104,13 @@ dense_mesh = ctx.mesh_for(DENSE_DOMAIN)
 
 model = MyCustomLayer(...)
 
-parallelize_fsdp(model, mesh=dense_mesh["dp_cp_shard"])
+parallelize_fsdp(model, mesh=dense_mesh[DenseDim.DP_CP_SHARD])
 ```
 
 ### HSDP
 
 ```python
-from d9d.dist_context import DENSE_DOMAIN, DistributedContext
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DistributedContext
 from d9d.parallel import parallelize_hsdp
 
 ctx: DistributedContext = ...
@@ -122,8 +122,8 @@ model = MyCustomLayer(...)
 
 parallelize_hsdp(
     model,
-    mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"],
-    shard_dim="dp_cp_shard",
+    mesh=dense_mesh[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE],
+    shard_dim=DenseDim.DP_CP_SHARD,
 )
 ```
 

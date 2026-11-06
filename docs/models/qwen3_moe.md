@@ -2,7 +2,7 @@
 
 ## About
 
-The `d9d.models.qwen3_moe` package implements the [Qwen3](https://arxiv.org/abs/2505.09388) Mixture-of-Experts (MoE) backbone. `parallelize_qwen3_moe_model()` applies the default horizontal parallelism to it: HSDP for the dense modules and expert parallelism for the MoE layers. Tensor parallelism and context parallelism are not supported yet.
+The `d9d.models.qwen3_moe` package implements the [Qwen3](https://arxiv.org/abs/2505.09388) Mixture-of-Experts (MoE) backbone. `parallelize_qwen3_moe_model()` applies the default horizontal parallelism to it: HSDP for the dense modules and expert parallelism for the MoE layers. A distributed job must set the `expert` section of `mesh`, e.g. `expert_parallel: 1` for experts without sharding. Tensor parallelism and context parallelism are not supported yet.
 
 ## Hugging Face Compatibility
 

@@ -1,11 +1,12 @@
 import contextlib
+import logging
 from collections.abc import Iterator
 
 import torch
 from tqdm import tqdm
 
 from d9d.data import MicrobatchPack, build_device_pack_stream
-from d9d.dist_context import BATCH_DOMAIN, DeviceMeshParameters, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext, build_dist_logger
 from d9d.pipelining.factory import PipelineScheduleInferenceConfig
 from d9d.rng import SeedScope, fork_rng, fork_rng_child
 
@@ -53,17 +54,19 @@ from ..event.catalogue.inference import (
 )
 from ..state import InferenceJobState
 
+logger = logging.getLogger(__name__)
+
 
 class InferenceConfigurator:
     """Configurator that assembles the distributed inference environment.
 
-    It combines the device mesh parameters, the ``InferenceConfig`` and the user-defined providers
+    It combines the distributed context, the ``InferenceConfig`` and the user-defined providers
     into an ``Inference`` object that is ready to run the inference loop.
     """
 
     def __init__(
         self,
-        mesh: DeviceMeshParameters,
+        dist_context: DistributedContext,
         parameters: InferenceConfig,
         task_provider: InferenceTaskProvider,
         model_provider: ModelProvider,
@@ -72,13 +75,13 @@ class InferenceConfigurator:
         """Constructs the ``InferenceConfigurator`` object.
 
         Args:
-            mesh: Definition of the distributed device mesh topology.
+            dist_context: The distributed context of the job. The caller owns and closes it.
             parameters: The global configuration object for inference.
             task_provider: Factory for creating the inference task logic.
             model_provider: Factory for defining and creating model stages.
             data_provider: Factory for building the microbatch pack stream.
         """
-        self._mesh = mesh
+        self._dist_context = dist_context
         self._parameters = parameters
         self._task_provider = task_provider
         self._model_provider = model_provider
@@ -103,9 +106,7 @@ class InferenceConfigurator:
 
         event_bus.trigger(EVENT_INFERENCE_CONFIG_STARTED, EventConfigurationStartedContext(dist_context=dist_context))
 
-        dp_rank = (
-            dist_context.mesh_for(BATCH_DOMAIN)["dp"].get_local_rank() if dist_context.mesh_params.is_distributed else 0
-        )
+        dp_rank = dist_context.coordinate(BASE_DOMAIN, BaseDim.DP)
         data_seed_scope = seed_scope.child("data")
         with fork_rng_child("data_provider"):
             microbatch_pack_stream = self._data_provider(
@@ -150,7 +151,7 @@ class InferenceConfigurator:
             pipeline_state=pipeline_state_handler,
         )
 
-        gc = ManualGarbageCollector(dist_context=dist_context, config=self._parameters.gc, schedule=schedule)
+        gc = ManualGarbageCollector(config=self._parameters.gc, schedule=schedule)
 
         checkpointer = StateCheckpointer(
             dist_context=dist_context, schedule=schedule, config=self._parameters.checkpointing, gc=gc, run_name=None
@@ -176,13 +177,13 @@ class InferenceConfigurator:
     def configure(self) -> "Inference":
         """Builds all inference components and returns a configured ``Inference`` object.
 
-        It creates the distributed context and builds the model, the data stream and the auxiliary components.
+        It configures the ``d9d`` logger and builds the model, the data stream and the auxiliary components.
 
         Returns:
             A ready-to-use inference engine that holds the job state.
         """
-        # Build the mesh outside the fork: it sets the current CUDA device, whose generator the fork saves.
-        dist_context = self._mesh.build()
+        dist_context = self._dist_context
+        build_dist_logger(dist_context, level=logging.INFO)
         seed_scope = SeedScope.root(self._parameters.determinism.base_seed)
 
         with fork_rng(seed_scope.child("configure")):
@@ -233,11 +234,11 @@ class Inference:
         self._enable_eval_mode()
 
         self._state.dist_context.wait_world()
-        self._state.dist_context.logger.info("Trying to load last checkpoint before doing anything else")
+        logger.info("Trying to load last checkpoint before doing anything else")
         self._state.checkpointer.load_last_checkpoint(self._state)
 
         if self._state.schedule.current_step >= self._state.schedule.total_steps:
-            self._state.dist_context.logger.info("Inference is already complete, nothing to do")
+            logger.info("Inference is already complete, nothing to do")
             return
 
         self._state.dist_context.wait_world()

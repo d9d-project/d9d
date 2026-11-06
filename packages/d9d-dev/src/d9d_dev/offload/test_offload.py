@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DeviceMeshParameters
 from d9d.loop.component import PipelinedOptimizer, TrackedModules
 from d9d.offload import OffloadContext, OnloadContext, offload_tensor, onload_tensor
 from torch import nn
@@ -50,8 +50,8 @@ def test_tracked_modules_offload_guards(dist_ctx_factory):
 @pytest.mark.distributed
 @pytest.mark.parametrize("placement", [Shard(0), Replicate()])
 def test_offload_dtensor_round_trip(dist_ctx_factory, placement):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE]
     device = dist_ctx.current_device
 
     local = torch.randn(4, 8, device=device)
@@ -83,7 +83,7 @@ def test_offload_dtensor_round_trip(dist_ctx_factory, placement):
 
 @pytest.mark.distributed
 def test_tracked_modules_round_trip(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
     device = dist_ctx.current_device
 
     module = nn.Sequential(nn.Linear(2048, 2048), nn.Linear(2048, 2048), nn.Linear(2048, 2048)).to(device)
@@ -116,7 +116,7 @@ def test_tracked_modules_round_trip(dist_ctx_factory):
 
 @pytest.mark.distributed
 def test_pipelined_optimizer_round_trip(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
     device = dist_ctx.current_device
 
     module = nn.Linear(64, 64).to(device)

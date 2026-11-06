@@ -59,7 +59,7 @@ class ShardMoESparseExpertsParallel(ParallelStyle):
         return module
 
 
-def parallelize_expert_parallel(module: MoELayer, mesh_experts: DeviceMesh, expert_shard_dim: str = "ep_shard"):
+def parallelize_expert_parallel(module: MoELayer, mesh_experts: DeviceMesh, expert_shard_dim: str):
     """Applies expert parallelism to an MoE layer.
 
     The sparse experts are sharded along ``expert_shard_dim`` and replicated along the other mesh

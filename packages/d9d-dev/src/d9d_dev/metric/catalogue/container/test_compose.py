@@ -2,7 +2,7 @@ import copy
 
 import pytest
 import torch
-from d9d.dist_context import FLAT_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import METRIC_DOMAIN, DeviceMeshParameters, MetricDim
 from d9d.metric.catalogue.aggregation import WeightedMeanMetric
 from d9d.metric.catalogue.container import ComposeMetric
 from d9d.pytree import tree_map
@@ -52,9 +52,9 @@ def test_local(device: str):
 
 @pytest.mark.distributed
 def test_distributed(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
     device = dist_ctx.current_device
-    rank = dist_ctx.mesh_for(FLAT_DOMAIN).get_rank()
+    rank = dist_ctx.rank
 
     # Setup
     expect_device = torch.scalar_tensor(0, device=device).device
@@ -78,7 +78,7 @@ def test_distributed(dist_ctx_factory):
     mean_b.update(torch.tensor([float(rank) * 2], device=device), torch.tensor([1.0], device=device))
 
     # Verify ComposeMetric delegates sync triggers to children
-    metric.sync(dist_ctx.mesh_for(FLAT_DOMAIN).get_group())
+    metric.sync(dist_ctx.mesh_for(METRIC_DOMAIN)[MetricDim.PP_DP_CP].get_group())
 
     # Compute Check (Global Aggregation)
     expect_state = {"a": torch.tensor(3.5, device=device), "b": torch.tensor(7.0, device=device)}
@@ -97,6 +97,6 @@ def test_distributed(dist_ctx_factory):
     metric.load_state_dict(old_state)
 
     # We must sync again after loading state to re-populate global synced buffers
-    metric.sync(dist_ctx.mesh_for(FLAT_DOMAIN).get_group())
+    metric.sync(dist_ctx.mesh_for(METRIC_DOMAIN)[MetricDim.PP_DP_CP].get_group())
 
     assert_close(metric.compute(), expect_state)

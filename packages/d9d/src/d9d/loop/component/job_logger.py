@@ -7,7 +7,7 @@ from torch.distributed.checkpoint.stateful import Stateful
 from torch.profiler import record_function
 
 from d9d import pytree
-from d9d.dist_context import FLAT_DOMAIN, DistributedContext
+from d9d.dist_context import METRIC_DOMAIN, DistributedContext, MetricDim
 from d9d.metric import AsyncMetricCollector
 from d9d.metric.catalogue.container import ComposeMetric
 from d9d.pytree import PyTree, ScalarTree
@@ -116,8 +116,8 @@ class JobLogger(Stateful):
             return
 
         self._metric_collector.schedule_collection(
-            self._dist_context.mesh_for(FLAT_DOMAIN).get_group()
-            if self._dist_context.mesh_params.is_distributed
+            self._dist_context.mesh_for(METRIC_DOMAIN)[MetricDim.PP_DP_CP].get_group()
+            if self._dist_context.is_distributed
             else None
         )
 

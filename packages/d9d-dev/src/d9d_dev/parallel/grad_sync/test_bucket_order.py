@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.distributed as dist
-from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DeviceMeshParameters
 from d9d.parallel.grad_sync.synchronizer import GradientSynchronizer
 from torch import nn
 from torch.distributed import DeviceMesh
@@ -49,8 +49,8 @@ def _expected_events(order: list[int], accumulations: int) -> list[tuple[str, in
 @pytest.mark.parametrize("accumulations", [1, 2])
 @pytest.mark.parametrize("rank_dependent_order", [False, True], ids=["same_order", "rank_dependent_order"])
 def test_buckets_reduce_in_bucket_order(dist_ctx_factory, monkeypatch, accumulations, rank_dependent_order):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE]
     rank = mesh.get_local_rank()
     world_size = mesh.size()
 

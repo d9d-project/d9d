@@ -2,121 +2,158 @@
 
 ## About
 
-The `d9d.dist_context` package is the single source of truth for the distributed execution environment. Its `DistributedContext` class holds the topology, the rank mapping and the communication groups, so that every rank agrees on them. Use the context for all distributed questions, such as "Am I the main process?" or "Which rank is my pipeline peer?". Do not read raw `os.environ` variables or create ad-hoc process groups: this can lead to silent inconsistencies. `DistributedContext` requires CUDA GPUs. It sets the current CUDA device of each process to its local rank.
+The `d9d.dist_context` package holds the distributed state of a process. Its `DistributedContext` knows the rank, the GPU of the rank, the process groups and the device meshes of the domains. Every component that needs these facts gets the context through its constructor. Do not read raw `os.environ` variables or create ad-hoc process groups: then the components can disagree about the topology. `DistributedContext` requires CUDA GPUs.
 
-## An Explicit Object
+## Creating and Closing the Context
 
-`DistributedContext` is a plain object. You build it once from `DeviceMeshParameters`, which also creates the process groups, and pass it to every component that needs it. Besides the device meshes, it holds a logger that prefixes each line with the mesh coordinates of the rank. It also sets the timeout of all process groups and synchronizes ranks. [d9d and Other Frameworks](../concepts/comparison.md#what-a-component-can-see) compares this with the global state of other frameworks.
+`init_dist_context()` creates the context from `DeviceMeshParameters`, once per process. In a distributed job, every rank calls it with the same arguments. It takes the world size and the rank from the default process group if one exists, and otherwise from `WORLD_SIZE` and `RANK` of the launcher. Without a launcher, the job has one rank and runs with `python`. The product of the four parallelism degrees must equal the world size.
 
-## DeviceMesh Domains
+The context owns its process groups, so it closes like a file. The code that calls `init_dist_context()` closes the context, usually with a `with` block. `close()` destroys the groups that the context created, and the default process group only if the context created it. If the block raises, the context keeps its groups, so the job fails instead of hanging.
 
-Different parts of a model need different parallelism strategies, for example dense layers and Mixture-of-Experts (MoE) layers. d9d describes each strategy as a **`DeviceMesh` domain**.
+A job takes the context and never closes it. `TrainingConfigurator` and `InferenceConfigurator` take it as `dist_context`, so one context can serve several jobs of a process, e.g. training and then evaluation.
 
-The physical GPUs stay the same, but each domain arranges them into a different mesh. There are domains for MoE layers, for dense layers and for the input batch. Get the `DeviceMesh` of a domain with `dist_context.mesh_for(domain_name)`.
+## GPU Assignment
 
-!!! info "Demonstration Video"
-    To understand domains better, watch our short demonstration video [on YouTube](https://www.youtube.com/watch?v=UZ2yHTGdzzU).
+The degrees describe the ranks, not the GPUs. The same configuration runs on 8 GPUs and on 2, so the context takes the GPU of each rank from the launch:
 
-### Regular Domain (`regular`)
+*   **Local rank**: It comes from `LOCAL_RANK`, which `torchrun` sets. It is the index of the rank on its node, whatever its GPU.
+*   **GPU**: The node runs `LOCAL_WORLD_SIZE` ranks on `torch.cuda.device_count()` visible GPUs. If the ranks do not outnumber the GPUs, local rank `i` runs on GPU `i`. Otherwise each GPU runs an equal block of consecutive local ranks. E.g. with 8 ranks on 2 GPUs, local ranks 4 to 7 run on GPU 1. The context raises if the counts do not divide.
 
-*   **Identifier**: `REGULAR_DOMAIN` or `"regular"`
-*   **Purpose**: The most granular mesh, with every parallelism in its own dimension. d9d uses it for logging.
-*   **Dimensions**:
-    1.  `pp`: Pipeline Parallel
-    2.  `dp_replicate`: Data Parallel (DDP style)
-    3.  `dp_shard`: Data Parallel (FSDP style)
-    4.  `cp_shard`: Context Parallel (FSDP style)
-    5.  `cp_replicate`: Context Parallel (DDP style)
-    6.  `tp`: Tensor Parallel
+Several ranks on one GPU let you check a parallel layout on fewer GPUs than it targets. They need `NCCL_MULTI_RANK_GPU_ENABLE=1` from the launcher. [CONTRIBUTING.md](https://github.com/d9d-project/d9d/blob/main/CONTRIBUTING.md#distributed-tests-on-fewer-gpus) shows the setup for the tests of d9d.
 
-### Expert Domain (`expert`)
+## Parallelism Degrees
 
-*   **Identifier**: `EXPERT_DOMAIN` or `"expert"`
-*   **Purpose**: The mesh for MoE layers. Shard sparse expert layers across the `ep_shard` dimension and replicate them across the `ep_replicate` dimension.
-*   **Dimensions**:
-    1.  `pp`: Pipeline Parallel
-    2.  `ep_replicate`: Combined replication dimension (`(DP * CP) // EP`)
-    3.  `ep_shard`: Expert Parallel
+The work of one step splits in four ways. `DeviceMeshParameters` holds one degree for each:
 
-### Dense Domain (`dense`)
+*   **`pipeline_parallel`**: It splits the layers into stages.
+*   **`data_parallel`**: It splits the samples.
+*   **`context_parallel`**: It splits one sample into parts, e.g. a text into chunks of the sequence, a graph into subgraphs or an image into tiles.
+*   **`tensor_parallel`**: It splits the matrix multiplications inside one sample.
 
-*   **Identifier**: `DENSE_DOMAIN` or `"dense"`
-*   **Purpose**: The mesh for dense layers.
-*   **Dimensions**:
-    1.  `pp`: Pipeline Parallel
-    2.  `dp_replicate`: Data Parallel replication in HSDP
-    3.  `dp_cp_shard`: Data Parallel and Context Parallel merged, for sharding in HSDP
-    4.  `cp_replicate`: Context Parallel replication
-    5.  `tp`: Tensor Parallel
+Other kinds of parallelism split the same ranks differently, so they do not add to the world size. Each built-in domain that does so has its own section:
 
-### Batch Domain (`batch`)
+*   **`dense`**: The sizes of the shard groups of the dense layers, `data_parallel_shard` and `context_parallel_shard`. They default to 1, so the dense layers do not shard, as in DDP. The number of replicas follows from the degree, so a shard size that fits the memory of a GPU stays when the job grows.
+*   **`expert`**: The degree of expert parallelism, `expert_parallel`. Without this section, the job builds no expert domain.
 
-*   **Identifier**: `BATCH_DOMAIN` or `"batch"`
-*   **Purpose**: The mesh for distributing the input batch and sharding the data loader.
-*   **Dimensions**:
-    1.  `pp`: Pipeline Parallel
-    2.  `dp`: Data Parallel (`dp_replicate * dp_shard`)
-    3.  `cp`: Context Parallel (`cp_replicate * cp_shard`)
-    4.  `tp`: Tensor Parallel
+The shard sizes must divide `data_parallel` and `context_parallel`, and `expert_parallel` must divide `data_parallel * context_parallel`.
 
-### Flat Domain (`flat`)
+## Domains
 
-*   **Identifier**: `FLAT_DOMAIN` or `"flat"`
-*   **Purpose**: A mesh with a single dimension that holds all processes.
-*   **Dimensions**:
-    1.  `world`: World size
+Different parts of a model need different parallelism, e.g. dense layers and Mixture-of-Experts (MoE) layers. d9d describes each arrangement of the ranks as a **domain**. All domains hold the same ranks, and each arranges them into its own device mesh. The context keeps each mesh under its domain object: `dist_context.mesh_for(DENSE_DOMAIN)`.
+
+| Domain | Dimensions | Purpose |
+|:-------|:-----------|:--------|
+| `BASE_DOMAIN` | `BaseDim`: `PP`, `DP`, `CP`, `TP` | Pipeline stages, data and the coordinates of a rank |
+| `DENSE_DOMAIN` | `DenseDim`: `PP`, `DP_REPLICATE`, `DP_CP_SHARD`, `CP_REPLICATE`, `TP` | Dense layers |
+| `EXPERT_DOMAIN` | `ExpertDim`: `PP`, `EP_REPLICATE`, `EP_SHARD`, `TP` | Expert layers |
+| `METRIC_DOMAIN` | `MetricDim`: `PP_DP_CP`, `TP` | Sums of the metrics and the loss weights |
+
+*   **Base domain**: Its dimensions are the four degrees. Their order defines how the ranks lie in the world: the ranks of one tensor-parallel group are neighbors.
+*   **Dense domain**: It splits `dp` into `DP_REPLICATE` and a shard, and `cp` into a shard and `CP_REPLICATE`, as the `dense` section says. `DP_CP_SHARD` merges the two shards.
+*   **Expert domain**: The context builds it only if the `expert` section is set. Otherwise `mesh_for(EXPERT_DOMAIN)` raises and asks to set the section. `EP_REPLICATE` and `EP_SHARD` split the ranks of `dp * cp`. So an expert-parallel group never holds two ranks of one tensor-parallel group, which hold the same tokens.
+*   **Metric domain**: `PP_DP_CP` holds all ranks with their own tokens or pipeline stage. The gradient manager and the metrics sum over it, so the ranks of one tensor-parallel group count once.
+
+Each domain names its dimensions with a `StrEnum`, e.g. `DenseDim.DP_REPLICATE`, so the type checker catches a dimension of another domain.
+
+## Coordinates and Communication
+
+`DistributedContext` answers four kinds of questions. Only communication needs process groups:
+
+| Kind | Members | In a job without parallelism |
+|:-----|:--------|:-----------------------------|
+| Rank | `rank`, `world_size`, `is_main_process`, `local_rank`, `is_local_main_process`, `current_device` | Rank 0 of 1 |
+| Coordinates | `coordinate()`, `dim_size()` | Coordinate 0, size 1 |
+| Communication | `is_distributed`, `mesh_for()`, `wait_world()`, `main_process_first()`, `local_main_process_first()`, `set_timeout()` | `is_distributed` is `False` and `mesh_for()` raises. `set_timeout()` does nothing. The others only wait for the GPU. |
+
+Code that communicates checks `is_distributed` before it calls `mesh_for()`.
+
+## Extra Domains
+
+A new kind of parallelism adds a domain that splits the ranks differently. For example, an image model can split the `cp` ranks into height and width. Subclass `DeviceMeshDomain` and return the dimensions of the mesh from `mesh_dims()`, outermost first. The context lays out the ranks along them row-major, as `init_device_mesh()` does. So dimensions that keep the order of the base dimensions group the ranks as they do. A domain takes its own degrees in its constructor.
+
+Pass the domain in `extra_domains` of `init_dist_context()`. The sizes of its dimensions must be positive and multiply to the world size, and the names of its dimensions must be unique. The names of all domains must be unique too. `mesh_for()` looks the mesh up by the domain object, so a domain object that was not passed raises, even if its name matches.
 
 ## Usage
 
-### Initialization
+### Configuration
 
-Build the context from `DeviceMeshParameters`.
+A job with pipeline parallelism, HSDP inside each node and expert parallelism:
 
-```python
-from d9d.dist_context import DeviceMeshParameters
-
-# Define the topology.
-params = DeviceMeshParameters(
-    pipeline_parallel=2,
-    data_parallel_replicate=8,
-    data_parallel_shard=1,
-    context_parallel_replicate=1,
-    context_parallel_shard=1,
-    expert_parallel=8,
-    tensor_parallel=1,
-)
-
-dist_context = params.build()
+```yaml
+mesh:
+  pipeline_parallel: 2
+  data_parallel: 16
+  dense:
+    data_parallel_shard: 8
+  expert:
+    expert_parallel: 8
 ```
 
-### Accessing DeviceMesh Domains
+### Creating the Context
 
 ```python
-from torch.distributed import DeviceMesh
+from d9d.dist_context import DeviceMeshParameters, init_dist_context
+from d9d.loop.run import TrainingConfigurator
 
-from d9d.dist_context import DENSE_DOMAIN, DistributedContext
+params = DeviceMeshParameters(data_parallel=8)
+
+with init_dist_context(params) as dist_context:
+    trainer = TrainingConfigurator(
+        dist_context=dist_context,
+        # The parameters and the providers of the job.
+    ).configure()
+    trainer.train()
+```
+
+### Coordinates and Meshes
+
+```python
+from d9d.dist_context import BASE_DOMAIN, DENSE_DOMAIN, BaseDim, DenseDim, DistributedContext
 
 dist_context: DistributedContext = ...
 
-mesh_dense: DeviceMesh = dist_context.mesh_for(DENSE_DOMAIN)
+# Works with and without parallelism.
+dp_rank = dist_context.coordinate(BASE_DOMAIN, BaseDim.DP)
+dp_size = dist_context.dim_size(BASE_DOMAIN, BaseDim.DP)
+
+if dist_context.is_distributed:
+    shard_mesh = dist_context.mesh_for(DENSE_DOMAIN)[DenseDim.DP_CP_SHARD]
 ```
 
-### Rank Utilities
+### An Extra Domain
 
 ```python
-if dist_context.is_main_process:
-    print("I am global rank 0")
+from enum import StrEnum
 
-if dist_context.is_local_main_process:
-    print("I am rank 0 on this node")
+from d9d.dist_context import DeviceMeshDomain, DeviceMeshParameters, MeshDim, init_dist_context
 
-# Synchronize.
-dist_context.wait_world()
+
+class DataContextParallelDim(StrEnum):
+    PP = "pp"
+    DP_CP = "dp_cp"
+    TP = "tp"
+
+
+class DataContextParallelDomain(DeviceMeshDomain[DataContextParallelDim]):
+    @property
+    def name(self) -> str:
+        return "dp_cp"
+
+    def mesh_dims(self, params: DeviceMeshParameters) -> tuple[MeshDim[DataContextParallelDim], ...]:
+        return (
+            MeshDim(DataContextParallelDim.PP, params.pipeline_parallel),
+            MeshDim(DataContextParallelDim.DP_CP, params.data_parallel * params.context_parallel),
+            MeshDim(DataContextParallelDim.TP, params.tensor_parallel),
+        )
+
+
+DP_CP_DOMAIN = DataContextParallelDomain()
+
+with init_dist_context(params, extra_domains=(DP_CP_DOMAIN,)) as dist_context:
+    shard_index = dist_context.coordinate(DP_CP_DOMAIN, DataContextParallelDim.DP_CP)
 ```
 
-### Context Managers
-
-These context managers control the order in which ranks run a block.
+### Ordering the Ranks
 
 ```python
 # Only one process per node downloads the file.
@@ -125,6 +162,9 @@ with dist_context.local_main_process_first():
         download_dataset()
     # Other ranks enter the block after the download.
 # All ranks continue together.
+
+# Wait for all ranks.
+dist_context.wait_world()
 ```
 
 ## API Reference

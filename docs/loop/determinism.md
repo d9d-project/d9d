@@ -8,7 +8,7 @@ d9d derives a seed for each call of user code from `determinism.base_seed`. The 
 
 The loop runs each call of user code in a [fork of the global generators](../rng/index.md#forks-of-the-global-generators). `configure()`, `train()`, `infer()` and `export()` fork a child of `SeedScope.root(base_seed)`. Inside, each step and each call forks a child of the innermost fork. Its keys are the name of the call and its counters, such as the step, the stage and the microbatch.
 
-The task hooks and the model pass also take the `dp` coordinate of the rank in the [batch domain](../dist_context/index.md#batch-domain-batch) into the key. The `dp` ranks work on other samples. The model pass also takes the `cp` coordinate, because the `cp` ranks work on other parts of the same samples. It forks per stage and microbatch, so the dropout masks do not depend on the pipeline schedule. These ranks draw the same numbers:
+The task hooks and the model pass also take the `dp` coordinate of the rank in the [base domain](../dist_context/index.md#domains) into the key. The `dp` ranks work on other samples. The model pass also takes the `cp` coordinate, because the `cp` ranks work on other parts of the same samples. It forks per stage and microbatch, so the dropout masks do not depend on the pipeline schedule. These ranks draw the same numbers:
 
 | Call                     | Ranks that draw the same numbers                     |
 |:-------------------------|:-----------------------------------------------------|

@@ -145,7 +145,11 @@ You write four parts: the data, the model, the task with the loss, and the model
         # You choose the parallelism of each submodule. Here, the whole model gets HSDP over the dense mesh domain.
         def parallelize_model_stage(self, context: ParallelizeModelStageContext[MLP]):
             mesh = context.dist_context.mesh_for(DENSE_DOMAIN)
-            parallelize_hsdp(context.model, mesh=mesh["dp_replicate", "dp_cp_shard", "cp_replicate"])
+            parallelize_hsdp(
+                context.model,
+                mesh=mesh[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE],
+                shard_dim=DenseDim.DP_CP_SHARD,
+            )
 
         def prepare_export_model_stage(self, context: PrepareExportModelStageContext[MLP]) -> PrepareExportModelStageResult:
             return PrepareExportModelStageResult(state_mapper=identity_mapper_from_module(context.model))
@@ -156,21 +160,22 @@ You write four parts: the data, the model, the task with the loss, and the model
     ```python
     config = ProjectConfig.model_validate(yaml.safe_load(Path(sys.argv[1]).read_text()))
 
-    trainer = TrainingConfigurator(
-        mesh=config.mesh,
-        parameters=config.trainer,
-        model_provider=MLPProvider(),
-        task_provider=lambda ctx: RegressionTask(),
-        data_provider=AutoDataProvider(
-            dataset_factory=lambda context: RegressionDataset(num_samples=65536, num_features=16),
-            collator=RegressionDataset.collate,
-            config=config.data,
-        ),
-        optimizer_provider=AutoOptimizerProvider(config.optimizer),
-        lr_scheduler_provider=AutoLRSchedulerProvider(config.lr_scheduler),
-    ).configure()
+    with init_dist_context(config.mesh) as dist_context:
+        trainer = TrainingConfigurator(
+            dist_context=dist_context,
+            parameters=config.trainer,
+            model_provider=MLPProvider(),
+            task_provider=lambda ctx: RegressionTask(),
+            data_provider=AutoDataProvider(
+                dataset_factory=lambda context: RegressionDataset(num_samples=65536, num_features=16),
+                collator=RegressionDataset.collate,
+                config=config.data,
+            ),
+            optimizer_provider=AutoOptimizerProvider(config.optimizer),
+            lr_scheduler_provider=AutoLRSchedulerProvider(config.lr_scheduler),
+        ).configure()
 
-    trainer.train()
+        trainer.train()
     ```
 
 d9d owns the training loop: gradient synchronization and accumulation, clipping, checkpointing, logging and timeouts.
@@ -181,7 +186,9 @@ To train on 4 GPUs with fully sharded data parallelism, change the mesh in the c
 
 ```yaml
 mesh:
-  data_parallel_shard: 4
+  data_parallel: 4
+  dense:
+    data_parallel_shard: 4
 ```
 
 ```bash

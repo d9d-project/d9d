@@ -2,7 +2,7 @@ from collections.abc import Iterator
 from typing import Any
 
 from d9d.data import MicrobatchPack, MicrobatchPackStream
-from d9d.dist_context import BATCH_DOMAIN, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext
 
 
 class DataParallelMicrobatchPackStream(MicrobatchPackStream):
@@ -15,10 +15,7 @@ class DataParallelMicrobatchPackStream(MicrobatchPackStream):
             dist_context: The distributed context.
             inner: The wrapped microbatch pack stream that owns the actual data position.
         """
-        if dist_context.mesh_params.is_distributed:
-            self._dp_rank = dist_context.mesh_for(BATCH_DOMAIN)["dp"].get_local_rank()
-        else:
-            self._dp_rank = 0
+        self._dp_rank = dist_context.coordinate(BASE_DOMAIN, BaseDim.DP)
         self._inner = inner
 
     def __iter__(self) -> Iterator[MicrobatchPack]:

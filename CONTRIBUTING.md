@@ -46,7 +46,7 @@ We provide a `Makefile` to automate common development tasks.
 
 | Command       | Description                                                                                                                   |
 |:--------------|:------------------------------------------------------------------------------------------------------------------------------|
-| `make test`   | Runs **both** local unit tests and distributed `torchrun` tests. **NOTE:** currently distributed tests require a 8-GPU setup. |
+| `make test`   | Runs **both** local unit tests and distributed `torchrun` tests on 8 ranks. With fewer than 8 GPUs, run `make test SHARED_GPUS=1` (see [Distributed Tests on Fewer GPUs](#distributed-tests-on-fewer-gpus)). |
 | `make lint`   | Runs `ruff` formatting, `ruff` linter checks and type checking using `ty`.                                                    |
 | `make mkdocs` | Starts a local documentation server at `localhost:8081`.                                                                      |
 
@@ -146,6 +146,12 @@ Every test has one of two markers:
     `dist_ctx_factory(DeviceMeshParameters(...))`.
 
 All PRs must pass `make test`.
+
+#### Distributed Tests on Fewer GPUs
+
+The distributed tests always run 8 ranks. With fewer GPUs, run `make test SHARED_GPUS=1`. Several ranks then share one
+GPU, so the number of GPUs must divide 8. The ranks run under [CUDA MPS](https://docs.nvidia.com/deploy/mps/index.html),
+which makes the tests many times faster. Several ranks on one GPU are experimental in NCCL.
 
 #### What to Test
 

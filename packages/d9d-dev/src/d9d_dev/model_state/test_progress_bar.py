@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 import torch
-from d9d.dist_context import REGULAR_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DeviceMeshParameters
 from d9d.model_state.io import load_model_state, save_model_state
 from d9d.model_state.io.reader import _StateLoadingFlow  # noqa: PLC2701 - unit under test
 from d9d.model_state.io.writer import _StateWritingFlowLocal  # noqa: PLC2701 - unit under test
@@ -18,7 +18,7 @@ class SimpleModel(nn.Module):
 
 @pytest.mark.distributed
 def test_load_model_state_tqdm_per_rank_config(dist_ctx_factory, shared_tmp_dir):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
     local_rank = torch.cuda.current_device()
     device = f"cuda:{local_rank}"
 
@@ -62,10 +62,10 @@ def test_load_model_state_tqdm_per_rank_config(dist_ctx_factory, shared_tmp_dir)
 
 @pytest.mark.distributed
 def test_save_model_state_tqdm_per_rank_config(dist_ctx_factory, shared_tmp_dir):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
     local_rank = torch.cuda.current_device()
     device = f"cuda:{local_rank}"
-    group = dist_ctx.mesh_for(REGULAR_DOMAIN)["dp_replicate"].get_group()
+    group = dist_ctx.mesh_for(BASE_DOMAIN)[BaseDim.DP].get_group()
 
     pbar_state: dict = {}
 

@@ -20,7 +20,7 @@ logging:
 A log line looks like this:
 
 ```text
-[d9d] [local] 2026-10-04 01:08:11,755 - INFO - step 1 (stage=train): loss=15.0928
+[d9d] [pp:0-dp:0-cp:0-tp:0] 2026-11-05 01:16:45,007 - INFO - step 1 (stage=train): loss=14.6085
 ```
 
 ### W&B (`wandb`)

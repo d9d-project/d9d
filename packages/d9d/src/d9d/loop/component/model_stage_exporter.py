@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from d9d.dist_context import REGULAR_DOMAIN, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext
 from d9d.model_state.io import save_model_state, save_model_state_pipeline_parallel
 from d9d.model_state.mapper.compose import ModelStateMapperParallel
 from d9d.rng import fork_rng_child
@@ -34,7 +34,7 @@ class ModelStageExporter:
             ValueError: If the run has no parallelism but holds more than one stage. Nothing then decides
                 which stage writes the index.
         """
-        alone = not self._dist_context.mesh_params.is_distributed
+        alone = not self._dist_context.is_distributed
         stages = list(self._modules.modules.values())
         if alone and len(stages) != 1:
             raise ValueError(f"The model stage count ({len(stages)}) must be 1 in a run without parallelism.")
@@ -54,8 +54,8 @@ class ModelStageExporter:
         save_model_state_pipeline_parallel(
             dest_dir=save_dir,
             mapper=mapper,
-            device_mesh=self._dist_context.mesh_for(REGULAR_DOMAIN),
-            pipeline_dim_name="pp",
+            device_mesh=self._dist_context.mesh_for(BASE_DOMAIN),
+            pipeline_dim_name=BaseDim.PP,
             models=stages,
             show_progress=True,
             position=self._dist_context.local_rank,

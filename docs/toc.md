@@ -59,7 +59,7 @@ Loading and exporting model weights, including Hugging Face checkpoints.
 ## ⚡ Parallelism
 Strategies for distributing computations.
 
-*   **[Distributed Context](./dist_context/index.md)**: The `DistributedContext` and the `DeviceMesh` domains (`regular`, `dense`, `expert`, `batch`, `flat`).
+*   **[Distributed Context](./dist_context/index.md)**: The `DistributedContext`, the assignment of ranks to GPUs and the `DeviceMesh` domains (`base`, `dense`, `expert`, `metric` and your own).
 *   **[Horizontal Parallelism](./parallel/index.md)**: Replicate, FSDP, HSDP and expert parallelism over `DTensor` placements.
 *   **[Gradient Synchronization](./parallel/grad_sync.md)**: Gradient all-reduce in buckets, overlapped with the backward pass.
 *   **[Gradient Norm and Clipping](./parallel/grad_norm.md)**: The global gradient norm and clipping over parameters with mixed placements.

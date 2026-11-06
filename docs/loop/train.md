@@ -10,7 +10,7 @@ You do not create a `Trainer` from loose objects. You build it with the `Trainin
 
 The `TrainingConfigurator` combines:
 
-*   the [infrastructure configuration](../dist_context/index.md),
+*   the [distributed context](../dist_context/index.md), which the caller creates and closes,
 *   the [job configuration](./config.md),
 *   the [user logic](./interfaces/index.md) (providers).
 
@@ -20,8 +20,8 @@ It returns a `Trainer` that holds a prepared `TrainJobState`.
 
 `TrainingConfigurator.configure()` runs these steps:
 
-1.  **Distributed Context Initialization**:
-    *   Builds the global [DistributedContext](../dist_context/index.md). This creates the NCCL process groups and `DeviceMesh` objects.
+1.  **Logging**:
+    *   Configures the `d9d` logger. Each line starts with the coordinates of the rank in the base domain of the [DistributedContext](../dist_context/index.md).
 
 2.  **Seed Scopes**:
     *   Derives the root seed scope from `determinism.base_seed`. From here on, each call of user code runs with the global generators seeded from its own scope. See [Random Numbers in the Loop](./determinism.md).
@@ -180,21 +180,23 @@ The round trip keeps object identity, optimizer state dict keys and `DTensor` me
 Build the trainer with a `TrainingConfigurator`, then call `train()`:
 
 ```python
+from d9d.dist_context import init_dist_context
 from d9d.loop.run import TrainingConfigurator
 
-trainer = TrainingConfigurator(
-    mesh=mesh_params,                  # Physical cluster layout
-    parameters=config,                 # TrainerConfig (schedule, checkpointing, ...)
+with init_dist_context(mesh_params) as dist_context:
+    trainer = TrainingConfigurator(
+        dist_context=dist_context,         # Ranks, GPUs and device meshes
+        parameters=config,                 # TrainerConfig (schedule, checkpointing, ...)
 
-    # --- User Logic ---
-    model_provider=...,                # How to build the model
-    task_provider=...,                 # How to compute the loss
-    data_provider=...,                 # How to load data
-    optimizer_provider=...,            # How to optimize
-    lr_scheduler_provider=...,         # LR scheduler
-).configure()
+        # --- User Logic ---
+        model_provider=...,                # How to build the model
+        task_provider=...,                 # How to compute the loss
+        data_provider=...,                 # How to load data
+        optimizer_provider=...,            # How to optimize
+        lr_scheduler_provider=...,         # LR scheduler
+    ).configure()
 
-trainer.train()
+    trainer.train()
 ```
 
 ## API Reference

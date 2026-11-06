@@ -1,4 +1,4 @@
-from d9d.dist_context import DENSE_DOMAIN, DistributedContext
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DistributedContext
 from d9d.nn.head import ClassificationHead, EmbeddingHead, SplitLanguageModellingHead
 from d9d.parallel import parallelize_hsdp
 
@@ -11,7 +11,11 @@ def parallelize_causal_lm_head(head: SplitLanguageModellingHead, dist_context: D
         dist_context: The distributed context that provides the device meshes.
     """
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
-    parallelize_hsdp(head, mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"])
+    parallelize_hsdp(
+        head,
+        mesh=dense_mesh[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE],
+        shard_dim=DenseDim.DP_CP_SHARD,
+    )
 
 
 def parallelize_classification_head(head: ClassificationHead, dist_context: DistributedContext) -> None:
@@ -22,7 +26,11 @@ def parallelize_classification_head(head: ClassificationHead, dist_context: Dist
         dist_context: The distributed context that provides the device meshes.
     """
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
-    parallelize_hsdp(head, mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"])
+    parallelize_hsdp(
+        head,
+        mesh=dense_mesh[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE],
+        shard_dim=DenseDim.DP_CP_SHARD,
+    )
 
 
 def parallelize_embedding_head(head: EmbeddingHead, dist_context: DistributedContext) -> None:
@@ -33,4 +41,8 @@ def parallelize_embedding_head(head: EmbeddingHead, dist_context: DistributedCon
         dist_context: The distributed context that provides the device meshes.
     """
     dense_mesh = dist_context.mesh_for(DENSE_DOMAIN)
-    parallelize_hsdp(head, mesh=dense_mesh["dp_replicate", "dp_cp_shard", "cp_replicate"])
+    parallelize_hsdp(
+        head,
+        mesh=dense_mesh[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE],
+        shard_dim=DenseDim.DP_CP_SHARD,
+    )

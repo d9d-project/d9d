@@ -1,4 +1,4 @@
-from d9d.dist_context import BATCH_DOMAIN, DistributedContext
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DistributedContext
 
 
 def num_microbatches_for_global_batch(
@@ -21,10 +21,7 @@ def num_microbatches_for_global_batch(
     Raises:
         ValueError: If ``global_batch_size`` is not divisible by ``dp_size * microbatch_size``.
     """
-    if dist_context.mesh_params.is_distributed:
-        dp_size = dist_context.mesh_for(BATCH_DOMAIN)["dp"].size()
-    else:
-        dp_size = 1
+    dp_size = dist_context.dim_size(BASE_DOMAIN, BaseDim.DP)
 
     global_microbatch = dp_size * microbatch_size
 

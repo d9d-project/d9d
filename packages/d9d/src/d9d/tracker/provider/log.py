@@ -58,7 +58,7 @@ class LogTracker(BaseTracker[LogTrackerConfig]):
 
     @contextmanager
     def open(self, properties: RunConfig) -> Generator[BaseTrackerRun, None, None]:
-        # The DistributedContext configures the d9d logger with the rank prefix of each line.
+        # The training and inference configurators configure the d9d logger with the rank prefix of each line.
         yield LogRun(logging.getLogger("d9d"))
 
     @classmethod

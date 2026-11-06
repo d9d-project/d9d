@@ -1,7 +1,7 @@
 import pytest
 import torch
 import torch.distributed as dist
-from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DenseDomainConfig, DeviceMeshParameters
 from d9d.parallel import parallelize_hsdp
 from torch import nn
 from torch.distributed.fsdp import FSDPModule
@@ -37,9 +37,9 @@ def _sum_peer_ranks(rank: int, shard_group_size: int, shard_group: int) -> int:
 
 @pytest.mark.distributed
 def test_parallelize_hsdp(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_shard=4, data_parallel_replicate=2))
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8, dense=DenseDomainConfig(data_parallel_shard=4)))
 
-    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate", "dp_cp_shard"]
+    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD]
 
     param_size = 16
 

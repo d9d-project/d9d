@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.dist_context import DENSE_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import DENSE_DOMAIN, DenseDim, DeviceMeshParameters
 from d9d.parallel.grad_sync.synchronizer import GradientSynchronizer
 from torch import nn
 from torch.distributed import DeviceMesh
@@ -65,8 +65,8 @@ def _backward_order(params: list[nn.Parameter], rank: int, rank_dependent: bool)
     [(torch.float32, torch.float32), (torch.bfloat16, torch.float32), (torch.bfloat16, torch.bfloat16)],
 )
 def test_e2e(dist_ctx_factory, tensor_specs, param_dtype, grad_dtype, param_groups_layout, rank_dependent_order):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel_replicate=8))
-    sync_mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate"]
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    sync_mesh = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE]
     params = [
         _make_dtensor_param(
             shape=spec["shape"],

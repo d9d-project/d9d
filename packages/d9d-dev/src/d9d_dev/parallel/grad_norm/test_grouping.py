@@ -1,6 +1,6 @@
 import pytest
 import torch
-from d9d.dist_context import EXPERT_DOMAIN, DeviceMeshParameters
+from d9d.dist_context import EXPERT_DOMAIN, DeviceMeshParameters, ExpertDim, ExpertDomainConfig
 from d9d.parallel.grad_norm import group_parameters_for_norm
 from torch import nn
 from torch.distributed.tensor import DTensor, Partial, Replicate, Shard, distribute_tensor
@@ -8,13 +8,15 @@ from torch.distributed.tensor import DTensor, Partial, Replicate, Shard, distrib
 
 @pytest.mark.distributed
 def test_grouping_mechanism(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=4, expert_parallel=2, data_parallel_replicate=2))
+    dist_ctx = dist_ctx_factory(
+        DeviceMeshParameters(pipeline_parallel=4, data_parallel=2, expert=ExpertDomainConfig(expert_parallel=2))
+    )
     ep_mesh = dist_ctx.mesh_for(EXPERT_DOMAIN)
 
     local_param = nn.Parameter(
         distribute_tensor(
             torch.randn(16, 16, device="cuda"),
-            device_mesh=ep_mesh[["ep_replicate", "ep_shard"]],
+            device_mesh=ep_mesh[ExpertDim.EP_REPLICATE, ExpertDim.EP_SHARD],
             placements=[Replicate(), Replicate()],
         )
     )
@@ -22,7 +24,7 @@ def test_grouping_mechanism(dist_ctx_factory):
     sharded_param = nn.Parameter(
         distribute_tensor(
             torch.randn(16, 16, device="cuda"),
-            device_mesh=ep_mesh[["ep_replicate", "ep_shard"]],
+            device_mesh=ep_mesh[ExpertDim.EP_REPLICATE, ExpertDim.EP_SHARD],
             placements=[Replicate(), Shard(0)],
         )
     )
@@ -40,7 +42,7 @@ def test_grouping_mechanism(dist_ctx_factory):
 
     assert first_group.shard_meshes is not None, "First group should be the sharded one"
     assert len(first_group.shard_meshes) == 1
-    assert first_group.shard_meshes[0] == ep_mesh["ep_shard"]
+    assert first_group.shard_meshes[0] == ep_mesh[ExpertDim.EP_SHARD]
 
     assert second_group.shard_meshes is None, "Second group should be the local one"
 
@@ -50,13 +52,15 @@ def test_grouping_mechanism(dist_ctx_factory):
 
 @pytest.mark.distributed
 def test_grouping_rejects_partial_placement(dist_ctx_factory):
-    dist_ctx = dist_ctx_factory(DeviceMeshParameters(pipeline_parallel=4, expert_parallel=2, data_parallel_replicate=2))
+    dist_ctx = dist_ctx_factory(
+        DeviceMeshParameters(pipeline_parallel=4, data_parallel=2, expert=ExpertDomainConfig(expert_parallel=2))
+    )
     ep_mesh = dist_ctx.mesh_for(EXPERT_DOMAIN)
 
     partial_param = nn.Parameter(
         DTensor.from_local(
             torch.randn(16, 16, device="cuda"),
-            device_mesh=ep_mesh[["ep_replicate", "ep_shard"]],
+            device_mesh=ep_mesh[ExpertDim.EP_REPLICATE, ExpertDim.EP_SHARD],
             placements=[Replicate(), Partial()],
         )
     )
