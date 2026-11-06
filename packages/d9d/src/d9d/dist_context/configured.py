@@ -2,8 +2,6 @@ import datetime
 import logging
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
-from types import TracebackType
-from typing import Self
 
 import torch
 import torch.distributed as dist
@@ -17,7 +15,7 @@ logger = logging.getLogger(__name__)
 class DistributedContext:
     """The distributed state of one process: its rank, its GPU, its process groups and the meshes of its domains.
 
-    Create it with ``init_dist_context()``. The code that creates it closes it.
+    Create it with ``init_dist_context()``. It is valid only inside the ``with`` block of ``init_dist_context()``.
     """
 
     def __init__(
@@ -29,7 +27,6 @@ class DistributedContext:
         domain_dims: Mapping[DeviceMeshDomain, tuple[MeshDim, ...]],
         meshes: Mapping[DeviceMeshDomain, DeviceMesh],
         groups: list[dist.ProcessGroup],
-        owns_default_group: bool,
     ):
         """Constructs the ``DistributedContext`` object.
 
@@ -42,8 +39,7 @@ class DistributedContext:
             device: The GPU of this rank.
             domain_dims: The dimensions of the mesh of every domain of the context.
             meshes: The mesh of every domain. Empty in a job without parallelism.
-            groups: The process groups that the context created and destroys on close.
-            owns_default_group: Whether the context created the default process group and destroys it on close.
+            groups: The process groups of the meshes, without the default process group.
         """
         self._rank = rank
         self._world_size = world_size
@@ -52,12 +48,6 @@ class DistributedContext:
         self._domain_dims = dict(domain_dims)
         self._meshes = dict(meshes)
         self._groups = list(groups)
-        self._owns_default_group = owns_default_group
-        self._closed = False
-
-    def _check_open(self):
-        if self._closed:
-            raise RuntimeError("The distributed context is closed. Use it only before close().")
 
     def _dims_of(self, domain: DeviceMeshDomain) -> tuple[MeshDim, ...]:
         if domain in self._domain_dims:
@@ -79,9 +69,7 @@ class DistributedContext:
 
         Raises:
             ValueError: If the job has no parallelism or the context has no such domain.
-            RuntimeError: If the context is closed.
         """
-        self._check_open()
         self._dims_of(domain)
         if not self.is_distributed:
             raise ValueError(
@@ -101,7 +89,6 @@ class DistributedContext:
 
         Raises:
             ValueError: If the context has no such domain or the domain has no such dimension.
-            RuntimeError: If the context is closed.
         """
         self._dim_index(domain, self._dims_of(domain), dim)
         if not self.is_distributed:
@@ -169,12 +156,7 @@ class DistributedContext:
         return self._device
 
     def wait_world(self):
-        """Blocks until all ranks reach this point and the GPU of this rank finishes its queued work.
-
-        Raises:
-            RuntimeError: If the context is closed.
-        """
-        self._check_open()
+        """Blocks until all ranks reach this point and the GPU of this rank finishes its queued work."""
         if self.is_distributed:
             dist.barrier(device_ids=[self._device.index])
         torch.cuda.synchronize(self._device)
@@ -186,11 +168,7 @@ class DistributedContext:
 
         Args:
             timeout_seconds: The new timeout in seconds.
-
-        Raises:
-            RuntimeError: If the context is closed.
         """
-        self._check_open()
         if not self.is_distributed:
             return
 
@@ -208,11 +186,7 @@ class DistributedContext:
 
         Other ranks wait before entering the block. Local main processes wait after leaving it, so all ranks
         continue together.
-
-        Raises:
-            RuntimeError: If the context is closed.
         """
-        self._check_open()
         if not self.is_local_main_process:
             self.wait_world()
 
@@ -227,11 +201,7 @@ class DistributedContext:
 
         Other ranks wait before entering the block. The global main process waits after leaving it, so all ranks
         continue together.
-
-        Raises:
-            RuntimeError: If the context is closed.
         """
-        self._check_open()
         if not self.is_main_process:
             self.wait_world()
 
@@ -239,47 +209,3 @@ class DistributedContext:
 
         if self.is_main_process:
             self.wait_world()
-
-    def close(self):
-        """Destroys the process groups that the context created.
-
-        It destroys the default process group only if the context created it. A second call does nothing.
-        """
-        if self._closed:
-            return
-        self._closed = True
-        self._meshes.clear()
-        groups, self._groups = self._groups, []
-        # Destroying the default group destroys all groups, e.g. if the script already called
-        # destroy_process_group().
-        if not dist.is_initialized():
-            return
-        # Reverse order, as destroy_process_group() does: ncclCommAbort() is collective in some NCCL versions.
-        for group in reversed(groups):
-            dist.destroy_process_group(group)
-        if self._owns_default_group:
-            dist.destroy_process_group()
-
-    def __enter__(self) -> Self:
-        """Returns this context."""
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: TracebackType | None,
-    ):
-        """Closes this context.
-
-        If the block raised, the context keeps its process groups and only stops working, as after ``close()``.
-        """
-        if exc_value is None:
-            self.close()
-            return
-        # Destroying a group waits for the other ranks, which can wait in a collective with this rank, so the job
-        # would hang until the timeout. The process exits with the error instead, and the launcher stops the other
-        # ranks.
-        self._closed = True
-        self._meshes.clear()
-        self._groups = []
