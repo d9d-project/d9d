@@ -1,9 +1,17 @@
-from typing import Any
+from __future__ import annotations
+
+from contextlib import nullcontext
+from typing import TYPE_CHECKING, Any
 
 import torch
 from torch import nn
 
-from d9d.pipelining.api import PipelineComputeKind, PipelineSchedule, PipelineStepHandler
+from d9d.pipelining.api import PipelineComputeKind, PipelineSchedule, PipelineStepHandler, as_segments
+
+from ..stage.segments import SegmentChain, backward_chains, forward_chains
+
+if TYPE_CHECKING:
+    from d9d.parallel.runtime import ParameterRuntime
 
 
 class OfflinePipelineExecutor(PipelineSchedule[Any, Any, Any]):
@@ -14,15 +22,43 @@ class OfflinePipelineExecutor(PipelineSchedule[Any, Any, Any]):
     API.
     """
 
-    def __init__(self, model: nn.Module, do_backward: bool):
+    def __init__(self, model: nn.Module, do_backward: bool, runtime: ParameterRuntime | None = None):
         """Constructs the ``OfflinePipelineExecutor`` object.
 
         Args:
             model: The PyTorch module to execute.
             do_backward: Whether to execute the backward pass.
+            runtime: The ``ParameterRuntime`` that owns the unsharded parameters, or ``None`` to run the module as one
+                autograd graph.
         """
         self._model = model
         self._do_backward = do_backward
+        self._runtime = runtime
+        self._source = as_segments(model)
+
+    def _run_with_runtime(
+        self,
+        inputs: Any,
+        shared: Any,
+        microbatch_idx: int,
+        handler: PipelineStepHandler[Any],
+        final: bool,
+        runtime: ParameterRuntime,
+    ):
+        chain = SegmentChain(self._source, runtime.stage_segments(0), 0, runtime)
+        with handler.compute_context(PipelineComputeKind.forward, 0, microbatch_idx):
+            chain.start_forward(inputs, shared)
+            result = forward_chains([chain], runtime, 0, [nullcontext()])[0]
+        processing_result = handler.process_outputs(result, microbatch_idx)
+        if self._do_backward:
+            if not isinstance(processing_result, torch.Tensor):
+                raise ValueError(
+                    f"The result of process_outputs() ({type(processing_result).__name__}) must be a loss tensor."
+                )
+            del result
+            with handler.compute_context(PipelineComputeKind.backward, 0, microbatch_idx):
+                chain.start_backward([processing_result], None)
+                backward_chains([chain], runtime, 0, runtime.reduction_plan(0, final=final), [nullcontext()])
 
     def step(
         self,
@@ -42,6 +78,17 @@ class OfflinePipelineExecutor(PipelineSchedule[Any, Any, Any]):
         for microbatch_idx in range(num_microbatches):
             inputs = inputs_microbatches[microbatch_idx]
             shared = shared_microbatches[microbatch_idx]
+
+            if self._runtime is not None:
+                self._run_with_runtime(
+                    inputs,
+                    shared,
+                    microbatch_idx,
+                    handler,
+                    final=microbatch_idx == num_microbatches - 1,
+                    runtime=self._runtime,
+                )
+                continue
 
             with handler.compute_context(PipelineComputeKind.forward, 0, microbatch_idx):
                 result = self._model(inputs, shared)

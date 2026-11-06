@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import dataclasses
 import logging
 from typing import TYPE_CHECKING, Any
@@ -16,6 +18,7 @@ from .communications import PipelineCommunicationHandler
 from .program_cache import PipelineProgramCache
 
 if TYPE_CHECKING:
+    from d9d.parallel.runtime import ParameterRuntime
     from d9d.pipelining.program.builder import PipelineProgramBuilder
 
 _logger = logging.getLogger(__name__)
@@ -28,7 +31,7 @@ class _MicrobatchInputSpec:
     leaf_specs: tuple[TensorSpec, ...]
 
     @classmethod
-    def of(cls, microbatch: Any) -> "_MicrobatchInputSpec":
+    def of(cls, microbatch: Any) -> _MicrobatchInputSpec:
         """Builds a fingerprint from a single microbatch's ``PipelineInput``.
 
         Args:
@@ -56,7 +59,7 @@ class _BufferConfig:
     microbatches: tuple[_MicrobatchInputSpec, ...]
 
     @classmethod
-    def of(cls, inputs_microbatches: tuple[Any, ...]) -> "_BufferConfig":
+    def of(cls, inputs_microbatches: tuple[Any, ...]) -> _BufferConfig:
         """Builds a buffer config from the per-microbatch inputs of a pack.
 
         Args:
@@ -75,7 +78,8 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
         self,
         pp_group: ProcessGroup,
         stages: list[PipelineStage],
-        program_builder: "PipelineProgramBuilder",
+        program_builder: PipelineProgramBuilder,
+        runtime: ParameterRuntime | None = None,
     ):
         """Constructs the ``PipelineScheduleExecutor`` object.
 
@@ -83,9 +87,11 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
             pp_group: The pipeline-parallel process group.
             stages: List of stages managed by this executor.
             program_builder: Builder that composes the per-rank action program for a microbatch count.
+            runtime: The ``ParameterRuntime`` that owns the gradient reductions, or ``None`` if the stages run as one
+                autograd graph each.
         """
         self._stages = {stage.info.current_stage: stage for stage in stages}
-        self._programs = PipelineProgramCache(pp_group, program_builder)
+        self._programs = PipelineProgramCache(pp_group, program_builder, runtime)
         self._comm_handler = PipelineCommunicationHandler(self._stages)
 
         self._buffer_config: _BufferConfig | None = None
@@ -136,6 +142,7 @@ class PipelineScheduleExecutor(PipelineSchedule[Any, Any, Any]):
             pipeline_inputs_microbatches=inputs_microbatches,
             pipeline_shared_microbatches=shared_microbatches,
             handler=handler,
+            reductions=program.reductions,
         )
 
         try:
