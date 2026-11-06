@@ -3,6 +3,7 @@ import torch
 from d9d.dist_context import DENSE_DOMAIN, DenseDim, DeviceMeshParameters
 from d9d.loop.component import PipelinedOptimizer, TrackedModules
 from d9d.offload import OffloadContext, OnloadContext, offload_tensor, onload_tensor
+from d9d.rng import SeedScope, fork_rng
 from torch import nn
 from torch.distributed.tensor import DTensor, Replicate, Shard
 
@@ -160,4 +161,6 @@ def test_pipelined_optimizer_round_trip(dist_ctx_factory):
 
     # the optimizer remains usable after the round trip
     module(torch.randn(8, 64, device=device)).sum().backward()
-    optimizer.step()
+    # step() forks the generators from the seed scope that the training loop opens.
+    with fork_rng(SeedScope.root(0)):
+        optimizer.step()
