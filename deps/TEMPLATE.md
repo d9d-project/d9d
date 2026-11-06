@@ -54,8 +54,10 @@ What breaks for users, one item per change, and how they migrate.
 
 ## Alternatives Considered
 
-One subsection per alternative: what it is, which frameworks use it and why this design is better. Name the frameworks, and leave out references to files and lines.
+List only the alternatives a reviewer would raise: the current design, the design of another framework, or another answer to a question that this DEP decides. Leave out variants that a Design Principle already rules out.
+
+One subsection per alternative: what it is, which frameworks use it and what goes wrong with it. Name the frameworks, and leave out references to files and lines.
 
 ## Deferred Work
 
-What the DEP leaves out on purpose, with the reason or the issue that tracks it.
+What the DEP leaves out on purpose: what each item would give, and the reason or the issue that tracks it.
