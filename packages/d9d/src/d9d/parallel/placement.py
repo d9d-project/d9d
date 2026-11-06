@@ -1,6 +1,8 @@
 import dataclasses
 
-from torch.distributed.tensor import DTensor, Replicate, Shard
+from torch import nn
+from torch.distributed import DeviceMesh
+from torch.distributed.tensor import DTensor, Placement, Replicate, Shard, distribute_tensor
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
@@ -45,3 +47,22 @@ def split_placement_dims(data: DTensor) -> PlacementDims:
                 raise ValueError(f"Parameter placement ({placement}) is not supported. Use Replicate or Shard.")
 
     return PlacementDims(replicate_dim_names=tuple(replicate_dim_names), shard_dim_names=tuple(shard_dim_names))
+
+
+def distribute_parameters(module: nn.Module, mesh: DeviceMesh, placements: tuple[Placement, ...]):
+    """Turns the parameters of a module into ``DTensor`` objects without changing how the module runs.
+
+    A parameter that several submodules hold stays one parameter.
+
+    Args:
+        module: The module.
+        mesh: The device mesh.
+        placements: The placements of the parameters, one per mesh dimension.
+    """
+    distributed: dict[int, nn.Parameter] = {}
+    for submodule in module.modules():
+        for name, param in list(submodule.named_parameters(recurse=False, remove_duplicate=False)):
+            if id(param) not in distributed:
+                data = distribute_tensor(param.data, mesh, placements)
+                distributed[id(param)] = nn.Parameter(data, requires_grad=param.requires_grad)
+            submodule.register_parameter(name, distributed[id(param)])
