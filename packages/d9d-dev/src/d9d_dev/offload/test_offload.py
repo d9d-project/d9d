@@ -120,47 +120,47 @@ def test_pipelined_optimizer_round_trip(dist_ctx_factory):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
     device = dist_ctx.current_device
 
-    module = nn.Linear(64, 64).to(device)
-    inner = torch.optim.AdamW(module.parameters())
-
-    # populate the optimizer state with a step
-    module(torch.randn(8, 64, device=device)).sum().backward()
-    inner.step()
-
-    optimizer = PipelinedOptimizer({0: inner})
-    snapshots = {
-        id(param): {key: value.detach().clone() for key, value in state.items() if torch.is_tensor(value)}
-        for param, state in inner.state.items()
-    }
-    state_ids = {
-        id(param): {key: id(value) for key, value in state.items() if torch.is_tensor(value)}
-        for param, state in inner.state.items()
-    }
-
-    assert not optimizer.is_offloaded()
-    optimizer.offload(OffloadContext(device=dist_ctx.current_device, pin_memory=False))
-
-    assert optimizer.is_offloaded()
-    for param, state in inner.state.items():
-        for key, value in state.items():
-            if torch.is_tensor(value):
-                assert value.device.type == "cpu"
-                # the optimizer-state dict entry is the same tensor object as before offload
-                assert id(value) == state_ids[id(param)][key]
-
-    optimizer.onload(OnloadContext(device=dist_ctx.current_device))
-
-    assert not optimizer.is_offloaded()
-    for param, state in inner.state.items():
-        for key, value in state.items():
-            if torch.is_tensor(value):
-                assert value.device.type == "cuda"
-                # tensor object identity is preserved through the full round trip
-                assert id(value) == state_ids[id(param)][key]
-                assert torch.equal(value.detach().cpu(), snapshots[id(param)][key].cpu())
-
-    # the optimizer remains usable after the round trip
-    module(torch.randn(8, 64, device=device)).sum().backward()
-    # step() forks the generators from the seed scope that the training loop opens.
+    # The training loop runs the optimizer in a fork_rng(), and step() forks the generators from it.
     with fork_rng(SeedScope.root(0)):
+        module = nn.Linear(64, 64).to(device)
+        inner = torch.optim.AdamW(module.parameters())
+
+        # populate the optimizer state with a step
+        module(torch.randn(8, 64, device=device)).sum().backward()
+        inner.step()
+
+        optimizer = PipelinedOptimizer({0: inner})
+        snapshots = {
+            id(param): {key: value.detach().clone() for key, value in state.items() if torch.is_tensor(value)}
+            for param, state in inner.state.items()
+        }
+        state_ids = {
+            id(param): {key: id(value) for key, value in state.items() if torch.is_tensor(value)}
+            for param, state in inner.state.items()
+        }
+
+        assert not optimizer.is_offloaded()
+        optimizer.offload(OffloadContext(device=dist_ctx.current_device, pin_memory=False))
+
+        assert optimizer.is_offloaded()
+        for param, state in inner.state.items():
+            for key, value in state.items():
+                if torch.is_tensor(value):
+                    assert value.device.type == "cpu"
+                    # the optimizer-state dict entry is the same tensor object as before offload
+                    assert id(value) == state_ids[id(param)][key]
+
+        optimizer.onload(OnloadContext(device=dist_ctx.current_device))
+
+        assert not optimizer.is_offloaded()
+        for param, state in inner.state.items():
+            for key, value in state.items():
+                if torch.is_tensor(value):
+                    assert value.device.type == "cuda"
+                    # tensor object identity is preserved through the full round trip
+                    assert id(value) == state_ids[id(param)][key]
+                    assert torch.equal(value.detach().cpu(), snapshots[id(param)][key].cpu())
+
+        # the optimizer remains usable after the round trip
+        module(torch.randn(8, 64, device=device)).sum().backward()
         optimizer.step()
