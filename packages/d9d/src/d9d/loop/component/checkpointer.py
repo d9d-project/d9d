@@ -103,7 +103,9 @@ class StateCheckpointer:
             logger.info(f"Saving checkpoint {next_checkpoint_id}")
 
             save_from = {"state": state}
-            dcp.save(state_dict=save_from, checkpoint_id=next_checkpoint_id)
+            # Module.state_dict() detaches each parameter, and detaching a DTensor inside inference mode raises.
+            with torch.inference_mode(mode=False):
+                dcp.save(state_dict=save_from, checkpoint_id=next_checkpoint_id)
 
             self._purge_old_checkpoints()
             self._free_memory()
@@ -141,7 +143,9 @@ class StateCheckpointer:
         logger.info(f"Loading checkpoint {last_checkpoint}")
 
         load_into = {"state": state}
-        dcp.load(state_dict=load_into, checkpoint_id=last_checkpoint)
+        # Loading calls state_dict() too, so it must also run outside inference mode.
+        with torch.inference_mode(mode=False):
+            dcp.load(state_dict=load_into, checkpoint_id=last_checkpoint)
         self._free_memory()
 
         logger.info("Waiting for world after loading checkpoint")
