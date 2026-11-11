@@ -94,11 +94,13 @@ class ModelStateMapperSequential(ModelStateMapper):
     @staticmethod
     def _merge_groups(groups: Sequence[tuple[AbstractSet[str], AbstractSet[str]]]) -> frozenset[StateGroup]:
         saved_groups: list[tuple[set[str], set[str]]] = []
+        # Each pass reads back the groups it saved, so keep them in the (inputs, outputs) order of saved_groups.
+        groups = [(input_names, output_names) for output_names, input_names in groups]
 
         saved_groups_modified = True
         while saved_groups_modified:
             saved_groups_modified = False
-            for output_names, input_names in groups:
+            for input_names, output_names in groups:
                 was_new_group_created = False
                 for group in saved_groups:
                     if group[0].intersection(input_names) or group[1].intersection(output_names):
