@@ -1072,7 +1072,7 @@ wheels = [
 
 [[package]]
 name = "d9d"
-version = "0.25.0"
+version = "0.26.0"
 source = { editable = "packages/d9d" }
 dependencies = [
     { name = "d9d-kernels" },
@@ -1181,7 +1181,7 @@ requires-dist = [
 
 [[package]]
 name = "d9d-kernels"
-version = "0.25.0"
+version = "0.26.0"
 source = { editable = "packages/d9d-kernels" }
 dependencies = [
     { name = "torch" },

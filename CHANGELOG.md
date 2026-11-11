@@ -2,6 +2,143 @@
 
 <!-- version list -->
 
+## v0.26.0 (2026-11-11)
+
+### Bug Fixes
+
+- Test enviroment ([#121](https://github.com/d9d-project/d9d/pull/121),
+  [`339bccc`](https://github.com/d9d-project/d9d/commit/339bcccfefe748f9f936f3d7dc7b4d9988afbaaf))
+
+- **autograd**: Keep all weight gradients in the split backward pass
+  ([#147](https://github.com/d9d-project/d9d/pull/147),
+  [`866bcdc`](https://github.com/d9d-project/d9d/commit/866bcdc8325a65958aea2930c852b2c0f09c9d55))
+
+- **data**: Make the BufferSortedDataset order depend only on the seed and the buffer index
+  ([#138](https://github.com/d9d-project/d9d/pull/138),
+  [`6f9b837`](https://github.com/d9d-project/d9d/commit/6f9b837cf510b62e0fce9cbed8ec7607eb0ea10c))
+
+- **loop**: Keep tied parameters and buffers through materialization
+  ([#145](https://github.com/d9d-project/d9d/pull/145),
+  [`35aed27`](https://github.com/d9d-project/d9d/commit/35aed27f78aa8dbe64a91435d4f815c95e5f552d))
+
+- **loop**: Save and load checkpoints outside inference mode
+  ([#160](https://github.com/d9d-project/d9d/pull/160),
+  [`26919ef`](https://github.com/d9d-project/d9d/commit/26919ef796d8d36b3450c85b722ec6da39ce033a))
+
+- **loop**: Validate dtype names in configs ([#135](https://github.com/d9d-project/d9d/pull/135),
+  [`509a44d`](https://github.com/d9d-project/d9d/commit/509a44d996cace503dcf3efeee501be92def2f1d))
+
+- **model_state**: Keep inputs and outputs apart when Sequential merges groups
+  ([#172](https://github.com/d9d-project/d9d/pull/172),
+  [`45d3f3d`](https://github.com/d9d-project/d9d/commit/45d3f3d6aa1d82c47bed8f04a008c9c72585c162))
+
+- **nn**: Keep the dtype of dt_bias when MambaDecayGate resets parameters
+  ([#171](https://github.com/d9d-project/d9d/pull/171),
+  [`954a985`](https://github.com/d9d-project/d9d/commit/954a98532026e8ad1968e016cbafd483dd2d27af))
+
+- **optim**: Seed StochasticAdamW from an explicit seed
+  ([#139](https://github.com/d9d-project/d9d/pull/139),
+  [`abbe775`](https://github.com/d9d-project/d9d/commit/abbe77570e3923eb677ee9b9ff92ce48acefbe8e))
+
+- **parallel**: Reject unsupported placements in the gradient norm
+  ([#136](https://github.com/d9d-project/d9d/pull/136),
+  [`e61248a`](https://github.com/d9d-project/d9d/commit/e61248a5d7d4b134db82f0dc79b1cfecf6c7ed42))
+
+- **pipelining**: Release the forward cache after each step
+  ([#146](https://github.com/d9d-project/d9d/pull/146),
+  [`691e7a4`](https://github.com/d9d-project/d9d/commit/691e7a4fc01737d670976e73e87297f310900bdc))
+
+### Documentation
+
+- Add DEP writing rules and a dep agent skill ([#140](https://github.com/d9d-project/d9d/pull/140),
+  [`580bbd2`](https://github.com/d9d-project/d9d/commit/580bbd2c89fe0d1d743b0d0fac696723deda7159))
+
+- Add sections and rules for PR descriptions ([#162](https://github.com/d9d-project/d9d/pull/162),
+  [`16a728b`](https://github.com/d9d-project/d9d/commit/16a728bc654dc3c1008dfafa5a96988c52611009))
+
+- Add testing rules, design principles and a review agent skill
+  ([#159](https://github.com/d9d-project/d9d/pull/159),
+  [`ba8f6da`](https://github.com/d9d-project/d9d/commit/ba8f6dadd5abff7c05c9fff95c8ee0d7cf62f413))
+
+- Add the design principle that the owner of a resource closes it
+  ([#162](https://github.com/d9d-project/d9d/pull/162),
+  [`16a728b`](https://github.com/d9d-project/d9d/commit/16a728bc654dc3c1008dfafa5a96988c52611009))
+
+- Add the implement skill for agents ([#162](https://github.com/d9d-project/d9d/pull/162),
+  [`16a728b`](https://github.com/d9d-project/d9d/commit/16a728bc654dc3c1008dfafa5a96988c52611009))
+
+- Extend the contributing rules, the DEP template and the agent skills
+  ([#162](https://github.com/d9d-project/d9d/pull/162),
+  [`16a728b`](https://github.com/d9d-project/d9d/commit/16a728bc654dc3c1008dfafa5a96988c52611009))
+
+- **dep**: Add DEP-0011 scoped random number generation
+  ([#141](https://github.com/d9d-project/d9d/pull/141),
+  [`14c2efe`](https://github.com/d9d-project/d9d/commit/14c2efe18be7019224fe9654aaad986e2ca5c9aa))
+
+- **dep**: Add DEP-0012 rework of DistributedContext
+  ([#161](https://github.com/d9d-project/d9d/pull/161),
+  [`a4a51ff`](https://github.com/d9d-project/d9d/commit/a4a51ffa4f3b6d236e905e3e9cb9a6cc3545e962))
+
+- **dep**: Align DEP-0012 with its implementation
+  ([#161](https://github.com/d9d-project/d9d/pull/161),
+  [`a4a51ff`](https://github.com/d9d-project/d9d/commit/a4a51ffa4f3b6d236e905e3e9cb9a6cc3545e962))
+
+- **dep**: Check claims about PyTorch with a prototype in the dep skill
+  ([#162](https://github.com/d9d-project/d9d/pull/162),
+  [`16a728b`](https://github.com/d9d-project/d9d/commit/16a728bc654dc3c1008dfafa5a96988c52611009))
+
+- **dep**: Keep the groups of DEP-0012 on an error and read the coordinates from the mesh
+  ([#161](https://github.com/d9d-project/d9d/pull/161),
+  [`a4a51ff`](https://github.com/d9d-project/d9d/commit/a4a51ffa4f3b6d236e905e3e9cb9a6cc3545e962))
+
+- **dep**: List only the alternatives a reviewer would raise and say what deferred work gives
+  ([#162](https://github.com/d9d-project/d9d/pull/162),
+  [`16a728b`](https://github.com/d9d-project/d9d/commit/16a728bc654dc3c1008dfafa5a96988c52611009))
+
+- **dep**: Mark DEP-0012 as implemented in #166
+  ([#166](https://github.com/d9d-project/d9d/pull/166),
+  [`ba92108`](https://github.com/d9d-project/d9d/commit/ba9210813b47bc940adebe3796e9c2177ce72046))
+
+- **dist_context**: Describe init_dist_context(), the new domains and the mesh configuration
+  ([#166](https://github.com/d9d-project/d9d/pull/166),
+  [`ba92108`](https://github.com/d9d-project/d9d/commit/ba9210813b47bc940adebe3796e9c2177ce72046))
+
+- **pipelining**: Describe the step handler ([#154](https://github.com/d9d-project/d9d/pull/154),
+  [`5ee8e82`](https://github.com/d9d-project/d9d/commit/5ee8e82b45325607a614900400f61ead16aaebcb))
+
+### Features
+
+- **autograd**: Add needs_input_grad() for split backward
+  ([#134](https://github.com/d9d-project/d9d/pull/134),
+  [`2ccccbc`](https://github.com/d9d-project/d9d/commit/2ccccbcffac129bcc8105f50202123190fbc0afb))
+
+- **dist_context**: Add declarative domains and split the mesh parameters into degrees and sections
+  ([#166](https://github.com/d9d-project/d9d/pull/166),
+  [`ba92108`](https://github.com/d9d-project/d9d/commit/ba9210813b47bc940adebe3796e9c2177ce72046))
+
+- **dist_context**: Build the context with init_dist_context() and move all users to the new domains
+  ([#166](https://github.com/d9d-project/d9d/pull/166),
+  [`ba92108`](https://github.com/d9d-project/d9d/commit/ba9210813b47bc940adebe3796e9c2177ce72046))
+
+- **dist_context**: Implement DEP-0012 rework of DistributedContext
+  ([#166](https://github.com/d9d-project/d9d/pull/166),
+  [`ba92108`](https://github.com/d9d-project/d9d/commit/ba9210813b47bc940adebe3796e9c2177ce72046))
+
+- **pipelining**: Replace the step callbacks with PipelineStepHandler
+  ([#154](https://github.com/d9d-project/d9d/pull/154),
+  [`5ee8e82`](https://github.com/d9d-project/d9d/commit/5ee8e82b45325607a614900400f61ead16aaebcb))
+
+- **rng**: Seed each call of user code from its own seed scope
+  ([#157](https://github.com/d9d-project/d9d/pull/157),
+  [`b63324a`](https://github.com/d9d-project/d9d/commit/b63324acae5dab958fe4ee4aab1b5fb9d78a0ed9))
+
+### Performance Improvements
+
+- **pytree**: Find unregistered dataclasses without a Python pass over all leaves
+  ([#137](https://github.com/d9d-project/d9d/pull/137),
+  [`915833f`](https://github.com/d9d-project/d9d/commit/915833ffbc00bf630581a6f1c9fd3c82d1b91540))
+
+
 ## v0.25.0 (2026-10-29)
 
 ### Bug Fixes
