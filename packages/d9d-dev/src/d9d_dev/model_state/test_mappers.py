@@ -157,6 +157,17 @@ def test_sequential_composition_chaining():
 
 
 @pytest.mark.local
+def test_sequential_composition_split_then_separate_groups():
+    # a -> (b, c), then b and c pass in separate groups: both trace back to a, so the groups merge.
+    m1 = ModelStateMapperChunkTensors(source_name="a", target_names=["b", "c"], dim=0)
+    m2 = ModelStateMapperParallel([ModelStateMapperIdentity("b"), ModelStateMapperIdentity("c")])
+    seq = ModelStateMapperSequential([m1, m2])
+
+    expected_groups = frozenset([StateGroup(inputs=frozenset(["a"]), outputs=frozenset(["b", "c"]))])
+    assert seq.state_dependency_groups() == expected_groups
+
+
+@pytest.mark.local
 def test_shard_mapper():
     # Create 4 independent tasks
     mappers = [ModelStateMapperRename(f"in_{i}", f"out_{i}") for i in range(4)]
