@@ -165,7 +165,7 @@ class MambaDecayGate(nn.Module, ModuleLateInit):
             torch.rand(self._num_heads, device=self.dt_bias.device) * (math.log(self._dt_max) - math.log(self._dt_min))
             + math.log(self._dt_min)
         ).clamp(min=self._dt_init_floor)
-        self.dt_bias.data = dt + torch.log(-torch.expm1(-dt))
+        self.dt_bias.data = (dt + torch.log(-torch.expm1(-dt))).to(self.dt_bias.dtype)
 
 
 class MambaDecayGateParameters(BaseModel):

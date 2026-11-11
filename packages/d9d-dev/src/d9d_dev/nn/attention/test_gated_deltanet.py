@@ -180,3 +180,12 @@ def test_consistent_to_hf(
     torch.testing.assert_close(out_d9d, out_hf, atol=1e-2, rtol=1e-2)
     torch.testing.assert_close(inputs_d9d.pre.grad, inputs_hf.pre.grad, atol=1e-6, rtol=0.01)
     assert_mapped_gradients_close(from_module=module_hf, to_module=module_d9d, map_with=mapper)
+
+
+@pytest.mark.local
+def test_reset_parameters_keeps_dtype():
+    module = build_d9d(torch.bfloat16, num_qk_heads=4, num_value_heads=8)
+
+    module.reset_parameters()
+
+    assert {param.dtype for param in module.parameters()} == {torch.bfloat16}
