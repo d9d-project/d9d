@@ -2,7 +2,7 @@
 
 ## About
 
-This page explains how the `ParameterRuntime` gathers weights, reduces gradients and bounds its memory. It is for readers who change the runtime or the pipeline program that drives it.
+This page explains how the [`ParameterRuntime`](./runtime.md) gathers weights, reduces gradients and bounds its memory. It is for readers who change the runtime or the pipeline program that drives it.
 
 ## Lifecycle
 
@@ -85,7 +85,5 @@ The first forward gathers groups on demand. Later forwards prefetch using the re
 ## API Reference
 
 ::: d9d.parallel.runtime.memory
-
-::: d9d.parallel.runtime
 
 ::: d9d.pipelining.stage.windows

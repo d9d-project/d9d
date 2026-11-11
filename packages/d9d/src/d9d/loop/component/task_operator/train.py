@@ -145,7 +145,6 @@ class TrainTaskOperator(typing.Generic[TBatch, TPipelineInput, TSharedInput, TPi
                 inputs_microbatches, shared_microbatches = build_pipeline_microbatch_inputs(
                     task=self._task, pipeline_state=self._pipeline_state, pack=pack
                 )
-                self._gradient_manager.set_required_accumulations(len(pack))
                 self._pipeline.schedule.step(
                     inputs_microbatches=inputs_microbatches,
                     shared_microbatches=shared_microbatches,

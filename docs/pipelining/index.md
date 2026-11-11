@@ -44,7 +44,7 @@ To use pipeline parallelism, your model implements `d9d.pipelining.api.ModuleSup
 *   **`forward(inputs, shared)`**: `inputs` is the `PipelineInput` on the first stage and the incoming `StageTransfer` on the other stages. It returns the outgoing `StageTransfer` on non-last stages and the `PipelineOutput` on the last stage. The stage knows its position from the `PipelineStageInfo` it gets at construction. It branches on `is_current_stage_first` and `is_current_stage_last` explicitly.
 *   **`stage_transfer_spec(pipeline_input, boundary)`**: Returns a PyTree with the same structure as `StageTransfer`, with every tensor leaf replaced by a `TensorSpec`. The `boundary` (`StageBoundary.incoming` or `outgoing`) selects which stage edge to describe.
 
-To let the [Parameter Runtime](../parallel/runtime_internals.md) gather weights layer by layer, a model can also describe its stage as segments.
+To let the [Parameter Runtime](../parallel/runtime.md) gather weights layer by layer, a model can also expose resumable forward boundaries (see [Model Design](../models/model_design.md#parameter-groups)).
 
 The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* have the same dataclass type. So `pytree.tree_flatten` gives the same leaf order on both ends. Sender and receiver agree on the order by construction, and they need no handshake.
 
@@ -230,7 +230,7 @@ To use pipelining outside the `Trainer`, for example in a custom loop, call the 
 
 `build_schedule` takes a model provider instead of a built model. The model provider is a function that accepts a `PipelineStageInfo` and returns the `nn.Module` for that stage. This keeps construction consistent.
 
-`build_schedule` also takes the program builder of the schedule, and a `ParameterRuntime` if the model uses data parallelism (see [Parameter Runtime](../parallel/runtime_internals.md)). `build_program_builder` builds it from a schedule config. You can also pass your own builder (see [Building Custom Schedules](./internals.md#building-custom-schedules)).
+`build_schedule` also takes the program builder of the schedule, and a `ParameterRuntime` if the model uses data parallelism (see [Parameter Runtime](../parallel/runtime.md#usage)). `build_program_builder` builds it from a schedule config. You can also pass your own builder (see [Building Custom Schedules](./internals.md#building-custom-schedules)).
 
 ```python
 import torch.nn.functional as F

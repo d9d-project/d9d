@@ -35,6 +35,10 @@ _GRAD_TOLERANCE_BY_DTYPE: Final[dict[torch.dtype, GradTolerance]] = {
 }
 
 
+# bf16 gradients that a distributed run sums in another order than one GPU, e.g. over experts or replicas, drift
+# by a few bf16 ulps of the largest values.
+BF16_REORDERED_SUM_TOLERANCE: Final[Tolerance] = Tolerance(atol=5e-3, rtol=1e-2)
+
 # fp32 gradients that a graph cut into regions sums in another order than one graph, e.g. over the experts of a MoE
 # layer, drift by a few fp32 ulps of the largest values.
 FP32_REORDERED_SUM_TOLERANCE: Final[Tolerance] = Tolerance(atol=1e-4, rtol=1e-4)

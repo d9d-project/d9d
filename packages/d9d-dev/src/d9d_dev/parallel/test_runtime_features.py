@@ -1,10 +1,11 @@
 import pytest
 import torch
 import torch.distributed as dist
-from d9d.dist_context import BASE_DOMAIN, BaseDim
-from d9d.models import DecoderForCausalLM
-from d9d.models.qwen3_dense import Qwen3DenseModel
+from d9d.dist_context import BASE_DOMAIN, DENSE_DOMAIN, BaseDim, DenseDim
+from d9d.models import DecoderForCausalLM, parallelize_causal_lm_head
+from d9d.models.qwen3_dense import Qwen3DenseModel, parallelize_qwen3_dense_model
 from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
+from d9d.parallel import parallelize_hsdp
 from d9d.pipelining.api import PipelineStageInfo, mark_window, run_steps
 from d9d.pipelining.factory import (
     PipelineScheduleGPipeConfig,
@@ -22,7 +23,6 @@ from d9d_dev.parallel.runtime_step import (
     global_weight,
     local,
     make_runtime,
-    place_hsdp,
     shard_of,
 )
 from d9d_dev.pipelining.step_handler import FunctionStepHandler
@@ -123,7 +123,8 @@ def test_own_model(dist_ctx_factory, mesh, model_type, data, budget):
     def _provider(stage):
         with torch.device("meta"):
             model = model_type()
-        place_hsdp(model, dist_ctx)
+        layout = dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_REPLICATE, DenseDim.DP_CP_SHARD, DenseDim.CP_REPLICATE]
+        parallelize_hsdp(model, mesh=layout, shard_dim=DenseDim.DP_CP_SHARD)
         model.to_empty(device="cuda")
         _set_weights(model)
         built["model"] = model
@@ -178,7 +179,8 @@ def _distributed_model(dist_ctx, stage, freeze):
     if freeze:
         for name, param in model.named_parameters():
             param.requires_grad_(not _is_frozen(name))
-    place_hsdp(model, dist_ctx)
+    parallelize_qwen3_dense_model(dist_ctx, model.model, stage)
+    parallelize_causal_lm_head(model.head, dist_ctx)
     model.to_empty(device="cuda")
     with torch.no_grad():
         model.reset_parameters()

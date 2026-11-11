@@ -3,14 +3,13 @@ from collections.abc import Callable
 from typing import Any
 
 import torch
-from d9d.dist_context import DATA_SHARD_DIMS, DENSE_DOMAIN, DenseDomainConfig, DeviceMeshParameters, DistributedContext
+from d9d.dist_context import DATA_SHARD_DIMS, DenseDomainConfig, DeviceMeshParameters
 from d9d.models.io import SequenceHeadShared, SequenceInput, SequenceShared
 from d9d.models.qwen3_dense import Qwen3DenseLayerParameters, Qwen3DenseParameters
 from d9d.nn.head import SequenceCausalLMHeadShared
-from d9d.parallel import distribute_parameters
 from d9d.parallel.runtime import ParameterRuntime
 from torch import nn
-from torch.distributed.tensor import DTensor, Replicate, Shard
+from torch.distributed.tensor import DTensor, Shard
 
 MESHES = [
     DeviceMeshParameters(data_parallel=8, dense=DenseDomainConfig(data_parallel_shard=8)),
@@ -74,14 +73,6 @@ def shard_of(full: torch.Tensor, param: DTensor) -> torch.Tensor:
             rows = -(-full.shape[placement.dim] // sub_mesh.size())
             return full.narrow(placement.dim, rows * sub_mesh.get_local_rank(), local(param).shape[placement.dim])
     return full
-
-
-def place_hsdp(module: nn.Module, dist_ctx: DistributedContext):
-    """Places the parameters of a module for HSDP on the dense mesh, as a ParameterRuntime expects them."""
-    mesh = dist_ctx.mesh_for(DENSE_DOMAIN)["dp_replicate", "dp_cp_shard", "cp_replicate"]
-    dims = tuple(name for name in mesh.mesh_dim_names or () if mesh[name].size() > 1)
-    if dims:
-        distribute_parameters(module, mesh[dims], tuple(Shard(0) if x == "dp_cp_shard" else Replicate() for x in dims))
 
 
 def make_runtime(bucket_size_mib: int = 32, **kwargs: Any) -> ParameterRuntime:

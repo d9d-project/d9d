@@ -1,8 +1,10 @@
 import pytest
 import torch
 from d9d.dist_context import DENSE_DOMAIN, DenseDim, DeviceMeshParameters
-from d9d.loop.component import PipelinedOptimizer, TrackedModules
+from d9d.loop.component import PipelinedOptimizer, TrackedModules, build_parameter_runtime
+from d9d.loop.config import ParameterRuntimeConfig
 from d9d.offload import OffloadContext, OnloadContext, offload_tensor, onload_tensor
+from d9d.rng import SeedScope, fork_rng
 from torch import nn
 from torch.distributed.tensor import DTensor, Replicate, Shard
 
@@ -34,7 +36,9 @@ def test_offload_tensor_round_trip(dtype):
 @pytest.mark.local
 def test_tracked_modules_offload_guards(dist_ctx_factory):
     dist_ctx = dist_ctx_factory(DeviceMeshParameters())
-    tracked = TrackedModules(dist_ctx, {0: nn.Linear(8, 4)}, lambda _name, _tensor: True)
+    tracked = TrackedModules(
+        dist_ctx, {0: nn.Linear(8, 4)}, lambda _name, _tensor: True, build_parameter_runtime(ParameterRuntimeConfig())
+    )
     offload_ctx = OffloadContext(device=dist_ctx.current_device, pin_memory=False)
 
     assert not tracked.is_offloaded()
@@ -89,7 +93,9 @@ def test_tracked_modules_round_trip(dist_ctx_factory):
     module = nn.Sequential(nn.Linear(2048, 2048), nn.Linear(2048, 2048), nn.Linear(2048, 2048)).to(device)
     param_bytes = sum(p.numel() * p.element_size() for p in module.parameters())
 
-    tracked = TrackedModules(dist_ctx, {0: module}, lambda _name, _tensor: True)
+    tracked = TrackedModules(
+        dist_ctx, {0: module}, lambda _name, _tensor: True, build_parameter_runtime(ParameterRuntimeConfig())
+    )
     params = list(module.parameters())
     snapshots = [p.detach().clone() for p in params]
 
@@ -160,4 +166,6 @@ def test_pipelined_optimizer_round_trip(dist_ctx_factory):
 
     # the optimizer remains usable after the round trip
     module(torch.randn(8, 64, device=device)).sum().backward()
-    optimizer.step()
+    # PipelinedOptimizer.step() forks the generators from the seed scope of the loop.
+    with fork_rng(SeedScope.root(0)):
+        optimizer.step()
