@@ -140,11 +140,12 @@ class Qwen3MoEModel(
             first_inputs = cast(SequenceInput, inputs)
             last_hidden_states = self.embed_tokens(first_inputs.input_ids)
             hidden_states_snapshot = None
-            state_aggregator.add_hidden_states(last_hidden_states)
+            collected = state_aggregator.collect(last_hidden_states)
         else:
             transfer_inputs = cast(SequenceTransfer[torch.Tensor], inputs)
             last_hidden_states = transfer_inputs.hidden_states
             hidden_states_snapshot = transfer_inputs.hidden_states_snapshot
+            collected = ()
 
         rope_params = self.rope_provider(shared.position_ids)
 
@@ -158,14 +159,14 @@ class Qwen3MoEModel(
             else:
                 last_hidden_states = decoder_layer(last_hidden_states, rope_params)
 
-            state_aggregator.add_hidden_states(last_hidden_states)
+            collected += state_aggregator.collect(last_hidden_states)
 
         if self._stage.is_current_stage_last:
             last_hidden_states = self.norm(last_hidden_states)
 
         return SequenceTransfer(
             hidden_states=last_hidden_states,
-            hidden_states_snapshot=state_aggregator.pack_with_snapshot(hidden_states_snapshot),
+            hidden_states_snapshot=state_aggregator.pack(collected, hidden_states_snapshot),
         )
 
     def reset_parameters(self):
