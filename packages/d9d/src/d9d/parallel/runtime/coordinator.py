@@ -283,6 +283,29 @@ class ParameterRuntime:
         bound.ledger.ensure_budget(minimum_stage_budget([bucket.plan for bucket in state.buckets], order) + retained)
 
     @contextmanager
+    def compute_parameters(self, stage_index: int) -> Generator[None, None, None]:
+        """Puts the unsharded parameters of a stage into its modules without their values.
+
+        Code can read the shapes and dtypes that the stage computes with, e.g. to describe its transfers. The
+        weights are not gathered, so the code must not read their values.
+
+        Args:
+            stage_index: The index of the stage.
+
+        Yields:
+            Nothing.
+
+        Raises:
+            ValueError: If the runtime is not bound.
+        """
+        handles = self._require_bound().stages[stage_index].handles
+        bind_parameters(handles, unsharded=True)
+        try:
+            yield
+        finally:
+            bind_parameters(handles, unsharded=False)
+
+    @contextmanager
     def group_weights(
         self, stage_index: int, group_index: int, prepare: Sequence[BucketId] = (), next_group: int | None = None
     ) -> Generator[None, None, None]:
