@@ -16,7 +16,15 @@ from d9d.nn.head import (
     SplitLanguageModellingHead,
     TaskHead,
 )
-from d9d.pipelining.api import ModuleSupportsPipelining, PipelineStageInfo, StageBoundary, TensorSpec
+from d9d.pipelining.api import (
+    ModuleSupportsPipelining,
+    PipelineStageInfo,
+    StageBoundary,
+    TensorSpec,
+    WindowSteps,
+    mark_window,
+    run_steps,
+)
 
 from .backbone import DecoderBackbone
 from .head import (
@@ -89,12 +97,14 @@ class DecoderWithHeads(
         super().__init__()
 
         self.model = backbone
+        mark_window(cast(nn.Module, backbone))
         self._stage = stage
 
         if stage.is_current_stage_last:
             self.heads: Mapping[str, TaskHead[THeadShared, THeadOutput]] = cast(
                 Mapping[str, TaskHead[THeadShared, THeadOutput]], nn.ModuleDict(dict(heads))
             )
+            mark_window(cast(nn.Module, self.heads))
 
     def forward(
         self,
@@ -114,12 +124,31 @@ class DecoderWithHeads(
             The produced ``SequenceTransfer`` on non-last stages, or each head's output keyed by
                 head name on the last stage.
         """
-        model_outputs = self.model(inputs, shared.sequence)
+        return run_steps(self, inputs, shared)
 
+    async def forward_steps(
+        self,
+        steps: WindowSteps,
+        inputs: SequenceInput | SequenceTransfer[torch.Tensor],
+        shared: SequenceHeadsShared[THeadShared],
+    ) -> SequenceTransfer[torch.Tensor] | SequenceHeadsOutput[THeadOutput]:
+        """Runs the resumable backbone and the attached heads.
+
+        Args:
+            steps: The execution boundaries of this forward.
+            inputs: Token ids or the incoming stage transfer.
+            shared: The backbone and head inputs of this microbatch.
+
+        Returns:
+            The backbone transfer, or the head outputs on the last stage.
+        """
+        model_outputs = await steps.call(cast(nn.Module, self.model), inputs, shared.sequence)
         if not self._stage.is_current_stage_last:
             return model_outputs
-
-        return {name: head(model_outputs.hidden_states, shared.heads[name]) for name, head in self.heads.items()}
+        model_outputs, heads_shared = await steps.enter(cast(nn.Module, self.heads), (model_outputs, shared.heads))
+        return await steps.finish(
+            {name: head(model_outputs.hidden_states, heads_shared[name]) for name, head in self.heads.items()}
+        )
 
     def reset_parameters(self) -> None:
         """Resets the parameters of the backbone and of every head."""
@@ -188,10 +217,12 @@ class DecoderWithHead(
         super().__init__()
 
         self.model = backbone
+        mark_window(cast(nn.Module, backbone))
         self._stage = stage
 
         if stage.is_current_stage_last:
             self.head: THead = head
+            mark_window(head)
 
     def forward(
         self,
@@ -208,12 +239,28 @@ class DecoderWithHead(
             The produced ``SequenceTransfer`` on non-last stages, or the head's output on the last
                 stage.
         """
-        model_outputs = self.model(inputs, shared.sequence)
+        return run_steps(self, inputs, shared)
 
+    async def forward_steps(
+        self,
+        steps: WindowSteps,
+        inputs: SequenceInput | SequenceTransfer[torch.Tensor],
+        shared: SequenceHeadShared[THeadShared],
+    ) -> SequenceTransfer[torch.Tensor] | THeadOutput:
+        """Runs the resumable backbone and the attached heads.
+
+        Args:
+            steps: The execution boundaries of this forward.
+            inputs: Token ids or the incoming stage transfer.
+            shared: The backbone and head inputs of this microbatch.
+
+        Returns:
+            The backbone transfer, or the head outputs on the last stage.
+        """
+        model_outputs = await steps.call(cast(nn.Module, self.model), inputs, shared.sequence)
         if not self._stage.is_current_stage_last:
             return model_outputs
-
-        return self.head(model_outputs.hidden_states, shared.head)
+        return await steps.call(self.head, model_outputs.hidden_states, shared.head)
 
     def reset_parameters(self) -> None:
         """Resets the parameters of the backbone and of the head."""
