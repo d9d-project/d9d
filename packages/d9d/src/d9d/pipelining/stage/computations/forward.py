@@ -1,9 +1,23 @@
+from __future__ import annotations
+
 import dataclasses
-from typing import Generic
+from collections.abc import Sequence
+from contextlib import AbstractContextManager, nullcontext
+from typing import TYPE_CHECKING, Generic, cast
 
 from torch import nn
 
-from d9d.pipelining.api import TPipelineInput, TPipelineOutput, TSharedInput, TStageTransfer
+from d9d.pipelining.api import (
+    TPipelineInput,
+    TPipelineOutput,
+    TSharedInput,
+    TStageTransfer,
+)
+
+from ..windows import WindowChain, forward_chains
+
+if TYPE_CHECKING:
+    from d9d.parallel.runtime import ParameterRuntime
 
 
 @dataclasses.dataclass(slots=True)
@@ -15,10 +29,12 @@ class ForwardCache(Generic[TPipelineInput, TStageTransfer, TPipelineOutput]):
             PyTree.
         outputs: The stage's produced ``StageTransfer`` (or ``PipelineOutput`` on the last stage) as a
             PyTree.
+        chain: The executed regions, or ``None`` if the stage ran as one autograd graph.
     """
 
     inputs: TPipelineInput | TStageTransfer
     outputs: TStageTransfer | TPipelineOutput
+    chain: WindowChain | None = None
 
 
 class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipelineOutput]):
@@ -27,15 +43,18 @@ class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput
     It caches the inputs and outputs of each microbatch for the backward pass.
     """
 
-    def __init__(self, stage_index: int, module: nn.Module):
+    def __init__(self, stage_index: int, module: nn.Module, runtime: ParameterRuntime | None = None):
         """Constructs the ``ForwardComputeHandler`` object.
 
         Args:
             stage_index: Logical index of the stage.
             module: The module that runs this stage.
+            runtime: The ``ParameterRuntime`` that owns the unsharded parameters, or ``None`` to run the module as one
+                autograd graph.
         """
         self._stage_idx = stage_index
         self._module = module
+        self._runtime = runtime
 
         self._cache: dict[int, ForwardCache[TPipelineInput, TStageTransfer, TPipelineOutput]] = {}
 
@@ -50,6 +69,11 @@ class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput
         Raises:
             RuntimeError: If the module forward pass raises. The original exception is chained.
         """
+        if self._runtime is not None:
+            # The caller already holds the compute context of this microbatch.
+            self.run_window([microbatch_index], [inputs], [shared], [nullcontext()])
+            return
+
         try:
             output = self._module(inputs, shared)
         except Exception as e:
@@ -59,9 +83,50 @@ class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput
 
         self._cache[microbatch_index] = ForwardCache(inputs=inputs, outputs=output)
 
-    def reset(self):
-        """Releases cached forward inputs and outputs."""
-        self._cache.clear()
+    def run_window(
+        self,
+        microbatches: list[int],
+        inputs: Sequence[TPipelineInput | TStageTransfer],
+        shared: Sequence[TSharedInput],
+        contexts: Sequence[AbstractContextManager[None]],
+    ):
+        """Runs the forward pass of several microbatches, region by region.
+
+        Each region gets its weights once for all of them. It needs a ``ParameterRuntime``.
+
+        Args:
+            microbatches: The microbatch identifiers.
+            inputs: The stage input of each microbatch.
+            shared: The ``SharedInput`` of each microbatch.
+            contexts: The compute context of each microbatch. Each is entered once per region.
+
+        Raises:
+            ValueError: If the stage has no ``ParameterRuntime``.
+            RuntimeError: If a forward pass raises. The original exception is chained.
+        """
+        runtime = self._runtime
+        if runtime is None:
+            raise ValueError(f"Stage ({self._stage_idx}) has no ParameterRuntime, so it cannot run a window.")
+        chains = [self._new_chain(runtime) for _ in microbatches]
+        try:
+            for chain, chain_inputs, chain_shared, context in zip(chains, inputs, shared, contexts, strict=True):
+                with context:
+                    chain.start_forward(chain_inputs, chain_shared)
+            outputs = forward_chains(chains, runtime, self._stage_idx, contexts)
+        except Exception as e:
+            for chain, context in zip(chains, contexts, strict=True):
+                with context:
+                    chain.close()
+            raise RuntimeError(
+                f"The forward pass failed on stage ({self._stage_idx}) for microbatches ({microbatches})."
+            ) from e
+
+        for position, microbatch in enumerate(microbatches):
+            output = cast(TStageTransfer | TPipelineOutput, outputs[position])
+            self._cache[microbatch] = ForwardCache(inputs=inputs[position], outputs=output, chain=chains[position])
+
+    def _new_chain(self, runtime: ParameterRuntime) -> WindowChain:
+        return WindowChain(self._module, self._stage_idx, runtime)
 
     def get_outputs(self, microbatch_index: int) -> TStageTransfer | TPipelineOutput:
         """Retrieves cached outputs for a specific microbatch without removing them.
@@ -74,10 +139,12 @@ class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput
         """
         return self._cache[microbatch_index].outputs
 
-    def pop_inputs_outputs(
-        self, microbatch_index: int
-    ) -> tuple[TPipelineInput | TStageTransfer, TStageTransfer | TPipelineOutput]:
-        """Retrieves and removes the cached inputs and outputs for a specific microbatch.
+    def reset(self):
+        """Releases cached forward inputs, outputs and region graphs."""
+        self._cache.clear()
+
+    def pop_cache(self, microbatch_index: int) -> ForwardCache[TPipelineInput, TStageTransfer, TPipelineOutput]:
+        """Retrieves and removes the cached forward pass of a microbatch.
 
         The backward pass calls it.
 
@@ -85,7 +152,6 @@ class ForwardComputeHandler(Generic[TPipelineInput, TStageTransfer, TSharedInput
             microbatch_index: Identifier for the microbatch.
 
         Returns:
-            A tuple containing (inputs, outputs).
+            The inputs, the outputs and the executed regions of the forward pass.
         """
-        cache = self._cache.pop(microbatch_index)
-        return cache.inputs, cache.outputs
+        return self._cache.pop(microbatch_index)

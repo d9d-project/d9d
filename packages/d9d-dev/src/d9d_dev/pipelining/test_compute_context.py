@@ -2,7 +2,10 @@ from contextlib import contextmanager
 
 import pytest
 import torch
-from d9d.pipelining.api import PipelineComputeKind, PipelineStageInfo, PipelineStepHandler
+import torch.nn.functional as F
+from d9d.dist_context import BASE_DOMAIN, BaseDim, DeviceMeshParameters
+from d9d.pipelining.api import PipelineComputeKind, PipelineStageInfo, PipelineStepHandler, mark_window, run_steps
+from d9d.pipelining.factory import PipelineScheduleGPipeConfig, build_program_builder, build_schedule
 from d9d.pipelining.runtime import (
     BackwardFullInputComputeAction,
     BackwardWeightComputeAction,
@@ -11,7 +14,10 @@ from d9d.pipelining.runtime import (
 )
 from d9d.pipelining.runtime.action import ActionContext
 from d9d.pipelining.runtime.callback import PipelineLossHandler
+from d9d.rng import SeedScope, fork_rng, fork_rng_child
 from torch import nn
+
+from d9d_dev.parallel.runtime_step import make_runtime
 
 
 class _Recorder(PipelineStepHandler[torch.Tensor]):
@@ -40,10 +46,10 @@ class _FakeStage:
     def get_pipeline_output(self, microbatch_index):
         return torch.ones(2)
 
-    def backward_one_chunk(self, microbatch_index, loss, full_backward):
+    def backward_one_chunk(self, microbatch_index, loss, full_backward, final=None):
         self._recorder.events.append(("backward", microbatch_index))
 
-    def backward_weight_one_chunk(self, microbatch_index):
+    def backward_weight_one_chunk(self, microbatch_index, final=None):
         self._recorder.events.append(("backward_weight", microbatch_index))
 
 
@@ -107,3 +113,68 @@ def test_offline_executor_opens_the_compute_context_without_process_outputs():
             ("exit", PipelineComputeKind.backward, 0, microbatch_idx),
         ]
     ]
+
+
+class _DropoutLayer(nn.Linear):
+    def forward(self, activations, constants):
+        return F.dropout(super().forward(activations), 0.5)
+
+
+class _DropoutChain(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.layers = nn.ModuleList(mark_window(_DropoutLayer(8, 8, bias=False, device="cuda")) for _ in range(3))
+
+    def reset_parameters(self):
+        for layer in self.layers:
+            layer.reset_parameters()
+
+    async def forward_steps(self, steps, inputs, shared):
+        for layer in self.layers:
+            inputs = await steps.call(layer, inputs, shared)
+        return inputs
+
+    def forward(self, inputs, shared):
+        return run_steps(self, inputs, shared)
+
+
+class _ForkingHandler(PipelineStepHandler[torch.Tensor]):
+    def __init__(self):
+        self.outputs = {}
+
+    def compute_context(self, kind: PipelineComputeKind, stage_idx: int, microbatch_idx: int):
+        return fork_rng_child(kind.value, stage_idx, microbatch_idx)
+
+    def process_outputs(self, outputs: torch.Tensor, microbatch_idx: int) -> torch.Tensor:
+        self.outputs[microbatch_idx] = outputs.detach().clone()
+        return outputs.sum()
+
+
+@pytest.mark.distributed
+def test_window_draws_the_numbers_of_one_compute(dist_ctx_factory):
+    # Without pipeline parallelism, the runtime runs one region of all microbatches before the next region.
+    dist_ctx = dist_ctx_factory(DeviceMeshParameters(data_parallel=8))
+    model = _DropoutChain()
+    runtime = make_runtime()
+    schedule_info, _ = build_schedule(
+        pp_mesh=dist_ctx.mesh_for(BASE_DOMAIN)[BaseDim.PP],
+        program_builder=build_program_builder(PipelineScheduleGPipeConfig()),
+        model_provider=lambda _stage: model,
+        runtime=runtime,
+    )
+    inputs = torch.randn(4, 2, 8, device="cuda")
+    handler = _ForkingHandler()
+    scope = SeedScope.root(0)
+    runtime.bind()
+    try:
+        runtime.zero_grad()
+        with fork_rng(scope):
+            schedule_info.schedule.step(tuple(inputs), (None,) * len(inputs), handler)
+        runtime.wait()
+    finally:
+        runtime.unbind()
+
+    for microbatch, microbatch_inputs in enumerate(inputs):
+        with torch.no_grad(), fork_rng(scope.child("forward", 0, microbatch)):
+            expected = model(microbatch_inputs, None)
+        assert torch.equal(handler.outputs[microbatch], expected)

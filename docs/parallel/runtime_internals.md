@@ -2,7 +2,7 @@
 
 ## About
 
-This page explains how the `ParameterRuntime` gathers weights, reduces gradients and bounds its memory. It is for readers who change the runtime or the code that drives it.
+This page explains how the `ParameterRuntime` gathers weights, reduces gradients and bounds its memory. It is for readers who change the runtime or the pipeline program that drives it.
 
 ## Lifecycle
 
@@ -69,10 +69,23 @@ The budget is a target with a floor: the runtime raises a smaller budget to the 
 5.  It puts the unsharded parameters into the modules and runs the block.
 6.  It frees the weights of the buckets that the budget does not keep.
 
-The caller then reduces the buckets whose gradients are complete. `reduction_plan()` lists them by segment: a bucket reduces after its first segment, which ends its backward pass. A gathered bucket reduces after every pass that writes its gradients. The final pass also sums the gradient shards across the replicas and finds out which parameters any rank used: each rank marks a parameter when autograd writes its gradient, and the flags are reduced with `MAX` over every mesh dimension of the bucket. So a parameter that its layer shards, such as an expert, keeps a zero gradient on a rank whose part got no tokens. `wait()` checks that the program reduced every bucket in a final pass, reads the flags on the host, sets the gradients of unused parameters to `None` and runs the post-accumulate-grad hooks of the others. Reading the flags adds one host synchronization per step. When the budget is exhausted, the memory ledger also waits for retired buffers.
+The pipeline program then reduces the buckets whose gradients are complete. `reduction_plan(stage, order, final)` lists preparation and reduction by region occurrence. A bucket reduces after its first forward occurrence, which ends its backward pass. A gathered bucket reduces after every pass that writes its gradients. The final pass also sums the gradient shards across the replicas and finds out which parameters any rank used: each rank marks a parameter when autograd writes its gradient, and the flags are reduced with `MAX` over every mesh dimension of the bucket. So a parameter that its layer shards, such as an expert, keeps a zero gradient on a rank whose part got no tokens. `wait()` checks that the program reduced every bucket in a final pass, reads the flags on the host, sets the gradients of unused parameters to `None` and runs the post-accumulate-grad hooks of the others. Reading the flags adds one host synchronization per step. When the budget is exhausted, the memory ledger also waits for retired buffers.
+
+## Pipeline Program
+
+`PipelineProgramCache` adds two things to the program of a rank:
+
+*   **Windows**: In a distributed job without pipeline parallelism, it merges consecutive forward computes, and consecutive full backward computes, into `ForwardWindowComputeAction` and `BackwardWindowComputeAction`. With peers, a window would delay the output of a stage that another rank waits for.
+*   **Final passes**: The cache records only whether each weight-writing action is final. The executor builds its `ReductionPlan` from the completed forward trace.
+
+`WindowChain` holds the cut graph of one microbatch. Each boundary tensor has one producer. Every consumer adds to its gradient and runs before the producer in the backward pass, so the gradient is complete when the producer needs it. `forward_chains()` and `backward_chains()` run several chains region by region. Each microbatch has its own backward pass inside its compute context.
+
+The first forward gathers groups on demand. Later forwards prefetch using the recorded order, or an explicit next-group hint. A window checks matching requests before gathering. Every participating rank must follow the same sequence. Returning from the outer coroutine creates an output graph that routes loss gradients to completed regions. Coroutine cleanup and each resume run inside the microbatch compute context.
 
 ## API Reference
 
 ::: d9d.parallel.runtime.memory
 
 ::: d9d.parallel.runtime
+
+::: d9d.pipelining.stage.windows

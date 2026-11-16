@@ -47,6 +47,26 @@ def test_fork_rng_restores_outer_state(device, fail):
 
 @pytest.mark.local
 @pytest.mark.parametrize("fail", [False, True])
+def test_reentered_fork_continues_its_numbers(device, fail):
+    with fork_rng(SeedScope.root(0)):
+        expected = torch.cat([torch.rand(4, device=device), torch.rand(4, device=device)])
+
+    fork = fork_rng(SeedScope.root(0))
+    exit_check = pytest.raises(RuntimeError, match="boom") if fail else contextlib.nullcontext()
+    with exit_check, fork:
+        first = torch.rand(4, device=device)
+        if fail:
+            raise RuntimeError("boom")
+    with fork:
+        second = torch.rand(4, device=device)
+
+    assert torch.equal(torch.cat([first, second]), expected)
+    with fork, pytest.raises(RuntimeError, match="already open"), fork:
+        pass
+
+
+@pytest.mark.local
+@pytest.mark.parametrize("fail", [False, True])
 def test_fork_rng_child_follows_innermost_fork(fail):
     def draw_child() -> torch.Tensor:
         with fork_rng_child("x"):

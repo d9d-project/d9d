@@ -35,6 +35,11 @@ _GRAD_TOLERANCE_BY_DTYPE: Final[dict[torch.dtype, GradTolerance]] = {
 }
 
 
+# fp32 gradients that a graph cut into regions sums in another order than one graph, e.g. over the experts of a MoE
+# layer, drift by a few fp32 ulps of the largest values.
+FP32_REORDERED_SUM_TOLERANCE: Final[Tolerance] = Tolerance(atol=1e-4, rtol=1e-4)
+
+
 def forward_tolerance_for(dtype: torch.dtype) -> Tolerance:
     return _FORWARD_TOLERANCE_BY_DTYPE.get(dtype, Tolerance(atol=1e-5, rtol=1e-5))
 
