@@ -3,7 +3,7 @@ import torch
 import torch.distributed as dist
 from d9d.dist_context import DENSE_DOMAIN, DenseDim, DenseDomainConfig, DeviceMeshParameters
 from d9d.parallel import distribute_parameters
-from d9d.pipelining.api import mark_window
+from d9d.pipelining.api import mark_parameter_group
 from torch import nn
 from torch.distributed.tensor import DTensor, Shard, distribute_tensor
 
@@ -512,8 +512,8 @@ def test_runtime_lifecycle_is_explicit():
 class _TiedGroups(nn.Module):
     def __init__(self):
         super().__init__()
-        self.first = mark_window(nn.Linear(4, 4, bias=False, device="cuda"))
-        self.second = mark_window(nn.Linear(4, 4, bias=False, device="cuda"))
+        self.first = mark_parameter_group(nn.Linear(4, 4, bias=False, device="cuda"))
+        self.second = mark_parameter_group(nn.Linear(4, 4, bias=False, device="cuda"))
         self.second.weight = self.first.weight
 
     async def forward_steps(self, steps, inputs, shared):
@@ -551,7 +551,7 @@ class _ParameterAliasStage(nn.Module):
     def __init__(self):
         super().__init__()
         self.scale = nn.Parameter(torch.ones(4, device="cuda"))
-        self.alias = mark_window(_ParameterAliasGroup(self.scale))
+        self.alias = mark_parameter_group(_ParameterAliasGroup(self.scale))
 
     async def forward_steps(self, steps, inputs, shared):
         return await steps.call(self.alias, inputs, shared)

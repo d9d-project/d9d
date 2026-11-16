@@ -11,7 +11,7 @@ from torch.distributed import DeviceMesh, ProcessGroup
 from torch.distributed.tensor import DTensor, Shard
 
 from d9d.parallel.placement import split_placement_dims
-from d9d.pipelining.api.groups import window_groups
+from d9d.pipelining.api.groups import parameter_group_roots
 
 from .parameter import ParameterPlan, local_tensor, plan_parameters
 
@@ -330,7 +330,7 @@ def plan_stages(
     parameter_stages: dict[int, int] = {}
 
     for stage_index, module in modules.items():
-        groups = window_groups(module)
+        groups = parameter_group_roots(module)
 
         parameters_by_group = plan_parameters(module, groups, compute_dtype, training)
         parameters = list({id(x): x for group in parameters_by_group for x in group}.values())

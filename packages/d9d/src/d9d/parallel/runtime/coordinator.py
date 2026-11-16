@@ -239,7 +239,9 @@ class ParameterRuntime:
         """
         index = self._require_bound().stages[stage_index].group_indices.get(id(module))
         if index is None:
-            raise ValueError("The boundary module is not registered. Mark it with mark_window() before bind().")
+            raise ValueError(
+                "The boundary module is not registered. Mark it with mark_parameter_group() before bind()."
+            )
         return index
 
     def group_parameters(self, stage_index: int, group: int | None) -> list[nn.Parameter]:
