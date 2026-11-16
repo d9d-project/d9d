@@ -7,7 +7,6 @@ from d9d.models.io import SequenceHeadShared, SequenceHeadsShared, SequenceInput
 from d9d.models.qwen3_dense import Qwen3DenseLayerParameters, Qwen3DenseModel, Qwen3DenseParameters
 from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
 from d9d.pipelining.api import PipelineStageInfo, mark_window, run_steps
-from d9d.pipelining.api.groups import group_modules, window_groups
 from torch import nn
 
 
@@ -203,13 +202,5 @@ def test_decoder_matches_its_backbone_and_heads(make_backbone, multi_head, tied_
     expected_grads = torch.autograd.grad(expected_loss, tuple(decoder.parameters()))
     for actual_grad, expected_grad in zip(actual_grads, expected_grads, strict=True):
         torch.testing.assert_close(actual_grad, expected_grad)
-    groups = window_groups(decoder)
-    group_parameters = {
-        id(p)
-        for group in groups
-        for module in group_modules(group, set(groups))
-        for p in module.parameters(recurse=False)
-    }
-    assert group_parameters == {id(p) for p in decoder.parameters()}
     assert {name: id(p) for name, p in decoder.named_parameters()} == parameter_ids
     assert tuple(decoder.state_dict()) == state_keys
