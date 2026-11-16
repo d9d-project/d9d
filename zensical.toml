@@ -83,6 +83,7 @@ nav = [
         { "Horizontal Parallelism" = [
             "parallel/index.md",
             "parallel/grad_sync.md",
+            "parallel/runtime_internals.md",
             "parallel/grad_norm.md",
         ] },
         { "Pipeline Parallelism" = [
