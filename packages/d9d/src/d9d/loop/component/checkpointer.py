@@ -13,6 +13,7 @@ from d9d.dist_context import DistributedContext
 from ..config import CheckpointingConfig
 from .garbage_collector import ManualGarbageCollector
 from .job_schedule import JobSchedule
+from .timeout_manager import TimeoutManager
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ class StateCheckpointer:
         schedule: JobSchedule,
         config: CheckpointingConfig,
         gc: ManualGarbageCollector,
+        timeout_manager: TimeoutManager,
         run_name: str | None,
     ):
         """Constructs the ``StateCheckpointer`` object.
@@ -48,11 +50,13 @@ class StateCheckpointer:
             schedule: The job schedule that tracks the current step.
             config: The checkpointing configuration.
             gc: The garbage collector used to free memory around checkpoint I/O.
+            timeout_manager: The manager that applies the initialization timeout to checkpoint I/O.
             run_name: The run name to append to the save directory. ``None`` uses the save directory as is.
         """
         self._dist_context = dist_context
         self._schedule = schedule
         self._gc = gc
+        self._timeout_manager = timeout_manager
 
         if run_name:
             self._save_dir = config.save_dir / run_name
@@ -93,7 +97,8 @@ class StateCheckpointer:
             shutil.rmtree(delete_dir)
 
     def _checkpoint(self, state: Stateful):
-        with record_function("Checkpoint Save"):
+        # Ranks finish writing at different times, so the fastest rank can wait for the slowest longer than a step.
+        with record_function("Checkpoint Save"), self._timeout_manager.init_timeout():
             next_checkpoint_id = self._next_checkpoint_id()
 
             logger.info("Freeing up memory before checkpointing")
@@ -138,19 +143,21 @@ class StateCheckpointer:
             logger.info("Starting job from scratch")
             return
 
-        logger.info("Waiting for world before loading checkpoint")
-        self._dist_context.wait_world()
-        logger.info(f"Loading checkpoint {last_checkpoint}")
+        # Trainer.export() can load a checkpoint after training, when the step timeout is active.
+        with self._timeout_manager.init_timeout():
+            logger.info("Waiting for world before loading checkpoint")
+            self._dist_context.wait_world()
+            logger.info(f"Loading checkpoint {last_checkpoint}")
 
-        load_into = {"state": state}
-        # Loading calls state_dict() too, so it must also run outside inference mode.
-        with torch.inference_mode(mode=False):
-            dcp.load(state_dict=load_into, checkpoint_id=last_checkpoint)
-        self._free_memory()
+            load_into = {"state": state}
+            # Loading calls state_dict() too, so it must also run outside inference mode.
+            with torch.inference_mode(mode=False):
+                dcp.load(state_dict=load_into, checkpoint_id=last_checkpoint)
+            self._free_memory()
 
-        logger.info("Waiting for world after loading checkpoint")
-        self._dist_context.wait_world()
-        logger.info("Checkpoint successfully loaded across the world")
+            logger.info("Waiting for world after loading checkpoint")
+            self._dist_context.wait_world()
+            logger.info("Checkpoint successfully loaded across the world")
 
     def load_last_checkpoint(self, state: Stateful):
         """Loads the latest checkpoint in the save directory.

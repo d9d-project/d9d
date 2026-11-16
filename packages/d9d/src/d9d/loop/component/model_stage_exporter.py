@@ -7,22 +7,31 @@ from d9d.rng import fork_rng_child
 
 from ..control import ModelProvider, PrepareExportModelStageContext
 from .model_stage_factory import TrackedModules
+from .timeout_manager import TimeoutManager
 
 
 class ModelStageExporter:
     """Exporter of the model stages held by this process to a ``.safetensors`` checkpoint."""
 
-    def __init__(self, model_provider: ModelProvider, modules: TrackedModules, dist_context: DistributedContext):
+    def __init__(
+        self,
+        model_provider: ModelProvider,
+        modules: TrackedModules,
+        dist_context: DistributedContext,
+        timeout_manager: TimeoutManager,
+    ):
         """Constructs the ``ModelStageExporter`` object.
 
         Args:
             model_provider: The provider that maps each stage to its export state mapper.
             modules: The model stages held by this process.
             dist_context: The distributed context.
+            timeout_manager: The manager that applies the initialization timeout to the export.
         """
         self._model_provider = model_provider
         self._modules = modules
         self._dist_context = dist_context
+        self._timeout_manager = timeout_manager
 
     def export(self, save_dir: Path):
         """Writes every stage this process holds to ``save_dir``.
@@ -51,12 +60,15 @@ class ModelStageExporter:
         if alone:
             save_model_state(dest_dir=save_dir, mapper=mapper, model=stages[0])
             return
-        save_model_state_pipeline_parallel(
-            dest_dir=save_dir,
-            mapper=mapper,
-            device_mesh=self._dist_context.mesh_for(BASE_DOMAIN),
-            pipeline_dim_name=BaseDim.PP,
-            models=stages,
-            show_progress=True,
-            position=self._dist_context.local_rank,
-        )
+
+        # Ranks finish writing at different times, so the fastest rank can wait for the slowest longer than a step.
+        with self._timeout_manager.init_timeout():
+            save_model_state_pipeline_parallel(
+                dest_dir=save_dir,
+                mapper=mapper,
+                device_mesh=self._dist_context.mesh_for(BASE_DOMAIN),
+                pipeline_dim_name=BaseDim.PP,
+                models=stages,
+                show_progress=True,
+                position=self._dist_context.local_rank,
+            )

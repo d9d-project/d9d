@@ -1,3 +1,5 @@
+from collections.abc import Generator
+from contextlib import contextmanager
 from enum import StrEnum
 
 from d9d.dist_context import DistributedContext
@@ -23,7 +25,8 @@ class TimeoutManager:
     """Manager that adjusts the distributed timeouts dynamically during the job loop.
 
     The manager switches from the initialization timeout to the step timeout. The initialization
-    timeout can be longer to cover compilation, caching and other startup work.
+    timeout can be longer to cover compilation, caching and other startup work. Components with long collective
+    I/O, such as checkpoint saving and model export, apply it again with ``init_timeout()``.
     """
 
     def __init__(self, dist_context: DistributedContext, config: TimeoutConfig):
@@ -68,4 +71,30 @@ class TimeoutManager:
             case _:
                 raise ValueError(
                     f"Timeout state ({self._state}) has no init timeout. Call set_init() before set_periodic()."
+                )
+
+    @contextmanager
+    def init_timeout(self) -> Generator[None, None, None]:
+        """Applies the initialization timeout inside the block.
+
+        The step timeout comes back after the block if it was active before. The call is collective.
+
+        Raises:
+            ValueError: If ``set_init`` was not called before.
+        """
+        match self._state:
+            case TimeoutState.set_initial:
+                yield
+            case TimeoutState.set_regular:
+                self._dist_context.set_timeout(self._config.init_timeout)
+                self._state = TimeoutState.set_initial
+
+                # No try/finally: the restore waits for all ranks, so it would hang a rank that failed alone.
+                yield
+
+                self._dist_context.set_timeout(self._config.step_timeout)
+                self._state = TimeoutState.set_regular
+            case _:
+                raise ValueError(
+                    f"Timeout state ({self._state}) has no init timeout. Call set_init() before init_timeout()."
                 )

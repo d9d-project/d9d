@@ -154,7 +154,12 @@ class InferenceConfigurator:
         gc = ManualGarbageCollector(config=self._parameters.gc, schedule=schedule)
 
         checkpointer = StateCheckpointer(
-            dist_context=dist_context, schedule=schedule, config=self._parameters.checkpointing, gc=gc, run_name=None
+            dist_context=dist_context,
+            schedule=schedule,
+            config=self._parameters.checkpointing,
+            gc=gc,
+            timeout_manager=timeout_manager,
+            run_name=None,
         )
 
         profiler = JobProfiler(dist_context=dist_context, schedule=schedule, config=self._parameters.profiling)
