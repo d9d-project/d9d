@@ -104,8 +104,10 @@ class JobLogger(Stateful):
     def install(self):
         """Binds the async metric collector to the device while the context is open."""
         self._metric_collector.bind()
-        yield
-        self._metric_collector.unbind()
+        try:
+            yield
+        finally:
+            self._metric_collector.unbind()
 
     def trigger_sync(self):
         """Starts the async aggregation of metrics across ranks if this step logs metrics.

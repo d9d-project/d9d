@@ -190,7 +190,7 @@ class DistributedContext:
         if not self.is_local_main_process:
             self.wait_world()
 
-        yield
+        yield  # ruff: ignore[fallible-context-manager] - the ranks continue together only after a successful block
 
         if self.is_local_main_process:
             self.wait_world()
@@ -205,7 +205,7 @@ class DistributedContext:
         if not self.is_main_process:
             self.wait_world()
 
-        yield
+        yield  # ruff: ignore[fallible-context-manager] - the ranks continue together only after a successful block
 
         if self.is_main_process:
             self.wait_world()

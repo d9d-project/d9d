@@ -80,10 +80,11 @@ class AimTracker(BaseTracker[AimConfig]):
         self._restart_hash = run.hash
         self._run = run
 
-        yield AimRun(run)
-
-        self._run.close()
-        self._run = None
+        try:
+            yield AimRun(run)
+        finally:
+            run.close()
+            self._run = None
 
     @classmethod
     def from_config(cls, config: AimConfig) -> Self:

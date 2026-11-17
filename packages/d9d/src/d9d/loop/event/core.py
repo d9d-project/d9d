@@ -68,5 +68,5 @@ class EventBus:
             context: The context object passed to both events.
         """
         self.trigger(event_pre, context)
-        yield
+        yield  # ruff: ignore[fallible-context-manager] - the post-event fires only after a successful block
         self.trigger(event_post, context)

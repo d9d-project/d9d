@@ -21,8 +21,10 @@ class _Recorder(PipelineStepHandler[torch.Tensor]):
     @contextmanager
     def compute_context(self, kind: PipelineComputeKind, stage_idx: int, microbatch_idx: int):
         self.events.append(("enter", kind, stage_idx, microbatch_idx))
-        yield
-        self.events.append(("exit", kind, stage_idx, microbatch_idx))
+        try:
+            yield
+        finally:
+            self.events.append(("exit", kind, stage_idx, microbatch_idx))
 
     def process_outputs(self, outputs: torch.Tensor, microbatch_idx: int) -> torch.Tensor:
         self.events.append(("process_outputs", microbatch_idx))
