@@ -254,10 +254,6 @@ exclude = [
     "packages/*-dev/**",
 ]
 
-[tool.ty.rules]
-# currently does not work properly with torch.distributed package (please see https://github.com/astral-sh/ty/issues/2244)
-possibly-missing-attribute = "ignore"
-
 [[tool.ty.overrides]]
 include = [
     "packages/d9d/src/d9d/kernel/cce/*",
