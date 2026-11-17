@@ -44,9 +44,8 @@ class WindowBoundary(Generic[TState]):
 class WindowSteps:
     """The boundaries of one call of a resumable forward.
 
-    The executor creates an instance for each call, also when several microbatches run in turn. User compute
-    contexts, such as ``no_grad()`` and autocast, must not span a boundary. The executor enters the compute contexts
-    around each resume.
+    Each call gets its own instance, so do not keep it after the call returns. Grad mode, inference mode and autocast
+    belong to the thread, so open and close their contexts between two boundaries.
     """
 
     def __init__(self, *, eager: bool = False):
