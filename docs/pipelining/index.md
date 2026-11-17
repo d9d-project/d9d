@@ -48,7 +48,9 @@ The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* 
 
 ### Resumable Forwards
 
-`ModuleSupportsResumableForward` describes a forward that can suspend at explicit execution boundaries. Implement `forward_steps(steps, inputs, shared)` and delegate synchronous `forward()` to `run_steps()`. A nested resumable module can take any arguments after `steps`, and `run_steps()` passes them through:
+A resumable forward splits the forward pass of a stage at boundaries. The code between two boundaries is a region, and it runs with the weights of one parameter group. So an executor can gather the weights of one group at a time instead of the whole stage.
+
+To support it, implement `forward_steps(steps, inputs, shared)` of `ModuleSupportsResumableForward` and delegate `forward()` to `run_steps()`. `run_steps()` runs the regions one after another, as an ordinary forward does. Mark the root module of each parameter group with `mark_parameter_group()` when you build the model:
 
 ```python
 import torch
@@ -71,23 +73,27 @@ class ResumableMLP(nn.Module):
         return run_steps(self, inputs, shared)
 ```
 
-`mark_parameter_group()` declares a parameter group without wrapping the module or changing its checkpoint names. The stage root owns parameters outside marked descendants. `call()` requests an ordinary module's group before invoking it and finishes the region with its output. For a resumable module, it composes that module's `forward_steps()` and finishes its final region. In eager execution, nested modules use their normal calls and hooks. Differentiable operations stay inside these module calls. For arbitrary computation between boundaries, use the manual form:
+A group holds the parameters of the marked module and its descendants, except those of marked descendants. The stage root holds the rest. The mark adds no wrapper and keeps the parameter names, so checkpoints do not change.
+
+`steps.call(module, ...)` runs a module in a region of its group. If the module is resumable too, an executor runs its `forward_steps()` with the same `steps`, so its regions become regions of the caller. Under `run_steps()`, `call()` calls the module as usual, so its module hooks run. A nested resumable module can take any arguments after `steps`. Only the stage root follows the `(inputs, shared)` contract of pipelining.
+
+Every differentiable operation must run inside a region. For code between module calls, open a region with `enter()`:
 
 ```python
 async def forward_steps(self, steps: ForwardSteps, inputs: torch.Tensor, shared: None) -> torch.Tensor:
     inputs = await steps.enter(self.first, inputs)
     hidden = self.first(inputs)
-    hidden, skip = await steps.enter(self.second, (hidden, inputs))
-    return self.second(hidden) + skip
+    hidden = await steps.enter(self.second, hidden)
+    return self.second(hidden) + inputs
 ```
 
-A manual boundary passes in its state every differentiable value that the open region computed and a later region reads, including residuals. Use the returned state in place of the passed one. A value that crossed an earlier boundary can stay in a local variable for later regions. Before switching from a manual region to `call()`, use `state = await steps.finish(state)`. A helper coroutine's return does not finish its region; only the executor's outer coroutine has that implicit finish.
+A resumable forward follows these rules:
 
-Each invocation receives a separate `ForwardSteps`. Executors advance the coroutine to `ForwardBoundary` events and resume it with the processed state. A boundary's `module` names the next parameter group; `None` finishes the current region without entering another one. User contexts such as `no_grad()` and autocast must not span suspension points, and the window executor raises an error if one does. Executors own compute contexts around each resume and coroutine cleanup. This protocol does not use an `asyncio` event loop.
-
-`run_steps()` immediately resumes boundaries without graph cuts or parameter management. The parameter runtime instead gathers groups on demand and interleaves microbatches at boundaries. The first pass learns the group order; later passes prefetch from that order. An explicit `prefetch=next_module` on `enter()` names the next group and must match the next request.
-
-Every forward while the runtime is bound must use the same group order, including repeated groups. Microbatches in a window and participating ranks must agree. A model without `forward_steps()` executes as one whole-stage group. Conditional token routing inside a group is supported; changing the group sequence is not.
+*   **Modules**: `enter()` takes a marked module or the stage root. So does `call()`, unless the module is resumable.
+*   **State**: The state of a boundary must hold every differentiable value that the open region computed and a later region reads. Use the returned state in place of the passed one. A value that crossed an earlier boundary, such as `inputs` above, can stay in a local variable.
+*   **Finish**: If a region opened with `enter()` is still open, call `state = await steps.finish(state)` before `call()`. When a `forward_steps()` that the executor or `call()` started returns, its open region finishes. A helper coroutine that you await directly does not finish it.
+*   **Steps**: Each call gets its own `ForwardSteps`. Do not keep it after the call returns.
+*   **Contexts**: Grad mode, inference mode and autocast belong to the thread. Open and close their contexts between two boundaries.
 
 ### Example
 
