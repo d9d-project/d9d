@@ -1,5 +1,6 @@
 """Public pipelining API for end users."""
 
+from .groups import mark_parameter_group
 from .module import (
     ModuleSupportsPipelining,
     PipelineStageInfo,
@@ -8,6 +9,7 @@ from .module import (
     distribute_layers_for_pipeline_stage,
 )
 from .schedule import PipelineSchedule
+from .steps import ForwardSteps, ModuleSupportsResumableForward, run_steps
 from .types import (
     PipelineComputeKind,
     PipelineStepHandler,
@@ -18,7 +20,9 @@ from .types import (
 )
 
 __all__ = [
+    "ForwardSteps",
     "ModuleSupportsPipelining",
+    "ModuleSupportsResumableForward",
     "PipelineComputeKind",
     "PipelineSchedule",
     "PipelineStageInfo",
@@ -30,4 +34,6 @@ __all__ = [
     "TStageTransfer",
     "TensorSpec",
     "distribute_layers_for_pipeline_stage",
+    "mark_parameter_group",
+    "run_steps",
 ]

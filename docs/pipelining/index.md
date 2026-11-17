@@ -46,6 +46,55 @@ To use pipeline parallelism, your model implements `d9d.pipelining.api.ModuleSup
 
 The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* have the same dataclass type. So `pytree.tree_flatten` gives the same leaf order on both ends. Sender and receiver agree on the order by construction, and they need no handshake.
 
+### Resumable Forwards
+
+A resumable forward splits the forward pass of a stage at forward boundaries. The code between two boundaries is a region, and it runs with the weights of one parameter group. So an executor can gather the weights of one group at a time instead of the whole stage.
+
+A group holds the parameters of a module marked with `mark_parameter_group()` and its descendants, except those of marked descendants. The other parameters belong to the group of the stage root. The mark adds no wrapper and keeps the parameter names, so checkpoints do not change.
+
+To make a stage resumable, implement `forward_steps(steps, inputs, shared)` of `ModuleSupportsResumableForward` and delegate `forward()` to `run_steps()`. `run_steps()` runs the regions one after another, as an ordinary forward does. Mark the root module of each parameter group with `mark_parameter_group()` when you build the model:
+
+```python
+import torch
+from torch import nn
+
+from d9d.pipelining.api import ForwardSteps, mark_parameter_group, run_steps
+
+
+class ResumableMLP(nn.Module):
+    def __init__(self, width: int):
+        super().__init__()
+        self.first = mark_parameter_group(nn.Sequential(nn.Linear(width, width), nn.Tanh()))
+        self.second = mark_parameter_group(nn.Linear(width, width))
+
+    async def forward_steps(self, steps: ForwardSteps, inputs: torch.Tensor, shared: None) -> torch.Tensor:
+        hidden = await steps.call(self.first, inputs)
+        return await steps.call(self.second, hidden)
+
+    def forward(self, inputs: torch.Tensor, shared: None) -> torch.Tensor:
+        return run_steps(self, inputs, shared)
+```
+
+`steps.call(module, ...)` runs a module in a region of its group. If the module is resumable too, `call()` runs its `forward_steps()` with the same `steps`, so its regions become regions of the caller. Under `run_steps()`, `call()` runs a resumable module through its `forward()` instead, so its module hooks run. A nested resumable module can take any arguments after `steps`. Only the stage root follows the `(inputs, shared)` contract of pipelining.
+
+Every differentiable operation must run inside a region. For code between module calls, open a region with `enter()`:
+
+```python
+async def forward_steps(self, steps: ForwardSteps, inputs: torch.Tensor, shared: None) -> torch.Tensor:
+    inputs = await steps.enter(self.first, inputs)
+    hidden = self.first(inputs)
+    hidden = await steps.enter(self.second, hidden)
+    return self.second(hidden) + inputs
+```
+
+A resumable forward follows these rules:
+
+*   **Modules**: `enter()` takes a marked module or the stage root, and the region must read only the parameters of its group. `call()` takes the same modules, unless the module is resumable.
+*   **State**: The state of a boundary must hold every differentiable value that the open region computed and a later region reads. Use the returned state in place of the passed one. A value that crossed an earlier boundary, such as `inputs` above, can stay in a local variable.
+*   **Finish**: If a region opened with `enter()` is still open, call `state = await steps.finish(state)` before `call()`. When a `forward_steps()` that the executor or `call()` started returns, its open region finishes. A helper coroutine that you await directly does not finish it.
+*   **Steps**: Do not keep `steps` after `forward_steps()` returns.
+*   **Contexts**: Grad mode, inference mode and autocast belong to the thread. Open and close their contexts between two boundaries.
+
 ### Example
 
 Below is a skeleton of a Transformer-like model that supports d9d pipelining.
