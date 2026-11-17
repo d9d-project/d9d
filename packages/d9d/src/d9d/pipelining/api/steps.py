@@ -61,8 +61,8 @@ class WindowSteps:
         """Finishes the open region, if any, and requests the parameter group of ``module``.
 
         Args:
-            module: The module whose parameter group covers every parameter that the code reads before the next
-                boundary.
+            module: The stage root or a module marked with ``mark_window()``. Its parameter group covers every
+                parameter that the code reads before the next boundary.
             state: Every differentiable value that the open region computed and a later region reads, also if the
                 next region does not read it. A value that crossed an earlier boundary can stay in a local variable.
             prefetch: The module whose parameter group the region after this one uses, or ``None`` to leave the
