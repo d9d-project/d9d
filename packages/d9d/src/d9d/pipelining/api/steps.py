@@ -44,8 +44,8 @@ class ForwardBoundary(Generic[TState]):
 class ForwardSteps:
     """The boundaries of one call of a resumable forward.
 
-    Each call gets its own instance, so do not keep it after the call returns. Grad mode, inference mode and autocast
-    belong to the thread, so open and close their contexts between two boundaries.
+    Do not keep it after ``forward_steps()`` returns. Grad mode, inference mode and autocast belong to the thread, so
+    open and close their contexts between two boundaries.
     """
 
     def __init__(self, *, eager: bool = False):
