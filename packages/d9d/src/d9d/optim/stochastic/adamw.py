@@ -107,7 +107,7 @@ class StochasticAdamW(Optimizer):
         super().load_state_dict(state_dict)
 
     @torch.no_grad()
-    def step(self, closure: None = None) -> None:  # ty: ignore[invalid-method-override] - closures are not supported
+    def step(self, closure: None = None) -> None:  # ty: ignore[incompatible-method-override] - takes no closure
         if closure is not None:
             raise ValueError("StochasticAdamW does not support closures. Call step() without a closure.")
 

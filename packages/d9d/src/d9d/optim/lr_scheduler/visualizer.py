@@ -39,7 +39,7 @@ def visualize_lr_scheduler(factory: SchedulerFactory, num_steps: int, init_lr: f
         ImportError: If ``plotly`` is not installed.
     """
     try:
-        import plotly.graph_objects as go  # noqa: PLC0415
+        import plotly.graph_objects as go  # ruff: ignore[import-outside-top-level]
     except ImportError as e:
         raise ImportError("Scheduler visualization requires plotly. Install the d9d[visualization] extra.") from e
     lrs = _get_history(factory, num_steps, init_lr)

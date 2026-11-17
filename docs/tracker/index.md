@@ -297,13 +297,13 @@ class CometTracker(BaseTracker[CometConfig]):
 
 ### Registration
 
-Add the configuration to the `AnyTrackerConfig` union in `packages/d9d/src/d9d/tracker/factory.py`, and a `case` for it to `tracker_from_config()`. If the SDK is an optional dependency, add the extra `tracker-<provider>` to `packages/d9d/pyproject.toml`. Import the tracker inside the `case`, so that d9d imports without the SDK and does not spend time to import an SDK that the job does not use:
+Add the configuration to the `AnyTrackerConfig` union in `packages/d9d/src/d9d/tracker/factory.py`, and a `case` for it to `_tracker_type()`, which returns the tracker class. If the SDK is an optional dependency, add the extra `tracker-<provider>` to `packages/d9d/pyproject.toml`. Import the tracker inside the `case`, so that d9d imports without the SDK and does not spend time to import an SDK that the job does not use:
 
 ```python
 case CometConfig():
-    from .provider.comet.tracker import CometTracker  # noqa: PLC0415
+    from .provider.comet.tracker import CometTracker  # ruff: ignore[import-outside-top-level]
 
-    return CometTracker.from_config(config)
+    return CometTracker
 ```
 
 ## API Reference

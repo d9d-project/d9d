@@ -147,7 +147,7 @@ class _StateWritingFlowLocal:
 def _finalize_master(dest_dir: Path, indices: list[ModelStateIndex]):
     total_size = sum(index.metadata.total_size for index in indices)
     total_weight_map_local = dict(pair for index in indices for pair in index.weight_map.items())
-    shard_count = len({file_name for index in indices for _, file_name in index.weight_map.items()})
+    shard_count = len({file_name for index in indices for file_name in index.weight_map.values()})
 
     total_weight_map = {}
 

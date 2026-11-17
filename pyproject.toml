@@ -1,9 +1,9 @@
 [dependency-groups]
 dev = [
-    "ruff>=0.14.13,<0.15.0",
+    "ruff>=0.17.5,<0.18.0",
     "pre-commit>=4.5.1,<5.0.0",
     "python-semantic-release>=10.5.3,<11.0.0",
-    "ty>=0.0.16,<0.0.17",
+    "ty>=0.0.104,<0.0.105",
 ]
 docs = [
     "zensical>=0.0.24,<0.0.25",
@@ -253,10 +253,6 @@ convention = "google"
 exclude = [
     "packages/*-dev/**",
 ]
-
-[tool.ty.rules]
-# currently does not work properly with torch.distributed package (please see https://github.com/astral-sh/ty/issues/2244)
-possibly-missing-attribute = "ignore"
 
 [[tool.ty.overrides]]
 include = [

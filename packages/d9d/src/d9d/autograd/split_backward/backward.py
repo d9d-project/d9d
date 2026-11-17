@@ -295,7 +295,8 @@ def stage_backward_input(
     )
 
 
-def stage_backward_weight(  # noqa: C901 - edge collection and the single backward pass share the clamp hooks
+# ruff: ignore[complex-structure] - edge collection and the single backward pass share the clamp hooks
+def stage_backward_weight(
     pending: PendingWeightBackward,
 ):
     """Runs the second phase of a split backward pass: the weight gradients.

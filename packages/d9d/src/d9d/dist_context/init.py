@@ -108,15 +108,14 @@ def _dtensor_rng_tracker(mesh: DeviceMesh) -> Generator[None, None, None]:
     # and overwrites the seeds of the other pipeline stages. Stopgap: PyTorch has no public API to create it without
     # the broadcast. The tracker takes only the device type and the global rank from the mesh, so any mesh with all
     # the ranks works.
-    dtensor_random = torch.distributed.tensor._random  # noqa: SLF001 - no public API
-    previous = dtensor_random._rng_tracker  # noqa: SLF001 - no public API
-    dtensor_random._rng_tracker = dtensor_random.OffsetBasedRNGTracker(  # noqa: SLF001 - no public API
-        mesh, run_state_sync=False
-    )
+    dtensor_random = torch.distributed.tensor._random  # ruff: ignore[private-member-access] - no public API
+    previous = dtensor_random._rng_tracker  # ruff: ignore[private-member-access] - no public API
+    # ruff: ignore[private-member-access] - no public API
+    dtensor_random._rng_tracker = dtensor_random.OffsetBasedRNGTracker(mesh, run_state_sync=False)
     try:
         yield
     finally:
-        dtensor_random._rng_tracker = previous  # noqa: SLF001 - no public API
+        dtensor_random._rng_tracker = previous  # ruff: ignore[private-member-access] - no public API
 
 
 def _build_meshes(

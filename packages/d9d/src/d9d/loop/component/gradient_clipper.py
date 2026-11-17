@@ -39,8 +39,10 @@ class GradientClipper:
     def install(self):
         """Groups the parameters for global gradient norm computation while the context is open."""
         self._parameter_groups = group_parameters_for_norm(self._all_parameters())
-        yield
-        self._parameter_groups = None
+        try:
+            yield
+        finally:
+            self._parameter_groups = None
 
     def clip(self) -> torch.Tensor:
         """Computes the global L2 norm of the gradients and clips them to the configured maximum norm.

@@ -42,7 +42,8 @@ def tree_unflatten(treespec: PyTreeSpec, leaves: list[TLeaf]) -> PyTree[TLeaf]:
     Returns:
         The reconstructed nested structure.
     """
-    return optree.tree_unflatten(treespec, leaves)
+    # optree types the result with its own PyTree alias.
+    return cast(PyTree[TLeaf], optree.tree_unflatten(treespec, leaves))
 
 
 def tree_leaves(tree: PyTree[TLeaf], is_leaf: IsLeaf | None = None) -> list[TLeaf]:
@@ -70,7 +71,8 @@ def tree_map(func: Callable[[TLeaf], TMapped], tree: PyTree[TLeaf]) -> PyTree[TM
         A new tree with ``func`` applied to each leaf.
     """
     leaves, treespec = _flattener.flatten(tree)
-    return optree.tree_unflatten(treespec, [func(leaf) for leaf in leaves])
+    # optree types the result with its own PyTree alias.
+    return cast(PyTree[TMapped], optree.tree_unflatten(treespec, [func(leaf) for leaf in leaves]))
 
 
 def tree_map_only(
@@ -110,5 +112,5 @@ def tree_leaves_with_path(tree: PyTree[TLeaf], is_leaf: IsLeaf | None = None) ->
     Returns:
         A list of ``(path, leaf)`` tuples in deterministic (sorted-key) order.
     """
-    paths, leaves, _ = _flattener.flatten_with_path(cast(Any, tree), is_leaf)
+    paths, leaves, _ = _flattener.flatten_with_path(tree, is_leaf)
     return list(zip(paths, leaves, strict=True))

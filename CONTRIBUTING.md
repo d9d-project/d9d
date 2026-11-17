@@ -211,9 +211,9 @@ and PR descriptions.
     explanation to a class docstring or a module constant just to have a place for it.
 *   **Justify code that looks removable.** Some code exists because of an external limitation, such as a kernel
     requirement or a PyTorch quirk. Say so briefly and name the source, so nobody deletes the code as redundant.
-*   **Give every suppression a reason.** Name the code and end with ` - <reason>`, e.g.
-    `# noqa: BLE001 - re-raised in the consuming thread`. Lazy imports of optional dependencies (`PLC0415`) need no
-    reason.
+*   **Give every suppression a reason.** Name the rule, not its code, and end with ` - <reason>`, e.g.
+    `# ruff: ignore[blind-except] - re-raised in the consuming thread`. If the line gets too long, put the comment on
+    its own line above. Lazy imports of optional dependencies (`import-outside-top-level`) need no reason.
 *   **Write a TODO as `# TODO(owner): ...`,** once per item, with a link to its issue.
 *   **Write comments as sentences** ([PEP 8](https://peps.python.org/pep-0008/#comments)). Start with a capital
     letter, unless the comment starts with a lowercase identifier, and end with a period.

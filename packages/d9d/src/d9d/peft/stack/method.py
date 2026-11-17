@@ -35,6 +35,6 @@ class PeftStack(PeftMethod[PeftStackConfig]):
     @classmethod
     def from_config(cls, config: PeftStackConfig) -> Self:
         # The factory imports this module to build a stack.
-        from ..factory import peft_method_from_config  # noqa: PLC0415 - circular import
+        from ..factory import peft_method_from_config  # ruff: ignore[import-outside-top-level] - circular import
 
         return cls([peft_method_from_config(method) for method in config.methods])

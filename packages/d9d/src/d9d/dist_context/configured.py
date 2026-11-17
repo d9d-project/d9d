@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 import logging
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
@@ -175,7 +175,7 @@ class DistributedContext:
         logger.info(f"Setting global timeout to {timeout_seconds} seconds")
         self.wait_world()
 
-        timeout = datetime.timedelta(seconds=timeout_seconds)
+        timeout = dt.timedelta(seconds=timeout_seconds)
         dist.set_timeout(timeout)
         for group in self._groups:
             dist.set_timeout(timeout, group)
@@ -190,7 +190,7 @@ class DistributedContext:
         if not self.is_local_main_process:
             self.wait_world()
 
-        yield
+        yield  # ruff: ignore[fallible-context-manager] - the ranks continue together only after a successful block
 
         if self.is_local_main_process:
             self.wait_world()
@@ -205,7 +205,7 @@ class DistributedContext:
         if not self.is_main_process:
             self.wait_world()
 
-        yield
+        yield  # ruff: ignore[fallible-context-manager] - the ranks continue together only after a successful block
 
         if self.is_main_process:
             self.wait_world()

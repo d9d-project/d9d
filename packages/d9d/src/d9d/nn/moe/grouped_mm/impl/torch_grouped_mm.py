@@ -44,7 +44,7 @@ class _TorchGroupedMmFunction(Function):
         return F.grouped_mm(a, b, offs=group_ends)
 
     @staticmethod
-    def backward(  # ty: ignore[invalid-method-override] - torch declares backward with variadic grad_outputs
+    def backward(  # ty: ignore[incompatible-method-override] - torch declares backward with variadic grad_outputs
         ctx: Any, grad: torch.Tensor
     ) -> tuple[torch.Tensor | None, torch.Tensor | None, None]:
         grad = grad.contiguous()

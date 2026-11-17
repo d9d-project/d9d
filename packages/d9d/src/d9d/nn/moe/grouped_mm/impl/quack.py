@@ -42,7 +42,7 @@ class _QuackGroupedMmFunction(Function):
         return cast(torch.Tensor, gemm(a, b, cu_seqlens_m=cu_rows, tuned=False))
 
     @staticmethod
-    def backward(  # ty: ignore[invalid-method-override] - torch declares backward with variadic grad_outputs
+    def backward(  # ty: ignore[incompatible-method-override] - torch declares backward with variadic grad_outputs
         ctx: Any, grad: torch.Tensor
     ) -> tuple[torch.Tensor | None, torch.Tensor | None, None]:
         grad = grad.contiguous()

@@ -30,7 +30,8 @@ class DevicePackStream(abc.ABC, Stateful):
     """
 
     @abc.abstractmethod
-    def __iter__(self) -> Generator[MicrobatchPack, None, None]:  # noqa: PYI058 - the loop closes it
+    # ruff: ignore[generator-return-from-iter-method] - the loop closes it
+    def __iter__(self) -> Generator[MicrobatchPack, None, None]:
         """Yields the stream's packs on the device, ready for use on the current CUDA stream.
 
         Closing the generator stops any work done ahead and releases the packs prepared for later steps.
@@ -58,6 +59,7 @@ class DirectDevicePackStream(DevicePackStream):
                 if pack is None:
                     return
                 device_pack = _copy_pack_to_device(pack, self._device)
+            # ruff: ignore[unnecessary-assign-before-yield] - keeps the consumer out of record_function()
             yield device_pack
 
     def state_dict(self) -> dict[str, Any]:
@@ -88,17 +90,18 @@ class _BackgroundIterator(Generic[TItem]):
         self._thread.start()
 
     def _run(self, iterator: Iterator[TItem]):
-        try:
-            while True:
-                self._free_slots.acquire()
-                if self._stop.is_set():
-                    return
+        while True:
+            self._free_slots.acquire()
+            if self._stop.is_set():
+                return
+            try:
                 item = next(iterator, _Exhausted())
-                self._items.put(item)
-                if isinstance(item, _Exhausted):
-                    return
-        except BaseException as error:  # noqa: BLE001 - re-raised in the consuming thread
-            self._items.put(_Failed(error))
+            except BaseException as error:  # ruff: ignore[blind-except] - re-raised in the consuming thread
+                self._items.put(_Failed(error))
+                return
+            self._items.put(item)
+            if isinstance(item, _Exhausted):
+                return
 
     def __iter__(self) -> Iterator[TItem]:
         while True:
@@ -195,6 +198,7 @@ class PrefetchingDevicePackStream(DevicePackStream):
                     if prefetched is None:
                         return
                     pack = self._hand_over(prefetched)
+                # ruff: ignore[unnecessary-assign-before-yield] - keeps the consumer out of record_function()
                 yield pack
         finally:
             prefetched_packs.close()
