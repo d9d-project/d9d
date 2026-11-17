@@ -187,7 +187,7 @@ class TimeoutConfig(BaseModel):
     """Configuration for distributed process group timeouts.
 
     Attributes:
-        init_timeout: The timeout in seconds for the job setup and the first step.
+        init_timeout: The timeout in seconds for the job setup, the first step, checkpoint I/O and model export.
         step_timeout: The timeout in seconds for communication in later steps.
     """
 

@@ -206,12 +206,18 @@ class TrainingConfigurator:
             schedule=schedule,
             config=self._parameters.checkpointing,
             gc=gc,
+            timeout_manager=timeout_manager,
             run_name=self._parameters.run.name,
         )
 
         profiler = JobProfiler(dist_context=dist_context, schedule=schedule, config=self._parameters.profiling)
 
-        exporter = ModelStageExporter(model_provider=self._model_provider, dist_context=dist_context, modules=modules)
+        exporter = ModelStageExporter(
+            model_provider=self._model_provider,
+            dist_context=dist_context,
+            modules=modules,
+            timeout_manager=timeout_manager,
+        )
 
         job_logger = JobLogger(
             dist_context=dist_context,
