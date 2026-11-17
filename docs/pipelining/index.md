@@ -48,7 +48,7 @@ The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* 
 
 ### Resumable Forwards
 
-`ModuleSupportsWindows` describes a forward that can suspend at explicit execution boundaries. Implement `forward_steps(steps, inputs, shared)` and delegate synchronous `forward()` to `run_steps()`:
+`ModuleSupportsWindows` describes a forward that can suspend at explicit execution boundaries. Implement `forward_steps(steps, inputs, shared)` and delegate synchronous `forward()` to `run_steps()`. A nested resumable module can take any arguments after `steps`, and `run_steps()` passes them through:
 
 ```python
 import torch

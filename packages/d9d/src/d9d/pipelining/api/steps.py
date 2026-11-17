@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import dataclasses
 from collections.abc import Generator
-from typing import Any, Generic, Protocol, TypeVar, cast, runtime_checkable
+from typing import Any, Generic, ParamSpec, Protocol, TypeVar, cast, runtime_checkable
 
 from torch import nn
 
 TState = TypeVar("TState")
-TInput_contra = TypeVar("TInput_contra", contravariant=True)
-TShared_contra = TypeVar("TShared_contra", contravariant=True)
+TParams = ParamSpec("TParams")
+TOutput = TypeVar("TOutput")
 TOutput_co = TypeVar("TOutput_co", covariant=True)
 
 
@@ -124,52 +124,50 @@ class WindowSteps:
 
 
 @runtime_checkable
-class ModuleSupportsWindows(Protocol[TInput_contra, TShared_contra, TOutput_co]):
+class ModuleSupportsWindows(Protocol[TParams, TOutput_co]):
     """Protocol for modules whose forward pass can suspend at execution boundaries."""
 
-    async def forward_steps(self, steps: WindowSteps, inputs: TInput_contra, shared: TShared_contra) -> TOutput_co:
+    async def forward_steps(self, steps: WindowSteps, *args: TParams.args, **kwargs: TParams.kwargs) -> TOutput_co:
         """Runs the forward pass and suspends at the boundaries of ``steps``.
 
         Args:
             steps: The boundaries of this call, created by the executor.
-            inputs: The input of the model or pipeline stage.
-            shared: The shared input of the microbatch.
+            *args: The positional arguments of the forward pass.
+            **kwargs: The keyword arguments of the forward pass.
 
         Returns:
-            The output of the model or stage. When the outermost coroutine returns, the executor finishes any open
+            The output of the forward pass. When the outermost coroutine returns, the executor finishes any open
                 region. A return from a nested helper coroutine finishes no region.
         """
         ...
 
 
 def run_steps(
-    module: ModuleSupportsWindows[TInput_contra, TShared_contra, TOutput_co],
-    inputs: TInput_contra,
-    shared: TShared_contra,
-) -> TOutput_co:
+    module: ModuleSupportsWindows[TParams, TOutput], *args: TParams.args, **kwargs: TParams.kwargs
+) -> TOutput:
     """Runs a resumable forward eagerly, with the ordinary autograd graph and without parameter management.
 
     Each boundary resumes at once with its own state. The function closes the coroutine on exit, also on failure.
 
     Args:
         module: The module with a resumable forward.
-        inputs: The input of the model or stage.
-        shared: The shared input of the microbatch.
+        *args: The positional arguments of ``forward_steps()``, after ``steps``.
+        **kwargs: The keyword arguments of ``forward_steps()``.
 
     Returns:
-        The output of the model or stage.
+        The output of the forward pass.
 
     Raises:
         TypeError: If the coroutine yields an object other than a ``WindowBoundary``.
     """
-    coroutine = module.forward_steps(WindowSteps(eager=True), inputs, shared)
+    coroutine = module.forward_steps(WindowSteps(eager=True), *args, **kwargs)
     state: Any = None
     try:
         while True:
             try:
                 boundary = coroutine.send(state)
             except StopIteration as completed:
-                return cast(TOutput_co, completed.value)
+                return cast(TOutput, completed.value)
             if not isinstance(boundary, WindowBoundary):
                 raise TypeError("forward_steps() must yield only WindowBoundary events. Use WindowSteps operations.")
             state = boundary.state
