@@ -81,7 +81,7 @@ async def forward_steps(self, steps: WindowSteps, inputs: torch.Tensor, shared: 
     return self.second(hidden) + skip
 ```
 
-Manual boundaries expose every new differentiable value from the open region that later regions need, including residuals. The caller reassigns the returned state. Previously returned boundary tensors retain their producers and can be saved for later calls. Before switching from a manual region to `call()`, use `state = await steps.finish(state)`. A helper coroutine's return does not finish its region; only the executor's outer coroutine has that implicit finish.
+A manual boundary passes in its state every differentiable value that the open region computed and a later region reads, including residuals. Use the returned state in place of the passed one. A value that crossed an earlier boundary can stay in a local variable for later regions. Before switching from a manual region to `call()`, use `state = await steps.finish(state)`. A helper coroutine's return does not finish its region; only the executor's outer coroutine has that implicit finish.
 
 Each invocation receives a separate `WindowSteps`. Executors advance the coroutine to `WindowBoundary` events and resume it with the processed state. A boundary's `module` names the next parameter group; `None` finishes the current region without entering another one. User contexts such as `no_grad()` and autocast must not span suspension points, and the window executor raises an error if one does. Executors own compute contexts around each resume and coroutine cleanup. This protocol does not use an `asyncio` event loop.
 

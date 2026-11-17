@@ -19,8 +19,8 @@ class WindowBoundary(Generic[TState]):
     Attributes:
         module: The module whose parameter group the next region uses, or ``None`` if the boundary only finishes a
             region.
-        state: The live state at the boundary. It holds every new differentiable value that later regions need.
-            Tensors exposed at earlier boundaries keep their producers and can stay outside the state.
+        state: The values that cross the boundary. It holds every differentiable value that the finished region
+            computed and a later region reads. A value that crossed an earlier boundary can stay in a local variable.
         prefetch: The module whose parameter group the region after the next one uses, or ``None`` to leave the
             choice to the executor.
     """
@@ -64,7 +64,8 @@ class WindowSteps:
         Args:
             module: The module whose parameter group covers every parameter that the code reads before the next
                 boundary.
-            state: Every live differentiable value, including the values that later regions only pass through.
+            state: Every differentiable value that the open region computed and a later region reads, also if the
+                next region does not read it. A value that crossed an earlier boundary can stay in a local variable.
             prefetch: The module whose parameter group the region after this one uses, or ``None`` to leave the
                 choice to the executor. All microbatches and ranks must pass the same value.
 
@@ -79,7 +80,7 @@ class WindowSteps:
         """Finishes the open region without entering another one.
 
         Args:
-            state: The live state that the region produced and later regions need.
+            state: Every differentiable value that the region computed and a later region reads.
 
         Returns:
             The state that the executor supplies. Use it in place of ``state`` from here on.
