@@ -14,13 +14,15 @@ TOutput_co = TypeVar("TOutput_co", covariant=True)
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class WindowBoundary(Generic[TState]):
-    """A suspension that finishes a region and optionally requests another module's parameters.
+    """The event that a resumable forward yields to its executor at a boundary.
 
     Attributes:
-        module: The module whose parameter group the next region uses, or ``None`` to only finish a region.
-        state: The state exposed at this boundary. Include new differentiable values that later regions need.
-            Previously exposed boundary tensors keep their producers and may be retained separately.
-        prefetch: The group requested after this region, or ``None`` to use the learned order.
+        module: The module whose parameter group the next region uses, or ``None`` if the boundary only finishes a
+            region.
+        state: The live state at the boundary. It holds every new differentiable value that later regions need.
+            Tensors exposed at earlier boundaries keep their producers and can stay outside the state.
+        prefetch: The module whose parameter group the region after the next one uses, or ``None`` to leave the
+            choice to the executor.
     """
 
     module: nn.Module | None
@@ -28,41 +30,46 @@ class WindowBoundary(Generic[TState]):
     prefetch: nn.Module | None = None
 
     def __await__(self) -> Generator[WindowBoundary[TState], TState, TState]:
-        """Yields the boundary and returns the state supplied by the executor.
+        """Suspends the coroutine until the executor resumes this boundary.
 
         Returns:
-            The state supplied when the executor resumes this boundary.
+            The state that the executor supplies on resume.
+
+        Yields:
+            This boundary, to the executor.
         """
         return (yield self)
 
 
 class WindowSteps:
-    """Execution boundaries for one invocation of a resumable forward.
+    """The boundaries of one call of a resumable forward.
 
-    A model receives this object from its executor. Each invocation has its own instance, including when several
-    microbatches run in turn. User compute contexts must not span a boundary. The executor owns the contexts around
-    resumes.
+    The executor creates an instance for each call, also when several microbatches run in turn. User compute
+    contexts, such as ``no_grad()`` and autocast, must not span a boundary. The executor enters the compute contexts
+    around each resume.
     """
 
     def __init__(self, *, eager: bool = False):
         """Constructs the ``WindowSteps`` object.
 
         Args:
-            eager: Whether nested resumable modules run through their synchronous ``forward`` and module hooks.
+            eager: Whether nested resumable modules run through their ``forward()``, so that their module hooks run.
         """
         self._active = False
         self._eager = eager
 
     async def enter(self, module: nn.Module, state: TState, *, prefetch: nn.Module | None = None) -> TState:
-        """Finishes the previous region and requests the module's parameters before continuing.
+        """Finishes the open region, if any, and requests the parameter group of ``module``.
 
         Args:
-            module: The module whose parameter group covers every parameter used before the next boundary.
-            state: All live differentiable state, including values passed through to later regions.
-            prefetch: The next group, or ``None`` to use the learned order. All microbatches and ranks must agree.
+            module: The module whose parameter group covers every parameter that the code reads before the next
+                boundary.
+            state: Every live differentiable value, including the values that later regions only pass through.
+            prefetch: The module whose parameter group the region after this one uses, or ``None`` to leave the
+                choice to the executor. All microbatches and ranks must pass the same value.
 
         Returns:
-            The state supplied by the executor. Reassign it before continuing the computation.
+            The state that the executor supplies. Use it in place of ``state`` from here on.
         """
         state = await WindowBoundary(module, state, prefetch)
         self._active = True
@@ -72,10 +79,10 @@ class WindowSteps:
         """Finishes the open region without entering another one.
 
         Args:
-            state: The live state produced in this region that later regions need.
+            state: The live state that the region produced and later regions need.
 
         Returns:
-            The state supplied by the executor. Reassign it before continuing the computation.
+            The state that the executor supplies. Use it in place of ``state`` from here on.
 
         Raises:
             ValueError: If no region is open.
@@ -87,23 +94,24 @@ class WindowSteps:
         return state
 
     async def call(self, module: nn.Module, *args: Any, **kwargs: Any) -> Any:
-        """Runs a module between entry and finish boundaries.
+        """Runs a module between boundaries and returns its output.
 
-        Differentiable operations outside module calls require an explicit region opened with ``enter()``.
-        An ordinary module forms one region of its parameter group. A resumable module runs its own
-        ``forward_steps()`` with these boundaries, so its regions request their own groups. In eager mode it runs
-        through its synchronous module call, preserving module hooks.
+        An ordinary module forms one region with its parameter group. A resumable module runs its own
+        ``forward_steps()`` with these boundaries, so each of its regions requests its own group. With ``eager=True``,
+        a resumable module runs through its ``forward()`` instead, so its module hooks run. Differentiable operations
+        outside module calls need a region opened with ``enter()``.
 
         Args:
-            module: The module to call.
-            *args: The positional arguments of the module call.
-            **kwargs: The keyword arguments of the module call.
+            module: The module to run.
+            *args: The positional arguments of the module.
+            **kwargs: The keyword arguments of the module.
 
         Returns:
-            The module output, after the executor processes the finish boundary.
+            The output of the module, as the executor supplies it at the finishing boundary.
 
         Raises:
-            ValueError: If a manual region is still open. Finish it with its complete live state first.
+            ValueError: If a region opened with ``enter()`` is still open. Call ``finish()`` with its live state
+                first.
         """
         if self._active:
             raise ValueError("A window region is still open. Call finish() with its live state before call().")
@@ -120,16 +128,16 @@ class ModuleSupportsWindows(Protocol[TInput_contra, TShared_contra, TOutput_co])
     """Protocol for modules whose forward pass can suspend at execution boundaries."""
 
     async def forward_steps(self, steps: WindowSteps, inputs: TInput_contra, shared: TShared_contra) -> TOutput_co:
-        """Computes the model, yielding boundaries through ``steps``.
+        """Runs the forward pass and suspends at the boundaries of ``steps``.
 
         Args:
-            steps: The boundaries for this invocation, supplied by the executor.
-            inputs: The input of this model or pipeline stage.
+            steps: The boundaries of this call, created by the executor.
+            inputs: The input of the model or pipeline stage.
             shared: The shared input of the microbatch.
 
         Returns:
-            The output of the model or stage. The executor finishes any open region when its outer coroutine returns.
-            Returning from a nested helper coroutine does not finish a region.
+            The output of the model or stage. When the outermost coroutine returns, the executor finishes any open
+                region. A return from a nested helper coroutine finishes no region.
         """
         ...
 
@@ -139,20 +147,20 @@ def run_steps(
     inputs: TInput_contra,
     shared: TShared_contra,
 ) -> TOutput_co:
-    """Runs a resumable forward eagerly, without graph cuts or parameter management.
+    """Runs a resumable forward eagerly, with the ordinary autograd graph and without parameter management.
 
-    Each boundary resumes immediately with its original state. The coroutine is closed on exit, including on failure.
+    Each boundary resumes at once with its own state. The function closes the coroutine on exit, also on failure.
 
     Args:
-        module: The model with a resumable forward.
+        module: The module with a resumable forward.
         inputs: The input of the model or stage.
         shared: The shared input of the microbatch.
 
     Returns:
-        The output of the model or stage, with the ordinary autograd graph intact.
+        The output of the model or stage.
 
     Raises:
-        TypeError: If the coroutine yields anything other than a ``WindowBoundary``.
+        TypeError: If the coroutine yields an object other than a ``WindowBoundary``.
     """
     coroutine = module.forward_steps(WindowSteps(eager=True), inputs, shared)
     state: Any = None

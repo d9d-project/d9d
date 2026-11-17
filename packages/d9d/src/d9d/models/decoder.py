@@ -132,15 +132,16 @@ class DecoderWithHeads(
         inputs: SequenceInput | SequenceTransfer[torch.Tensor],
         shared: SequenceHeadsShared[THeadShared],
     ) -> SequenceTransfer[torch.Tensor] | SequenceHeadsOutput[THeadOutput]:
-        """Runs the resumable backbone and the attached heads.
+        """Runs the backbone and, on the last stage, every attached head, with a boundary before each parameter group.
 
         Args:
-            steps: The execution boundaries of this forward.
-            inputs: Token ids or the incoming stage transfer.
-            shared: The backbone and head inputs of this microbatch.
+            steps: The boundaries of this call, created by the executor.
+            inputs: ``SequenceInput`` on the first stage; the incoming ``SequenceTransfer`` otherwise.
+            shared: The backbone shared input plus the per-head shared inputs.
 
         Returns:
-            The backbone transfer, or the head outputs on the last stage.
+            The produced ``SequenceTransfer`` on non-last stages, or each head's output keyed by
+                head name on the last stage.
         """
         model_outputs = await steps.call(cast(nn.Module, self.model), inputs, shared.sequence)
         if not self._stage.is_current_stage_last:
@@ -247,15 +248,16 @@ class DecoderWithHead(
         inputs: SequenceInput | SequenceTransfer[torch.Tensor],
         shared: SequenceHeadShared[THeadShared],
     ) -> SequenceTransfer[torch.Tensor] | THeadOutput:
-        """Runs the resumable backbone and the attached heads.
+        """Runs the backbone and, on the last stage, the attached head, with a boundary before each parameter group.
 
         Args:
-            steps: The execution boundaries of this forward.
-            inputs: Token ids or the incoming stage transfer.
-            shared: The backbone and head inputs of this microbatch.
+            steps: The boundaries of this call, created by the executor.
+            inputs: ``SequenceInput`` on the first stage; the incoming ``SequenceTransfer`` otherwise.
+            shared: The backbone shared input plus the head's shared input.
 
         Returns:
-            The backbone transfer, or the head outputs on the last stage.
+            The produced ``SequenceTransfer`` on non-last stages, or the head's output on the last
+                stage.
         """
         model_outputs = await steps.call(cast(nn.Module, self.model), inputs, shared.sequence)
         if not self._stage.is_current_stage_last:

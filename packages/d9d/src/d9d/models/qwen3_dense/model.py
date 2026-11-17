@@ -152,15 +152,18 @@ class Qwen3DenseModel(
         inputs: SequenceInput | SequenceTransfer[torch.Tensor],
         shared: SequenceShared,
     ) -> SequenceTransfer[torch.Tensor]:
-        """Runs the backbone, exposing its live state before each parameter group.
+        """Executes the backbone forward pass of the current stage, with a boundary before each parameter group.
 
         Args:
-            steps: The execution boundaries of this forward.
-            inputs: Token ids on the first stage, or the incoming transfer.
-            shared: Position ids and the hidden-state aggregation mask.
+            steps: The boundaries of this call, created by the executor.
+            inputs: ``SequenceInput`` with token ids on the first stage, or the incoming
+                ``SequenceTransfer`` on other stages.
+            shared: The backbone shared input: position ids and, if snapshotting is enabled, the
+                aggregation mask.
 
         Returns:
-            The stage output and its hidden-state snapshot.
+            The produced ``SequenceTransfer`` with the hidden states and, if enabled, the updated
+                snapshot.
         """
         rope = self.rope_provider(shared.position_ids)
         aggregator = create_hidden_states_aggregator(self._hidden_states_snapshot_mode, shared.hidden_states_agg_mask)
