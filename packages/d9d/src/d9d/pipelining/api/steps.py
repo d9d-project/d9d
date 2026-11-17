@@ -110,11 +110,10 @@ class WindowSteps:
             The output of the module, as the executor supplies it at the finishing boundary.
 
         Raises:
-            ValueError: If a region opened with ``enter()`` is still open. Call ``finish()`` with its live state
-                first.
+            ValueError: If a region opened with ``enter()`` is still open. Call ``finish()`` first.
         """
         if self._active:
-            raise ValueError("A window region is still open. Call finish() with its live state before call().")
+            raise ValueError("A window region is still open. Call finish() before call().")
         if not self._eager and isinstance(module, ModuleSupportsWindows):
             result = await module.forward_steps(self, *args, **kwargs)
             return await self.finish(result) if self._active else result
@@ -130,14 +129,16 @@ class ModuleSupportsWindows(Protocol[TParams, TOutput_co]):
     async def forward_steps(self, steps: WindowSteps, *args: TParams.args, **kwargs: TParams.kwargs) -> TOutput_co:
         """Runs the forward pass and suspends at the boundaries of ``steps``.
 
+        When this coroutine returns, the executor finishes the open region, if any. A nested helper coroutine
+        finishes no region when it returns.
+
         Args:
             steps: The boundaries of this call, created by the executor.
             *args: The positional arguments of the forward pass.
             **kwargs: The keyword arguments of the forward pass.
 
         Returns:
-            The output of the forward pass. When the outermost coroutine returns, the executor finishes any open
-                region. A return from a nested helper coroutine finishes no region.
+            The output of the forward pass.
         """
         ...
 
@@ -147,7 +148,8 @@ def run_steps(
 ) -> TOutput:
     """Runs a resumable forward eagerly, with the ordinary autograd graph and without parameter management.
 
-    Each boundary resumes at once with its own state. The function closes the coroutine on exit, also on failure.
+    Each boundary resumes at once with its own state. Nested resumable modules run through their ``forward()``, so
+    their module hooks run.
 
     Args:
         module: The module with a resumable forward.

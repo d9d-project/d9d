@@ -21,5 +21,6 @@ def mark_window(module: TModule) -> TModule:
     Returns:
         The same module, without wrappers or hooks.
     """
-    cast(_MarkedWindow, module)._d9d_window = True  # ruff: ignore[private-member-access] - The registration API owns this metadata.
+    # ruff: ignore[private-member-access] - mark_window() owns this attribute.
+    cast(_MarkedWindow, module)._d9d_window = True
     return module
