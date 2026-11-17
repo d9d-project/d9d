@@ -1,3 +1,5 @@
+from torch.optim import Optimizer
+
 from d9d.dist_context import DistributedContext
 from d9d.optim import LRSchedulerProtocol, OptimizerProtocol
 from d9d.rng import fork_rng_child
@@ -49,7 +51,7 @@ class OptimizerFactory:
         Returns:
             A tuple of the pipeline-aware optimizer and scheduler.
         """
-        optimizers: dict[int, OptimizerProtocol] = {}
+        optimizers: dict[int, Optimizer] = {}
         lr_schedulers: dict[int, LRSchedulerProtocol] = {}
         for stage_index, module in self._tracked_modules.modules.items():
             with fork_rng_child("optimizer_provider", stage_index):

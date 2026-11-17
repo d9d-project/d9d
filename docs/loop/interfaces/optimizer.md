@@ -12,6 +12,8 @@ The `d9d.loop.auto` package builds standard optimizers from a Pydantic configura
 
 For a custom optimizer, implement the `OptimizerProvider` protocol. It receives the model stage and returns a PyTorch optimizer. Each optimizer step runs with the global generators seeded per step and stage, so an optimizer can draw from them. See [Random Numbers in the Loop](../determinism.md).
 
+A checkpoint needs state for every parameter, so the loop creates missing state with a step on zero gradients at zero learning rate and weight decay, and drops it again. Such a step must not change the parameters. See [Checkpointing](../checkpointing.md).
+
 ## Usage
 
 `AutoOptimizerConfig` is a discriminated union, so validate it with a Pydantic `TypeAdapter`:
