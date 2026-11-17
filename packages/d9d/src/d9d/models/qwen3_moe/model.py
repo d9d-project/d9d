@@ -56,10 +56,12 @@ class Qwen3MoEModel(
         super().__init__()
 
         if stage.is_current_stage_first:
-            self.embed_tokens = SplitTokenEmbeddings(
-                hidden_size=params.layer.hidden_size,
-                split_vocab_size=params.split_vocab_size,
-                split_order=params.split_vocab_order,
+            self.embed_tokens = mark_parameter_group(
+                SplitTokenEmbeddings(
+                    hidden_size=params.layer.hidden_size,
+                    split_vocab_size=params.split_vocab_size,
+                    split_order=params.split_vocab_order,
+                )
             )
 
         # A ModuleDict keyed by global layer index keeps the parameter FQNs the same on every
@@ -73,7 +75,12 @@ class Qwen3MoEModel(
 
         self._num_layers_before = layer_start
         self._layers_iter = list(map(str, range(layer_start, layer_end)))
-        layers = nn.ModuleDict({str(layer_idx): Qwen3MoELayer(params=params.layer) for layer_idx in self._layers_iter})
+        layers = nn.ModuleDict(
+            {
+                str(layer_idx): mark_parameter_group(Qwen3MoELayer(params=params.layer))
+                for layer_idx in self._layers_iter
+            }
+        )
         self.layers: Mapping[str, Qwen3MoELayer] = cast(Mapping[str, Qwen3MoELayer], layers)
 
         self.rope_provider = RotaryEmbeddingProvider(
@@ -84,18 +91,11 @@ class Qwen3MoEModel(
         )
 
         if stage.is_current_stage_last:
-            self.norm = RMSNorm(params.layer.hidden_size, eps=params.layer.rms_norm_eps)
+            self.norm = mark_parameter_group(RMSNorm(params.layer.hidden_size, eps=params.layer.rms_norm_eps))
 
         self._stage = stage
         self._hidden_states_snapshot_mode = hidden_states_snapshot_mode
         self._enable_checkpointing = enable_checkpointing
-
-        if stage.is_current_stage_first:
-            mark_parameter_group(self.embed_tokens)
-        for layer in self.layers.values():
-            mark_parameter_group(layer)
-        if stage.is_current_stage_last:
-            mark_parameter_group(self.norm)
 
         # Task heads read these dimensions from the backbone.
         self._hidden_size = params.layer.hidden_size
