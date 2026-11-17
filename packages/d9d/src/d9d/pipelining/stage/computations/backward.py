@@ -130,7 +130,9 @@ class BackwardComputeHandler(Generic[TPipelineInput, TStageTransfer]):
             case BackwardSeedLoss():
                 return [seed.loss], None
             case BackwardSeedTransfer():
-                return pytree.tree_leaves(seed.outputs), pytree.tree_leaves(seed.output_grads)
+                # Every leaf of a stage transfer is a tensor.
+                outputs = cast(list[torch.Tensor], pytree.tree_leaves(seed.outputs))
+                return outputs, cast(list[torch.Tensor], pytree.tree_leaves(seed.output_grads))
             case _:
                 raise ValueError(f"Unknown backward seed type ({type(seed).__name__}).")
 

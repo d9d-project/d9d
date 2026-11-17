@@ -1,6 +1,6 @@
 from collections.abc import Generator
 from contextlib import contextmanager
-from typing import Any
+from typing import Any, cast
 
 import torch
 from torch.distributed.checkpoint.stateful import Stateful
@@ -30,7 +30,8 @@ def _flatten_pytree_for_metrics(tree: PyTree[torch.Tensor]) -> dict[str, torch.T
 
     for path_tuple, value in pytree.tree_leaves_with_path(tree):
         flat_key = "/".join(str(segment) for segment in path_tuple)
-        flat_dict[flat_key] = value
+        # ty infers the leaf type of a PyTree as the whole tree.
+        flat_dict[flat_key] = cast(torch.Tensor, value)
 
     return flat_dict
 

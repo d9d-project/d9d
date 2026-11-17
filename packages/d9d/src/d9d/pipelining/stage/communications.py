@@ -34,7 +34,10 @@ def _build_receive_plan(spec_per_microbatch: tuple[PyTree[TensorSpec], ...]) -> 
     for pytree_specs in spec_per_microbatch:
         # Sender and receiver match leaves by flatten order, and tree_flatten keeps that order deterministic.
         leaf_specs, treespec = pytree.tree_flatten(pytree_specs, is_leaf=_is_spec)
-        plan_per_microbatch.append(_MicrobatchReceivePlan(leaf_specs=leaf_specs, treespec=treespec))
+        # ty infers the leaf type of a PyTree as the whole tree.
+        plan_per_microbatch.append(
+            _MicrobatchReceivePlan(leaf_specs=cast(list[TensorSpec], leaf_specs), treespec=treespec)
+        )
 
     return plan_per_microbatch
 
@@ -85,9 +88,9 @@ class StageReceiver(Generic[TStageTransfer]):
             inputs: The ``StageTransfer`` produced by the peer stage.
             microbatch_index: The microbatch identifier.
         """
-        self._live_buffers[microbatch_index] = [
-            leaf.detach().requires_grad_(self._requires_grad) for leaf in pytree.tree_leaves(inputs)
-        ]
+        # Every leaf of a stage transfer is a tensor.
+        leaves = cast(list[torch.Tensor], pytree.tree_leaves(inputs))
+        self._live_buffers[microbatch_index] = [leaf.detach().requires_grad_(self._requires_grad) for leaf in leaves]
 
     def pop_inputs(self, microbatch_index: int) -> TStageTransfer:
         """Retrieves and releases the input transfer for a specific microbatch.
@@ -158,7 +161,6 @@ class StageSender(Generic[TStageTransfer]):
         Returns:
             A list of ``dist.P2POp`` objects for ``dist.isend``.
         """
-        return [
-            dist.P2POp(dist.isend, leaf, self._peer_global_rank, self._group)
-            for leaf in pytree.tree_leaves(send_contents)
-        ]
+        # Every leaf of a stage transfer is a tensor.
+        leaves = cast(list[torch.Tensor], pytree.tree_leaves(send_contents))
+        return [dist.P2POp(dist.isend, leaf, self._peer_global_rank, self._group) for leaf in leaves]
