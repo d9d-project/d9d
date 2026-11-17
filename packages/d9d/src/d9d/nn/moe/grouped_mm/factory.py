@@ -77,19 +77,19 @@ def build_grouped_mm_backend(
 
     match resolved:
         case TorchGroupedMmBackendConfig():
-            from .impl.torch_grouped_mm import TorchGroupedMm  # noqa: PLC0415
+            from .impl.torch_grouped_mm import TorchGroupedMm  # ruff: ignore[import-outside-top-level]
 
             return TorchGroupedMm(params)
         case QuackGroupedMmBackendConfig():
-            from .impl.quack import QuackGroupedMm  # noqa: PLC0415
+            from .impl.quack import QuackGroupedMm  # ruff: ignore[import-outside-top-level]
 
             return QuackGroupedMm(params)
         case GroupedGemmBackendConfig():
-            from .impl.grouped_gemm import GroupedGemm  # noqa: PLC0415
+            from .impl.grouped_gemm import GroupedGemm  # ruff: ignore[import-outside-top-level]
 
             return GroupedGemm()
         case EagerGroupedMmBackendConfig():
-            from .impl.eager import EagerGroupedMm  # noqa: PLC0415
+            from .impl.eager import EagerGroupedMm  # ruff: ignore[import-outside-top-level]
 
             return EagerGroupedMm()
         case _:

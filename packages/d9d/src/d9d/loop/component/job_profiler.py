@@ -83,7 +83,8 @@ class JobProfiler:
             with_stack=config.with_stack,
             # By default only the thread that enters the profiler is recorded, which misses background
             # threads such as data prefetching; torch exposes this option only under a private name.
-            experimental_config=tprof._ExperimentalConfig(profile_all_threads=True),  # noqa: SLF001 - no public name
+            # ruff: ignore[private-member-access] - no public name
+            experimental_config=tprof._ExperimentalConfig(profile_all_threads=True),
         ) as profiler:
             profiler.step_num = self._schedule.current_step
             yield profiler

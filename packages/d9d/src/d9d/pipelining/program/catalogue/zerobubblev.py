@@ -44,7 +44,7 @@ class ZeroBubbleVPipelineProgramBuilder(PipelineProgramBuilder):
 
         return add_communication_ops(compute_actions=actions, stage_to_rank=stage_to_rank, num_stages=num_stages)
 
-    def _generate_rank_schedule(  # noqa: C901 - the schedule phases share counters
+    def _generate_rank_schedule(  # ruff: ignore[complex-structure] - the schedule phases share counters
         self,
         rank: int,
         pp_size: int,

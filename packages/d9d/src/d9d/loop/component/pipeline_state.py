@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from typing import Generic, TypeVar
 
@@ -33,7 +33,7 @@ class PipelineStateHandler(Generic[TState]):
         self._state[microbatch_idx] = pytree.tree_map_only(torch.Tensor, lambda x: x.detach(), state)
 
     @contextmanager
-    def scope(self, microbatch_idx: int) -> Iterator[TState]:
+    def scope(self, microbatch_idx: int) -> Generator[TState, None, None]:
         """Yields the stored side-data for a microbatch, detaching every tensor leaf on exit.
 
         Tensors written into the state while the scope is open are detached from the autograd

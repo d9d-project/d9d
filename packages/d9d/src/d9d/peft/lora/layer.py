@@ -38,9 +38,9 @@ class LoRALinear(nn.Module):
             )
 
         super().__init__()
-        self.lora_A = _linear_like(base_layer, base_layer.in_features, params.r)
-        self.lora_B = _linear_like(base_layer, params.r, base_layer.out_features)
-        self.base = base_layer
+        self.lora_A: nn.Linear = _linear_like(base_layer, base_layer.in_features, params.r)
+        self.lora_B: nn.Linear = _linear_like(base_layer, params.r, base_layer.out_features)
+        self.base: nn.Linear = base_layer
 
         self.dropout: nn.Dropout = nn.Dropout(params.dropout)
 

@@ -1,5 +1,4 @@
 import math
-from typing import cast
 
 import torch.distributed as dist
 import torch.nn.utils
@@ -59,11 +58,8 @@ def _get_global_norm_pow_horizontal(parameter_groups: ParametersForNorm, norm_ty
                     "sharded on more than one mesh dimension is not supported. File an issue if you need it."
                 )
             process_group = group.shard_meshes[0].get_group()
-            work = cast(
-                dist.Work,
-                dist.all_reduce(
-                    local_norm_pow, op=_reduce_op_from_norm_type(norm_type), group=process_group, async_op=True
-                ),
+            work = dist.all_reduce(
+                local_norm_pow, op=_reduce_op_from_norm_type(norm_type), group=process_group, async_op=True
             )
             works.append(work)
         norms.append(local_norm_pow)

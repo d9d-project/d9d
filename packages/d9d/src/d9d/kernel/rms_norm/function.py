@@ -19,7 +19,7 @@ class RMSNormFunction(Function):
         return out
 
     @staticmethod
-    def backward(  # ty: ignore[invalid-method-override] - torch declares backward with variadic grad_outputs
+    def backward(  # ty: ignore[incompatible-method-override] - torch declares backward with variadic grad_outputs
         ctx: Any, grad_output: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor, None, None]:
         x, weight = ctx.saved_tensors

@@ -116,4 +116,4 @@ def test_pp_ep_norm_calculation(dist_ctx_factory):
 def test_empty_params():
     groups = group_parameters_for_norm([])
     norm = clip_grad_norm_distributed_(groups, max_norm=1.0, norm_type=2.0, pp_mesh=None)
-    assert norm.item() == 0.0
+    assert torch.equal(norm.cpu(), torch.tensor(0.0))

@@ -1,4 +1,5 @@
 import pytest
+import torch
 from d9d.dist_context import METRIC_DOMAIN, DeviceMeshParameters, MetricDim
 from d9d.metric import AsyncMetricCollector
 
@@ -24,7 +25,7 @@ def test_lifecycle_local():
 
     result = collector.collect_results()
 
-    assert result.item() == 20.0
+    assert torch.equal(result.cpu(), torch.tensor(20.0))
 
     assert metric.reset_called
 
@@ -50,7 +51,7 @@ def test_lifecycle_distributed(dist_ctx_factory):
     result = collector.collect_results()
 
     # Logic: (10 + 1 (sync add)) * 2 = 22
-    assert result.item() == 22.0
+    assert torch.equal(result.cpu(), torch.tensor(22.0))
     assert metric.reset_called
 
     collector.unbind()
@@ -93,7 +94,7 @@ def test_pytree_support():
     results = collector.collect_results()
 
     # "a" is the metric state itself, which reset() clears, so the results must not alias it.
-    assert results["a"].item() == 1.0
+    assert torch.equal(results["a"].cpu(), torch.tensor(1.0))
     assert [value.item() for value in results["b"]] == [2.0, 3.0]
 
     collector.unbind()

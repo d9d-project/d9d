@@ -79,7 +79,7 @@ class MoELayer(nn.Module, ModuleLateInit):
             group: Process group that spans the expert-parallel ranks.
         """
         # Import lazily, so DeepEP is loaded only when expert parallelism is used.
-        from .communications.deepep import DeepEpCommunicationHandler  # noqa: PLC0415
+        from .communications.deepep import DeepEpCommunicationHandler  # ruff: ignore[import-outside-top-level]
 
         communicator = DeepEpCommunicationHandler(num_experts=self._num_grouped_experts)
         communicator.setup(group, self._hidden_dim, self.router.gate.weight.dtype)

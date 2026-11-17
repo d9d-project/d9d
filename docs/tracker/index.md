@@ -301,7 +301,7 @@ Add the configuration to the `AnyTrackerConfig` union in `packages/d9d/src/d9d/t
 
 ```python
 case CometConfig():
-    from .provider.comet.tracker import CometTracker  # noqa: PLC0415
+    from .provider.comet.tracker import CometTracker  # ruff: ignore[import-outside-top-level]
 
     return CometTracker.from_config(config)
 ```

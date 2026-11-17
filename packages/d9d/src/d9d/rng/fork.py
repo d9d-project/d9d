@@ -1,4 +1,4 @@
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import AbstractContextManager, contextmanager
 from contextvars import ContextVar
 
@@ -10,7 +10,7 @@ _current_seed_scope: ContextVar[SeedScope | None] = ContextVar("current_seed_sco
 
 
 @contextmanager
-def fork_rng(scope: SeedScope) -> Iterator[None]:
+def fork_rng(scope: SeedScope) -> Generator[None, None, None]:
     """Seeds the global generators from a seed scope while the context is open.
 
     The global generators are the torch CPU generator and the CUDA generator of the current device.

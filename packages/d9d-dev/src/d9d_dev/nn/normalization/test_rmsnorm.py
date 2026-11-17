@@ -11,11 +11,11 @@ def test_rms_norm_init() -> None:
 
     layer_standard = RMSNorm(hidden_size, zero_centered=False)
     layer_standard.reset_parameters()
-    assert torch.all(layer_standard.weight == 1.0)
+    assert torch.equal(layer_standard.weight, torch.ones_like(layer_standard.weight))
 
     layer_zero = RMSNorm(hidden_size, zero_centered=True)
     layer_zero.reset_parameters()
-    assert torch.all(layer_zero.weight == 0.0)
+    assert torch.equal(layer_zero.weight, torch.zeros_like(layer_zero.weight))
 
 
 @pytest.mark.parametrize("zero_centered", [False, True])

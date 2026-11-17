@@ -38,19 +38,19 @@ def tracker_from_config(config: AnyTrackerConfig) -> BaseTracker:
             case NullTrackerConfig():
                 return NullTracker.from_config(config)
             case AimConfig():
-                from .provider.aim.tracker import AimTracker  # noqa: PLC0415
+                from .provider.aim.tracker import AimTracker  # ruff: ignore[import-outside-top-level]
 
                 return AimTracker.from_config(config)
             case WandbConfig():
-                from .provider.wandb.tracker import WandbTracker  # noqa: PLC0415
+                from .provider.wandb.tracker import WandbTracker  # ruff: ignore[import-outside-top-level]
 
                 return WandbTracker.from_config(config)
             case TensorBoardConfig():
-                from .provider.tensorboard.tracker import TensorBoardTracker  # noqa: PLC0415
+                from .provider.tensorboard.tracker import TensorBoardTracker  # ruff: ignore[import-outside-top-level]
 
                 return TensorBoardTracker.from_config(config)
             case MLflowConfig():
-                from .provider.mlflow.tracker import MLflowTracker  # noqa: PLC0415
+                from .provider.mlflow.tracker import MLflowTracker  # ruff: ignore[import-outside-top-level]
 
                 return MLflowTracker.from_config(config)
             case _:

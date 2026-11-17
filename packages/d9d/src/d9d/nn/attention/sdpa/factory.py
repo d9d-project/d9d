@@ -63,19 +63,19 @@ def build_sdpa_backend(
 
     match resolved:
         case FlashAttention4SdpaBackendConfig():
-            from .impl.flash4 import FlashAttention4Sdpa  # noqa: PLC0415
+            from .impl.flash4 import FlashAttention4Sdpa  # ruff: ignore[import-outside-top-level]
 
             return FlashAttention4Sdpa(resolved, params)
         case FlashAttention2SdpaBackendConfig():
-            from .impl.flash2 import FlashAttention2Sdpa  # noqa: PLC0415
+            from .impl.flash2 import FlashAttention2Sdpa  # ruff: ignore[import-outside-top-level]
 
             return FlashAttention2Sdpa(resolved, params)
         case TorchSdpaBackendConfig():
-            from .impl.torch_sdpa import TorchSdpa  # noqa: PLC0415
+            from .impl.torch_sdpa import TorchSdpa  # ruff: ignore[import-outside-top-level]
 
             return TorchSdpa(resolved, params)
         case EagerSdpaBackendConfig():
-            from .impl.eager import EagerSdpa  # noqa: PLC0415
+            from .impl.eager import EagerSdpa  # ruff: ignore[import-outside-top-level]
 
             return EagerSdpa(resolved, params)
         case _:

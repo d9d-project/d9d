@@ -385,7 +385,7 @@ class PipelineStage(Generic[TPipelineInput, TStageTransfer, TSharedInput, TPipel
         # autograd graph early. Views cannot be detached in place. Mirrors torch/distributed/pipelining/stage.py.
         if self._info.is_current_stage_last and not self._info.is_current_stage_first:
             for t in pytree.tree_leaves(fwd_outputs):
-                if not t._is_view():  # noqa: SLF001 - PyTorch has no public check for views
+                if not t._is_view():  # ruff: ignore[private-member-access] - PyTorch has no public check for views
                     t.detach_()
 
     def backward_weight_one_chunk(self, microbatch_index: int):

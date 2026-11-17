@@ -1,4 +1,4 @@
-import datetime
+import datetime as dt
 import logging
 from collections.abc import Generator, Mapping
 from contextlib import contextmanager
@@ -175,7 +175,7 @@ class DistributedContext:
         logger.info(f"Setting global timeout to {timeout_seconds} seconds")
         self.wait_world()
 
-        timeout = datetime.timedelta(seconds=timeout_seconds)
+        timeout = dt.timedelta(seconds=timeout_seconds)
         dist.set_timeout(timeout)
         for group in self._groups:
             dist.set_timeout(timeout, group)
