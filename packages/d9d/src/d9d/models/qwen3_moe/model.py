@@ -11,13 +11,13 @@ from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode, create_
 from d9d.nn.normalization import RMSNorm
 from d9d.nn.positional import RotaryEmbeddingProvider, RotaryEmbeddingStyle
 from d9d.pipelining.api import (
+    ForwardSteps,
     ModuleSupportsPipelining,
     PipelineStageInfo,
     StageBoundary,
     TensorSpec,
-    WindowSteps,
     distribute_layers_for_pipeline_stage,
-    mark_window,
+    mark_parameter_group,
     run_steps,
 )
 
@@ -91,11 +91,11 @@ class Qwen3MoEModel(
         self._enable_checkpointing = enable_checkpointing
 
         if stage.is_current_stage_first:
-            mark_window(self.embed_tokens)
+            mark_parameter_group(self.embed_tokens)
         for layer in self.layers.values():
-            mark_window(layer)
+            mark_parameter_group(layer)
         if stage.is_current_stage_last:
-            mark_window(self.norm)
+            mark_parameter_group(self.norm)
 
         # Task heads read these dimensions from the backbone.
         self._hidden_size = params.layer.hidden_size
@@ -146,7 +146,7 @@ class Qwen3MoEModel(
 
     async def forward_steps(
         self,
-        steps: WindowSteps,
+        steps: ForwardSteps,
         inputs: SequenceInput | SequenceTransfer[torch.Tensor],
         shared: SequenceShared,
     ) -> SequenceTransfer[torch.Tensor]:

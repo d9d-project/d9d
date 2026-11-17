@@ -48,22 +48,22 @@ The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* 
 
 ### Resumable Forwards
 
-`ModuleSupportsWindows` describes a forward that can suspend at explicit execution boundaries. Implement `forward_steps(steps, inputs, shared)` and delegate synchronous `forward()` to `run_steps()`. A nested resumable module can take any arguments after `steps`, and `run_steps()` passes them through:
+`ModuleSupportsResumableForward` describes a forward that can suspend at explicit execution boundaries. Implement `forward_steps(steps, inputs, shared)` and delegate synchronous `forward()` to `run_steps()`. A nested resumable module can take any arguments after `steps`, and `run_steps()` passes them through:
 
 ```python
 import torch
 from torch import nn
 
-from d9d.pipelining.api import WindowSteps, mark_window, run_steps
+from d9d.pipelining.api import ForwardSteps, mark_parameter_group, run_steps
 
 
 class ResumableMLP(nn.Module):
     def __init__(self, width: int):
         super().__init__()
-        self.first = mark_window(nn.Sequential(nn.Linear(width, width), nn.Tanh()))
-        self.second = mark_window(nn.Linear(width, width))
+        self.first = mark_parameter_group(nn.Sequential(nn.Linear(width, width), nn.Tanh()))
+        self.second = mark_parameter_group(nn.Linear(width, width))
 
-    async def forward_steps(self, steps: WindowSteps, inputs: torch.Tensor, shared: None) -> torch.Tensor:
+    async def forward_steps(self, steps: ForwardSteps, inputs: torch.Tensor, shared: None) -> torch.Tensor:
         hidden = await steps.call(self.first, inputs)
         return await steps.call(self.second, hidden)
 
@@ -71,10 +71,10 @@ class ResumableMLP(nn.Module):
         return run_steps(self, inputs, shared)
 ```
 
-`mark_window()` declares a parameter group without wrapping the module or changing its checkpoint names. The stage root owns parameters outside marked descendants. `call()` requests an ordinary module's group before invoking it and finishes the region with its output. For a resumable module, it composes that module's `forward_steps()` and finishes its final region. In eager execution, nested modules use their normal calls and hooks. Differentiable operations stay inside these module calls. For arbitrary computation between boundaries, use the manual form:
+`mark_parameter_group()` declares a parameter group without wrapping the module or changing its checkpoint names. The stage root owns parameters outside marked descendants. `call()` requests an ordinary module's group before invoking it and finishes the region with its output. For a resumable module, it composes that module's `forward_steps()` and finishes its final region. In eager execution, nested modules use their normal calls and hooks. Differentiable operations stay inside these module calls. For arbitrary computation between boundaries, use the manual form:
 
 ```python
-async def forward_steps(self, steps: WindowSteps, inputs: torch.Tensor, shared: None) -> torch.Tensor:
+async def forward_steps(self, steps: ForwardSteps, inputs: torch.Tensor, shared: None) -> torch.Tensor:
     inputs = await steps.enter(self.first, inputs)
     hidden = self.first(inputs)
     hidden, skip = await steps.enter(self.second, (hidden, inputs))
@@ -83,7 +83,7 @@ async def forward_steps(self, steps: WindowSteps, inputs: torch.Tensor, shared: 
 
 A manual boundary passes in its state every differentiable value that the open region computed and a later region reads, including residuals. Use the returned state in place of the passed one. A value that crossed an earlier boundary can stay in a local variable for later regions. Before switching from a manual region to `call()`, use `state = await steps.finish(state)`. A helper coroutine's return does not finish its region; only the executor's outer coroutine has that implicit finish.
 
-Each invocation receives a separate `WindowSteps`. Executors advance the coroutine to `WindowBoundary` events and resume it with the processed state. A boundary's `module` names the next parameter group; `None` finishes the current region without entering another one. User contexts such as `no_grad()` and autocast must not span suspension points, and the window executor raises an error if one does. Executors own compute contexts around each resume and coroutine cleanup. This protocol does not use an `asyncio` event loop.
+Each invocation receives a separate `ForwardSteps`. Executors advance the coroutine to `ForwardBoundary` events and resume it with the processed state. A boundary's `module` names the next parameter group; `None` finishes the current region without entering another one. User contexts such as `no_grad()` and autocast must not span suspension points, and the window executor raises an error if one does. Executors own compute contexts around each resume and coroutine cleanup. This protocol does not use an `asyncio` event loop.
 
 `run_steps()` immediately resumes boundaries without graph cuts or parameter management. The parameter runtime instead gathers groups on demand and interleaves microbatches at boundaries. The first pass learns the group order; later passes prefetch from that order. An explicit `prefetch=next_module` on `enter()` names the next group and must match the next request.
 

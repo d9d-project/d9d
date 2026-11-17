@@ -13,7 +13,7 @@ TOutput_co = TypeVar("TOutput_co", covariant=True)
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
-class WindowBoundary(Generic[TState]):
+class ForwardBoundary(Generic[TState]):
     """The event that a resumable forward yields to its executor at a boundary.
 
     Attributes:
@@ -29,7 +29,7 @@ class WindowBoundary(Generic[TState]):
     state: TState
     prefetch: nn.Module | None = None
 
-    def __await__(self) -> Generator[WindowBoundary[TState], TState, TState]:
+    def __await__(self) -> Generator[ForwardBoundary[TState], TState, TState]:
         """Suspends the coroutine until the executor resumes this boundary.
 
         Returns:
@@ -41,7 +41,7 @@ class WindowBoundary(Generic[TState]):
         return (yield self)
 
 
-class WindowSteps:
+class ForwardSteps:
     """The boundaries of one call of a resumable forward.
 
     Each call gets its own instance, so do not keep it after the call returns. Grad mode, inference mode and autocast
@@ -49,7 +49,7 @@ class WindowSteps:
     """
 
     def __init__(self, *, eager: bool = False):
-        """Constructs the ``WindowSteps`` object.
+        """Constructs the ``ForwardSteps`` object.
 
         Args:
             eager: Whether nested resumable modules run through their ``forward()``, so that their module hooks run.
@@ -61,7 +61,7 @@ class WindowSteps:
         """Finishes the open region, if any, and requests the parameter group of ``module``.
 
         Args:
-            module: The stage root or a module marked with ``mark_window()``. Its parameter group covers every
+            module: The stage root or a module marked with ``mark_parameter_group()``. Its parameter group covers every
                 parameter that the code reads before the next boundary.
             state: Every differentiable value that the open region computed and a later region reads, also if the
                 next region does not read it. A value that crossed an earlier boundary can stay in a local variable.
@@ -71,7 +71,7 @@ class WindowSteps:
         Returns:
             The state that the executor supplies. Use it in place of ``state`` from here on.
         """
-        state = await WindowBoundary(module, state, prefetch)
+        state = await ForwardBoundary(module, state, prefetch)
         self._active = True
         return state
 
@@ -88,8 +88,8 @@ class WindowSteps:
             ValueError: If no region is open.
         """
         if not self._active:
-            raise ValueError("No window region is open. Call enter() before finish().")
-        state = await WindowBoundary(None, state)
+            raise ValueError("No region is open. Call enter() before finish().")
+        state = await ForwardBoundary(None, state)
         self._active = False
         return state
 
@@ -113,8 +113,8 @@ class WindowSteps:
             ValueError: If a region opened with ``enter()`` is still open. Call ``finish()`` first.
         """
         if self._active:
-            raise ValueError("A window region is still open. Call finish() before call().")
-        if not self._eager and isinstance(module, ModuleSupportsWindows):
+            raise ValueError("A region is still open. Call finish() before call().")
+        if not self._eager and isinstance(module, ModuleSupportsResumableForward):
             result = await module.forward_steps(self, *args, **kwargs)
             return await self.finish(result) if self._active else result
         args, kwargs = await self.enter(module, (args, kwargs))
@@ -123,10 +123,10 @@ class WindowSteps:
 
 
 @runtime_checkable
-class ModuleSupportsWindows(Protocol[TParams, TOutput_co]):
+class ModuleSupportsResumableForward(Protocol[TParams, TOutput_co]):
     """Protocol for modules whose forward pass can suspend at execution boundaries."""
 
-    async def forward_steps(self, steps: WindowSteps, *args: TParams.args, **kwargs: TParams.kwargs) -> TOutput_co:
+    async def forward_steps(self, steps: ForwardSteps, *args: TParams.args, **kwargs: TParams.kwargs) -> TOutput_co:
         """Runs the forward pass and suspends at the boundaries of ``steps``.
 
         When this coroutine returns, the executor finishes the open region, if any. A nested helper coroutine
@@ -144,7 +144,7 @@ class ModuleSupportsWindows(Protocol[TParams, TOutput_co]):
 
 
 def run_steps(
-    module: ModuleSupportsWindows[TParams, TOutput], *args: TParams.args, **kwargs: TParams.kwargs
+    module: ModuleSupportsResumableForward[TParams, TOutput], *args: TParams.args, **kwargs: TParams.kwargs
 ) -> TOutput:
     """Runs a resumable forward eagerly, with the ordinary autograd graph and without parameter management.
 
@@ -160,9 +160,9 @@ def run_steps(
         The output of the forward pass.
 
     Raises:
-        TypeError: If the coroutine yields an object other than a ``WindowBoundary``.
+        TypeError: If the coroutine yields an object other than a ``ForwardBoundary``.
     """
-    coroutine = module.forward_steps(WindowSteps(eager=True), *args, **kwargs)
+    coroutine = module.forward_steps(ForwardSteps(eager=True), *args, **kwargs)
     state: Any = None
     try:
         while True:
@@ -170,8 +170,8 @@ def run_steps(
                 boundary = coroutine.send(state)
             except StopIteration as completed:
                 return cast(TOutput, completed.value)
-            if not isinstance(boundary, WindowBoundary):
-                raise TypeError("forward_steps() must yield only WindowBoundary events. Use WindowSteps operations.")
+            if not isinstance(boundary, ForwardBoundary):
+                raise TypeError("forward_steps() must yield only ForwardBoundary events. Use ForwardSteps operations.")
             state = boundary.state
     finally:
         coroutine.close()

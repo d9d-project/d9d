@@ -6,7 +6,7 @@ from d9d.models.decoder import DecoderWithHead, DecoderWithHeads
 from d9d.models.io import SequenceHeadShared, SequenceHeadsShared, SequenceInput, SequenceShared, SequenceTransfer
 from d9d.models.qwen3_dense import Qwen3DenseLayerParameters, Qwen3DenseModel, Qwen3DenseParameters
 from d9d.nn.hidden_states_aggregator import HiddenStatesAggregationMode
-from d9d.pipelining.api import PipelineStageInfo, mark_window, run_steps
+from d9d.pipelining.api import PipelineStageInfo, mark_parameter_group, run_steps
 from torch import nn
 
 
@@ -80,13 +80,13 @@ def test_sequence_model_matches_direct_forward_and_gradients(first_stage, last_s
         split_vocab_order=["a"],
     )
     model = Qwen3DenseModel(params, stage, HiddenStatesAggregationMode.mean, checkpointing)
-    model.layers = nn.ModuleDict({name: mark_window(modules[name]) for name in ("first", "second")})
+    model.layers = nn.ModuleDict({name: mark_parameter_group(modules[name]) for name in ("first", "second")})
     model._layers_iter = ["first", "second"]
     model.rope_provider = _Positions(positions)
     if first_stage:
-        model.embed_tokens = mark_window(modules["embed"])
+        model.embed_tokens = mark_parameter_group(modules["embed"])
     if last_stage:
-        model.norm = mark_window(modules["norm"])
+        model.norm = mark_parameter_group(modules["norm"])
     actual = model(inputs, shared)
 
     expected = _direct_forward(reference, reference_inputs, positions, first_stage, last_stage)

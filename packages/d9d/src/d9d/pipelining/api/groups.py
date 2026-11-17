@@ -5,11 +5,11 @@ from torch import nn
 TModule = TypeVar("TModule", bound=nn.Module)
 
 
-class _MarkedWindow(Protocol):
-    _d9d_window: bool
+class _MarkedParameterGroup(Protocol):
+    _d9d_parameter_group: bool
 
 
-def mark_window(module: TModule) -> TModule:
+def mark_parameter_group(module: TModule) -> TModule:
     """Makes a module the root of its own parameter group.
 
     A resumable forward requests a group at each boundary, and the executor gathers the weights of that group for the
@@ -23,6 +23,6 @@ def mark_window(module: TModule) -> TModule:
     Returns:
         The same module, so that the call can wrap an assignment.
     """
-    # ruff: ignore[private-member-access] - mark_window() owns this attribute.
-    cast(_MarkedWindow, module)._d9d_window = True
+    # ruff: ignore[private-member-access] - mark_parameter_group() owns this attribute.
+    cast(_MarkedParameterGroup, module)._d9d_parameter_group = True
     return module

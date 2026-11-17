@@ -17,12 +17,12 @@ from d9d.nn.head import (
     TaskHead,
 )
 from d9d.pipelining.api import (
+    ForwardSteps,
     ModuleSupportsPipelining,
     PipelineStageInfo,
     StageBoundary,
     TensorSpec,
-    WindowSteps,
-    mark_window,
+    mark_parameter_group,
     run_steps,
 )
 
@@ -97,14 +97,14 @@ class DecoderWithHeads(
         super().__init__()
 
         self.model = backbone
-        mark_window(cast(nn.Module, backbone))
+        mark_parameter_group(cast(nn.Module, backbone))
         self._stage = stage
 
         if stage.is_current_stage_last:
             self.heads: Mapping[str, TaskHead[THeadShared, THeadOutput]] = cast(
                 Mapping[str, TaskHead[THeadShared, THeadOutput]], nn.ModuleDict(dict(heads))
             )
-            mark_window(cast(nn.Module, self.heads))
+            mark_parameter_group(cast(nn.Module, self.heads))
 
     def forward(
         self,
@@ -128,7 +128,7 @@ class DecoderWithHeads(
 
     async def forward_steps(
         self,
-        steps: WindowSteps,
+        steps: ForwardSteps,
         inputs: SequenceInput | SequenceTransfer[torch.Tensor],
         shared: SequenceHeadsShared[THeadShared],
     ) -> SequenceTransfer[torch.Tensor] | SequenceHeadsOutput[THeadOutput]:
@@ -218,12 +218,12 @@ class DecoderWithHead(
         super().__init__()
 
         self.model = backbone
-        mark_window(cast(nn.Module, backbone))
+        mark_parameter_group(cast(nn.Module, backbone))
         self._stage = stage
 
         if stage.is_current_stage_last:
             self.head: THead = head
-            mark_window(head)
+            mark_parameter_group(head)
 
     def forward(
         self,
@@ -244,7 +244,7 @@ class DecoderWithHead(
 
     async def forward_steps(
         self,
-        steps: WindowSteps,
+        steps: ForwardSteps,
         inputs: SequenceInput | SequenceTransfer[torch.Tensor],
         shared: SequenceHeadShared[THeadShared],
     ) -> SequenceTransfer[torch.Tensor] | THeadOutput:
