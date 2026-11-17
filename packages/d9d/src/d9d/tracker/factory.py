@@ -30,32 +30,37 @@ def tracker_from_config(config: AnyTrackerConfig) -> BaseTracker:
         ImportError: If the optional dependency of the provider is not installed.
         ValueError: If the configuration type is unknown.
     """
-    # Each SDK takes seconds to import, so a provider imports it only when a job selects it.
     try:
-        match config:
-            case LogTrackerConfig():
-                return LogTracker.from_config(config)
-            case NullTrackerConfig():
-                return NullTracker.from_config(config)
-            case AimConfig():
-                from .provider.aim.tracker import AimTracker  # ruff: ignore[import-outside-top-level]
-
-                return AimTracker.from_config(config)
-            case WandbConfig():
-                from .provider.wandb.tracker import WandbTracker  # ruff: ignore[import-outside-top-level]
-
-                return WandbTracker.from_config(config)
-            case TensorBoardConfig():
-                from .provider.tensorboard.tracker import TensorBoardTracker  # ruff: ignore[import-outside-top-level]
-
-                return TensorBoardTracker.from_config(config)
-            case MLflowConfig():
-                from .provider.mlflow.tracker import MLflowTracker  # ruff: ignore[import-outside-top-level]
-
-                return MLflowTracker.from_config(config)
-            case _:
-                raise ValueError(f"Tracker configuration type ({type(config).__name__}) is not supported.")
+        tracker_type = _tracker_type(config)
     except ImportError as e:
         raise ImportError(
             f"Tracker provider ({config.provider}) cannot be loaded. Install the d9d[tracker-{config.provider}] extra."
         ) from e
+    return tracker_type.from_config(config)
+
+
+def _tracker_type(config: AnyTrackerConfig) -> type[BaseTracker]:
+    # Each SDK takes seconds to import, so a provider imports it only when a job selects it.
+    match config:
+        case LogTrackerConfig():
+            return LogTracker
+        case NullTrackerConfig():
+            return NullTracker
+        case AimConfig():
+            from .provider.aim.tracker import AimTracker  # ruff: ignore[import-outside-top-level]
+
+            return AimTracker
+        case WandbConfig():
+            from .provider.wandb.tracker import WandbTracker  # ruff: ignore[import-outside-top-level]
+
+            return WandbTracker
+        case TensorBoardConfig():
+            from .provider.tensorboard.tracker import TensorBoardTracker  # ruff: ignore[import-outside-top-level]
+
+            return TensorBoardTracker
+        case MLflowConfig():
+            from .provider.mlflow.tracker import MLflowTracker  # ruff: ignore[import-outside-top-level]
+
+            return MLflowTracker
+        case _:
+            raise ValueError(f"Tracker configuration type ({type(config).__name__}) is not supported.")
