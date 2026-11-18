@@ -1,6 +1,6 @@
-"""Explicit data parallelism that the pipeline program drives: weight gathers, gradient reductions and memory."""
+"""Explicit data parallelism that the pipeline program drives: weight gathers, gradient reductions and buffers."""
 
 from .coordinator import ParameterRuntime
-from .types import BucketId, ReductionPlan
+from .stage import BackwardPass, StageParameters
 
-__all__ = ["BucketId", "ParameterRuntime", "ReductionPlan"]
+__all__ = ["BackwardPass", "ParameterRuntime", "StageParameters"]

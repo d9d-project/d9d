@@ -1,6 +1,5 @@
 import pytest
-from d9d.pipelining.api import mark_parameter_group
-from d9d.pipelining.api.groups import group_modules, parameter_group_roots
+from d9d.pipelining.api import mark_parameter_group, marked_parameter_groups
 from torch import nn
 
 
@@ -17,17 +16,10 @@ class _Resumable(_Plain):
 
 
 @pytest.mark.local
-@pytest.mark.parametrize("resumable", [False, True])
-def test_parameter_groups_partition_the_stage(resumable):
-    model = _Resumable() if resumable else _Plain()
-
-    roots = parameter_group_roots(model)
-
-    # Marks take effect only in a resumable stage.
-    assert roots == ([model, model.block, model.block[1]] if resumable else [model])
-    groups = [
-        [id(p) for module in group_modules(root, set(roots)) for p in module.parameters(recurse=False)]
-        for root in roots
-    ]
-    every_parameter = [p for group in groups for p in group]
-    assert sorted(every_parameter) == sorted(id(p) for p in model.parameters())
+def test_marked_parameter_groups():
+    model = _Resumable()
+    assert marked_parameter_groups(model) == [model.block, model.block[1]]
+    assert marked_parameter_groups(nn.Linear(2, 2)) == []
+    # Only a resumable forward can request the groups, so marks in another stage are a mistake.
+    with pytest.raises(ValueError, match=r"stage \(_Plain\) marks parameter groups but has no forward_steps\(\)"):
+        marked_parameter_groups(_Plain())

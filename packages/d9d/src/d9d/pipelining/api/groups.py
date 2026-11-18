@@ -31,40 +31,26 @@ def mark_parameter_group(module: TModule) -> TModule:
     return module
 
 
-def parameter_group_roots(module: nn.Module) -> list[nn.Module]:
-    """Returns the roots of the parameter groups of a stage: the stage root and its marked descendants.
+def marked_parameter_groups(module: nn.Module) -> list[nn.Module]:
+    """Returns the modules of a stage that ``mark_parameter_group()`` marked.
+
+    Pass them to ``ParameterRuntime.register_stage()``.
 
     Args:
-        module: The stage module.
+        module: The stage root.
 
     Returns:
-        The group roots, in registration order, without duplicate modules.
+        The marked descendants, in the order of ``module.modules()``. Empty for a stage without marks.
+
+    Raises:
+        ValueError: If the stage has marks but no resumable forward, so no region could request their groups.
     """
-    if not isinstance(module, ModuleSupportsResumableForward):
-        return [module]
-    return [
-        module,
-        *(child for child in module.modules() if child is not module and isinstance(child, _MarkedParameterGroup)),
+    marked: list[nn.Module] = [
+        child for child in module.modules() if child is not module and isinstance(child, _MarkedParameterGroup)
     ]
-
-
-def group_modules(module: nn.Module, roots: set[nn.Module]) -> list[nn.Module]:
-    """Returns the modules of a group, stopping at nested group roots.
-
-    Args:
-        module: The root of the group.
-        roots: All group roots of the stage.
-
-    Returns:
-        The modules whose own parameters belong to this group, each once.
-    """
-    result: dict[nn.Module, None] = {}
-    # A loop instead of a nested recursive function, which would hold the modules in a reference cycle.
-    pending = [module]
-    while pending:
-        current = pending.pop()
-        if current in result:
-            continue
-        result[current] = None
-        pending.extend(child for child in reversed(list(current.children())) if child not in roots)
-    return list(result)
+    if marked and not isinstance(module, ModuleSupportsResumableForward):
+        raise ValueError(
+            f"The stage ({type(module).__name__}) marks parameter groups but has no forward_steps(). Implement "
+            "ModuleSupportsResumableForward on the stage root."
+        )
+    return marked

@@ -1,8 +1,7 @@
 import dataclasses
 
-from torch import nn
-from torch.distributed import DeviceMesh
-from torch.distributed.tensor import DTensor, Placement, Replicate, Shard, distribute_tensor
+from torch import Tensor
+from torch.distributed.tensor import DTensor, Replicate, Shard
 
 
 @dataclasses.dataclass(kw_only=True, frozen=True)
@@ -49,20 +48,16 @@ def split_placement_dims(data: DTensor) -> PlacementDims:
     return PlacementDims(replicate_dim_names=tuple(replicate_dim_names), shard_dim_names=tuple(shard_dim_names))
 
 
-def distribute_parameters(module: nn.Module, mesh: DeviceMesh, placements: tuple[Placement, ...]):
-    """Turns the parameters of a module into ``DTensor`` objects without changing how the module runs.
-
-    A parameter that several submodules hold stays one parameter.
+def dist_grad_from_local(data: DTensor, local_grad: Tensor) -> DTensor:
+    """Builds a ``DTensor`` gradient from a local tensor, with the shape, stride and placements of ``data``.
 
     Args:
-        module: The module.
-        mesh: The device mesh.
-        placements: The placements of the parameters, one per mesh dimension.
+        data: The parameter ``DTensor`` to take the metadata from.
+        local_grad: The local tensor containing gradient data.
+
+    Returns:
+        A new DTensor wrapping the local gradient.
     """
-    distributed: dict[int, nn.Parameter] = {}
-    for submodule in module.modules():
-        for name, param in list(submodule.named_parameters(recurse=False, remove_duplicate=False)):
-            if id(param) not in distributed:
-                data = distribute_tensor(param.data, mesh, placements)
-                distributed[id(param)] = nn.Parameter(data, requires_grad=param.requires_grad)
-            submodule.register_parameter(name, distributed[id(param)])
+    return DTensor.from_local(
+        local_grad, shape=data.shape, stride=data.stride(), device_mesh=data.device_mesh, placements=data.placements
+    )
