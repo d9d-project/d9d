@@ -10,7 +10,7 @@ from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor
 from torch.utils.hooks import RemovableHandle
 
-from .placement_helper import dist_grad_from_local
+from ..placement import dist_grad_from_local
 
 
 class AbstractGradientBucket(abc.ABC):
