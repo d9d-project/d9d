@@ -1,17 +1,16 @@
 """Stage registration, binding and the gradients of a step."""
 
 import dataclasses
-from collections.abc import Collection, Iterator, Sequence
+from collections.abc import Collection, Sequence
 from types import TracebackType
 from typing import Self
 
 import torch
 from torch import nn
 
-from .bucket import AnyBucket, BucketGradients, GatheredBucket, PendingGradientBuffers, ReplicatedBucket
-from .parameter import install_tensor_hook_bridge, make_local_handle
-from .plan import StagePlan, plan_stages
-from .stage import StageParameters, StageState, StepState
+from .bucket import BucketGradients, PendingGradientBuffers
+from .plan import plan_stages
+from .stage import StageParameters, bind_stage
 
 
 @dataclasses.dataclass(slots=True)
@@ -21,21 +20,20 @@ class _BoundState:
     Attributes:
         gather_stream: The stream that gathers weights.
         reduce_stream: The stream that reduces gradients.
-        step: The state of the current step.
         pending: The gradient buffers that the reduce stream may still read.
-        stages: The parameter state of each stage, by stage index.
+        stages: The parameters of each stage, by stage index.
+        finished: Whether ``wait()`` finished the gradients of the current step.
     """
 
     gather_stream: torch.cuda.Stream
     reduce_stream: torch.cuda.Stream
-    step: StepState
     pending: PendingGradientBuffers
-    stages: dict[int, StageState] = dataclasses.field(default_factory=dict)
+    stages: dict[int, StageParameters] = dataclasses.field(default_factory=dict)
+    finished: bool = False
 
-    def buckets(self) -> Iterator[AnyBucket]:
-        """Yields the buckets of all stages."""
-        for state in self.stages.values():
-            yield from state.buckets
+    def gradients(self) -> list[BucketGradients]:
+        """Returns the gradients of the trainable buckets of all stages."""
+        return [item for stage in self.stages.values() for item in stage.gradients]
 
 
 class ParameterRuntime:
@@ -121,8 +119,9 @@ class ParameterRuntime:
         Run the steps on the stream that runs ``bind()``.
 
         Raises:
-            ValueError: If the runtime is already bound, if a parameter is shared by several stages, if the placements
-                of a parameter are not supported, or if a shard does not match ``torch.chunk``.
+            ValueError: If the runtime is already bound, if a parameter is shared by several stages, if a trainable
+                parameter has no ``grad_dtype``, if the placements of a parameter are not supported, or if a shard
+                does not match ``torch.chunk``.
         """
         if self._bound is not None:
             raise ValueError("The runtime is already bound. Call unbind() first.")
@@ -131,61 +130,23 @@ class ParameterRuntime:
         bound = _BoundState(
             gather_stream=torch.cuda.Stream(),
             reduce_stream=torch.cuda.Stream(),
-            step=StepState(),
             pending=PendingGradientBuffers(),
         )
         self._bound = bound
         try:
             for stage_index, plan in plans.items():
-                self._bind_stage(bound, stage_index, plan)
+                bound.stages[stage_index] = bind_stage(
+                    stage_index, plan, bound.gather_stream, bound.reduce_stream, bound.pending
+                )
         except Exception:
             self.unbind()
             raise
 
-    @staticmethod
-    def _bind_stage(bound: _BoundState, stage_index: int, plan: StagePlan):
-        # The stage joins the bound state before its buckets exist, so teardown releases them if a later one fails.
-        state = StageState(
-            stage_index=stage_index,
-            group_indices={group: index for index, group in enumerate(plan.groups)},
-            handles=[],
-            handles_by_group=[],
-            buckets=[],
-            gathered_by_group=[[] for _ in plan.parameters_by_group],
-            step=bound.step,
-        )
-        bound.stages[stage_index] = state
-
-        # A parameter without a gather views its local data. The unsharded parameters of a gathered bucket view its
-        # weight buffer, so the bucket creates them.
-        gathered = {x for bucket in plan.buckets if bucket.gather is not None for x in bucket.parameters}
-        handles = {x: make_local_handle(x) for x in plan.parameters if x not in gathered}
-
-        # The buckets keep the order of the plan, which is the reduction order.
-        for bucket_plan in plan.buckets:
-            match bucket_plan.gather:
-                case None:
-                    bucket: AnyBucket = ReplicatedBucket(
-                        bucket_plan, [handles[x] for x in bucket_plan.parameters], bound.reduce_stream
-                    )
-                case gather:
-                    bucket = GatheredBucket(
-                        bucket_plan, gather, bound.gather_stream, bound.reduce_stream, bound.pending
-                    )
-                    handles.update((handle.plan, handle) for handle in bucket.handles)
-                    for group in bucket_plan.groups:
-                        state.gathered_by_group[group].append(bucket)
-            state.buckets.append(bucket)
-
-        state.handles = list(handles.values())
-        state.handles_by_group = [[handles[x] for x in group] for group in plan.parameters_by_group]
-        for handle in state.handles:
-            install_tensor_hook_bridge(handle)
-
     def unbind(self):
-        """Releases the unsharded parameters, the gradient buffers and the hooks.
+        """Releases the unsharded parameters, the buffers and the hooks.
 
-        It sets the ``.grad`` of the sharded parameters to ``None``. It does nothing on an unbound runtime.
+        It sets the ``.grad`` of the sharded parameters to ``None``. The ``StageParameters`` of the stages raise
+        afterwards. Without a bind, it does nothing.
         """
         bound = self._bound
         if bound is None:
@@ -193,28 +154,18 @@ class ParameterRuntime:
         torch.cuda.current_stream().wait_stream(bound.reduce_stream)
         torch.cuda.current_stream().wait_stream(bound.gather_stream)
         bound.pending.free_all()
-        for bucket in bound.buckets():
-            bucket.unbind()
-        for state in bound.stages.values():
-            for handle in state.handles:
-                if handle.hook is not None:
-                    handle.hook.remove()
-                # A graph that the program still holds, e.g. through a logged loss, keeps the unsharded parameter
-                # alive. So it must keep neither the gradient buffer nor the local data, which an offload replaces.
-                handle.unsharded.grad = None
-                handle.unsharded.data = handle.unsharded.data.new_empty(0)
-            state.unbind()
-        bound.step.reduced.clear()
+        for stage in bound.stages.values():
+            stage.close()
         self._bound = None
 
     def stage(self, stage_index: int) -> StageParameters:
-        """Returns the parameter groups of a bound stage.
+        """Returns the parameters of a stage.
 
         Args:
             stage_index: The index of the stage.
 
         Returns:
-            The parameter groups of the stage.
+            The parameters of the stage, valid until ``unbind()``.
 
         Raises:
             ValueError: If the runtime is not bound, or if the stage is not registered.
@@ -222,21 +173,7 @@ class ParameterRuntime:
         stages = self._require_bound().stages
         if stage_index not in stages:
             raise ValueError(f"The stage ({stage_index}) is not registered. Call register_stage() before bind().")
-        return StageParameters(stages[stage_index])
-
-    @staticmethod
-    def _gradients(bound: _BoundState) -> list[BucketGradients]:
-        return [bucket.gradients for bucket in bound.buckets() if bucket.gradients is not None]
-
-    @staticmethod
-    def _invalidate_weights(bound: _BoundState):
-        for bucket in bound.buckets():
-            match bucket:
-                case GatheredBucket():
-                    bucket.invalidate_weights()
-                case ReplicatedBucket():
-                    # The parameters view the local data, which holds the latest writes.
-                    pass
+        return stages[stage_index]
 
     def wait(self):
         """Finishes the gradients of the step for the current stream.
@@ -246,45 +183,40 @@ class ParameterRuntime:
 
         Raises:
             ValueError: If the runtime is not bound, if this step is already finished, if the backward passes did not
-                reduce a bucket, if a gradient was replaced during the step, or if a post-accumulate-grad hook set a
+                reduce a group, if a gradient was replaced during the step, or if a post-accumulate-grad hook set a
                 gradient to ``None``.
         """
         bound = self._require_bound()
-        step = bound.step
-        if step.finished:
+        if bound.finished:
             raise ValueError("The gradients of this step are already finished. Call zero_grad() before the next step.")
 
-        for state in bound.stages.values():
-            missing = sorted(
-                {
-                    group
-                    for bucket in state.buckets
-                    if bucket.plan.trainable and bucket not in step.reduced
-                    for group in bucket.plan.groups
-                }
-            )
+        for stage_index, stage in bound.stages.items():
+            missing = stage.unreduced_groups()
             if missing:
                 raise ValueError(
-                    f"The backward passes of stage ({state.stage_index}) did not reduce the parameter groups "
-                    f"({missing}). Run a backward pass with final=True over every region of the stage before wait()."
+                    f"The backward passes of stage ({stage_index}) did not reduce the parameter groups ({missing}). "
+                    "Run a backward pass with final=True over every region of the stage before wait()."
                 )
 
-        gradients = self._gradients(bound)
+        gradients = bound.gradients()
         for item in gradients:
             item.check()
 
         torch.cuda.current_stream().wait_stream(bound.reduce_stream)
         bound.pending.free_all()
         # The optimizer writes the sharded weights after wait(), and a gather that no region used can still read them.
-        self._invalidate_weights(bound)
+        for stage in bound.stages.values():
+            stage.invalidate_weights()
         # From here on, a retry would run the hooks that already ran.
-        step.finished = True
+        bound.finished = True
         for item in gradients:
             item.finish()
 
     @torch.no_grad()
     def scale_grads(self, factor: torch.Tensor):
-        """Multiplies all gradients in place. Call it after ``wait()``.
+        """Multiplies all gradients in place.
+
+        Call it after ``wait()``.
 
         Args:
             factor: The scalar to multiply the gradients by.
@@ -294,14 +226,14 @@ class ParameterRuntime:
         """
         bound = self._require_bound()
         # Before wait(), a reduction on the reduce stream can still overwrite the scaled gradients.
-        if not bound.step.finished:
+        if not bound.finished:
             raise ValueError("The gradients of this step are not finished. Call wait() before scale_grads().")
-        tensors = [item.tensor for item in self._gradients(bound)]
+        tensors = [item.tensor for item in bound.gradients()]
         if tensors:
             torch._foreach_mul_(tensors, factor)
 
     def zero_grad(self):
-        """Starts a step: clears the gradients and drops the unsharded weights.
+        """Starts a step: zeroes the gradients and drops the unsharded weights.
 
         Call it after the optimizer step and before the next forward pass. Without a bind, it does nothing.
         """
@@ -310,17 +242,18 @@ class ParameterRuntime:
             return
         # A failed step can leave reductions queued on the reduce stream.
         torch.cuda.current_stream().wait_stream(bound.reduce_stream)
-        for bucket in bound.buckets():
-            bucket.zero_grad()
-        # A gather that started before the optimizer step holds the weights from before it.
-        self._invalidate_weights(bound)
-        bound.step.reduced.clear()
-        bound.step.finished = False
+        for stage in bound.stages.values():
+            stage.zero_grad()
+            # A gather that started before the optimizer step holds the weights from before it.
+            stage.invalidate_weights()
+        bound.finished = False
 
     def invalidate_weights(self):
-        """Drops the unsharded weights before a load of the sharded ones, including frozen and inference weights.
+        """Drops the unsharded weights, so the next region gathers the sharded ones anew.
 
-        The next group reads the new sharded weights. Without a bind, it does nothing: ``bind()`` reads them anew.
+        Call it after a write to the sharded weights outside ``wait()`` and ``zero_grad()``, e.g. a checkpoint load.
+        Without a bind, it does nothing.
         """
         if self._bound is not None:
-            self._invalidate_weights(self._bound)
+            for stage in self._bound.stages.values():
+                stage.invalidate_weights()

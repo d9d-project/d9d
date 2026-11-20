@@ -239,7 +239,7 @@ def test_backward_that_replaces_gradients_is_rejected():
     try:
         runtime.zero_grad()
         # With create_graph=True, autograd replaces the gradient instead of adding into the buffer of the runtime.
-        with pytest.raises(ValueError, match=r"\(Linear.weight\) was replaced during the backward pass"):
+        with pytest.raises(ValueError, match=r"\(weight\) was replaced during the backward pass"):
             run_one_region(
                 runtime, lambda: model(torch.ones(2, 4, device="cuda")).square().sum().backward(create_graph=True)
             )

@@ -15,10 +15,9 @@ class _MarkedParameterGroup(Protocol):
 def mark_parameter_group(module: TModule) -> TModule:
     """Makes a module the root of its own parameter group.
 
-    A resumable forward requests a group at each boundary, and the executor gathers the weights of that group for the
-    region. The group holds the parameters of the module and its descendants, except those of marked descendants.
-    The parameters outside every marked module belong to the group of the stage root. Mark the modules while
-    building the model. The forward and the parameter names stay the same.
+    The group holds the parameters of the module and its descendants, except those of marked descendants. The
+    parameters outside every marked module belong to the group of the stage root. Mark the modules while building the
+    model: the forward and the parameter names stay the same.
 
     Args:
         module: The module to mark.

@@ -1,18 +1,17 @@
-"""Planning of buckets: the roles of the mesh dimensions and the bucket of each parameter."""
+"""The buckets of a stage: the roles of the mesh dimensions and the bucket of each parameter."""
 
 import dataclasses
 import math
-from collections.abc import Mapping, Sequence
 from typing import cast
 
 import torch
-from torch import nn
+from torch import Tensor, nn
 from torch.distributed import DeviceMesh, ProcessGroup
 from torch.distributed.tensor import DTensor, Shard
 
 from d9d.parallel.placement import split_placement_dims
 
-from .parameter import ParameterPlan, local_tensor, plan_parameters
+from .parameter import ParameterPlan, local_tensor
 
 
 @dataclasses.dataclass(frozen=True, slots=True)
@@ -33,32 +32,32 @@ class DimRoles:
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class BucketKey:
-    """Properties that parameters must share to use one bucket.
+    """The properties that the parameters of one bucket share.
 
     Attributes:
-        mesh: The parameter mesh, or ``None`` for a parameter outside a device mesh.
+        mesh: The device mesh of the parameters, or ``None`` for parameters outside a device mesh.
         roles: The roles of the mesh dimensions.
         dtype: The dtype of the weights.
-        grad_dtype: The dtype of the gradients.
-        groups: The groups that use the gathered weights, or empty without a gather.
+        grad_dtype: The dtype of the gradients, or ``None`` in a frozen bucket.
+        groups: The groups that hold the parameters, or empty without a gather.
         trainable: Whether the bucket computes gradients.
     """
 
     mesh: DeviceMesh | None
     roles: DimRoles
     dtype: torch.dtype
-    grad_dtype: torch.dtype
+    grad_dtype: torch.dtype | None
     groups: tuple[int, ...]
     trainable: bool
 
 
 @dataclasses.dataclass(slots=True)
 class GatherPlan:
-    """The gather of a bucket.
+    """The plan of the all-gather of a bucket.
 
     Attributes:
         process_group: The process group of the gather dimension.
-        shard_sizes: The unpadded element count of the shard of each rank, one list per parameter.
+        shard_sizes: The number of elements of the shard of each rank without padding, one list per parameter.
     """
 
     process_group: ProcessGroup
@@ -67,17 +66,17 @@ class GatherPlan:
 
 @dataclasses.dataclass(slots=True)
 class BucketPlan:
-    """Parameters that share communication and gradient buffers, before the buffers exist.
+    """The plan of one bucket: parameters that share their collectives and buffers.
 
     Attributes:
         parameters: The parameters, in buffer order.
-        groups: The groups that use these parameters, in ascending order.
+        groups: The groups that hold the parameters, in ascending order.
         gather: The gather of the bucket, or ``None`` for a bucket without a gather.
         replica_process_groups: The process groups of the replica dimensions, in reduction order.
         dtype: The dtype of the weights.
-        grad_dtype: The dtype of the gradients.
+        grad_dtype: The dtype of the gradients, or ``None`` in a frozen bucket.
         trainable: Whether the bucket computes gradients.
-        numel: The buffer element count, including the padding of uneven chunks.
+        numel: The number of elements of the buffers, including the padding of uneven chunks.
     """
 
     parameters: list[ParameterPlan]
@@ -85,33 +84,35 @@ class BucketPlan:
     gather: GatherPlan | None
     replica_process_groups: list[ProcessGroup]
     dtype: torch.dtype
-    grad_dtype: torch.dtype
+    grad_dtype: torch.dtype | None
     trainable: bool
     numel: int = 0
 
 
-@dataclasses.dataclass(slots=True)
-class StagePlan:
-    """Parameters and buckets of one stage, before the buffers exist.
+def chunk_places(gather: GatherPlan, flat: Tensor) -> list[Tensor]:
+    """Returns the place of each parameter in a flat buffer of a gathered bucket.
 
-    Attributes:
-        groups: The roots of the groups of the stage. The first one is the stage root.
-        parameters: The parameters of the stage, each once.
-        parameters_by_group: The parameters that each group uses, by group index.
-        buckets: The buckets in reduction order.
+    Args:
+        gather: The gather of the bucket.
+        flat: A buffer with the padded chunks of all parameters.
+
+    Returns:
+        The place of each parameter: its padded chunks of all ranks, next to each other.
     """
-
-    groups: Sequence[nn.Module]
-    parameters: list[ParameterPlan]
-    parameters_by_group: list[list[ParameterPlan]]
-    buckets: list[BucketPlan]
+    parts = gather.process_group.size()
+    places, offset = [], 0
+    for sizes in gather.shard_sizes:
+        width = sizes[0]
+        places.append(flat[parts * offset : parts * (offset + width)])
+        offset += width
+    return places
 
 
 def classify_dims(parameter: ParameterPlan, data: DTensor, gather_dims: frozenset[str]) -> DimRoles:
     """Assigns a role to each mesh dimension of a parameter.
 
     Args:
-        parameter: The parameter.
+        parameter: The parameter, whose name the errors report.
         data: The data of the sharded parameter.
         gather_dims: The mesh dimensions along which data parallelism shards parameters.
 
@@ -119,7 +120,8 @@ def classify_dims(parameter: ParameterPlan, data: DTensor, gather_dims: frozense
         The roles of the mesh dimensions.
 
     Raises:
-        ValueError: If the placements are not supported.
+        ValueError: If the placements shard the parameter along several gather dimensions, not with ``Shard(0)``, or
+            along a gather dimension and another one.
     """
     dims = split_placement_dims(data)
     names = cast(tuple[str, ...], data.device_mesh.mesh_dim_names)
@@ -149,7 +151,8 @@ def _bucket_key(parameter: ParameterPlan, groups: tuple[int, ...], gather_dims: 
         mesh=mesh,
         roles=roles,
         dtype=parameter.sharded.dtype,
-        grad_dtype=parameter.grad_dtype,
+        # The gradient dtype of a frozen parameter does not matter, so frozen parameters share buckets regardless.
+        grad_dtype=parameter.sharded.grad_dtype if parameter.trainable else None,
         # Gathered weights live only in their groups. Weights without a gather live all the time.
         groups=() if roles.gather is None else groups,
         trainable=parameter.trainable,
@@ -183,12 +186,12 @@ def plan_buckets(
     """Groups the parameters of a stage into buckets.
 
     Args:
-        parameters_by_group: The parameters that each group uses.
+        parameters_by_group: The parameters that each group holds, by group index.
         bucket_size_mib: The size limit of buckets without a gather, in MiB.
         gather_dims: The mesh dimensions along which data parallelism shards parameters.
 
     Returns:
-        The buckets in reverse registration order.
+        The buckets in reduction order: the buckets of the last group first.
 
     Raises:
         ValueError: If the placements of a parameter are not supported, or if the shard of a gathered parameter does
@@ -218,7 +221,11 @@ def plan_buckets(
 
             size = local_tensor(parameter.sharded.data).numel()
             bucket = open_buckets.get(key)
-            if bucket is None or (not gathered and (bucket.numel + size) * key.grad_dtype.itemsize > max_bytes):
+            # A bucket without a gather is trainable, and plan_parameters() rejects a trainable parameter without
+            # grad_dtype.
+            if bucket is None or (
+                not gathered and (bucket.numel + size) * cast(torch.dtype, key.grad_dtype).itemsize > max_bytes
+            ):
                 bucket = _new_bucket(key, groups)
                 open_buckets[key] = bucket
                 buckets.append(bucket)
@@ -251,61 +258,16 @@ def _add_shard_sizes(gather: GatherPlan, parameter: ParameterPlan) -> int:
 
 
 def shard_sizes(sharded: nn.Parameter, parts: int) -> list[int]:
-    """Returns the unpadded element count of the ``Shard(0)`` shard of each rank.
+    """Returns the number of elements of the ``Shard(0)`` shard of each rank, without padding.
 
     Args:
         sharded: The sharded parameter.
         parts: The number of ranks of the gather dimension.
 
     Returns:
-        The element count of the shard of each rank.
+        The number of elements of each shard, by rank.
     """
     # Matches a DTensor with Shard(0), which follows torch.chunk: full chunks first, so the last ones are smaller.
     rows, row_size = sharded.shape[0], math.prod(sharded.shape[1:])
     full = math.ceil(rows / parts)
     return [max(0, min(full, rows - full * rank)) * row_size for rank in range(parts)]
-
-
-def plan_stages(
-    stages: Mapping[int, Sequence[nn.Module]],
-    training: bool,
-    bucket_size_mib: int,
-    gather_dims: frozenset[str],
-) -> dict[int, StagePlan]:
-    """Plans the buckets of every stage before any buffer exists.
-
-    Args:
-        stages: The roots of the groups of each stage, by stage index. The first root is the stage root.
-        training: Whether the job computes gradients.
-        bucket_size_mib: The size limit of buckets without a gather, in MiB.
-        gather_dims: The mesh dimensions along which data parallelism shards parameters.
-
-    Returns:
-        The plan of each stage.
-
-    Raises:
-        ValueError: If a parameter is shared by several stages, if the placements of a parameter are not supported,
-            or if a shard does not match ``torch.chunk``.
-    """
-    plans: dict[int, StagePlan] = {}
-    parameter_stages: dict[int, int] = {}
-
-    for stage_index, groups in stages.items():
-        parameters_by_group = plan_parameters(groups, training)
-        parameters = list(dict.fromkeys(x for group in parameters_by_group for x in group))
-        for parameter in parameters:
-            owner = parameter_stages.setdefault(id(parameter.sharded), stage_index)
-            if owner != stage_index:
-                raise ValueError(
-                    f"The parameter ({parameter.name}) is shared by stages ({owner}) and ({stage_index}). Place tied "
-                    "parameters on one stage."
-                )
-
-        plans[stage_index] = StagePlan(
-            groups=groups,
-            parameters=parameters,
-            parameters_by_group=parameters_by_group,
-            buckets=plan_buckets(parameters_by_group, bucket_size_mib, gather_dims),
-        )
-
-    return plans

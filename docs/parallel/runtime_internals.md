@@ -34,7 +34,7 @@ Around each region, the runtime writes the unsharded parameters into `module._pa
 
 The unsharded parameter of a gathered parameter views the weight buffer of its bucket. A parameter without a gather views its local tensor, so optimizer writes reach it directly.
 
-The unsharded parameters keep the dtype of the sharded ones. The gradients use `param.grad_dtype`, or the dtype of the parameter if it is `None`. Without training, the unsharded parameters require no gradients.
+The unsharded parameters keep the dtype of the sharded ones. The gradients use `param.grad_dtype`. A trainable parameter with `grad_dtype = None` raises in `bind()`, because a gradient buffer needs one dtype. Without training, the unsharded parameters require no gradients.
 
 ## Buckets
 
