@@ -1,6 +1,6 @@
 """Public pipelining API for end users."""
 
-from .groups import mark_parameter_group
+from .groups import mark_parameter_group, marked_parameter_groups
 from .module import (
     ModuleSupportsPipelining,
     PipelineStageInfo,
@@ -35,5 +35,6 @@ __all__ = [
     "TensorSpec",
     "distribute_layers_for_pipeline_stage",
     "mark_parameter_group",
+    "marked_parameter_groups",
     "run_steps",
 ]

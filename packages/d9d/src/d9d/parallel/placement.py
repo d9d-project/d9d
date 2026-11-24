@@ -1,5 +1,6 @@
 import dataclasses
 
+from torch import Tensor
 from torch.distributed.tensor import DTensor, Replicate, Shard
 
 
@@ -45,3 +46,18 @@ def split_placement_dims(data: DTensor) -> PlacementDims:
                 raise ValueError(f"Parameter placement ({placement}) is not supported. Use Replicate or Shard.")
 
     return PlacementDims(replicate_dim_names=tuple(replicate_dim_names), shard_dim_names=tuple(shard_dim_names))
+
+
+def dist_grad_from_local(data: DTensor, local_grad: Tensor) -> DTensor:
+    """Builds a ``DTensor`` gradient over a local tensor, with the shape, stride and placements of a parameter.
+
+    Args:
+        data: The parameter.
+        local_grad: The local gradient.
+
+    Returns:
+        A ``DTensor`` that views the local gradient.
+    """
+    return DTensor.from_local(
+        local_grad, shape=data.shape, stride=data.stride(), device_mesh=data.device_mesh, placements=data.placements
+    )
