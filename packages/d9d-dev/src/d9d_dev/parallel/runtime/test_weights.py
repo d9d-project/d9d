@@ -15,36 +15,36 @@ def test_groups_read_new_sharded_weights(dist_ctx_factory, mesh, training, trigg
     model = nn.Linear(16, 17, bias=False, device="cuda")
     place_hsdp(model, dist_ctx)
     runtime = make_runtime(training=training)
-    runtime.register_stage(0, model)
+    runtime.register(model, [])
     inputs = torch.ones((1, 16), device="cuda")
 
     def _forward():
-        with torch.no_grad(), runtime.stage(0).group_weights(0):
+        with torch.no_grad(), bound.parameters(model).group_weights(model, None):
             return model(inputs)
 
-    runtime.bind()
+    bound = runtime.bind()
     try:
         _forward()
         # A checkpoint load writes the weights after bind() or invalidate_weights(). The optimizer writes them after
         # wait(), and an evaluation can run before zero_grad().
         match trigger:
             case "rebind":
-                runtime.unbind()
-                runtime.bind()
+                bound.close()
+                bound = runtime.bind()
                 model.weight.data.fill_(2)
             case "invalidate_weights":
-                runtime.invalidate_weights()
+                bound.invalidate_weights()
                 model.weight.data.fill_(2)
             case "zero_grad":
                 model.weight.data.fill_(2)
-                runtime.zero_grad()
+                bound.zero_grad()
             case "wait":
-                run_one_region(runtime, lambda: model(inputs).sum().backward() if training else None)
+                run_one_region(bound, model, lambda: model(inputs).sum().backward() if training else None)
                 model.weight.data.fill_(2)
         actual = _forward()
         torch.testing.assert_close(actual, torch.full_like(actual, 32))
     finally:
-        runtime.unbind()
+        bound.close()
 
 
 class _TiedGroups(nn.Module):
@@ -68,11 +68,11 @@ class _AliasGroup(nn.Module):
         return inputs * self.scale
 
 
-class _AliasStage(nn.Module):
+class _AliasModel(nn.Module):
     def __init__(self):
         super().__init__()
         self.scale = nn.Parameter(torch.ones(4, 4, device="cuda"))
-        # The group holds the parameter that the stage owns, as a shared embedding of a head does.
+        # The group holds the parameter that the module owns, as a shared embedding of a head does.
         self.alias = mark_parameter_group(_AliasGroup(self.scale))
 
     async def forward_steps(self, steps, inputs):
@@ -92,7 +92,7 @@ def _tied_groups():
 
 
 def _alias_group():
-    model = _AliasStage()
+    model = _AliasModel()
     return model, [(model.alias, model, "scale", "scale")]
 
 
@@ -102,32 +102,32 @@ def test_one_parameter_has_one_unsharded_parameter(build):
     model, uses = build()
     originals = {id(param): param for param in model.parameters()}
     runtime = make_runtime()
-    runtime.register_stage(0, model, marked_parameter_groups(model))
-    runtime.bind()
+    runtime.register(model, marked_parameter_groups(model))
+    bound = runtime.bind()
     try:
         # The optimizer writes the sharded parameter, and every group that uses it must see the write.
         for param in originals.values():
             param.data.fill_(2)
-        stage = runtime.stage(0)
+        parameters = bound.parameters(model)
         for group, other, name, other_name in uses:
-            with stage.group_weights(stage.group_index(group)):
+            with parameters.group_weights(group, None):
                 param = getattr(group, name)
                 assert param is getattr(other, other_name)
                 assert torch.equal(param, torch.full_like(param, 2))
         assert {id(param): param for param in model.parameters()} == originals
     finally:
-        runtime.unbind()
+        bound.close()
 
 
 @pytest.mark.local
-def test_unbind_frees_what_bind_allocated():
+def test_close_frees_what_bind_allocated():
     model = nn.Linear(1024, 1024, device="cuda")
     runtime = make_runtime()
-    runtime.register_stage(0, model)
+    runtime.register(model, [])
     allocated = torch.cuda.memory_allocated()
     for _ in range(3):
-        runtime.bind()
-        runtime.zero_grad()
-        run_one_region(runtime, lambda: model(torch.ones(2, 1024, device="cuda")).sum().backward())
-        runtime.unbind()
+        bound = runtime.bind()
+        bound.zero_grad()
+        run_one_region(bound, model, lambda: model(torch.ones(2, 1024, device="cuda")).sum().backward())
+        bound.close()
         assert torch.cuda.memory_allocated() == allocated

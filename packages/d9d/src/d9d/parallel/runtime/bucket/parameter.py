@@ -1,5 +1,3 @@
-"""Unsharded parameters while the runtime is bound, their hooks and the modules that hold them."""
-
 import dataclasses
 from collections.abc import Sequence
 
@@ -11,30 +9,29 @@ from ..plan import ParameterPlan, local_tensor
 
 @dataclasses.dataclass(slots=True, eq=False)
 class ParameterHandle:
-    """One parameter of a bound runtime: its plan and the unsharded parameter that regions compute with.
+    """One parameter while it is bound: its plan and the unsharded parameter that regions compute with.
 
     Attributes:
         plan: The plan of the parameter.
         unsharded: The local parameter that regions compute with. Autograd writes its gradient.
-        hook: The hook that runs the tensor hooks of the sharded parameter, or ``None`` before
-            ``install_tensor_hook_bridge()`` and without gradients.
+        hook: The hook that runs the tensor hooks of the sharded parameter, or ``None`` without one.
     """
 
     plan: ParameterPlan
     unsharded: nn.Parameter
-    hook: RemovableHandle | None = None
+    hook: RemovableHandle | None
 
 
 def new_unsharded(plan: ParameterPlan, data: Tensor) -> nn.Parameter:
-    """Creates the unsharded parameter of a plan.
+    """Creates the unsharded parameter of a plan over a tensor.
 
     Args:
         plan: The plan of the parameter.
         data: The tensor that the unsharded parameter wraps.
 
     Returns:
-        The unsharded parameter. It requires a gradient only if the plan is trainable, in the ``grad_dtype`` of the
-        sharded parameter.
+        The unsharded parameter. It requires a gradient only if the plan is trainable, and its gradient has the
+        ``grad_dtype`` of the sharded parameter.
     """
     # Without training, a backward pass for input gradients must not leave gradients on the unsharded parameters.
     unsharded = nn.Parameter(data, requires_grad=plan.trainable)
@@ -49,20 +46,20 @@ def make_local_handle(plan: ParameterPlan) -> ParameterHandle:
         plan: The plan of the parameter.
 
     Returns:
-        A handle whose unsharded parameter views the local data, so it sees optimizer writes at once.
+        The handle. Its unsharded parameter views the local data.
     """
     local = local_tensor(plan.sharded.data).detach()
-    return ParameterHandle(plan=plan, unsharded=new_unsharded(plan, local))
+    return ParameterHandle(plan=plan, unsharded=new_unsharded(plan, local), hook=None)
 
 
 def install_tensor_hook_bridge(handle: ParameterHandle):
-    """Makes the tensor hooks of the sharded parameter run on the gradient of the unsharded one.
+    """Runs the tensor hooks of the sharded parameter on each gradient of the unsharded one.
 
-    The hooks see the local gradient of each backward pass, before any reduction. A hook that is added or removed
-    later takes effect at once. Without gradients, it does nothing.
+    The hooks see the local gradient of each backward pass, before any reduction. Hooks that are added or removed later
+    take effect at once. Without gradients, it installs nothing.
 
     Args:
-        handle: The parameter. Its ``hook`` gets the handle of the installed hook.
+        handle: The parameter. Its ``hook`` gets the installed hook.
     """
     if not handle.unsharded.requires_grad:
         return
@@ -83,8 +80,6 @@ def install_tensor_hook_bridge(handle: ParameterHandle):
 def run_post_accumulate_hooks(handle: ParameterHandle):
     """Runs the post-accumulate-grad hooks of the sharded parameter.
 
-    Call it after the final reduction.
-
     Args:
         handle: The parameter.
     """
@@ -97,11 +92,11 @@ def run_post_accumulate_hooks(handle: ParameterHandle):
 
 
 def bind_parameters(handles: Sequence[ParameterHandle], unsharded: bool):
-    """Puts unsharded or sharded parameters into every module that holds them.
+    """Puts the unsharded or the sharded parameters into every module that holds them.
 
     Args:
         handles: The parameters.
-        unsharded: Whether to put the unsharded parameters, otherwise the sharded ones.
+        unsharded: Whether to put the unsharded parameters. Otherwise, it puts the sharded ones back.
     """
     for handle in handles:
         parameter = handle.unsharded if unsharded else handle.plan.sharded
@@ -111,14 +106,14 @@ def bind_parameters(handles: Sequence[ParameterHandle], unsharded: bool):
 
 
 def release_parameter(handle: ParameterHandle):
-    """Removes the hook bridge and leaves the unsharded parameter without data and gradient.
+    """Removes the hook of a parameter and frees the data and the gradient of its unsharded parameter.
 
     Args:
         handle: The parameter.
     """
     if handle.hook is not None:
         handle.hook.remove()
-    # A graph that the program still holds, e.g. through a logged loss, keeps the unsharded parameter alive. So it
+    # A graph that the caller still holds, e.g. through a logged loss, keeps the unsharded parameter alive. So it
     # must keep neither the gradient buffer nor the local data, which an offload replaces.
     handle.unsharded.grad = None
     handle.unsharded.data = handle.unsharded.data.new_empty(0)

@@ -1,5 +1,3 @@
-"""The gradients of the buckets and their reductions: reduce-scatter for gathered buckets, all-reduce for the rest."""
-
 from collections.abc import Sequence
 from typing import cast
 
@@ -26,7 +24,7 @@ def _check_accumulated(handles: Sequence[ParameterHandle], grads: Sequence[Tenso
 
 
 class BucketGradients:
-    """The gradients of a bucket on this rank, which the ``.grad`` of each sharded parameter views."""
+    """The flat gradients of a bucket on this rank, which the gradients of its sharded parameters view."""
 
     def __init__(
         self,
@@ -41,9 +39,10 @@ class BucketGradients:
 
         Args:
             handles: The parameters of the bucket.
-            tensor: The flat gradients: the shard of this rank in a gathered bucket, the full gradients otherwise.
-            local_views: The view of ``tensor`` that holds the local gradient of each parameter.
-            replica_process_groups: The process groups over which the gradients are summed, in reduction order.
+            tensor: The flat gradients: the gradient shard of this rank in a gathered bucket, the full gradients
+                otherwise.
+            local_views: The view of ``tensor`` for the local gradient of each parameter.
+            replica_process_groups: The process groups that sum the gradients across replicas, in reduction order.
         """
         self._tensor = tensor
         self._handles = handles
@@ -62,24 +61,24 @@ class BucketGradients:
 
     @property
     def reduced(self) -> bool:
-        """Whether the final reduction of the step ran."""
+        """Whether ``reduce_replicas()`` ran since ``reset()``."""
         return self._reduced
 
     def reset(self):
-        """Zeroes the gradients for a new step and points the gradients of the sharded parameters at them again."""
+        """Zeroes the gradients and points the gradients of the sharded parameters at them again."""
         self._tensor.zero_()
         self._reduced = False
         for handle, view in zip(self._handles, self._views, strict=True):
             handle.plan.sharded.grad = view
 
     def reduce_replicas(self):
-        """Sums the gradients across replicas on the current stream, which ends the reduction of the step."""
+        """Sums the gradients across replicas on the current stream."""
         for process_group in self._replica_process_groups:
             dist.all_reduce(self._tensor, op=dist.ReduceOp.SUM, group=process_group)
         self._reduced = True
 
     def check(self):
-        """Checks that the gradient of every sharded parameter still views the bucket.
+        """Checks that the gradient of every sharded parameter still views the flat gradients.
 
         Raises:
             ValueError: If a gradient was replaced since ``reset()``.
@@ -95,7 +94,7 @@ class BucketGradients:
     def finish(self):
         """Runs the post-accumulate-grad hooks of the sharded parameters.
 
-        Call it after the final reduction. A gradient that a hook replaces is copied back into the bucket.
+        A gradient that a hook replaces is copied back into the flat gradients.
 
         Raises:
             ValueError: If a hook set a gradient to ``None``.
@@ -117,9 +116,11 @@ class BucketGradients:
             sharded.grad = view
 
     def clear(self):
-        """Sets the gradients of the sharded parameters to ``None``."""
+        """Sets the gradients of the sharded parameters to ``None`` and frees the flat gradients."""
         for handle in self._handles:
             handle.plan.sharded.grad = None
+        self._tensor = self._tensor.new_empty(0)
+        self._views = []
 
 
 class ShardedReduction:
@@ -135,19 +136,19 @@ class ShardedReduction:
     ):
         """Constructs the ``ShardedReduction`` object.
 
-        It points the gradients of the unsharded parameters at the gradient buffer, which has no memory yet. The
-        gradient buffer belongs to the current stream, so the backward passes must run on it.
+        It points the gradients of the unsharded parameters at the gradient buffer, which has no memory until
+        ``prepare()``. The buffer belongs to the current stream, so the backward passes must run on it.
 
         Args:
             plan: The plan of the bucket.
-            gather: The gather of the bucket, whose process group reduce-scatters.
+            gather: The plan of the all-gather, whose process group reduce-scatters.
             handles: The parameters, in buffer order.
             reduce_stream: The stream that reduces gradients.
-            pending: The gradient buffers of all buckets that the reduce stream may still read.
+            pending: The gradient buffers that the reduce stream may still read.
         """
         self._groups = plan.groups
         self._process_group = gather.process_group
-        # The bucket is trainable, and plan_parameters() rejects a trainable parameter without grad_dtype.
+        # The bucket is trainable, and plan_groups() rejects a trainable parameter without grad_dtype.
         grad_dtype = cast(torch.dtype, plan.grad_dtype)
         self._handles = handles
         self._reduce_stream = reduce_stream
@@ -167,7 +168,7 @@ class ShardedReduction:
             handle.unsharded.grad = view
             self._views.append(view)
             self._chunks.append(place.view(parts, -1))
-        self._buffer.release()
+        self._buffer.release(after=None)
 
         # The reduce-scatter writes the chunks of this rank, which lie in the same order.
         rank = gather.process_group.rank()
@@ -187,7 +188,7 @@ class ShardedReduction:
 
     @property
     def groups(self) -> tuple[int, ...]:
-        """The groups that hold the parameters of the bucket, in ascending order."""
+        """The groups that hold the parameters of the bucket."""
         return self._groups
 
     @property
@@ -214,10 +215,12 @@ class ShardedReduction:
 
     @torch.no_grad()
     def reduce(self, final: bool):
-        """Reduce-scatters the gradients of this backward pass, and sums them across replicas on the final pass.
+        """Reduce-scatters the gradients of the backward pass into the gradient shard.
+
+        On the final pass, it also sums the shard across replicas.
 
         Args:
-            final: Whether this is the last backward pass of the stage in the step.
+            final: Whether this is the final backward pass of the step.
 
         Raises:
             ValueError: If autograd replaced a gradient instead of accumulating it.
@@ -249,27 +252,27 @@ class ShardedReduction:
         if self._buffer.allocated:
             # A pending buffer waits for its reads. A backward pass that raised leaves a buffer that it never reduced.
             self._pending.take_back(self._buffer)
-            self._buffer.release()
+            self._buffer.release(after=None)
 
     def zero_grad(self):
-        """Frees the gradient buffer and zeroes the gradient shard for a new step."""
+        """Frees the gradient buffer and zeroes the gradient shard."""
         self._free_buffer()
         self._gradients.reset()
         self._shard_written = False
 
     def close(self):
-        """Frees the gradient buffer and sets the gradients of the sharded parameters to ``None``."""
+        """Frees the gradient buffer and the gradient shard, and sets the sharded gradients to ``None``."""
         self._free_buffer()
         self._gradients.clear()
 
 
 class ReplicatedReduction:
-    """The gradient buffer of trainable parameters without a gather, which autograd accumulates into directly."""
+    """The gradients of trainable parameters without a gather, which autograd accumulates into directly."""
 
     def __init__(self, plan: BucketPlan, handles: Sequence[ParameterHandle], reduce_stream: torch.cuda.Stream):
         """Constructs the ``ReplicatedReduction`` object.
 
-        It points the gradients of the sharded and unsharded parameters at the gradient buffer.
+        It points the gradients of the sharded and unsharded parameters at one flat buffer.
 
         Args:
             plan: The plan of the bucket.
@@ -281,7 +284,7 @@ class ReplicatedReduction:
         self._reduce_stream = reduce_stream
 
         device = handles[0].unsharded.device
-        # The bucket is trainable, and plan_parameters() rejects a trainable parameter without grad_dtype.
+        # The bucket is trainable, and plan_groups() rejects a trainable parameter without grad_dtype.
         tensor = torch.zeros((plan.numel,), dtype=cast(torch.dtype, plan.grad_dtype), device=device)
         self._views: list[Tensor] = []
         offset = 0
@@ -301,7 +304,7 @@ class ReplicatedReduction:
 
     @property
     def groups(self) -> tuple[int, ...]:
-        """The groups that hold the parameters of the bucket, in ascending order."""
+        """The groups that hold the parameters of the bucket."""
         return self._groups
 
     @property
@@ -311,10 +314,10 @@ class ReplicatedReduction:
 
     @torch.no_grad()
     def reduce(self, final: bool):
-        """Sums the gradients across replicas after the final backward pass of the step.
+        """Sums the gradients across replicas on the final backward pass of the step.
 
         Args:
-            final: Whether this is the last backward pass of the stage in the step.
+            final: Whether this is the final backward pass of the step.
 
         Raises:
             ValueError: If autograd replaced a gradient instead of accumulating it.
@@ -328,12 +331,13 @@ class ReplicatedReduction:
             self._gradients.reduce_replicas()
 
     def zero_grad(self):
-        """Zeroes the gradients for a new step."""
+        """Zeroes the gradients."""
         self._gradients.reset()
 
     def close(self):
-        """Sets the gradients of the sharded parameters to ``None``."""
+        """Frees the gradients and sets the gradients of the sharded parameters to ``None``."""
         self._gradients.clear()
+        self._views = []
 
 
 AnyReduction = ShardedReduction | ReplicatedReduction

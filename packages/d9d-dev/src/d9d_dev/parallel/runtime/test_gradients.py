@@ -42,11 +42,11 @@ def test_gradients_match_one_device(dist_ctx_factory, mesh, out_features):
     for param in (*model.parameters(), *reference.parameters()):
         param.grad_dtype = torch.float32
     runtime = make_runtime()
-    runtime.register_stage(0, model)
-    runtime.bind()
+    runtime.register(model, [])
+    bound = runtime.bind()
     try:
-        runtime.zero_grad()
-        run_one_region(runtime, lambda: model(_inputs(dist.get_rank())).square().sum().backward())
+        bound.zero_grad()
+        run_one_region(bound, model, lambda: model(_inputs(dist.get_rank())).square().sum().backward())
         for rank in range(dist.get_world_size()):
             reference(_inputs(rank)).square().sum().backward()
         # The bf16 half of the model rounds its products, so the gradients match only to bf16 tolerances.
@@ -56,7 +56,7 @@ def test_gradients_match_one_device(dist_ctx_factory, mesh, out_features):
                 local_grad(param), local_part(param, expected.grad), atol=tolerance.atol, rtol=tolerance.rtol
             )
     finally:
-        runtime.unbind()
+        bound.close()
 
 
 def _hooked_linear(dist_ctx):
@@ -67,13 +67,13 @@ def _hooked_linear(dist_ctx):
     reference.load_state_dict(model.state_dict())
     place_hsdp(model, dist_ctx)
     runtime = make_runtime()
-    runtime.register_stage(0, model)
+    runtime.register(model, [])
     return model, reference, runtime
 
 
-def _step(runtime, model):
-    runtime.zero_grad()
-    run_one_region(runtime, lambda: model(_inputs(dist.get_rank())).square().sum().backward())
+def _step(bound, model):
+    bound.zero_grad()
+    run_one_region(bound, model, lambda: model(_inputs(dist.get_rank())).square().sum().backward())
 
 
 def _double(param):
@@ -96,22 +96,22 @@ def test_post_accumulate_hooks_see_the_reduced_shard(dist_ctx_factory, mesh, hoo
     seen = []
     model.weight.register_post_accumulate_grad_hook(seen.append)
     model.weight.register_post_accumulate_grad_hook(hook)
-    runtime.bind()
+    bound = runtime.bind()
     try:
         if hook is _drop:
             with pytest.raises(ValueError, match="to None"):
-                _step(runtime, model)
+                _step(bound, model)
             return
-        _step(runtime, model)
+        _step(bound, model)
         # The hooks run once on the sharded parameter, after the gradient is summed over all ranks. A
         # replaced gradient lands in the bucket, so scale_grads() still reaches it.
         assert seen == [model.weight]
-        runtime.scale_grads(torch.tensor(0.5, device="cuda"))
+        bound.scale_grads(torch.tensor(0.5, device="cuda"))
         for rank in range(dist.get_world_size()):
             reference(_inputs(rank)).square().sum().backward()
         torch.testing.assert_close(local_grad(model.weight), local_part(model.weight, reference.weight.grad))
     finally:
-        runtime.unbind()
+        bound.close()
 
 
 @pytest.mark.distributed
@@ -123,9 +123,9 @@ def test_tensor_hooks_see_the_local_gradient(dist_ctx_factory, mesh, removed):
     handle = model.weight.register_hook(lambda grad: seen.append(grad.clone()))
     if removed:
         handle.remove()
-    runtime.bind()
+    bound = runtime.bind()
     try:
-        _step(runtime, model)
+        _step(bound, model)
         if removed:
             assert seen == []
             return
@@ -135,7 +135,7 @@ def test_tensor_hooks_see_the_local_gradient(dist_ctx_factory, mesh, removed):
         assert not isinstance(seen[0], DTensor)
         torch.testing.assert_close(seen[0], reference.weight.grad)
     finally:
-        runtime.unbind()
+        bound.close()
 
 
 class _ConditionalHead(nn.Module):
@@ -159,15 +159,15 @@ def test_unused_parameters_get_zero_gradients(dist_ctx_factory, mesh):
     reference.load_state_dict(model.state_dict())
     place_hsdp(model, dist_ctx)
     runtime = make_runtime()
-    runtime.register_stage(0, model)
-    runtime.bind()
+    runtime.register(model, [])
+    bound = runtime.bind()
     try:
         # The first step uses the head on rank 0 only, the second step on no rank. As in the gradient synchronizer,
         # a parameter gets the sum of the ranks that used it, and zeros if none did.
         for uses_head in ([True] + [False] * 7, [False] * 8):
             model.use_head = uses_head[dist.get_rank()]
-            runtime.zero_grad()
-            run_one_region(runtime, lambda: model(torch.ones(2, 4, device="cuda")).sum().backward())
+            bound.zero_grad()
+            run_one_region(bound, model, lambda: model(torch.ones(2, 4, device="cuda")).sum().backward())
 
             reference.zero_grad()
             for use_head in uses_head:
@@ -177,7 +177,7 @@ def test_unused_parameters_get_zero_gradients(dist_ctx_factory, mesh):
                 full = torch.zeros_like(expected) if expected.grad is None else expected.grad
                 torch.testing.assert_close(local_grad(param), local_part(param, full))
     finally:
-        runtime.unbind()
+        bound.close()
 
 
 @pytest.mark.distributed
@@ -188,21 +188,21 @@ def test_layer_sharded_parameter_keeps_the_rows_of_each_rank(dist_ctx_factory):
     # Shard(0) outside the data shard dimensions: each rank holds its own rows, as expert parallelism does.
     distribute_parameters(model, mesh, (Shard(0),))
     runtime = make_runtime()
-    runtime.register_stage(0, model)
-    runtime.bind()
+    runtime.register(model, [])
+    bound = runtime.bind()
     try:
-        runtime.zero_grad()
+        bound.zero_grad()
 
         def _backward():
             if dist.get_rank() == 0:
                 model(torch.ones(2, 4, device="cuda")).sum().backward()
 
-        run_one_region(runtime, _backward)
+        run_one_region(bound, model, _backward)
         # Only rank 0 used its rows, and the runtime leaves the rows of a layer-sharded parameter to their rank.
         expected = 2.0 if dist.get_rank() == 0 else 0.0
         torch.testing.assert_close(local_grad(model.weight), torch.full_like(model.weight.to_local(), expected))
     finally:
-        runtime.unbind()
+        bound.close()
 
 
 @pytest.mark.local
@@ -218,15 +218,15 @@ def test_post_accumulate_hook_can_remove_itself():
     handles.append(model.weight.register_post_accumulate_grad_hook(first))
     model.weight.register_post_accumulate_grad_hook(lambda _param: calls.append("second"))
     runtime = make_runtime()
-    runtime.register_stage(0, model)
-    runtime.bind()
+    runtime.register(model, [])
+    bound = runtime.bind()
     try:
         for _ in range(2):
-            runtime.zero_grad()
-            run_one_region(runtime, lambda: model(torch.ones(2, 4, device="cuda")).sum().backward())
+            bound.zero_grad()
+            run_one_region(bound, model, lambda: model(torch.ones(2, 4, device="cuda")).sum().backward())
         assert calls == ["first", "second", "second"]
     finally:
-        runtime.unbind()
+        bound.close()
 
 
 @pytest.mark.local
@@ -234,17 +234,19 @@ def test_post_accumulate_hook_can_remove_itself():
 def test_backward_that_replaces_gradients_is_rejected():
     model = nn.Linear(4, 4, bias=False, device="cuda")
     runtime = make_runtime()
-    runtime.register_stage(0, model)
-    runtime.bind()
+    runtime.register(model, [])
+    bound = runtime.bind()
     try:
-        runtime.zero_grad()
+        bound.zero_grad()
         # With create_graph=True, autograd replaces the gradient instead of adding into the buffer of the runtime.
         with pytest.raises(ValueError, match=r"\(weight\) was replaced during the backward pass"):
             run_one_region(
-                runtime, lambda: model(torch.ones(2, 4, device="cuda")).square().sum().backward(create_graph=True)
+                bound,
+                model,
+                lambda: model(torch.ones(2, 4, device="cuda")).square().sum().backward(create_graph=True),
             )
     finally:
-        runtime.unbind()
+        bound.close()
 
 
 @pytest.mark.distributed
@@ -259,13 +261,13 @@ def test_zero_grad_recovers_from_a_failed_backward(dist_ctx_factory, mesh, after
     reference.load_state_dict(model.state_dict())
     place_hsdp(model, dist_ctx)
     runtime = make_runtime()
-    runtime.register_stage(0, model)
-    runtime.bind()
+    runtime.register(model, [])
+    bound = runtime.bind()
     try:
-        runtime.zero_grad()
-        stage = runtime.stage(0)
-        stage.record_order((0,))
-        backward = stage.backward(final=True)
+        bound.zero_grad()
+        parameters = bound.parameters(model)
+        parameters.record_order((model,))
+        backward = parameters.backward(final=True)
         with pytest.raises(RuntimeError, match="Injected"):
             with backward.region(0):
                 model(_inputs(dist.get_rank())).square().sum().backward()
@@ -273,10 +275,10 @@ def test_zero_grad_recovers_from_a_failed_backward(dist_ctx_factory, mesh, after
                     raise RuntimeError("Injected failure inside the region.")
             raise RuntimeError("Injected failure before wait().")
 
-        runtime.zero_grad()
-        run_one_region(runtime, lambda: model(_inputs(dist.get_rank())).square().sum().backward())
+        bound.zero_grad()
+        run_one_region(bound, model, lambda: model(_inputs(dist.get_rank())).square().sum().backward())
         for rank in range(dist.get_world_size()):
             reference(_inputs(rank)).square().sum().backward()
         torch.testing.assert_close(local_grad(model.weight), local_part(model.weight, reference.weight.grad))
     finally:
-        runtime.unbind()
+        bound.close()

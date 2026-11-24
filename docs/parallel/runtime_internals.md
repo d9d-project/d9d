@@ -2,24 +2,26 @@
 
 ## About
 
-The `ParameterRuntime` is the data parallelism that a pipeline program drives. Modules keep their sharded parameters. Around each [region](../pipelining/index.md#resumable-forwards), the runtime puts the unsharded parameters of one parameter group into the modules. After the backward pass of a group, it reduces the gradients that are complete. This page is for readers who change the runtime or write a program that drives it.
+The `ParameterRuntime` is data parallelism that its caller drives region by region. A region is a part of the forward pass that needs the parameters of one parameter group. Modules keep their sharded parameters. Around each region, the runtime puts the unsharded parameters of its group into the modules. After the backward pass of a group, it reduces the gradients that are complete. This page is for readers who change the runtime or write code that drives it.
 
 ## Lifecycle
 
-1.  `register_stage()` adds the stage root and the roots of its parameter groups. It works only while the runtime is unbound, once per stage.
-2.  `bind()` plans the buckets and creates the unsharded parameters and the gradient buffers.
-3.  Each step starts with `zero_grad()`, runs the regions of every microbatch, and ends with `wait()`.
-4.  `unbind()` releases the buffers and the hooks, and sets the `.grad` of the sharded parameters to `None`. A runtime can be bound again, e.g. after an offload.
+The `ParameterRuntime` holds the configuration and the registered modules. What exists only while the modules are bound belongs to the `BoundParameters` that `bind()` returns:
 
-As a context manager, the runtime calls `unbind()` on exit. `stage()`, `wait()` and `scale_grads()` raise `ValueError` on an unbound runtime. `invalidate_weights()`, `zero_grad()` and `unbind()` do nothing then, because a checkpoint load or a teardown can come first. If `bind()` fails, the runtime stays unbound and can be bound again.
+1.  `ParameterRuntime.register()` adds a module and the roots of its parameter groups, once per module.
+2.  `ParameterRuntime.bind()` plans the buckets, creates the unsharded parameters and the gradient buffers, and returns the `BoundParameters`.
+3.  Each step starts with `BoundParameters.zero_grad()`, runs the regions of every microbatch, and ends with `BoundParameters.wait()`.
+4.  `BoundParameters.close()` releases the buffers and the hooks, and sets the `.grad` of the sharded parameters to `None`. A second call does nothing. After it, `bind()` binds the modules again, e.g. after an offload.
 
-A `StageParameters` object holds no memory after `unbind()`. Its `group_index()`, `group_weights()`, `record_order()` and `backward()` then raise, so take it again with `stage()` after each `bind()`.
+As a context manager, `BoundParameters` calls `close()` on exit. Its methods raise `ValueError` after `close()`. While a `BoundParameters` is open, `register()` and a second `bind()` raise, because two binds would point the gradients of the sharded parameters at their own buffers. If `bind()` fails, it releases what it built, and the runtime can bind again.
+
+A `ModuleParameters` object holds no memory after `close()`. Its `group_weights()`, `record_order()` and `backward()` then raise, so take it again with `parameters()` from each new `BoundParameters`.
 
 ## Parameter Groups
 
-A parameter group is the set of parameters that a region needs. Its root is a module that `register_stage()` receives, usually from `marked_parameter_groups()`. The group holds the parameters of the root and its descendants, except those of other roots. The stage root is the root of group 0, which holds the parameters outside every other group. A stage without other roots is one group.
+A parameter group is the set of parameters that a region needs. Its root is a module that `register()` receives. The group holds the parameters of the root and its descendants, except those of other roots. The registered module is the root of its own group, which holds the parameters outside every other group. A module without other roots is one group.
 
-`register_stage()` raises if a root is repeated, is the stage root or lies outside it. `marked_parameter_groups()` raises if a stage without `forward_steps()` has marks, because no region could request their groups.
+`register()` raises if a root is repeated, is the module itself or lies outside it.
 
 A parameter that several groups hold is a tied parameter, e.g. a tied embedding and LM head. It belongs to every group that holds it.
 
@@ -27,7 +29,7 @@ A parameter that several groups hold is a tied parameter, e.g. a tied embedding 
 
 Each parameter has two `nn.Parameter` objects:
 
-*   **Sharded**: The parameter that the module, the optimizer and checkpoints see. It is a `DTensor`, or a plain tensor outside a device mesh. It never changes identity.
+*   **Sharded**: The parameter that the module, the optimizer and checkpoints see. It is a `DTensor`, or a plain tensor in a job without parallelism. It never changes identity.
 *   **Unsharded**: The local tensor that regions compute with. Autograd writes its gradient.
 
 Around each region, the runtime writes the unsharded parameters into `module._parameters` and restores the sharded ones on exit. A tied parameter has one unsharded parameter for all its owners, so autograd adds up their gradients.
@@ -73,19 +75,19 @@ A buffer belongs to the stream that writes it, and only that stream frees its me
 
 ### Forward
 
-The first forward pass after `bind()` records the order of the stage with `record_order()`. The order holds the group of each region, or `None` for a region without a group. Later forward passes must have the same order, which `record_order()` checks.
+The first forward pass after `bind()` records the order of the module with `record_order()`. The order holds the root of the group of each region, or `None` for a region without a group. Later forward passes must have the same order, which `record_order()` checks.
 
-For each region, the program enters `StageParameters.group_weights()`, which:
+For each region, the caller enters `ModuleParameters.group_weights()`, which:
 
 1.  Records an event on the compute stream. Every gather of the region waits for it, so it never reads stale shards.
 2.  Gathers the weights of the group, unless a previous region prefetched or kept them.
-3.  Starts the gather of `next_group`. A program can take it from `StageParameters.order`, which is `None` until the first `record_order()`.
+3.  Starts the gather of the group of `next_root`. The caller can take it from `ModuleParameters.order`, which is `None` until the first `record_order()`.
 4.  Puts the unsharded parameters into the modules and runs the region.
-5.  Frees the weights that `next_group` does not use.
+5.  Frees the weights that the group of `next_root` does not use.
 
 ### Backward
 
-`StageParameters.backward()` starts a backward pass over the recorded order. Each region runs inside `BackwardPass.region()`, in reverse order and each once, or the region raises. The region gathers the weights as in the forward pass and prefetches the group of the region before it. Then it reduces the buckets whose gradients are complete:
+`ModuleParameters.backward()` starts a backward pass over the recorded order. Each region runs inside `BackwardPass.region()`, in reverse order and each once, or the region raises. The region gathers the weights as in the forward pass and prefetches the group of the region before it. Then it reduces the buckets whose gradients are complete:
 
 *   **Gathered bucket**: The gradient buffer is allocated at the last region of the bucket in forward order, the first one of the backward pass. After the first region in forward order, the bucket reduce-scatters and adds the result to the gradient shard. It does so on every backward pass.
 *   **Replicated bucket**: Autograd accumulates over all backward passes of the step, and the bucket reduces only after the final one.
@@ -104,13 +106,13 @@ Tensor hooks of a sharded parameter run each time autograd computes the local gr
 
 `zero_grad()` starts the next step. It clears the gradients and drops the unsharded weights. `invalidate_weights()` drops the unsharded weights before a checkpoint load.
 
-`unbind()` also empties the unsharded parameters. So a graph that the program still holds, e.g. through a logged loss, keeps no gradient buffer and no local data.
+`close()` also empties the unsharded parameters. So a graph that the caller still holds, e.g. through a logged loss, keeps no gradient buffer and no local data.
 
 ## Limits
 
 *   The runtime needs CUDA. `bind()` and the steps must run on one stream.
 *   A gathered parameter is sharded with `Shard(0)` along one dimension of `gather_dims`, with the chunk sizes of `torch.chunk`, and along no other dimension.
-*   A parameter can be tied only within one stage.
+*   A parameter can be tied only within one registered module.
 *   Every microbatch and every rank must use the same group order. Every forward pass must enter the group of every parameter.
 *   Gradients must accumulate in place: `backward(create_graph=True)` raises, and a hook must not set a gradient to `None`.
 *   A pass with `final=None` must write no weight gradients.
@@ -120,32 +122,34 @@ Tensor hooks of a sharded parameter run each time autograd computes the local gr
 
 ## Usage
 
-A program runs the regions of a stage in the recorded order. Here, `model.region()` stands for the code of one region:
+The caller runs the regions of a module in the recorded order. Here, `model.region()` stands for the code of one region:
 
 ```python
-with ParameterRuntime(gather_dims={DenseDim.DP_CP_SHARD}, bucket_size_mib=32) as runtime:
-    runtime.register_stage(0, model, marked_parameter_groups(model))
-    runtime.bind()
-    stage = runtime.stage(0)
-    order = (stage.group_index(model), stage.group_index(model.layer), stage.group_index(model))
+runtime = ParameterRuntime(gather_dims={DenseDim.DP_CP_SHARD}, bucket_size_mib=32, training=True)
+runtime.register(model, [model.layer])
 
-    runtime.zero_grad()
+with runtime.bind() as bound:
+    parameters = bound.parameters(model)
+    order = (model, model.layer, model)
+
+    bound.zero_grad()
     regions, hidden = [], inputs
-    for index, group in enumerate(order):
+    for index, root in enumerate(order):
         region_inputs = hidden.detach().requires_grad_(index > 0)
-        next_group = stage.order[index + 1] if stage.order is not None and index + 1 < len(order) else None
-        with stage.group_weights(group, next_group):
+        recorded = parameters.order
+        next_root = recorded[index + 1] if recorded is not None and index + 1 < len(order) else None
+        with parameters.group_weights(root, next_root):
             hidden = model.region(index, region_inputs)
         regions.append((region_inputs, hidden))
-    stage.record_order(order)
+    parameters.record_order(order)
 
-    backward, grad = stage.backward(final=True), None
+    backward, grad = parameters.backward(final=True), None
     for index in reversed(range(len(order))):
         region_inputs, outputs = regions[index]
         with backward.region(index):
             torch.autograd.backward(outputs, grad)
         grad = region_inputs.grad
-    runtime.wait()
+    bound.wait()
     optimizer.step()
 ```
 

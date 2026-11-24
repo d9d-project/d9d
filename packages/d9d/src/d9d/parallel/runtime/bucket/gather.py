@@ -1,5 +1,3 @@
-"""The unsharded weights of a gathered bucket and the all-gather that fills them."""
-
 import dataclasses
 from typing import cast
 
@@ -18,8 +16,8 @@ class _PendingGather:
 
     Attributes:
         work: The running collective.
-        gathered: The output of the collective: the chunks of all parameters of one rank, rank after rank.
-        source: The input of the collective. It must stay alive until the collective ends.
+        gathered: The output: the chunks of all parameters of each rank, rank after rank.
+        source: The input. It must stay alive until the collective ends.
     """
 
     work: dist.Work
@@ -28,15 +26,17 @@ class _PendingGather:
 
 
 class WeightGather:
-    """The unsharded weights of a gathered bucket, which one all-gather fills from the shards."""
+    """The unsharded weights of a gathered bucket, which one all-gather fills from the shards of all ranks."""
 
     def __init__(self, plan: BucketPlan, gather: GatherPlan, gather_stream: torch.cuda.Stream):
-        """Constructs the ``WeightGather`` object with unsharded parameters that have no memory yet.
+        """Constructs the ``WeightGather`` object.
+
+        It creates the unsharded parameters, which have no memory until ``start()``.
 
         Args:
             plan: The plan of the bucket.
-            gather: The gather of the bucket.
-            gather_stream: The stream that gathers weights and owns their memory.
+            gather: The plan of the all-gather.
+            gather_stream: The stream that gathers the weights and owns their memory.
         """
         self._gather = gather
         self._parts = gather.process_group.size()
@@ -51,19 +51,19 @@ class WeightGather:
         self._chunks: list[Tensor] = []
         for parameter, place in zip(plan.parameters, chunk_places(gather, self._buffer.tensor), strict=True):
             unsharded = new_unsharded(parameter, place[: parameter.sharded.numel()].view(parameter.sharded.shape))
-            self._handles.append(ParameterHandle(plan=parameter, unsharded=unsharded))
+            self._handles.append(ParameterHandle(plan=parameter, unsharded=unsharded, hook=None))
             # Views of .data, because a write to the weights bumps the version that saved graphs check.
             self._chunks.append(place.data.view(self._parts, -1))
-        self._buffer.release()
+        self._buffer.release(after=None)
 
     @property
     def handles(self) -> list[ParameterHandle]:
-        """The parameters, whose unsharded weights view the weight buffer."""
+        """The parameters of the bucket, whose unsharded parameters view the weight buffer."""
         return self._handles
 
     @torch.no_grad()
     def start(self, weights_written: torch.cuda.Event):
-        """Starts the all-gather of the unsharded weights, unless they are ready or already gathering.
+        """Starts the all-gather, unless the weights are ready or already gathering.
 
         Args:
             weights_written: The event after the latest writes to the sharded weights.
@@ -94,10 +94,7 @@ class WeightGather:
 
     @torch.no_grad()
     def finish(self):
-        """Makes the current stream wait for the started all-gather.
-
-        Without a started all-gather, it does nothing.
-        """
+        """Makes the current stream wait for the started all-gather, if any."""
         if self._pending is None:
             return
         pending = self._pending
@@ -117,13 +114,13 @@ class WeightGather:
     def free(self):
         """Frees the unsharded weights after the reads of the current stream.
 
-        The next all-gather of any bucket starts only after these reads.
+        The gather stream waits for these reads before its next all-gather.
         """
         self._ready = False
         self._buffer.release(after=torch.cuda.current_stream().record_event())
 
     def invalidate(self):
-        """Drops the unsharded weights, also while they are gathering, so the next use gathers the shards anew."""
+        """Drops the unsharded weights, also while they gather, so the next ``start()`` gathers the shards again."""
         self.finish()
         if self._buffer.allocated:
             self.free()

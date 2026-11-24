@@ -50,7 +50,7 @@ The `outgoing` transfer of stage *N* and the `incoming` transfer of stage *N+1* 
 
 A resumable forward splits the forward pass of a stage at forward boundaries. The code between two boundaries is a region, and it runs with the weights of one parameter group. So an executor can gather the weights of one group at a time instead of the whole stage.
 
-A group holds the parameters of a module marked with `mark_parameter_group()` and its descendants, except those of marked descendants. The other parameters belong to the group of the stage root. The mark adds no wrapper and keeps the parameter names, so checkpoints do not change.
+A group holds the parameters of a module marked with `mark_parameter_group()` and its descendants, except those of marked descendants. The other parameters belong to the group of the stage root. The mark adds no wrapper and keeps the parameter names, so checkpoints do not change. `marked_parameter_groups()` returns the marked modules of a stage. It raises if the stage has marks but no `forward_steps()`, because no region could request their groups.
 
 To make a stage resumable, implement `forward_steps(steps, inputs, shared)` of `ModuleSupportsResumableForward` and delegate `forward()` to `run_steps()`. `run_steps()` runs the regions one after another, as an ordinary forward does. Mark the root module of each parameter group with `mark_parameter_group()` when you build the model:
 

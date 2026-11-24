@@ -1,5 +1,3 @@
-"""The parameters of each parameter group of a stage."""
-
 import dataclasses
 from collections.abc import Sequence
 
@@ -9,14 +7,14 @@ from torch.distributed.tensor import DTensor
 
 @dataclasses.dataclass(slots=True, eq=False)
 class ParameterPlan:
-    """The plan of one parameter: the parameter and the modules that hold it.
+    """The plan of one parameter: the parameter, its name and the modules that hold it.
 
     Attributes:
-        name: The name of the parameter in the stage root, e.g. ``layers.3.attn.q_proj.weight``. A tied parameter
-            has its first name, as in the state dict.
-        owners: The modules that hold the parameter and its name in each. A tied parameter has several.
-        sharded: The parameter that the optimizer and checkpoints see: a ``DTensor``, or a plain tensor outside a
-            device mesh.
+        name: The path of the parameter in the registered module, e.g. ``layers.3.attn.q_proj.weight``. A tied
+            parameter has its first path, as in the state dict.
+        owners: Each module that holds the parameter, with its name there. A tied parameter has several.
+        sharded: The parameter that the optimizer and checkpoints see: a ``DTensor``, or a plain tensor in a job
+            without parallelism.
         trainable: Whether the job computes the gradient of the parameter.
     """
 
@@ -26,14 +24,47 @@ class ParameterPlan:
     trainable: bool
 
 
+@dataclasses.dataclass(slots=True)
+class GroupPlan:
+    """The plan of one parameter group: its root and the parameters that it holds.
+
+    Attributes:
+        root: The root module of the group.
+        name: The path of the root in the registered module, e.g. ``layers.3``, or the class name of the
+            registered module for its own group.
+        parameters: The parameters of the group.
+    """
+
+    root: nn.Module
+    name: str
+    parameters: list[ParameterPlan]
+
+
+def module_path(root: nn.Module, module: nn.Module) -> str:
+    """Returns the name of a module in errors: its path in a root module, or its class name outside of it.
+
+    Args:
+        root: The root module, e.g. a registered module.
+        module: The module to name.
+
+    Returns:
+        The path of ``module`` in ``root``, e.g. ``layers.3``, or the class name for ``root`` itself and for a module
+        outside it.
+    """
+    for path, submodule in root.named_modules(remove_duplicate=False):
+        if submodule is module and path:
+            return path
+    return type(module).__name__
+
+
 def local_tensor(data: Tensor) -> Tensor:
-    """Returns the local part of a ``DTensor``, or the tensor itself.
+    """Returns the local tensor of a ``DTensor``, or the tensor itself.
 
     Args:
         data: A ``DTensor`` or a plain tensor.
 
     Returns:
-        The tensor that this rank holds.
+        The tensor on this rank.
     """
     return data.to_local() if isinstance(data, DTensor) else data
 
@@ -51,34 +82,36 @@ def _group_modules(root: nn.Module, roots: set[nn.Module]) -> list[nn.Module]:
     return list(result)
 
 
-def plan_parameters(groups: Sequence[nn.Module], training: bool) -> list[list[ParameterPlan]]:
-    """Plans the parameters that each group holds.
+def plan_groups(module: nn.Module, group_roots: Sequence[nn.Module], training: bool) -> list[GroupPlan]:
+    """Plans the parameter groups of a registered module.
 
     A group holds the parameters of its root and of the root's descendants, except those of other roots. A tied
-    parameter has one plan, listed in every group that holds it.
+    parameter has one plan in every group that holds it.
 
     Args:
-        groups: The roots of the groups of a stage. The first one is the stage root.
+        module: The registered module, the root of its own group.
+        group_roots: The roots of the other groups.
         training: Whether the job computes gradients.
 
     Returns:
-        The parameters of each group, by group index.
+        The group of ``module``, then the groups of ``group_roots`` in their order.
 
     Raises:
         ValueError: If a trainable parameter has no ``grad_dtype``.
     """
     names: dict[int, str] = {}
-    for name, param in groups[0].named_parameters(remove_duplicate=False):
+    for name, param in module.named_parameters(remove_duplicate=False):
         names.setdefault(id(param), name)
 
     known: dict[int, ParameterPlan] = {}
     # A module can belong to several groups, but each of its slots holds the parameter once.
     slots: set[tuple[nn.Module, str]] = set()
-    plans: list[list[ParameterPlan]] = []
+    groups: list[GroupPlan] = []
+    roots = [module, *group_roots]
 
-    for group in groups:
+    for root in roots:
         group_plans: dict[int, ParameterPlan] = {}
-        for submodule in _group_modules(group, set(groups)):
+        for submodule in _group_modules(root, set(roots)):
             for name, param in submodule.named_parameters(recurse=False, remove_duplicate=False):
                 if id(param) not in known:
                     known[id(param)] = ParameterPlan(
@@ -90,7 +123,7 @@ def plan_parameters(groups: Sequence[nn.Module], training: bool) -> list[list[Pa
                     slots.add((submodule, name))
                     plan.owners.append((submodule, name))
                 group_plans[id(param)] = plan
-        plans.append(list(group_plans.values()))
+        groups.append(GroupPlan(root=root, name=module_path(module, root), parameters=list(group_plans.values())))
 
     for plan in known.values():
         # PyTorch accepts a gradient of any dtype with grad_dtype None, but a gradient buffer needs one dtype.
@@ -100,4 +133,4 @@ def plan_parameters(groups: Sequence[nn.Module], training: bool) -> list[list[Pa
                 "gradient buffer. Set grad_dtype to a dtype, e.g. param.grad_dtype = param.dtype."
             )
 
-    return plans
+    return groups

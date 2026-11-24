@@ -49,10 +49,10 @@ def split_placement_dims(data: DTensor) -> PlacementDims:
 
 
 def dist_grad_from_local(data: DTensor, local_grad: Tensor) -> DTensor:
-    """Builds a ``DTensor`` gradient from a local tensor, with the shape, stride and placements of ``data``.
+    """Builds a ``DTensor`` gradient over a local tensor, with the shape, stride and placements of a parameter.
 
     Args:
-        data: The parameter to take the metadata from.
+        data: The parameter.
         local_grad: The local gradient.
 
     Returns:

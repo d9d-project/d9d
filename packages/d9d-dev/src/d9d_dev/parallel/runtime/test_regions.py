@@ -21,7 +21,7 @@ class _Layer(nn.Module):
         self.unused = nn.Parameter(torch.ones(5, device="cuda"))
 
 
-class _Stage(nn.Module):
+class _Model(nn.Module):
     def __init__(self):
         super().__init__()
         self.embed = nn.Parameter(torch.randn(_HIDDEN, _HIDDEN, device="cuda") * 0.3)
@@ -31,7 +31,7 @@ class _Stage(nn.Module):
         self.second = mark_parameter_group(_Layer())
         self.second.linear.weight = self.first.linear.weight
 
-    # Only marks the stage as resumable. The test drives the regions itself.
+    # Only makes marked_parameter_groups() accept the marks. The test drives the regions itself.
     async def forward_steps(self, steps, inputs):
         raise NotImplementedError
 
@@ -55,20 +55,20 @@ def _inputs(rank, microbatch):
     return torch.randn(3, _HIDDEN, device="cuda", generator=generator)
 
 
-def _microbatch(stage, model, order, inputs, final, prefetch, dtype):
+def _microbatch(parameters, model, order, inputs, final, prefetch, dtype):
     regions = []
     hidden = inputs if dtype is None else inputs.to(dtype)
     for index, group in enumerate(order):
         region_inputs = hidden.detach().requires_grad_(index > 0)
-        # As the program does, the prefetch follows the order that the first microbatch recorded.
-        recorded = stage.order
+        # As a caller does, the prefetch follows the order that the first microbatch recorded.
+        recorded = parameters.order
         next_group = recorded[index + 1] if prefetch and recorded is not None and index + 1 < len(order) else None
-        with stage.group_weights(group, next_group=next_group):
+        with parameters.group_weights(group, next_group):
             hidden = model.region(index, region_inputs)
         regions.append((region_inputs, hidden))
-    stage.record_order(order)
+    parameters.record_order(order)
 
-    backward = stage.backward(final=final)
+    backward = parameters.backward(final=final)
     grad = None
     for index in reversed(range(len(order))):
         region_inputs, outputs = regions[index]
@@ -111,26 +111,26 @@ def _sgd(model):
 @pytest.mark.parametrize("prefetch", [False, True])
 def test_regions_match_one_device(dist_ctx_factory, mesh, prefetch):
     dist_ctx = dist_ctx_factory(mesh)
-    model = _Stage()
+    model = _Model()
     reference = copy.deepcopy(model)
     place_hsdp(model, dist_ctx)
     runtime = make_runtime()
-    runtime.register_stage(0, model, marked_parameter_groups(model))
-    runtime.bind()
+    runtime.register(model, marked_parameter_groups(model))
+    bound = runtime.bind()
     try:
-        stage = runtime.stage(0)
-        order = tuple(stage.group_index(module) for module in model.region_modules())
+        parameters = bound.parameters(model)
+        order = tuple(model.region_modules())
         tolerance = grad_tolerance_for(torch.float32)
         # Several steps check that the gathers read the weights that the previous optimizer step wrote.
         for step in range(3):
-            runtime.zero_grad()
+            bound.zero_grad()
             for microbatch in range(2):
                 inputs = _inputs(dist.get_rank(), 10 * step + microbatch)
-                _microbatch(stage, model, order, inputs, final=microbatch == 1, prefetch=prefetch, dtype=None)
-            runtime.wait()
+                _microbatch(parameters, model, order, inputs, final=microbatch == 1, prefetch=prefetch, dtype=None)
+            bound.wait()
             _reference_step(reference, step, len(order))
             _assert_grads_match(model, reference, tolerance)
             _sgd(model)
             _sgd(reference)
     finally:
-        runtime.unbind()
+        bound.close()

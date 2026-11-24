@@ -1,6 +1,7 @@
-"""Explicit data parallelism that the pipeline program drives: weight gathers, gradient reductions and buffers."""
+"""Data parallelism with weight gathers and gradient reductions around the regions of a module."""
 
+from .bound import BoundParameters
 from .coordinator import ParameterRuntime
-from .stage import BackwardPass, StageParameters
+from .module import BackwardPass, ModuleParameters
 
-__all__ = ["BackwardPass", "ParameterRuntime", "StageParameters"]
+__all__ = ["BackwardPass", "BoundParameters", "ModuleParameters", "ParameterRuntime"]

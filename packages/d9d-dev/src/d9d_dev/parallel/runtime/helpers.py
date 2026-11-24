@@ -2,7 +2,7 @@ from collections.abc import Callable
 
 import torch
 from d9d.dist_context import DENSE_DOMAIN, DenseDim, DenseDomainConfig, DeviceMeshParameters, DistributedContext
-from d9d.parallel.runtime import ParameterRuntime
+from d9d.parallel.runtime import BoundParameters, ParameterRuntime
 from torch import nn
 from torch.distributed import DeviceMesh
 from torch.distributed.tensor import DTensor, Placement, Replicate, Shard, distribute_tensor
@@ -40,13 +40,13 @@ def make_runtime(training: bool = True) -> ParameterRuntime:
     return ParameterRuntime(gather_dims={DenseDim.DP_CP_SHARD}, bucket_size_mib=32, training=training)
 
 
-def run_one_region(runtime: ParameterRuntime, closure: Callable[[], None]):
-    """Runs the forward and backward pass of a stage without marked groups and finishes the gradients of the step."""
-    stage = runtime.stage(0)
-    stage.record_order((0,))
-    with stage.backward(final=True).region(0):
+def run_one_region(bound: BoundParameters, module: nn.Module, closure: Callable[[], None]):
+    """Runs the forward and backward pass of a module without other groups and finishes the gradients of the step."""
+    parameters = bound.parameters(module)
+    parameters.record_order((module,))
+    with parameters.backward(final=True).region(0):
         closure()
-    runtime.wait()
+    bound.wait()
 
 
 def local_part(param: nn.Parameter, full: torch.Tensor) -> torch.Tensor:

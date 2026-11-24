@@ -15,12 +15,12 @@ class _MarkedParameterGroup(Protocol):
 def mark_parameter_group(module: TModule) -> TModule:
     """Makes a module the root of its own parameter group.
 
-    The group holds the parameters of the module and its descendants, except those of marked descendants. The
-    parameters outside every marked module belong to the group of the stage root. Mark the modules while building the
-    model: the forward and the parameter names stay the same.
+    The group holds the parameters of the module and its descendants, except those of other marked modules. The
+    parameters outside every marked module belong to the group of the stage root. The mark changes neither the forward
+    nor the parameter names.
 
     Args:
-        module: The module to mark.
+        module: The module.
 
     Returns:
         The same module, so that the call can wrap an assignment.
@@ -33,13 +33,11 @@ def mark_parameter_group(module: TModule) -> TModule:
 def marked_parameter_groups(module: nn.Module) -> list[nn.Module]:
     """Returns the modules of a stage that ``mark_parameter_group()`` marked.
 
-    Pass them to ``ParameterRuntime.register_stage()``.
-
     Args:
         module: The stage root.
 
     Returns:
-        The marked descendants, in the order of ``module.modules()``. Empty for a stage without marks.
+        The marked descendants, in the order of ``module.modules()``.
 
     Raises:
         ValueError: If the stage has marks but no resumable forward, so no region could request their groups.

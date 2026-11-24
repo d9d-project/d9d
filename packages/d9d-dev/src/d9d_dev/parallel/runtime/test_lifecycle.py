@@ -8,13 +8,6 @@ from torch.distributed.tensor import Shard
 from d9d_dev.parallel.runtime.helpers import distribute_parameters, make_runtime, run_one_region
 
 
-@pytest.fixture
-def runtime():
-    runtime = make_runtime()
-    yield runtime
-    runtime.unbind()
-
-
 def _parameters():
     return nn.ParameterDict(
         {"used": nn.Parameter(torch.ones(1, device="cuda")), "optional": nn.Parameter(torch.ones(1, device="cuda"))}
@@ -29,7 +22,8 @@ def _backward(parameters, use_optional):
 
 
 @pytest.mark.local
-def test_wait_finishes_each_step_once(runtime):
+def test_wait_finishes_each_step_once():
+    runtime = make_runtime()
     parameters = _parameters()
     calls = []
 
@@ -38,24 +32,27 @@ def test_wait_finishes_each_step_once(runtime):
         parameter.grad.mul_(2)
 
     parameters["used"].register_post_accumulate_grad_hook(double_gradient)
-    runtime.register_stage(0, parameters)
-    runtime.bind()
+    runtime.register(parameters, [])
 
-    for step, use_optional in enumerate((False, True)):
-        runtime.zero_grad()
-        run_one_region(runtime, lambda use_optional=use_optional: _backward(parameters, use_optional))
-        with pytest.raises(ValueError, match=r"already finished.*Call zero_grad\(\)"):
-            runtime.wait()
+    with runtime.bind() as bound:
+        for step, use_optional in enumerate((False, True)):
+            bound.zero_grad()
+            run_one_region(bound, parameters, lambda use_optional=use_optional: _backward(parameters, use_optional))
+            with pytest.raises(ValueError, match=r"already finished.*Call zero_grad\(\)"):
+                bound.wait()
 
-        assert len(calls) == step + 1
-        torch.testing.assert_close(parameters["used"].grad, torch.full_like(parameters["used"], 2))
-        # As in the gradient synchronizer, an unused parameter gets a zero gradient.
-        expected = torch.ones_like(parameters["optional"]) if use_optional else torch.zeros_like(parameters["optional"])
-        torch.testing.assert_close(parameters["optional"].grad, expected)
+            assert len(calls) == step + 1
+            torch.testing.assert_close(parameters["used"].grad, torch.full_like(parameters["used"], 2))
+            # An unused parameter gets a zero gradient.
+            expected = (
+                torch.ones_like(parameters["optional"]) if use_optional else torch.zeros_like(parameters["optional"])
+            )
+            torch.testing.assert_close(parameters["optional"].grad, expected)
 
 
 @pytest.mark.local
-def test_failed_hook_finishes_the_step(runtime):
+def test_failed_hook_finishes_the_step():
+    runtime = make_runtime()
     parameters = _parameters()
     calls = []
 
@@ -69,48 +66,49 @@ def test_failed_hook_finishes_the_step(runtime):
 
     parameters["used"].register_post_accumulate_grad_hook(first)
     failing_hook = parameters["used"].register_post_accumulate_grad_hook(fail)
-    runtime.register_stage(0, parameters)
-    runtime.bind()
+    runtime.register(parameters, [])
 
-    runtime.zero_grad()
-    with pytest.raises(RuntimeError, match="Injected hook failure"):
-        run_one_region(runtime, lambda: _backward(parameters, use_optional=False))
-    # A retry must not run the first hook again.
-    with pytest.raises(ValueError, match="already finished"):
-        runtime.wait()
-    assert calls == ["first", "failed"]
+    with runtime.bind() as bound:
+        bound.zero_grad()
+        with pytest.raises(RuntimeError, match="Injected hook failure"):
+            run_one_region(bound, parameters, lambda: _backward(parameters, use_optional=False))
+        # A retry must not run the first hook again.
+        with pytest.raises(ValueError, match="already finished"):
+            bound.wait()
+        assert calls == ["first", "failed"]
 
-    failing_hook.remove()
-    runtime.zero_grad()
-    run_one_region(runtime, lambda: _backward(parameters, use_optional=False))
-    assert calls == ["first", "failed", "first"]
+        failing_hook.remove()
+        bound.zero_grad()
+        run_one_region(bound, parameters, lambda: _backward(parameters, use_optional=False))
+        assert calls == ["first", "failed", "first"]
 
 
 @pytest.mark.local
-def test_wait_preconditions_can_be_corrected(runtime):
+def test_wait_preconditions_can_be_corrected():
+    runtime = make_runtime()
     parameters = _parameters()
-    runtime.register_stage(0, parameters)
-    runtime.bind()
-    runtime.zero_grad()
+    runtime.register(parameters, [])
 
-    with runtime.stage(0).group_weights(0):
-        _backward(parameters, use_optional=False)
-    with pytest.raises(ValueError, match="did not reduce the parameter groups"):
-        runtime.wait()
+    with runtime.bind() as bound:
+        bound.zero_grad()
+        module_parameters = bound.parameters(parameters)
+        with module_parameters.group_weights(parameters, None):
+            _backward(parameters, use_optional=False)
+        with pytest.raises(ValueError, match="did not reduce the parameter groups"):
+            bound.wait()
 
-    runtime.zero_grad()
-    stage = runtime.stage(0)
-    stage.record_order((0,))
-    with stage.backward(final=True).region(0):
-        _backward(parameters, use_optional=False)
-    expected = parameters["used"].grad
-    parameters["used"].grad = torch.empty_like(expected)
-    with pytest.raises(ValueError, match="was replaced"):
-        runtime.wait()
+        bound.zero_grad()
+        module_parameters.record_order((parameters,))
+        with module_parameters.backward(final=True).region(0):
+            _backward(parameters, use_optional=False)
+        expected = parameters["used"].grad
+        parameters["used"].grad = torch.empty_like(expected)
+        with pytest.raises(ValueError, match="was replaced"):
+            bound.wait()
 
-    parameters["used"].grad = expected
-    runtime.wait()
-    torch.testing.assert_close(parameters["used"].grad, torch.ones_like(parameters["used"]))
+        parameters["used"].grad = expected
+        bound.wait()
+        torch.testing.assert_close(parameters["used"].grad, torch.ones_like(parameters["used"]))
 
 
 class _Groups(nn.Module):
@@ -124,81 +122,108 @@ class _Groups(nn.Module):
         return await steps.call(self.second, hidden)
 
 
-def _record_twice(runtime, model):
-    runtime.stage(0).record_order((0, 1, 2))
-    runtime.stage(0).record_order((0, 2, 1))
+def _record_twice(runtime, bound, model):
+    bound.parameters(model).record_order((model, model.first, model.second))
+    bound.parameters(model).record_order((model, model.second, model.first))
 
 
-def _use_stage_after_rebind(runtime, model):
-    stage = runtime.stage(0)
-    runtime.unbind()
-    runtime.bind()
-    with stage.group_weights(0):
+def _use_parameters_after_rebind(runtime, bound, model):
+    parameters = bound.parameters(model)
+    bound.close()
+    with runtime.bind(), parameters.group_weights(model, None):
         pass
 
 
-def _register_foreign_group(runtime, model):
-    runtime.unbind()
-    runtime.register_stage(1, nn.Linear(4, 4), [model.first])
+def _register_foreign_group(runtime, bound, model):
+    bound.close()
+    runtime.register(nn.Linear(4, 4), [model.first])
 
 
-def _tie_across_stages(runtime, model):
+def _tie_across_modules(runtime, bound, model):
     other = nn.Linear(4, 4, device="cuda")
     other.weight = model.first.weight
-    runtime.unbind()
-    runtime.register_stage(1, other)
+    bound.close()
+    runtime.register(other, [])
     runtime.bind()
+
+
+def _step_after_close(runtime, bound, model):
+    bound.close()
+    bound.zero_grad()
 
 
 @pytest.mark.local
 @pytest.mark.parametrize(
     ("call", "match"),
     [
-        pytest.param(lambda runtime, model: runtime.stage(1), r"stage \(1\) is not registered", id="unknown_stage"),
         pytest.param(
-            lambda runtime, model: runtime.stage(0).group_index(nn.Linear(4, 4)),
+            lambda runtime, bound, model: bound.parameters(nn.Linear(4, 4)),
+            r"module \(Linear\) is not registered",
+            id="unknown_module",
+        ),
+        pytest.param(
+            lambda runtime, bound, model: bound.parameters(model).record_order((nn.Linear(4, 4),)),
             r"module \(Linear\) is not the root of a parameter group",
             id="unknown_group",
         ),
         pytest.param(
-            lambda runtime, model: runtime.stage(0).record_order((0, 1)), r"omitted the parameters", id="omitted"
+            lambda runtime, bound, model: bound.parameters(model).record_order((model, model.first)),
+            r"omitted the parameters",
+            id="omitted",
         ),
-        pytest.param(_record_twice, r"order \(\(0, 2, 1\)\) of stage \(0\) differs", id="changed_order"),
-        pytest.param(lambda runtime, model: runtime.stage(0).backward(final=True), r"no recorded order", id="backward"),
         pytest.param(
-            lambda runtime, model: runtime.register_stage(1, nn.Linear(4, 4)), r"Call unbind\(\) first", id="bound"
+            _record_twice,
+            r"order \(\['_Groups', 'second', 'first'\]\) of the module \(_Groups\) differs",
+            id="changed_order",
         ),
-        pytest.param(_tie_across_stages, r"Place tied parameters on one stage", id="tied_across_stages"),
         pytest.param(
-            lambda runtime, model: runtime.scale_grads(torch.ones((), device="cuda")),
+            lambda runtime, bound, model: bound.parameters(model).backward(final=True),
+            r"no recorded order",
+            id="backward",
+        ),
+        pytest.param(
+            lambda runtime, bound, model: runtime.register(nn.Linear(4, 4), []),
+            r"Close the BoundParameters first",
+            id="register_while_bound",
+        ),
+        pytest.param(
+            lambda runtime, bound, model: runtime.bind(),
+            r"already bound. Close the BoundParameters first",
+            id="bind_twice",
+        ),
+        pytest.param(_tie_across_modules, r"Place tied parameters in one registered module", id="tied_across_modules"),
+        pytest.param(
+            lambda runtime, bound, model: bound.scale_grads(torch.ones((), device="cuda")),
             r"Call wait\(\) before scale_grads\(\)",
             id="scale_before_wait",
         ),
-        pytest.param(_use_stage_after_rebind, r"Call stage\(\) again after bind\(\)", id="stage_after_rebind"),
-        pytest.param(_register_foreign_group, r"is not a submodule of the stage", id="foreign_group"),
+        pytest.param(_use_parameters_after_rebind, r"belong to a closed bind", id="parameters_after_rebind"),
+        pytest.param(_step_after_close, r"bound parameters are closed. Call bind\(\) again", id="step_after_close"),
+        pytest.param(_register_foreign_group, r"is not a submodule of the module", id="foreign_group"),
     ],
 )
-def test_runtime_rejects_misuse(runtime, call, match):
+def test_runtime_rejects_misuse(call, match):
+    runtime = make_runtime()
     model = _Groups()
-    runtime.register_stage(0, model, marked_parameter_groups(model))
-    runtime.bind()
-    with pytest.raises(ValueError, match=match):
-        call(runtime, model)
+    runtime.register(model, marked_parameter_groups(model))
+    with runtime.bind() as bound, pytest.raises(ValueError, match=match):
+        call(runtime, bound, model)
 
 
 @pytest.mark.local
-def test_runtime_requires_bind():
+def test_registration_and_close_are_checked():
     runtime = make_runtime()
-    runtime.register_stage(0, nn.Linear(4, 4, device="cuda"))
+    module = nn.Linear(4, 4, device="cuda")
+    runtime.register(module, [])
     with pytest.raises(ValueError, match="already registered"):
-        runtime.register_stage(0, nn.Linear(4, 4, device="cuda"))
-    for call in (lambda: runtime.stage(0), lambda: runtime.scale_grads(torch.ones(())), runtime.wait):
-        with pytest.raises(ValueError, match=r"Call bind\(\) first"):
+        runtime.register(module, [])
+    bound = runtime.bind()
+    bound.close()
+    # A second close does nothing.
+    bound.close()
+    for call in (lambda: bound.parameters(module), lambda: bound.scale_grads(torch.ones(())), bound.wait):
+        with pytest.raises(ValueError, match=r"Call bind\(\) again"):
             call()
-    # Without a bind, there is nothing to reset or drop.
-    runtime.zero_grad()
-    runtime.invalidate_weights()
-    runtime.unbind()
 
 
 @pytest.mark.distributed
@@ -207,6 +232,6 @@ def test_bind_rejects_shards_that_it_cannot_gather(dist_ctx_factory):
     model = nn.Linear(16, 16, bias=False, device="cuda")
     distribute_parameters(model, dist_ctx.mesh_for(DENSE_DOMAIN)[DenseDim.DP_CP_SHARD], (Shard(1),))
     runtime = make_runtime()
-    runtime.register_stage(0, model)
+    runtime.register(model, [])
     with pytest.raises(ValueError, match="cannot gather"):
         runtime.bind()

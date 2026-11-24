@@ -1,5 +1,3 @@
-"""The recorded order of the regions of a stage and its backward passes, region by region."""
-
 import dataclasses
 from collections.abc import Generator, Mapping, Sequence
 from contextlib import contextmanager, nullcontext
@@ -10,12 +8,12 @@ from .groups import ParameterGroups
 
 @dataclasses.dataclass(frozen=True, slots=True)
 class RegionPlan:
-    """The recorded order of the regions of a stage and the gradient work of its backward passes.
+    """The recorded order of the regions of a module and the gradient work of each region in a backward pass.
 
     Attributes:
         order: The group of each region, or ``None`` for a region without a group.
-        prepare_at: The reductions whose gradient buffers each region of a backward pass allocates, by region index.
-        reduce_at: The reductions that each region of a backward pass runs after it, by region index.
+        prepare_at: The reductions that allocate their gradient buffers before each region, by region index.
+        reduce_at: The reductions that run after each region, by region index.
     """
 
     order: tuple[int | None, ...]
@@ -24,11 +22,11 @@ class RegionPlan:
 
 
 def plan_regions(order: tuple[int | None, ...], reductions: Sequence[AnyReduction]) -> RegionPlan:
-    """Plans the gradient work of the backward passes over a recorded order.
+    """Plans the gradient work of the backward passes for a recorded order.
 
     Args:
         order: The group of each region, or ``None`` for a region without a group.
-        reductions: The gradient reductions of the stage, in reduction order.
+        reductions: The gradient reductions of the module, in reduction order.
 
     Returns:
         The plan of the regions.
@@ -50,22 +48,19 @@ def plan_regions(order: tuple[int | None, ...], reductions: Sequence[AnyReductio
 
 
 class BackwardPass:
-    """The weights and the gradient reductions of one backward pass of a stage, region by region.
+    """One backward pass of a module, region by region."""
 
-    Run the regions in reverse order of the forward pass, each inside ``region()``.
-    """
-
-    def __init__(self, stage_index: int, groups: ParameterGroups, regions: RegionPlan, final: bool | None):
+    def __init__(self, name: str, groups: ParameterGroups, regions: RegionPlan, final: bool | None):
         """Constructs the ``BackwardPass`` object.
 
         Args:
-            stage_index: The index of the stage.
-            groups: The parameter groups of the stage.
+            name: The name of the module, which errors report.
+            groups: The parameter groups of the module.
             regions: The plan of the regions.
-            final: Whether this is the last backward pass of the stage in the step, or ``None`` for a pass that
-                writes no weight gradients.
+            final: Whether this is the final backward pass of the step, or ``None`` for a pass that writes no weight
+                gradients.
         """
-        self._stage_index = stage_index
+        self._name = name
         self._groups = groups
         self._regions = regions
         self._final = final
@@ -75,22 +70,19 @@ class BackwardPass:
 
     @contextmanager
     def region(self, index: int) -> Generator[None, None, None]:
-        """Puts the unsharded weights of a region into its modules and reduces the gradients that are complete after it.
+        """Puts the weights of a region into its modules, and reduces the complete gradients after the region.
 
         Args:
             index: The index of the region in the forward pass.
 
-        Yields:
-            Nothing.
-
         Raises:
-            ValueError: If the runtime was unbound since, if the region is not the next one in reverse order, if it
+            ValueError: If the bound parameters are closed, if the region is not the next one in reverse order, if it
                 runs on another stream than ``bind()``, or if autograd replaced a gradient instead of accumulating it.
         """
         self._groups.require_open()
         if index != self._next_index:
             raise ValueError(
-                f"The backward pass of stage ({self._stage_index}) expects the region ({self._next_index}), not "
+                f"The backward pass of the module ({self._name}) expects the region ({self._next_index}), not "
                 f"({index}). Run the regions in reverse order of the forward pass, each once."
             )
         order = self._regions.order

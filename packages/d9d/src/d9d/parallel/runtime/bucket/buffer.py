@@ -1,5 +1,3 @@
-"""Buffers whose memory belongs to the stream that writes them, and the gradient buffers that wait for their reads."""
-
 from collections import deque
 
 import torch
@@ -7,19 +5,17 @@ from torch import Tensor
 
 
 class ManagedBuffer:
-    """A flat tensor whose memory can be freed and taken back while views of it stay alive.
-
-    Views of ``tensor``, e.g. the ones autograd saves, see the memory again after ``acquire()``. The memory belongs to
-    the home stream: only it writes the buffer, and ``release()`` waits for the reads of other streams.
-    """
+    """A flat tensor whose memory can be freed and given back while its views stay valid."""
 
     def __init__(self, size: int, dtype: torch.dtype, home: torch.cuda.Stream):
-        """Constructs the ``ManagedBuffer`` object without memory.
+        """Constructs the ``ManagedBuffer`` object.
+
+        The buffer has no memory until ``acquire()``.
 
         Args:
             size: The number of elements.
             dtype: The dtype of the elements.
-            home: The stream that writes the buffer and owns its memory.
+            home: The stream that owns the memory.
         """
         self._home = home
         self._bytes = size * dtype.itemsize
@@ -39,7 +35,7 @@ class ManagedBuffer:
         return self._allocated
 
     def acquire(self):
-        """Gives the buffer uninitialized memory from the pool of the home stream.
+        """Gives the buffer uninitialized memory.
 
         Raises:
             ValueError: If the buffer already has memory.
@@ -52,7 +48,7 @@ class ManagedBuffer:
         self._allocated = True
 
     def require_writer(self):
-        """Checks that the current stream may write the buffer, i.e. that it is the home stream.
+        """Checks that the current stream is the home stream, the only one that may write the buffer.
 
         Raises:
             ValueError: If the current stream is another stream.
@@ -71,11 +67,11 @@ class ManagedBuffer:
         """
         self._home.wait_event(read)
 
-    def release(self, after: torch.cuda.Event | None = None):
-        """Gives the memory back to the pool of the home stream, which can reuse it at once.
+    def release(self, after: torch.cuda.Event | None):
+        """Frees the memory, which the home stream can reuse at once.
 
         Args:
-            after: The event after the last read on another stream, or ``None`` if only the home stream read the buffer.
+            after: The event after the last read on another stream, or ``None`` if no other stream read the buffer.
 
         Raises:
             ValueError: If the buffer has no memory.
@@ -95,10 +91,7 @@ _PENDING_GRADIENT_BUFFERS = 2
 
 
 class PendingGradientBuffers:
-    """The gradient buffers that the reduce stream may still read, oldest first.
-
-    A pending buffer keeps its memory until ``make_room()`` or ``free_all()`` frees it, or ``take_back()`` returns it.
-    """
+    """The gradient buffers that the reduce stream may still read, oldest first."""
 
     def __init__(self):
         """Constructs the ``PendingGradientBuffers`` object."""
@@ -109,18 +102,18 @@ class PendingGradientBuffers:
 
         Args:
             buffer: The buffer.
-            read: The event after the last read on the reduce stream.
+            read: The event after the last read of the reduce stream.
         """
         self._pending.append((buffer, read))
 
     def take_back(self, buffer: ManagedBuffer) -> bool:
-        """Takes a pending buffer back with its memory, after its reads on the reduce stream.
+        """Removes a pending buffer with its memory, after its reads.
 
         Args:
             buffer: The buffer.
 
         Returns:
-            Whether the buffer was pending. Its memory then holds the old gradients.
+            Whether the buffer was pending.
         """
         for index, (pending, read) in enumerate(self._pending):
             if pending is buffer:
@@ -130,7 +123,7 @@ class PendingGradientBuffers:
         return False
 
     def make_room(self):
-        """Frees the oldest buffers after their reads, until another buffer fits under the limit."""
+        """Frees the oldest buffers after their reads, until another buffer stays within the limit."""
         while len(self._pending) >= _PENDING_GRADIENT_BUFFERS:
             buffer, read = self._pending.popleft()
             buffer.release(after=read)
